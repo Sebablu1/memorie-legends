@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Memorie Legends - Lobby</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>🃏 Memorie Legends</h1>
+
+      <div id="userInfo" class="user-info">
+        <span>👤 <span id="username"></span></span>
+        <span>💰 Créditos: <span id="credits">0</span></span>
+      </div>
+
+      <div class="actions">
+        <button id="rechargeBtn" class="btn-secondary">
+          Recargar +50 Créditos
+        </button>
+      </div>
+
+      <hr />
+
+      <div class="lobby-section">
+        <h3>🎮 Crear o Unirse a Sala</h3>
+
+        <div class="join-section">
+          <input
+            type="text"
+            id="roomCode"
+            placeholder="Código de sala"
+            style="text-transform: uppercase"
+          />
+          <button id="joinBtn" class="btn-primary">Unirse</button>
+        </div>
+
+        <div class="create-section">
+          <button id="createBtn" class="btn-success">
+            ✨ Crear Nueva Sala
+          </button>
+        </div>
+
+        <div id="mensaje" class="mensaje"></div>
+      </div>
+
+      <hr />
+
+      <div id="salasLista" class="salas-lista">
+        <h4>📋 Salas Activas</h4>
+        <div id="salasContainer"></div>
+      </div>
+
+      <hr />
+
+      <button id="logoutBtn" class="btn-danger">Cerrar Sesión</button>
+    </div>
+
+    <script type="module" src="js/lobby.js"></script>
+  </body>
+</html>

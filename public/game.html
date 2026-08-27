@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Memorie Legends - Partida</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>🃏 Memorie Legends</h1>
+
+      <div id="salaInfo" class="sala-info">
+        Sala: <span id="roomCode"></span>
+      </div>
+
+      <div id="estadoJuego" class="estado-juego">
+        <div id="fase">Esperando jugadores...</div>
+        <div id="turno">Turno de: <span id="turnoJugador">-</span></div>
+      </div>
+
+      <div id="mesa" class="mesa">
+        <div id="cartaMuestra" class="carta-muestra">
+          🃏 Muestra: <span id="muestra">-</span>
+        </div>
+        <div id="jugadores" class="jugadores-container"></div>
+      </div>
+
+      <div id="manoJugador" class="mano-jugador">
+        <h3>📋 Tus cartas</h3>
+        <div id="cartas" class="cartas-container"></div>
+      </div>
+
+      <div id="acciones" class="acciones">
+        <button id="levantarBtn" class="btn-primary" disabled>
+          Levantar carta
+        </button>
+        <button id="iniciarBtn" class="btn-success" style="display: none">
+          Iniciar partida
+        </button>
+        <button id="corteBtn" class="btn-warning" disabled>
+          Declarar Corte
+        </button>
+      </div>
+
+      <div id="mensaje" class="mensaje"></div>
+
+      <button id="salirBtn" class="btn-danger">Salir de la sala</button>
+    </div>
+
+    <script type="module" src="js/game.js"></script>
+  </body>
+</html>

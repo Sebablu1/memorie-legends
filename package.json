@@ -1,0 +1,17 @@
+{
+  "name": "memorie-legends",
+  "version": "1.0.0",
+  "description": "🃏 Juego de cartas multijugador en tiempo real con Firebase",
+  "main": "index.js",
+  "scripts": {
+    "start": "firebase serve",
+    "deploy": "firebase deploy",
+    "build": "echo 'No build needed'"
+  },
+  "keywords": ["game", "cards", "firebase", "multijugador"],
+  "author": "Tu Nombre",
+  "license": "MIT",
+  "devDependencies": {
+    "firebase-tools": "^13.0.0"
+  }
+}

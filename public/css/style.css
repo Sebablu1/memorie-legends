@@ -1,0 +1,257 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  color: #eee;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  background: rgba(22, 33, 62, 0.95);
+  padding: 30px;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+h1 {
+  text-align: center;
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+  background: linear-gradient(45deg, #e94560, #ff6b6b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+h2,
+h3,
+h4 {
+  text-align: center;
+  margin: 15px 0;
+  color: #eee;
+}
+
+input {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  background: rgba(15, 52, 96, 0.6);
+  color: #fff;
+  font-size: 1rem;
+  transition: all 0.3s;
+}
+
+input:focus {
+  outline: none;
+  border-color: #e94560;
+}
+
+button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: linear-gradient(45deg, #e94560, #c73652);
+  color: #fff;
+  width: 100%;
+}
+
+.btn-secondary {
+  background: linear-gradient(45deg, #4a90e2, #357abd);
+  color: #fff;
+}
+
+.btn-success {
+  background: linear-gradient(45deg, #4caf50, #388e3c);
+  color: #fff;
+}
+
+.btn-danger {
+  background: linear-gradient(45deg, #f44336, #d32f2f);
+  color: #fff;
+}
+
+.btn-warning {
+  background: linear-gradient(45deg, #ff9800, #f57c00);
+  color: #fff;
+}
+
+.user-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(15, 52, 96, 0.4);
+  padding: 15px 20px;
+  border-radius: 10px;
+  margin: 15px 0;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.join-section,
+.create-section {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 10px 0;
+  flex-wrap: wrap;
+}
+
+.join-section input {
+  width: 200px;
+}
+
+.sala-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(15, 52, 96, 0.4);
+  padding: 12px 20px;
+  border-radius: 8px;
+  margin: 10px 0;
+}
+
+.sala-code {
+  font-weight: bold;
+  color: #e94560;
+}
+
+.mesa {
+  background: rgba(15, 52, 96, 0.3);
+  padding: 20px;
+  border-radius: 12px;
+  margin: 15px 0;
+}
+
+.carta-muestra {
+  text-align: center;
+  font-size: 1.3rem;
+  padding: 15px;
+  background: rgba(233, 69, 96, 0.15);
+  border-radius: 10px;
+  margin-bottom: 20px;
+  border: 2px solid rgba(233, 69, 96, 0.3);
+}
+
+.jugadores-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+
+.jugador {
+  background: rgba(15, 52, 96, 0.5);
+  padding: 15px;
+  border-radius: 10px;
+  min-width: 180px;
+  text-align: center;
+  border: 2px solid transparent;
+}
+
+.jugador.esTurno {
+  border-color: #e94560;
+}
+
+.cartas {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.carta {
+  background: #fff;
+  color: #1a1a2e;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 0.85rem;
+  min-width: 50px;
+  text-align: center;
+}
+
+.carta.bocaAbajo {
+  background: #2b2b2b;
+  color: #666;
+}
+
+.acciones {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+
+.mensaje {
+  text-align: center;
+  padding: 12px;
+  margin: 15px 0;
+  border-radius: 8px;
+  background: rgba(15, 52, 96, 0.4);
+  min-height: 45px;
+}
+
+.link {
+  text-align: center;
+  margin-top: 15px;
+  color: #aaa;
+}
+
+.link a {
+  color: #e94560;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 15px;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+  }
+
+  .user-info {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .join-section {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .join-section input {
+    width: 100%;
+    max-width: 300px;
+  }
+}
