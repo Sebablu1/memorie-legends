@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Cómo protegemos tu cuenta, tus Leyendas y tus pagos en Memorie Legends.">
+    <meta name="theme-color" content="#0a0a0a">
+    <title>Seguridad - Memorie Legends</title>
+    <link rel="icon" href="img/claude-inspiration/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/tema.css" />
+    <link rel="stylesheet" href="css/legal.css">
+</head>
+<body>
+
+    <header>
+        <div class="header-content">
+            <a href="/dashboard.html" class="logo"><img src="img/claude-inspiration/logo.png" alt="Memorie Legends" class="logo-img"><span class="logo-text">Memorie Legends</span></a>
+            <nav>
+                <a href="/">Inicio</a>
+                <a href="/lobby.html">Lobby</a>
+                <a href="/mesa.html">Jugar</a>
+                <a href="/como-se-juega.html">Cómo se juega</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="legal-container">
+            <h1>🛡️ Seguridad en Memorie Legends</h1>
+            <p class="actualizado">Última actualización: 28 de agosto de 2026</p>
+
+            <p>Esta página describe las medidas de seguridad que <strong>están implementadas hoy</strong>. Al final listamos las que todavía no lo están, para que sepas exactamente con qué contás y con qué no.</p>
+
+            <h2>🔐 Autenticación y Acceso</h2>
+            <ul>
+                <li>Usamos <strong>Firebase Authentication</strong>, con inicio de sesión mediante Google o correo y contraseña.</li>
+                <li><strong>No almacenamos tu contraseña.</strong> La gestiona Firebase, que guarda únicamente un hash y nunca el texto original. Nuestro equipo no puede verla.</li>
+                <li>Podés restablecer tu contraseña por correo en cualquier momento desde la pantalla de inicio de sesión.</li>
+                <li>Todo el sitio se sirve exclusivamente por <strong>HTTPS</strong>.</li>
+            </ul>
+
+            <h2>💰 Protección de tus Leyendas</h2>
+            <p>Tu saldo nunca se calcula ni se modifica en tu navegador. Todas las operaciones con Leyendas ocurren en nuestros servidores:</p>
+            <ul>
+                <li>Las reglas de Firestore impiden que un jugador escriba su propio saldo, su puntaje de ranking o el resultado de una partida. Desde el navegador esos datos son <strong>sólo de lectura</strong>.</li>
+                <li>Cada movimiento de Leyendas queda asentado en un <strong>libro mayor</strong>: se registran el saldo anterior, el nuevo, el motivo y la referencia. El saldo y su asiento se escriben en la misma transacción, así nunca hay uno sin el otro.</li>
+                <li>Cada operación lleva una <strong>clave de idempotencia</strong>. Si una petición se repite por un problema de red, no se acredita ni se cobra dos veces.</li>
+                <li>Podés consultar tu propio historial de movimientos, pero no el de otros jugadores.</li>
+            </ul>
+
+            <h2>🎰 Ruleta y Sorteos</h2>
+            <ul>
+                <li>El premio de la ruleta <strong>se sortea en el servidor</strong>, no en tu dispositivo. El navegador sólo muestra el resultado que ya se decidió.</li>
+                <li>Usamos un generador de números aleatorios <strong>criptográfico</strong> del sistema operativo, no el generador común de JavaScript.</li>
+                <li>El tiempo de espera entre giros también se valida en el servidor: manipular el reloj de tu equipo no habilita giros extra.</li>
+                <li>Las probabilidades de cada premio están publicadas en la propia ruleta.</li>
+            </ul>
+
+            <h2>💳 Pagos y Transacciones</h2>
+            <ul>
+                <li>Las compras de Leyendas se procesan a través de <strong>Xsolla y Mercado Pago</strong>, en sus propias páginas de pago.</li>
+                <li><strong>Nunca vemos ni almacenamos datos de tarjetas.</strong> Esa información no pasa por nuestros servidores en ningún momento.</li>
+                <li>El importe se toma siempre del catálogo del servidor, nunca de lo que envía el navegador: no es posible alterar el precio de un paquete.</li>
+                <li>Las Leyendas se acreditan únicamente cuando el proveedor confirma el pago mediante un aviso firmado criptográficamente. <strong>Sin firma válida no se acredita nada.</strong></li>
+                <li>La acreditación es idempotente por transacción: si el proveedor reintenta el aviso, no se duplican las Leyendas.</li>
+            </ul>
+
+            <h2>📊 Datos de Juego</h2>
+            <ul>
+                <li>Las partidas y las cuentas se almacenan en <strong>Firestore</strong>, con reglas de acceso que limitan qué puede leer y escribir cada jugador.</li>
+                <li>Las operaciones concurrentes usan <strong>transacciones</strong>, de modo que dos acciones simultáneas no puedan corromper el estado de una partida.</li>
+                <li>Una partida cerrada no se puede volver a cerrar: los puntos y los premios se entregan una sola vez.</li>
+            </ul>
+
+            <h2>🚫 Trampas y Uso Indebido</h2>
+            <p>Está prohibido el uso de bots, scripts automatizados o cualquier método para obtener ventaja injusta, según nuestros <a href="/terminos.html">Términos y Condiciones</a>. Las cuentas que incumplan pueden ser suspendidas.</p>
+            <p>Si detectás a alguien haciendo trampa, escribinos a <strong>soporte@memorie-legends.com</strong> con el nombre del jugador y la fecha aproximada de la partida. Revisamos cada denuncia de forma manual.</p>
+
+            <h2>🧭 Lo que Todavía No Tenemos</h2>
+            <div class="aviso">
+                <p>Preferimos decirlo claro antes que dar una falsa sensación de seguridad. Estas funciones <strong>aún no están implementadas</strong>:</p>
+                <ul>
+                    <li><strong>Verificación en dos pasos (2FA):</strong> todavía no está disponible en la plataforma.</li>
+                    <li><strong>Detección automática de fraude:</strong> no hay un sistema que bloquee cuentas de forma automática. Las revisiones son manuales.</li>
+                    <li><strong>Equipo de moderación permanente:</strong> las denuncias las atiende directamente el equipo de desarrollo, sin un turno dedicado.</li>
+                </ul>
+                <p>Cuando incorporemos estas medidas, actualizaremos esta página y avisaremos a los jugadores.</p>
+            </div>
+
+            <h2>🔎 Reportar una Vulnerabilidad</h2>
+            <p>Si encontrás un fallo de seguridad, escribinos a <strong>soporte@memorie-legends.com</strong> con el asunto <em>«Seguridad»</em> antes de divulgarlo públicamente. Describí cómo reproducirlo y te responderemos a la brevedad. Agradecemos los reportes responsables.</p>
+
+            <h2>✅ Qué Podés Hacer Vos</h2>
+            <ul>
+                <li>Usá una contraseña larga y distinta de la de otros sitios, o iniciá sesión con Google.</li>
+                <li>No compartas tu cuenta ni tus credenciales con nadie. Nunca te vamos a pedir la contraseña por correo ni por chat.</li>
+                <li>Cerrá sesión si usás un equipo compartido.</li>
+                <li>Verificá que la dirección del sitio sea la oficial antes de iniciar sesión o pagar.</li>
+            </ul>
+
+            <div class="contacto">
+                <p><strong>📧 Contacto:</strong> soporte@memorie-legends.com</p>
+                <p><strong>📍 Jurisdicción:</strong> República Oriental del Uruguay</p>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="/como-se-juega.html">📜 Cómo se Juega</a>
+                <a href="/quienes-somos.html">🧠 Quiénes Somos</a>
+                <a href="/terminos.html">📜 Términos y Condiciones</a>
+                <a href="/privacidad.html">🔒 Políticas de Privacidad</a>
+                <a href="/seguridad.html">🛡️ Seguridad</a>
+            </div>
+            <p>© 2026 Memorie Legends. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+</body>
+</html>

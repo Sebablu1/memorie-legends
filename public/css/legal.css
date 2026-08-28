@@ -1,0 +1,311 @@
+/* ============================================================
+   Memorie Legends — páginas informativas y legales.
+   Una sola hoja para las cuatro páginas: si cambia el estilo,
+   cambia en un solo lugar.
+   ============================================================ */
+
+:root {
+  --fondo: #0a0a0a;
+  --fondo-panel: rgba(20, 20, 30, 0.9);
+  --borde: #2a2a3a;
+  --oro: #d4a843;
+  --oro-claro: #f0d98a;
+  --texto: #ffffff;
+  --texto-suave: #c0c0c0;
+  --texto-tenue: #666;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(212, 168, 67, 0.06), transparent 70%),
+    var(--fondo);
+  color: var(--texto);
+  font-family: "Inter", "Segoe UI", Tahoma, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.6;
+}
+
+/* ------------------------------------------------------- cabecera */
+
+header {
+  border-bottom: 1px solid var(--borde);
+  background: rgba(12, 12, 18, 0.92);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(8px);
+}
+
+.header-content {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.header-content .logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--oro);
+  text-decoration: none;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.header-content nav {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+
+.header-content nav a {
+  color: var(--texto-suave);
+  text-decoration: none;
+  font-size: 0.95rem;
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.header-content nav a:hover,
+.header-content nav a[aria-current="page"] {
+  color: var(--oro);
+  border-bottom-color: var(--oro);
+}
+
+/* ------------------------------------------------------ contenido */
+
+main {
+  flex: 1;
+}
+
+.legal-container {
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 32px 36px;
+  background: var(--fondo-panel);
+  border-radius: 16px;
+  border: 1px solid var(--borde);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.legal-container h1 {
+  color: var(--oro);
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 2.5rem;
+  line-height: 1.2;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.legal-container h2 {
+  color: var(--oro);
+  font-size: 1.5rem;
+  margin-top: 30px;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.legal-container h3 {
+  color: var(--oro-claro);
+  font-size: 1.1rem;
+  margin-top: 22px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.legal-container p {
+  line-height: 1.8;
+  margin-bottom: 15px;
+  color: var(--texto-suave);
+}
+
+.legal-container ul,
+.legal-container ol {
+  margin: 15px 0;
+  padding-left: 25px;
+}
+
+.legal-container li {
+  margin-bottom: 8px;
+  line-height: 1.6;
+  color: var(--texto-suave);
+}
+
+.legal-container strong {
+  color: var(--texto);
+}
+
+.legal-container a {
+  color: var(--oro);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.legal-container .contacto {
+  background: rgba(212, 168, 67, 0.1);
+  border-left: 3px solid var(--oro);
+  padding: 15px 20px;
+  border-radius: 8px;
+  margin: 20px 0;
+}
+
+.legal-container .contacto p:last-child {
+  margin-bottom: 0;
+}
+
+/* Fecha de última actualización, bajo el título. */
+.actualizado {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--texto-tenue);
+  margin-bottom: 26px;
+}
+
+/* Aviso destacado (por ejemplo, juego responsable). */
+.aviso {
+  background: rgba(212, 168, 67, 0.07);
+  border: 1px solid rgba(212, 168, 67, 0.28);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin: 22px 0;
+}
+
+.aviso p:last-child {
+  margin-bottom: 0;
+}
+
+/* --------------------------------------------------------- pie */
+
+footer {
+  border-top: 1px solid var(--borde);
+  background: rgba(12, 12, 18, 0.6);
+  margin-top: 40px;
+}
+
+.footer-content {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 28px 20px;
+  text-align: center;
+  color: var(--texto-tenue);
+  font-size: 0.9rem;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.footer-links a,
+.footer-legal a {
+  color: var(--oro);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.footer-links a:hover,
+.footer-legal a:hover {
+  text-decoration: underline;
+  color: var(--oro-claro);
+}
+
+.footer-legal {
+  text-align: center;
+  padding: 20px;
+  color: var(--texto-tenue);
+  font-size: 0.9rem;
+}
+
+.footer-legal a {
+  margin: 0 10px;
+}
+
+/* --------------------------------------------------- responsive */
+
+@media (max-width: 600px) {
+  .legal-container {
+    margin: 20px 15px;
+    padding: 20px 18px;
+  }
+
+  .legal-container h1 {
+    font-size: 1.8rem;
+  }
+
+  .legal-container h2 {
+    font-size: 1.25rem;
+  }
+
+  .header-content {
+    padding: 12px 15px;
+    justify-content: center;
+  }
+
+  .header-content nav {
+    gap: 16px;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .footer-links {
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
+/* --- marca con logo propio --- */
+
+.logo-img {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.logo-img.grande {
+  width: 84px;
+  height: 84px;
+  border-radius: 18px;
+}
+
+.logo-text {
+  font-family: "Playfair Display", Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+}
+
+.marca-titulo {
+  display: flex;
+  justify-content: center;
+}
+
+.marca-titulo a {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+}

@@ -1,0 +1,39 @@
+/* Pie con los enlaces legales, para las páginas que tienen su propio diseño.
+   Sólo estiliza el <footer>: no toca body ni nada más, para no pisar
+   los estilos de la mesa ni del lobby. */
+
+footer .footer-content {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 26px 20px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #7a8090;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+footer .footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+footer .footer-links a {
+  color: #d4a843;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+footer .footer-links a:hover {
+  text-decoration: underline;
+  color: #f0d98a;
+}
+
+@media (max-width: 600px) {
+  footer .footer-links {
+    flex-direction: column;
+    gap: 10px;
+  }
+}

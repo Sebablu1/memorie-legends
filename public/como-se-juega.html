@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta
+      name="description"
+      content="Reglas completas de Memorie Legends: la mirada de 2 segundos, el descarte por reflejos, los poderes y el corte."
+    />
+    <title>Cómo se Juega - Memorie Legends</title>
+    <link rel="icon" href="img/claude-inspiration/logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/tema.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/reglas.css" />
+    <link rel="stylesheet" href="css/pie.css" />
+  </head>
+  <body>
+    <header class="barra">
+      <div class="barra-contenido">
+        <a href="dashboard.html" class="marca">
+          <img src="img/claude-inspiration/logo.png" alt="Memorie Legends" class="logo-img" />
+          <span class="logo-text">Memorie Legends</span>
+        </a>
+        <nav>
+          <a href="dashboard.html">Inicio</a>
+          <a href="mesa.html">Jugar</a>
+          <a href="como-se-juega.html" aria-current="page">Cómo se juega</a>
+          <a href="ranking.html">Ranking</a>
+          <a href="tienda.html">Tienda</a>
+          <a href="ruleta.html">Ruleta</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <!-- ---------------------------------------------------- portada -->
+      <section class="reglas-portada">
+        <img class="mazo" src="img/claude-inspiration/logomazo.png" alt="" />
+        <div>
+          <h1 class="titulo-pagina">📜 Cómo se Juega</h1>
+          <p class="lema-plata">Domina las reglas y conviértete en una leyenda</p>
+          <p class="resumen">
+            Cada ronda mirás <b>una</b> de tus cuatro cartas durante 2 segundos. Después hay
+            5 segundos para descartar por reflejos: sólo el primero que acierta se salva. En
+            tu turno levantás del mazo y elegís cambiar o tirar — si tirás un 7, 8, 9 o 10
+            podés usar su poder. Cortás cuando creés tener el puntaje más bajo.
+            Quien <b>supera 150 puntos</b> queda eliminado.
+          </p>
+          <a class="btn-oro" href="mesa.html">🎮 Probar una partida</a>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------- objetivo y mesa -->
+      <section class="rejilla dos-columnas">
+        <article class="panel">
+          <h2>🎯 Objetivo</h2>
+          <p>
+            Ser el <b>último jugador en pie</b> manteniendo tu puntuación por debajo de
+            <b>150 puntos</b>. Quien supere ese límite queda eliminado.
+          </p>
+        </article>
+
+        <article class="panel">
+          <h2>👥 Jugadores</h2>
+          <ul class="lista">
+            <li>De 2 a 4 jugadores, humanos e IAs mezclados.</li>
+            <li>Los humanos inician sesión con Google.</li>
+            <li>Las IAs tienen cuatro niveles: Fácil, Medio, Difícil y Experto.</li>
+          </ul>
+        </article>
+      </section>
+
+      <!-- ----------------------------------------------------- baraja -->
+      <section class="panel bloque">
+        <h2>🃏 La Baraja</h2>
+        <p>
+          48 cartas: cuatro palos de doce valores cada uno, del 1 al 12. Sin comodines.
+        </p>
+
+        <div class="palos">
+          <figure><img src="img/claude-inspiration/basto.png" alt="" /><figcaption>Basto</figcaption></figure>
+          <figure><img src="img/claude-inspiration/copa.png" alt="" /><figcaption>Copa</figcaption></figure>
+          <figure><img src="img/claude-inspiration/espada.png" alt="" /><figcaption>Espada</figcaption></figure>
+          <figure><img src="img/claude-inspiration/Oro.png" alt="" /><figcaption>Oro</figcaption></figure>
+        </div>
+
+        <div class="valores-especiales">
+          <div class="valor-carta">
+            <img src="img/claude-inspiration/Caballo.PNG" alt="" />
+            <div>
+              <b>11 · Caballo</b>
+              <span>Vale <b class="bueno">0 puntos</b> en el corte. La mejor carta que podés tener.</span>
+            </div>
+          </div>
+          <div class="valor-carta">
+            <img src="img/claude-inspiration/Rey.png" alt="" />
+            <div>
+              <b>12 · Rey</b>
+              <span>Vale <b class="malo">12 puntos</b>. La más cara de la baraja.</span>
+            </div>
+          </div>
+        </div>
+        <p class="pie-nota">El resto de las cartas vale su número: un 7 son 7 puntos.</p>
+      </section>
+
+      <!-- ------------------------------------------ fases de la ronda -->
+      <h2 class="titulo-seccion">Las fases de una ronda</h2>
+
+      <ol class="fases">
+        <li class="panel fase">
+          <span class="numero">1</span>
+          <div>
+            <h3>Mirada · 2 segundos</h3>
+            <p>
+              Cada jugador ve <b>una sola</b> de sus cuatro cartas durante dos segundos.
+              Después vuelve a taparse sola. Si no elegís, se destapa la primera.
+            </p>
+          </div>
+        </li>
+
+        <li class="panel fase">
+          <span class="numero">2</span>
+          <div>
+            <h3>Carta muestra</h3>
+            <p>Se da vuelta una carta en el centro. Todos la ven al mismo tiempo.</p>
+          </div>
+        </li>
+
+        <li class="panel fase destacada">
+          <span class="numero">3</span>
+          <div>
+            <h3>Descarte por reflejos · 5 segundos</h3>
+            <p>Todos pueden descartar a la vez, y acá se define media partida:</p>
+            <ul class="lista">
+              <li><b class="bueno">Acertás primero:</b> te sacás la carta de encima, sin castigo.</li>
+              <li><b>Acertás tarde:</b> la descartás igual, pero recibís una carta más.</li>
+              <li><b class="malo">Errás:</b> recuperás tu carta, recibís una más, y todos ven cuál era y en qué posición.</li>
+            </ul>
+            <p class="pie-nota">Descartar es opcional: si no estás seguro, podés pasar.</p>
+          </div>
+        </li>
+
+        <li class="panel fase">
+          <span class="numero">4</span>
+          <div>
+            <h3>Levantar del mazo</h3>
+            <p>Por turnos, cada jugador levanta una carta y elige:</p>
+            <ul class="lista">
+              <li><b>Cambiarla</b> por una de las suyas, en cualquier posición.</li>
+              <li><b>Tirarla</b> directamente, sin cambiarla.</li>
+            </ul>
+          </div>
+        </li>
+
+        <li class="panel fase">
+          <span class="numero">5</span>
+          <div>
+            <h3>Poderes · 7, 8, 9 y 10</h3>
+            <p>
+              Sólo se activan si <b>tirás</b> la carta sin cambiarla. Se usan en el momento:
+              no se guardan. Usarlos es opcional.
+            </p>
+            <div class="poderes">
+              <div class="poder p7"><span class="cifra">7</span><b>Mirar propia</b><small>Ves una carta tuya, la conozcas o no.</small></div>
+              <div class="poder p8"><span class="cifra">8</span><b>Mirar rival</b><small>Ves una carta de otro jugador.</small></div>
+              <div class="poder p9"><span class="cifra">9</span><b>Cambio ciego</b><small>Intercambiás con un rival sin ver ninguna.</small></div>
+              <div class="poder p10"><span class="cifra">10</span><b>Cambio con vista</b><small>Intercambiás viendo las dos cartas.</small></div>
+            </div>
+          </div>
+        </li>
+
+        <li class="panel fase destacada">
+          <span class="numero">6</span>
+          <div>
+            <h3>El corte</h3>
+            <p>
+              En tu turno, <b>después de levantar</b>, podés cortar. Tirás una carta boca
+              abajo, se revelan todas las manos y se suman los puntos.
+            </p>
+            <ul class="lista">
+              <li><b class="bueno">−10 puntos</b> si cortaste sin quedarte ninguna carta.</li>
+              <li><b class="malo">+10 puntos</b> si cortaste sin tener el puntaje más bajo.</li>
+              <li>Si empatás en el más bajo, <b>no hay castigo</b>.</li>
+            </ul>
+          </div>
+        </li>
+
+        <li class="panel fase">
+          <span class="numero">7</span>
+          <div>
+            <h3>Fin de la ronda</h3>
+            <p>
+              La mano pasa al jugador de la derecha, se reparten cuatro cartas nuevas y
+              vuelve a empezar. Los totales se arrastran de una ronda a la otra.
+            </p>
+          </div>
+        </li>
+      </ol>
+
+      <!-- ------------------------------------------------- fin y IAs -->
+      <section class="rejilla dos-columnas">
+        <article class="panel">
+          <h2>🏁 Fin del juego</h2>
+          <ul class="lista">
+            <li>Quien <b>supera</b> los 150 puntos queda eliminado.</li>
+            <li>Gana el último que quede por debajo del límite.</li>
+            <li>Si hay empate al final, se juegan rondas extra.</li>
+          </ul>
+        </article>
+
+        <article class="panel">
+          <h2>🤖 Los cuatro niveles de IA</h2>
+          <table class="tabla-ia">
+            <thead><tr><th>Nivel</th><th class="num">Error</th><th class="num">Reacción</th></tr></thead>
+            <tbody>
+              <tr><td>Fácil</td><td class="num">30%</td><td class="num">2–4 s</td></tr>
+              <tr><td>Medio</td><td class="num">15%</td><td class="num">1–3 s</td></tr>
+              <tr><td>Difícil</td><td class="num">5%</td><td class="num">0,5–1,5 s</td></tr>
+              <tr><td>Experto</td><td class="num">0%</td><td class="num">0,3–0,8 s</td></tr>
+            </tbody>
+          </table>
+          <p class="pie-nota">También cambia cuánto recuerdan de lo que ya vieron.</p>
+        </article>
+      </section>
+
+      <section class="cierre">
+        <img src="img/claude-inspiration/Rey.png" alt="" class="rey-cierre" />
+        <div>
+          <h2>¿Listo para la mesa?</h2>
+          <p>Se aprende jugando. La partida contra la máquina no necesita cuenta.</p>
+          <a class="btn-oro" href="mesa.html">🎮 Jugar ahora</a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="footer-content">
+        <div class="footer-links">
+          <a href="/como-se-juega.html">📜 Cómo se Juega</a>
+          <a href="/quienes-somos.html">Quiénes Somos</a>
+          <a href="/terminos.html">Términos y Condiciones</a>
+          <a href="/privacidad.html">Políticas de Privacidad</a>
+          <a href="/seguridad.html">Seguridad</a>
+        </div>
+        <p>&copy; 2026 Memorie Legends. Todos los derechos reservados.</p>
+      </div>
+    </footer>
+  </body>
+</html>
