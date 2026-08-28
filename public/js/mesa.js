@@ -224,6 +224,21 @@ function estiloAbanico(indice, cantidad, { anguloTotal, arco, solape }) {
   return `--giro:${giro.toFixed(2)}deg;--desvio:${desvio.toFixed(1)}px;--solape:${solape.toFixed(0)}px;`;
 }
 
+/** Lugar libre en la mesa: se ve, pero no juega nadie. */
+function asientoVacio() {
+  return `
+    <div class="jugador vacante" aria-hidden="true">
+      <div class="cabecera-jugador">
+        <span class="ficha-vacante"></span>
+        <div class="datos">
+          <div class="nombre">Lugar libre</div>
+          <div class="puntos">sin jugador</div>
+        </div>
+      </div>
+      <div class="mano">${Array(4).fill('<div class="hueco vacio"></div>').join("")}</div>
+    </div>`;
+}
+
 function asientosParaMesa(total) {
   if (total <= 2) return ["abajo", "arriba"];
   if (total === 3) return ["abajo", "izq", "der"];
@@ -307,6 +322,12 @@ function dibujar() {
   estado.jugadores.forEach((jugador, i) => {
     const asiento = orden[i] ?? "arriba";
     dom.asientos[asiento].innerHTML += dibujarJugador(jugador, i);
+  });
+
+  // Con dos o tres jugadores sobran lugares en la mesa. Se dibujan vacíos
+  // en vez de desaparecer, para que la mesa se lea como una mesa de cuatro.
+  Object.entries(dom.asientos).forEach(([nombre, el]) => {
+    if (!orden.includes(nombre)) el.innerHTML = asientoVacio();
   });
 
   const muestra = estado.descarte[0];
