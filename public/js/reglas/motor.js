@@ -356,8 +356,19 @@ export function cortar(estado) {
   const cortePerfecto = cartasVivas(cortador.mano).length === 0;
 
   const { jugadores, corteFallido } = resolverCorte(estado.jugadores, indiceCortador);
-  const conEliminados = aplicarEliminacion(jugadores, estado.ronda);
-  const fin = comprobarFinPartida(conEliminados);
+  const eliminados = aplicarEliminacion(jugadores, estado.ronda);
+  const fin = comprobarFinPartida(eliminados);
+
+  // Si todos se pasaron de 150 en la misma ronda y quedaron empatados en el
+  // puntaje más bajo, hay que jugar una ronda de desempate. Para eso los
+  // empatados vuelven a la mesa: si siguieran eliminados no repartiría a
+  // nadie, la ronda no cambiaría nada y la partida no terminaría nunca.
+  const enDesempate = new Set(fin.desempate ? fin.empatados.map((j) => j.id) : []);
+  const conEliminados = enDesempate.size
+    ? eliminados.map((j) =>
+        enDesempate.has(j.id) ? { ...j, eliminado: false, eliminadoEnRonda: null } : j,
+      )
+    : eliminados;
 
   const eventos = [...estado.eventos];
   if (cortePerfecto) {
