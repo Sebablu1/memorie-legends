@@ -1,0 +1,214 @@
+/* Ruleta de Leyendas: rueda, aguja y tabla de premios. */
+
+.ruleta-zona {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 26px;
+  align-items: center;
+}
+
+.ruleta-caja {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 10px;
+}
+
+/* --- aguja --- */
+
+.aguja {
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  width: 0;
+  height: 0;
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-top: 30px solid var(--oro);
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7));
+}
+
+.aguja::after {
+  content: "";
+  position: absolute;
+  top: -34px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--oro-claro);
+  box-shadow: 0 0 14px var(--oro);
+}
+
+/* --- rueda --- */
+
+.rueda {
+  position: relative;
+  width: min(420px, 88vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 12px solid transparent;
+  background:
+    conic-gradient(var(--negro-3) 0 0) padding-box,
+    linear-gradient(150deg, #8a6432, #4a2f16 40%, #6d5227 60%, #1d1108) border-box;
+  box-shadow:
+    0 0 0 2px rgba(212, 168, 67, 0.5),
+    0 30px 70px rgba(0, 0, 0, 0.65),
+    inset 0 0 40px rgba(0, 0, 0, 0.5);
+}
+
+.rueda-cara {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  /* La rotación se aplica por JS al girar. */
+  transition: transform 5s cubic-bezier(0.15, 0.85, 0.2, 1);
+}
+
+.rueda-cara .sector {
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(50% 50%, 50% 0%, 100% 0%);
+  transform-origin: 50% 50%;
+}
+
+.rueda-cara .valor {
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  transform-origin: center;
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.rueda-centro {
+  position: relative;
+  z-index: 3;
+  width: 24%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, #1c1c22, var(--negro));
+  border: 3px solid var(--oro);
+  box-shadow: 0 0 26px rgba(212, 168, 67, 0.45), inset 0 2px 10px rgba(0, 0, 0, 0.7);
+  font-family: "Playfair Display", Georgia, serif;
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: var(--oro-claro);
+}
+
+.rueda.girando {
+  animation: vibrar 0.12s linear infinite;
+}
+
+@keyframes vibrar {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(1px, -1px); }
+  75% { transform: translate(-1px, 1px); }
+}
+
+/* --- resultado --- */
+
+.resultado {
+  min-height: 58px;
+  margin: 14px 0;
+  padding: 12px;
+  border-radius: 10px;
+  text-align: center;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--texto-tenue);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--borde-suave);
+}
+
+.resultado.premiado {
+  color: var(--texto);
+  border-color: var(--tinte, var(--oro));
+  background: color-mix(in srgb, var(--tinte, var(--oro)) 12%, transparent);
+  animation: aparecerPremio 0.5s cubic-bezier(0.2, 1.3, 0.4, 1);
+}
+
+.resultado .cantidad {
+  display: block;
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--tinte, var(--oro-claro));
+  margin-bottom: 2px;
+}
+
+@keyframes aparecerPremio {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.ruleta-controles .accion { width: 100%; }
+
+/* --- tabla de premios --- */
+
+.tabla-premios {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.premio-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid var(--tinte, var(--oro));
+  font-size: 0.85rem;
+}
+
+.premio-fila b {
+  color: var(--tinte, var(--oro-claro));
+  font-variant-numeric: tabular-nums;
+}
+
+.premio-fila span {
+  color: var(--texto-tenue);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Colores por rareza, iguales en rueda y tabla. */
+.rareza-comun { --tinte: #8a8a8a; }
+.rareza-normal { --tinte: var(--plata); }
+.rareza-raro { --tinte: #3d8b6b; }
+.rareza-epico { --tinte: #b87333; }
+.rareza-legendario { --tinte: var(--oro); }
+.rareza-mitico { --tinte: #c0392b; }
+
+#confeti {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 70;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+#confeti.activo { opacity: 1; }
+
+@media (max-width: 860px) {
+  .ruleta-zona {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#05070b" />
+    <title>Ranking - Memorie Legends</title>
+    <link rel="icon" href="img/claude-inspiration/logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/tema.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/tablas.css" />
+    <link rel="stylesheet" href="css/pie.css" />
+  </head>
+  <body>
+    <header class="barra">
+      <div class="barra-contenido">
+        <a href="dashboard.html" class="marca">
+          <img src="img/claude-inspiration/logo.png" alt="Memorie Legends" class="logo-img" />
+          <span class="logo-text">Memorie Legends</span>
+        </a>
+        <nav>
+          <a href="dashboard.html">Inicio</a>
+          <a href="mesa.html">Jugar</a>
+          <a href="como-se-juega.html">Cómo se juega</a>
+          <a href="ranking.html" aria-current="page">Ranking</a>
+          <a href="tienda.html">Tienda</a>
+          <a href="ruleta.html">Ruleta</a>
+        </nav>
+        <div class="derecha">
+          <div class="saldo" id="saldo"><b id="saldoValor">—</b><small>Leyendas</small></div>
+          <button class="accion sobria" id="btnSalir" type="button">Salir</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <h1 class="titulo-pagina">🏆 Ranking de Leyendas</h1>
+      <p class="subtitulo">Sólo suman las partidas jugadas con Leyendas. Las gratis no puntúan.</p>
+
+      <div class="pestanas" id="pestanas">
+        <button class="pestana activa" data-periodo="semanal" type="button">Semanal</button>
+        <button class="pestana" data-periodo="mensual" type="button">Mensual</button>
+        <button class="pestana" data-periodo="anual" type="button">Anual</button>
+      </div>
+
+      <p class="subtitulo" id="periodoActual" style="margin-top: 14px"></p>
+
+      <section class="panel">
+        <div id="tabla"></div>
+      </section>
+
+      <section class="panel" id="tuPuesto" style="margin-top: 18px; display: none">
+        <h2>Tu posición</h2>
+        <div id="tuFila"></div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="footer-content">
+        <div class="footer-links">
+          <a href="/como-se-juega.html">📜 Cómo se Juega</a>
+          <a href="/quienes-somos.html">Quiénes Somos</a>
+          <a href="/terminos.html">Términos y Condiciones</a>
+          <a href="/privacidad.html">Políticas de Privacidad</a>
+          <a href="/seguridad.html">Seguridad</a>
+        </div>
+        <p>&copy; 2026 Memorie Legends. Todos los derechos reservados.</p>
+      </div>
+    </footer>
+
+    <script type="module" src="js/ranking-ui.js"></script>
+  </body>
+</html>

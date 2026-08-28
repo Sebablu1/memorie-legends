@@ -1,0 +1,555 @@
+/* ============================================================
+   Memorie Legends — pantallas de la aplicación:
+   dashboard, ranking, tienda y ruleta.
+   Comparte el lenguaje visual de la mesa: oscuro, oro y fieltro.
+   ============================================================ */
+
+:root {
+  --noche-1: #0a0a0a;
+  --noche-2: #101010;
+  --panel: rgba(18, 18, 22, 0.86);
+  --panel-alto: rgba(26, 26, 32, 0.9);
+  --borde: rgba(212, 168, 67, 0.18);
+  --borde-suave: rgba(255, 255, 255, 0.08);
+
+  --oro: #d4a843;
+  --oro-claro: #f0d060;
+  --oro-hondo: #8a6d2a;
+
+  --rojo: #c0392b;
+  --verde: #3d8b6b;
+  --ambar: #f0d060;
+  --azul: #4a7fb5;
+
+  --texto: #ffffff;
+  --texto-tenue: #c0c0c0;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Inter", "Segoe UI", Tahoma, sans-serif;
+  color: var(--texto);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(ellipse 90% 55% at 50% 0%, rgba(212, 168, 67, 0.08), transparent 70%),
+    radial-gradient(ellipse 70% 60% at 50% 60%, rgba(26, 71, 42, 0.14), transparent 72%),
+    linear-gradient(165deg, var(--noche-2) 0%, var(--noche-1) 65%, #050505 100%);
+  background-attachment: fixed;
+}
+
+/* ================================================== barra superior */
+
+.barra {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--borde);
+  background: rgba(10, 10, 10, 0.92);
+  backdrop-filter: blur(10px);
+}
+
+.barra-contenido {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.barra .marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.barra .marca img {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 168, 67, 0.4);
+}
+
+.barra .marca span {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: linear-gradient(180deg, var(--oro-claro), var(--oro));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  white-space: nowrap;
+}
+
+.barra nav {
+  display: flex;
+  gap: 18px;
+  margin-left: 8px;
+  flex-wrap: wrap;
+}
+
+.barra nav a {
+  color: var(--texto-tenue);
+  text-decoration: none;
+  font-size: 0.92rem;
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.barra nav a:hover,
+.barra nav a[aria-current="page"] {
+  color: var(--oro);
+  border-bottom-color: var(--oro);
+}
+
+.barra .derecha {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Saldo de Leyendas */
+.saldo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: rgba(212, 168, 67, 0.1);
+  border: 1px solid rgba(212, 168, 67, 0.35);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.saldo b {
+  color: var(--oro-claro);
+  font-size: 1.05rem;
+}
+
+.saldo small {
+  color: var(--texto-tenue);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.saldo.subiendo b {
+  animation: destelloSaldo 0.9s ease-out;
+}
+
+@keyframes destelloSaldo {
+  0% { transform: scale(1); color: var(--oro-claro); }
+  35% { transform: scale(1.35); color: #fff; text-shadow: 0 0 18px var(--oro); }
+  100% { transform: scale(1); color: var(--oro-claro); }
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--borde);
+  object-fit: cover;
+  background: var(--panel-alto);
+}
+
+/* ======================================================= contenido */
+
+main {
+  flex: 1;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px 20px 40px;
+}
+
+.titulo-pagina {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 2rem;
+  margin-bottom: 6px;
+  background: linear-gradient(180deg, var(--oro-claro), var(--oro));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subtitulo {
+  color: var(--texto-tenue);
+  margin-bottom: 26px;
+  font-size: 0.95rem;
+}
+
+/* ------------------------------------------------ tarjetas de acceso */
+
+.rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 18px;
+}
+
+/* Los paneles de abajo son dos: media pantalla cada uno, sin hueco al lado.
+   Con auto-fit el navegador armaba tres columnas y dejaba una vacía. */
+.rejilla.dos-columnas {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 760px) {
+  .rejilla.dos-columnas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.tarjeta-accion {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+  border-radius: 18px;
+  text-decoration: none;
+  color: inherit;
+  background: linear-gradient(165deg, var(--panel-alto), rgba(12, 12, 14, 0.92));
+  border: 1px solid var(--borde-suave);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+}
+
+.tarjeta-accion:hover {
+  transform: translateY(-5px);
+  border-color: var(--acento-tarjeta, var(--oro));
+  box-shadow: 0 22px 46px rgba(0, 0, 0, 0.55),
+    0 0 30px -12px var(--acento-tarjeta, var(--oro));
+}
+
+/* Franja de color que identifica cada sección */
+.tarjeta-accion::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--acento-tarjeta, var(--oro));
+}
+
+.tarjeta-accion .icono {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.tarjeta-accion h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.tarjeta-accion p {
+  color: var(--texto-tenue);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.tarjeta-accion .pie-tarjeta {
+  margin-top: auto;
+  padding-top: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--acento-tarjeta, var(--oro));
+}
+
+.tarjeta-accion.mesa { --acento-tarjeta: var(--verde); }
+.tarjeta-accion.ranking { --acento-tarjeta: var(--oro); }
+.tarjeta-accion.tienda { --acento-tarjeta: var(--azul); }
+.tarjeta-accion.ruleta { --acento-tarjeta: var(--rojo); }
+.tarjeta-accion.amigos { --acento-tarjeta: #b87333; }
+
+/* --------------------------------------------- tarjeta ilustrada del Rey */
+
+.tarjeta-accion.tarjeta-rey {
+  --acento-tarjeta: var(--oro);
+  flex-direction: row;
+  align-items: center;
+  gap: 18px;
+  cursor: default;
+  overflow: hidden;
+}
+
+/* No se levanta al pasar: no es un acceso, es decoración informativa. */
+.tarjeta-accion.tarjeta-rey:hover {
+  transform: none;
+  border-color: var(--borde);
+  box-shadow: var(--sombra-negra);
+}
+
+.figura-rey {
+  width: 116px;
+  height: 116px;
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: 14px;
+  background: radial-gradient(circle at 50% 45%, rgba(212, 168, 67, 0.22), transparent 68%);
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.6));
+  animation: reyRespira 6s ease-in-out infinite;
+}
+
+@keyframes reyRespira {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-5px) scale(1.02); }
+}
+
+.rey-texto {
+  min-width: 0;
+}
+
+.rey-texto h2 {
+  color: var(--oro);
+  margin-bottom: 6px;
+}
+
+.rey-dato {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 0.8rem;
+  color: var(--oro-claro);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 700px) {
+  .tarjeta-accion.tarjeta-rey {
+    flex-direction: column;
+    text-align: center;
+  }
+  .figura-rey { width: 96px; height: 96px; }
+  .rey-dato { align-items: center; }
+}
+
+/* Etiqueta de estado dentro de una tarjeta */
+.etiqueta {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.etiqueta.lista {
+  background: rgba(76, 175, 80, 0.16);
+  border: 1px solid rgba(76, 175, 80, 0.5);
+  color: #8fd4b4;
+}
+
+.etiqueta.espera {
+  background: rgba(255, 176, 32, 0.14);
+  border: 1px solid rgba(255, 176, 32, 0.45);
+  color: var(--ambar);
+}
+
+/* ------------------------------------------------------- paneles */
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--borde);
+  border-radius: 16px;
+  padding: 20px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+
+.panel h2 {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 2.2px;
+  color: var(--oro);
+  margin-bottom: 14px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid rgba(212, 168, 67, 0.18);
+}
+
+.fila-dato {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.9rem;
+}
+
+.fila-dato:last-child { border-bottom: none; }
+.fila-dato span { color: var(--texto-tenue); }
+.fila-dato b { font-variant-numeric: tabular-nums; }
+
+/* --------------------------------------------------------- botones */
+
+button.accion,
+a.accion {
+  display: inline-block;
+  padding: 13px 24px;
+  border: none;
+  border-radius: 11px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  color: #1a1206;
+  background: linear-gradient(180deg, var(--oro-claro) 0%, var(--oro) 46%, var(--oro-hondo) 100%);
+  box-shadow: 0 5px 0 #6b530f, 0 12px 22px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
+}
+
+button.accion:hover:not(:disabled),
+a.accion:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 0 #6b530f, 0 18px 30px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+button.accion:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #6b530f, 0 6px 12px rgba(0, 0, 0, 0.4);
+}
+
+button.accion:disabled {
+  filter: grayscale(0.85) brightness(0.6);
+  cursor: not-allowed;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+}
+
+button.accion.sobria,
+a.accion.sobria {
+  color: var(--negro, #0a0a0a);
+  background: linear-gradient(180deg, var(--plata-clara) 0%, var(--plata-honda) 100%);
+  box-shadow: 0 5px 0 #6b6b6b, 0 12px 22px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+button.accion.sobria:hover:not(:disabled),
+a.accion.sobria:hover {
+  background: linear-gradient(180deg, #e2e2e2 0%, var(--plata-clara) 100%);
+  box-shadow: 0 8px 0 #6b6b6b, 0 18px 30px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* ------------------------------------------------------- mensajes */
+
+.aviso {
+  padding: 14px 18px;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  margin-bottom: 20px;
+  background: rgba(255, 176, 32, 0.08);
+  border: 1px solid rgba(255, 176, 32, 0.3);
+  color: #ffd79a;
+}
+
+.aviso b { color: #fff; }
+
+.vacio {
+  text-align: center;
+  padding: 46px 20px;
+  color: var(--texto-tenue);
+  font-size: 0.95rem;
+}
+
+.vacio .icono {
+  font-size: 2.6rem;
+  display: block;
+  margin-bottom: 12px;
+  opacity: 0.6;
+}
+
+/* ------------------------------------------------------------ pie */
+
+footer {
+  border-top: 1px solid var(--borde-suave);
+  margin-top: auto;
+}
+
+/* --------------------------------------------------- responsive */
+
+@media (max-width: 700px) {
+  .barra-contenido {
+    padding: 10px 14px;
+    gap: 10px;
+  }
+
+  .barra .marca span { font-size: 1rem; }
+
+  .barra nav {
+    order: 3;
+    width: 100%;
+    margin-left: 0;
+    gap: 14px;
+    justify-content: center;
+  }
+
+  .barra .derecha { margin-left: auto; }
+
+  main { padding: 20px 14px 30px; }
+
+  .titulo-pagina { font-size: 1.5rem; }
+
+  .rejilla { grid-template-columns: 1fr; }
+
+  .tarjeta-accion { padding: 18px; }
+}
+
+/* --- marca con logo propio --- */
+
+.logo-img {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.logo-img.grande {
+  width: 84px;
+  height: 84px;
+  border-radius: 18px;
+}
+
+.logo-text {
+  font-family: "Playfair Display", Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+}
+
+.marca-titulo {
+  display: flex;
+  justify-content: center;
+}
+
+.marca-titulo a {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+}

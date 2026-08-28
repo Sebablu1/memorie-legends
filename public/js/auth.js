@@ -68,8 +68,8 @@ onAuthStateChanged(auth, async (user) => {
         currentPage === "/" ||
         currentPage === "/index.html"
       ) {
-        console.log("✅ Redirigiendo al lobby...");
-        window.location.href = "lobby.html";
+        console.log("✅ Redirigiendo al panel...");
+        window.location.href = "dashboard.html";
       }
     } catch (error) {
       console.error("❌ Error al obtener datos:", error);

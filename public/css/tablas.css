@@ -1,0 +1,131 @@
+/* Pestañas del ranking, tabla de posiciones y tarjetas de paquetes. */
+
+.pestanas {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pestana {
+  padding: 10px 22px;
+  border-radius: 999px;
+  border: 1px solid var(--borde-suave);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--texto-tenue);
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pestana:hover { color: var(--texto); border-color: var(--borde); }
+
+.pestana.activa {
+  color: #1a1206;
+  background: linear-gradient(180deg, var(--oro-claro), var(--oro));
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(212, 168, 67, 0.3);
+}
+
+/* --- tabla de posiciones --- */
+
+.tabla-ranking { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+
+.tabla-ranking th {
+  text-align: left;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: var(--oro);
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(212, 168, 67, 0.2);
+}
+
+.tabla-ranking td {
+  padding: 12px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tabla-ranking tr:last-child td { border-bottom: none; }
+.tabla-ranking .num { text-align: right; font-variant-numeric: tabular-nums; }
+.tabla-ranking .puesto { width: 58px; font-weight: 800; color: var(--texto-tenue); }
+.tabla-ranking tr.yo td { background: rgba(212, 168, 67, 0.08); }
+.tabla-ranking tr.podio-1 .puesto,
+.tabla-ranking tr.podio-2 .puesto,
+.tabla-ranking tr.podio-3 .puesto { font-size: 1.2rem; }
+.tabla-ranking tr.podio-1 td { color: var(--oro-claro); font-weight: 700; }
+.tabla-ranking .puntos { color: var(--oro-claro); font-weight: 700; }
+
+/* --- paquetes de la tienda --- */
+
+.paquete {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 24px;
+  border-radius: 18px;
+  background: linear-gradient(165deg, var(--panel-alto), rgba(9, 13, 20, 0.9));
+  border: 1px solid var(--borde-suave);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+  transition: transform 0.25s, border-color 0.25s;
+}
+
+.paquete:hover { transform: translateY(-4px); border-color: var(--oro); }
+
+.paquete.destacado { border-color: rgba(212, 168, 67, 0.55); }
+
+.paquete .cinta {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(212, 168, 67, 0.16);
+  border: 1px solid rgba(212, 168, 67, 0.5);
+  color: var(--oro-claro);
+}
+
+.paquete h2 { font-size: 1.05rem; font-weight: 700; }
+
+.paquete .cantidad {
+  font-size: 2.1rem;
+  font-weight: 800;
+  color: var(--oro-claro);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.paquete .cantidad small {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--texto-tenue);
+}
+
+.paquete .bonus {
+  color: var(--verde);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.paquete .precio {
+  margin-top: 6px;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.paquete .unitario {
+  font-size: 0.76rem;
+  color: var(--texto-tenue);
+  margin-bottom: 14px;
+}
+
+.paquete .accion { margin-top: auto; width: 100%; }

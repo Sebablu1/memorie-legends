@@ -79,13 +79,13 @@ form.addEventListener("submit", async (e) => {
     console.log("✅ Datos guardados en localStorage");
 
     // 4. Mostrar mensaje de éxito
-    mensaje.textContent = "🎉 ¡Cuenta creada! +100 créditos gratis";
+    mensaje.textContent = "🎉 ¡Cuenta creada! +100 Leyendas de regalo";
     mensaje.className = "mensaje success";
-    boton.textContent = "Entrando al lobby...";
+    boton.textContent = "Entrando...";
 
     // 5. Redirigir al lobby
     setTimeout(() => {
-      window.location.href = "lobby.html";
+      window.location.href = "dashboard.html";
     }, 1500);
   } catch (error) {
     console.error("❌ Error de registro:", error);
