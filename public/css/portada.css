@@ -1,0 +1,89 @@
+/* Portada: presentación del juego para quien todavía no entró. */
+
+.portada {
+  text-align: center;
+  padding: 40px 20px 48px;
+  margin-bottom: 30px;
+}
+
+.portada-logo {
+  width: 132px;
+  height: 132px;
+  border-radius: 28px;
+  object-fit: cover;
+  border: 2px solid var(--oro);
+  box-shadow: var(--sombra-oro), 0 20px 50px rgba(0, 0, 0, 0.6);
+  margin-bottom: 22px;
+}
+
+.portada h1 {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(2.1rem, 6vw, 3.4rem);
+  line-height: 1.1;
+  color: var(--oro);
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.portada .lema {
+  color: var(--plata);
+  font-size: clamp(0.95rem, 2.4vw, 1.15rem);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 22px;
+}
+
+.portada .entrada {
+  max-width: 620px;
+  margin: 0 auto 30px;
+  color: var(--texto);
+  font-size: 1.02rem;
+  line-height: 1.75;
+  opacity: 0.9;
+}
+
+.portada-botones {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.portada-botones .btn-oro,
+.portada-botones .btn-plata {
+  text-decoration: none;
+  display: inline-block;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+}
+
+.portada .nota {
+  color: var(--plata-honda);
+  font-size: 0.85rem;
+}
+
+/* Las tarjetas de la portada son informativas: no se levantan al pasar. */
+.portada + .rejilla .tarjeta-accion {
+  cursor: default;
+}
+
+.portada + .rejilla .tarjeta-accion:hover {
+  transform: none;
+  border-color: var(--borde-suave);
+  box-shadow: var(--sombra-negra);
+}
+
+/* La barra de la portada muestra los accesos en vez del saldo. */
+.barra .derecha .accion {
+  text-decoration: none;
+  padding: 10px 18px;
+  font-size: 0.76rem;
+}
+
+@media (max-width: 600px) {
+  .portada { padding: 26px 12px 34px; }
+  .portada-logo { width: 96px; height: 96px; border-radius: 22px; }
+  .portada-botones { flex-direction: column; align-items: stretch; }
+  .barra .derecha .accion { padding: 9px 12px; font-size: 0.7rem; }
+}

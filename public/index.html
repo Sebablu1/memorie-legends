@@ -3,16 +3,107 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta
+      name="description"
+      content="Memorie Legends: juego de memoria y estrategia con baraja española. Jugá contra la máquina o con amigos."
+    />
     <title>Memorie Legends</title>
-    <link rel="stylesheet" href="css/style.css" />
+    <link rel="icon" href="img/claude-inspiration/logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/tema.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/portada.css" />
+    <link rel="stylesheet" href="css/pie.css" />
   </head>
   <body>
-    <div class="container">
-      <h1>🃏 Memorie Legends</h1>
-      <p>Redirigiendo al login...</p>
-    </div>
-    <script>
-      window.location.href = "login.html";
-    </script>
+    <header class="barra">
+      <div class="barra-contenido">
+        <a href="/" class="marca">
+          <img src="img/claude-inspiration/logo.png" alt="Memorie Legends" class="logo-img" />
+          <span class="logo-text">Memorie Legends</span>
+        </a>
+        <div class="derecha">
+          <a class="accion sobria" href="login.html">Iniciar sesión</a>
+          <a class="accion" href="register.html">Crear cuenta</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="portada">
+        <img class="portada-logo" src="img/claude-inspiration/logo.png" alt="" />
+        <h1>Memorie Legends</h1>
+        <p class="lema">Memoria, reflejos y estrategia con baraja española</p>
+        <p class="entrada">
+          Cuatro cartas boca abajo. Mirás una sola, durante dos segundos. A partir de ahí,
+          todo depende de lo que puedas recordar — y de cuánto se animen los demás.
+        </p>
+
+        <div class="portada-botones">
+          <a class="btn-oro" href="mesa.html">🎮 Jugar ahora</a>
+          <a class="btn-plata" href="login.html">Entrar a mi cuenta</a>
+        </div>
+        <p class="nota">La mesa contra la máquina se juega sin cuenta.</p>
+      </section>
+
+      <section class="rejilla">
+        <article class="tarjeta-accion mesa">
+          <span class="icono">🃏</span>
+          <h2>Cuatro niveles de rival</h2>
+          <p>
+            De Fácil a Experto: cambian el margen de error al descartar, la velocidad de
+            reacción y cuánto recuerdan de lo que ya vieron.
+          </p>
+        </article>
+
+        <article class="tarjeta-accion ranking">
+          <span class="icono">⚡</span>
+          <h2>Cinco segundos de reflejos</h2>
+          <p>
+            Al ver la muestra todos pueden descartar a la vez. Sólo el primero que acierta
+            se salva; equivocarse suma una carta y deja tu posición al descubierto.
+          </p>
+        </article>
+
+        <article class="tarjeta-accion tienda">
+          <span class="icono">✨</span>
+          <h2>Cartas con poder</h2>
+          <p>
+            El 7, el 8, el 9 y el 10 valen más tirados que guardados: mirar una carta propia
+            o ajena, o cambiarla con un rival, a ciegas o viéndola.
+          </p>
+        </article>
+
+        <article class="tarjeta-accion ruleta">
+          <span class="icono">✂️</span>
+          <h2>Cortar en el momento justo</h2>
+          <p>
+            Cortás cuando creés tener el puntaje más bajo. Si te equivocás, son diez puntos
+            más. Quien supera 150 queda eliminado.
+          </p>
+        </article>
+      </section>
+    </main>
+
+    <footer>
+      <div class="footer-content">
+        <div class="footer-links">
+          <a href="/como-se-juega.html">📜 Cómo se Juega</a>
+          <a href="/quienes-somos.html">Quiénes Somos</a>
+          <a href="/terminos.html">Términos y Condiciones</a>
+          <a href="/privacidad.html">Políticas de Privacidad</a>
+          <a href="/seguridad.html">Seguridad</a>
+        </div>
+        <p>&copy; 2026 Memorie Legends. Todos los derechos reservados.</p>
+      </div>
+    </footer>
+
+    <script type="module" src="js/portada.js"></script>
   </body>
 </html>

@@ -1,0 +1,100 @@
+/* ============================================================
+   Memorie Legends — paleta única: negro, oro y plata.
+   Todo el sitio lee de acá. Si cambia un color, cambia una vez.
+   ============================================================ */
+
+:root {
+  /* --- negros --- */
+  --negro: #0a0a0a;
+  --negro-2: #101010;
+  --negro-3: #16161a;
+
+  /* --- oro --- */
+  --oro: #d4a843;
+  --oro-claro: #f0d060;
+  --oro-hondo: #8a6d2a;
+
+  /* --- plata --- */
+  --plata: #c0c0c0;
+  --plata-clara: #d0d0d0;
+  --plata-honda: #a0a0a0;
+
+  /* --- texto --- */
+  --texto: #ffffff;
+  --texto-tenue: var(--plata);
+  --texto-suave: var(--plata);
+
+  /* --- superficies --- */
+  --panel: rgba(18, 18, 22, 0.86);
+  --panel-alto: rgba(26, 26, 32, 0.9);
+  --borde: rgba(212, 168, 67, 0.28);
+  --borde-suave: rgba(255, 255, 255, 0.08);
+
+  /* --- sombras --- */
+  --sombra-oro: 0 8px 30px rgba(212, 168, 67, 0.25);
+  --sombra-oro-fuerte: 0 6px 30px rgba(212, 168, 67, 0.4);
+  --sombra-negra: 0 14px 34px rgba(0, 0, 0, 0.55);
+
+  /* --- acentos, todos cálidos o neutros: sin rosa ni magenta --- */
+  --rojo: #c0392b; /* rojo profundo, para el dorso rojo y avisos */
+  --verde: #3d8b6b;
+  --bronce: #b87333;
+  --azul: #4a7fb5; /* azul apagado, para el dorso azul */
+  --ambar: var(--oro-claro);
+}
+
+/* ------------------------------------------------- botones de la paleta */
+
+.btn-oro {
+  background: linear-gradient(145deg, var(--oro), var(--oro-claro));
+  color: var(--negro);
+  border: none;
+  font-weight: 700;
+  border-radius: 12px;
+  padding: 14px 28px;
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 4px 20px rgba(212, 168, 67, 0.25);
+}
+
+.btn-oro:hover:not(:disabled) {
+  transform: scale(1.02);
+  box-shadow: var(--sombra-oro-fuerte);
+}
+
+.btn-plata {
+  background: var(--plata-honda);
+  color: var(--negro);
+  border: none;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.btn-plata:hover:not(:disabled) {
+  background: var(--plata-clara);
+}
+
+.btn-oro:disabled,
+.btn-plata:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ------------------------------------------------------ utilidades */
+
+.acento {
+  color: var(--oro);
+}
+
+.borde-oro {
+  border: 2px solid var(--oro);
+  border-radius: 16px;
+}
+
+.sombra-oro {
+  box-shadow: 0 8px 30px rgba(212, 168, 67, 0.2);
+}

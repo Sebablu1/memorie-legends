@@ -5,29 +5,68 @@
 }
 
 body {
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  color: #eee;
+  font-family: "Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: #ffffff;
   min-height: 100vh;
   padding: 20px;
+  /* Negro con relieve: halo dorado arriba, insinuación de fieltro abajo y una
+     trama diagonal muy tenue, para que no quede un plano muerto. */
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -5%, rgba(212, 168, 67, 0.13), transparent 68%),
+    radial-gradient(ellipse 90% 60% at 50% 110%, rgba(26, 71, 42, 0.22), transparent 70%),
+    repeating-linear-gradient(
+      45deg,
+      transparent 0 26px,
+      rgba(255, 255, 255, 0.007) 26px 52px
+    ),
+    #0a0a0a;
+  background-attachment: fixed;
 }
 
 .container {
   max-width: 1000px;
   margin: 0 auto;
-  background: rgba(22, 33, 62, 0.95);
+  background: rgba(18, 18, 22, 0.9);
   padding: 30px;
   border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(212, 168, 67, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 60px -30px rgba(212, 168, 67, 0.5);
+}
+
+/* Login y registro son formularios: 1000px los deja desparramados. */
+body.acceso .container {
+  max-width: 440px;
+  margin: 6vh auto;
+  padding: 34px 30px;
+}
+
+/* En una tarjeta angosta la marca va apilada, no en fila: si no, el nombre
+   se parte en dos líneas al lado de un logo diminuto. */
+body.acceso .marca-titulo a {
+  flex-direction: column;
+  gap: 14px;
+}
+
+body.acceso .marca-titulo .logo-img {
+  width: 84px;
+  height: 84px;
+  border-radius: 20px;
+  border: 2px solid rgba(212, 168, 67, 0.5);
+  box-shadow: 0 0 30px -8px rgba(212, 168, 67, 0.6);
+}
+
+body.acceso .marca-titulo .logo-text {
+  font-size: 1.9rem;
+  color: #d4a843;
+  white-space: nowrap;
 }
 
 h1 {
   text-align: center;
   font-size: 2.5rem;
   margin-bottom: 10px;
-  background: linear-gradient(45deg, #e94560, #ff6b6b);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #d4a843;
+  font-family: "Playfair Display", Georgia, serif;
 }
 
 h2,
@@ -35,7 +74,7 @@ h3,
 h4 {
   text-align: center;
   margin: 15px 0;
-  color: #eee;
+  color: #ffffff;
 }
 
 input {
@@ -43,7 +82,7 @@ input {
   padding: 12px 16px;
   border-radius: 8px;
   border: 2px solid rgba(255, 255, 255, 0.1);
-  background: rgba(15, 52, 96, 0.6);
+  background: rgba(255, 255, 255, 0.05);
   color: #fff;
   font-size: 1rem;
   transition: all 0.3s;
@@ -51,7 +90,7 @@ input {
 
 input:focus {
   outline: none;
-  border-color: #e94560;
+  border-color: #d4a843;
 }
 
 button {
@@ -77,36 +116,38 @@ button:disabled {
 }
 
 .btn-primary {
-  background: linear-gradient(45deg, #e94560, #c73652);
-  color: #fff;
+  background: linear-gradient(145deg, #d4a843, #f0d060);
+  color: #0a0a0a;
   width: 100%;
+  box-shadow: 0 4px 20px rgba(212, 168, 67, 0.25);
 }
 
 .btn-secondary {
-  background: linear-gradient(45deg, #4a90e2, #357abd);
-  color: #fff;
+  background: linear-gradient(180deg, #d0d0d0, #a0a0a0);
+  color: #0a0a0a;
 }
 
 .btn-success {
-  background: linear-gradient(45deg, #4caf50, #388e3c);
-  color: #fff;
+  background: linear-gradient(145deg, #d4a843, #f0d060);
+  color: #0a0a0a;
+  box-shadow: 0 4px 20px rgba(212, 168, 67, 0.25);
 }
 
 .btn-danger {
-  background: linear-gradient(45deg, #f44336, #d32f2f);
+  background: linear-gradient(145deg, #c0392b, #8e2c20);
   color: #fff;
 }
 
 .btn-warning {
-  background: linear-gradient(45deg, #ff9800, #f57c00);
-  color: #fff;
+  background: linear-gradient(145deg, #d4a843, #f0d060);
+  color: #0a0a0a;
 }
 
 .user-info {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(15, 52, 96, 0.4);
+  background: rgba(255, 255, 255, 0.04);
   padding: 15px 20px;
   border-radius: 10px;
   margin: 15px 0;
@@ -131,7 +172,7 @@ button:disabled {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(15, 52, 96, 0.4);
+  background: rgba(255, 255, 255, 0.04);
   padding: 12px 20px;
   border-radius: 8px;
   margin: 10px 0;
@@ -139,11 +180,11 @@ button:disabled {
 
 .sala-code {
   font-weight: bold;
-  color: #e94560;
+  color: #d4a843;
 }
 
 .mesa {
-  background: rgba(15, 52, 96, 0.3);
+  background: rgba(255, 255, 255, 0.03);
   padding: 20px;
   border-radius: 12px;
   margin: 15px 0;
@@ -167,7 +208,7 @@ button:disabled {
 }
 
 .jugador {
-  background: rgba(15, 52, 96, 0.5);
+  background: rgba(255, 255, 255, 0.05);
   padding: 15px;
   border-radius: 10px;
   min-width: 180px;
@@ -176,7 +217,7 @@ button:disabled {
 }
 
 .jugador.esTurno {
-  border-color: #e94560;
+  border-color: #d4a843;
 }
 
 .cartas {
@@ -188,7 +229,7 @@ button:disabled {
 
 .carta {
   background: #fff;
-  color: #1a1a2e;
+  color: #0a0a0a;
   padding: 8px 12px;
   border-radius: 6px;
   font-weight: bold;
@@ -198,8 +239,8 @@ button:disabled {
 }
 
 .carta.bocaAbajo {
-  background: #2b2b2b;
-  color: #666;
+  background: #16161a;
+  color: #a0a0a0;
 }
 
 .acciones {
@@ -215,18 +256,35 @@ button:disabled {
   padding: 12px;
   margin: 15px 0;
   border-radius: 8px;
-  background: rgba(15, 52, 96, 0.4);
-  min-height: 45px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Sin texto no se dibuja: antes dejaba un rectángulo gris vacío. */
+.mensaje:empty {
+  display: none;
+}
+
+.mensaje.success {
+  background: rgba(212, 168, 67, 0.12);
+  border-color: rgba(212, 168, 67, 0.4);
+  color: #f0d060;
+}
+
+.mensaje.error {
+  background: rgba(192, 57, 43, 0.14);
+  border-color: rgba(192, 57, 43, 0.45);
+  color: #f0cfc9;
 }
 
 .link {
   text-align: center;
   margin-top: 15px;
-  color: #aaa;
+  color: #c0c0c0;
 }
 
 .link a {
-  color: #e94560;
+  color: #d4a843;
   text-decoration: none;
   font-weight: bold;
 }
@@ -254,4 +312,41 @@ button:disabled {
     width: 100%;
     max-width: 300px;
   }
+}
+
+/* --- marca con logo propio --- */
+
+.logo-img {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.logo-img.grande {
+  width: 84px;
+  height: 84px;
+  border-radius: 18px;
+}
+
+.logo-text {
+  font-family: "Playfair Display", Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+}
+
+.marca-titulo {
+  display: flex;
+  justify-content: center;
+}
+
+.marca-titulo a {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
 }

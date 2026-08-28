@@ -4,34 +4,42 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Memorie Legends - Login</title>
+    <link rel="stylesheet" href="css/tema.css" />
     <link rel="stylesheet" href="css/style.css" />
     <style>
+      /* Botón de Google en modo oscuro: fondo #131314 y texto blanco, que es
+         la variante oscura que admite la guía de marca de Google. El logo va
+         a todo color, como exige esa guía. */
       .google-btn {
         width: 100%;
-        padding: 12px;
-        background: #ffffff;
-        color: #333;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        font-size: 1rem;
+        padding: 13px;
+        background: #131314;
+        color: #e3e3e3;
+        border: 1px solid #5f6368;
+        border-radius: 10px;
+        font-size: 0.98rem;
         font-weight: 600;
         cursor: pointer;
         margin-bottom: 15px;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 10px;
-        transition: all 0.3s;
+        gap: 12px;
+        transition: background 0.25s, border-color 0.25s, box-shadow 0.25s;
       }
       .google-btn:hover {
-        background: #f5f5f5;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        background: #1e1f20;
+        border-color: #8a8f95;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+      }
+      .google-btn:active {
+        background: #2a2b2d;
       }
       .or-divider {
         display: flex;
         align-items: center;
         margin: 15px 0;
-        color: #888;
+        color: #a0a0a0;
         font-size: 0.9rem;
       }
       .or-divider::before,
@@ -55,11 +63,11 @@
         margin-top: 25px;
         padding-top: 15px;
         border-top: 1px solid rgba(255, 255, 255, 0.1);
-        color: #888;
+        color: #a0a0a0;
         font-size: 0.8rem;
       }
       .support-footer a {
-        color: #4285f4;
+        color: #d4a843;
         text-decoration: none;
         font-weight: 600;
       }
@@ -67,13 +75,14 @@
         text-decoration: underline;
       }
     </style>
-  </head>
-  <body>
+      <link rel="stylesheet" href="css/pie.css" />
+</head>
+  <body class="acceso">
     <div class="container">
       <div style="text-align: center">
-        <div class="memorie-icon">🃏</div>
+        <div class="memorie-icon"><img src="img/claude-inspiration/logo.png" alt="Memorie Legends" class="logo-img grande"></div>
         <h1 style="margin-bottom: 5px">Memorie Legends</h1>
-        <p style="color: #888; margin-top: 0">Inicia sesión para jugar</p>
+        <p class="subtitulo" style="margin-top: 0">Inicia sesión para jugar</p>
       </div>
 
       <div id="mensaje" class="mensaje"></div>
@@ -160,11 +169,24 @@
           </a>
         </p>
         <p style="color: #555; font-size: 0.7rem; margin-top: 5px">
-          🃏 Memorie Legends - Tu juego de memoria favorito
+          Memorie Legends - Tu juego de memoria favorito
         </p>
       </div>
     </div>
 
     <script type="module" src="js/auth.js"></script>
+  
+    <footer>
+      <div class="footer-content">
+        <div class="footer-links">
+          <a href="/como-se-juega.html">📜 Cómo se Juega</a>
+          <a href="/quienes-somos.html">Quiénes Somos</a>
+          <a href="/terminos.html">Términos y Condiciones</a>
+          <a href="/privacidad.html">Políticas de Privacidad</a>
+          <a href="/seguridad.html">Seguridad</a>
+        </div>
+        <p>&copy; 2026 Memorie Legends. Todos los derechos reservados.</p>
+      </div>
+    </footer>
   </body>
 </html>
