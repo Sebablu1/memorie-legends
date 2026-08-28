@@ -1498,3 +1498,19 @@ button.accion.con-poder {
   border-radius: 4px;
   border: 2px dashed rgba(255, 255, 255, 0.2);
 }
+
+
+/* Carta que se tocó cuando no correspondía: se sacude y no se destapa. */
+.carta.rechazada {
+  animation: cartaRechazada 0.45s ease-in-out;
+}
+
+.carta.rechazada .dorso {
+  box-shadow: var(--sombra-carta), inset 0 0 0 2px #c0392b;
+}
+
+@keyframes cartaRechazada {
+  0%, 100% { transform: rotate(var(--giro)) translateY(var(--desvio)); }
+  25% { transform: rotate(var(--giro)) translateY(var(--desvio)) translateX(-6px); }
+  75% { transform: rotate(var(--giro)) translateY(var(--desvio)) translateX(6px); }
+}

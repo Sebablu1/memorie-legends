@@ -922,8 +922,24 @@ document.addEventListener("click", async (evento) => {
   const indiceJugador = Number(jugadorEl.dataset.jugador);
   const posicion = Number(cartaEl.dataset.posicion);
 
-  if (estado.fase === "mirar" && manejadorMirada && indiceJugador === YO) {
-    manejadorMirada(posicion);
+  if (estado.fase === "mirar" && indiceJugador === YO) {
+    if (manejadorMirada) {
+      manejadorMirada(posicion);
+    } else {
+      // Ya eligió: se explica por qué no pasa nada, en vez de ignorar el clic.
+      sonidos.error();
+      pista("⚠️ Sólo podés ver <b>una</b> carta al inicio de la ronda.");
+      const carta = cartaEl;
+      carta.classList.add("rechazada");
+      setTimeout(() => carta.classList.remove("rechazada"), 600);
+    }
+    return;
+  }
+
+  // Tocar la mano de otro jugador nunca hace nada, pero conviene decirlo.
+  if (estado.fase === "mirar" && indiceJugador !== YO) {
+    sonidos.error();
+    pista("⚠️ Sólo podés mirar una carta <b>tuya</b>.");
     return;
   }
 
