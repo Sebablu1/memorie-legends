@@ -97,13 +97,16 @@ export function penalizacionAbandono(partida) {
  */
 export function costoDeAbandonar(partida) {
   if (!usaLeyendas(partida)) {
-    return { entradaPerdida: 0, penalizacion: 0, total: 0, esEntrenamiento: true };
+    return { entradaPerdida: 0, penalizacion: 0, adicional: 0, total: 0, esEntrenamiento: true };
   }
   const entrada = Number(partida.entrada);
   const penalizacion = penalizacionAbandono(partida);
   return {
     entradaPerdida: entrada,
     penalizacion,
+    // Lo que se le descuenta del saldo AHORA: la entrada ya se cobró al
+    // entrar y no vuelve, así que lo adicional es sólo la penalización.
+    adicional: penalizacion,
     total: entrada + penalizacion,
     esEntrenamiento: false,
   };

@@ -213,6 +213,8 @@ export const MOTIVOS = {
   RULETA: "ruleta",
   REFERIDO: "referido",
   APUESTA: "apuesta",
+  // Sumidero de la casa: no va al pozo ni a otro jugador.
+  PENALIZACION_ABANDONO: "penalizacion_abandono",
   PREMIO_PARTIDA: "premio_partida",
   PREMIO_RANKING: "premio_ranking",
   COMPRA: "compra",

@@ -60,6 +60,17 @@ async function llamar(nombre, datos = {}) {
 export const crearSala = (entrada, nombre) => llamar("crearSala", { entrada, nombre });
 
 /**
+ * Abandona una partida en curso.
+ *
+ * Se manda SÓLO el código. La entrada y la penalización las calcula el
+ * servidor: si acá se mandara un monto, sería un monto elegido por el
+ * jugador.
+ *
+ * @returns {Promise<{entradaPerdida: number, penalizacion: number, saldo: number}>}
+ */
+export const abandonarPartida = (codigo) => llamar("abandonarPartida", { codigo });
+
+/**
  * Suma al jugador a una sala existente y le cobra la entrada.
  * @returns {Promise<{codigo: string, entrada: number, saldo: number}>}
  */

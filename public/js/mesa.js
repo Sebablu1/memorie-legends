@@ -23,6 +23,8 @@ import {
 import { dorsoDeAsiento } from "./reglas/baraja.js";
 import { LIMITE_ELIMINACION, puntosMano } from "./reglas/puntaje.js";
 import * as IA from "./reglas/ia.js";
+import { MODOS, costoDeAbandonar } from "./reglas/salas.js";
+import { abandonarPartida, ErrorDeServidor } from "./servidor.js";
 import { sonidos, alternarSilencio } from "./sonidos.js";
 import { lanzarConfeti } from "./confeti.js";
 
@@ -63,6 +65,7 @@ const dom = {
   relojRelleno: $("relojRelleno"),
   confeti: $("confeti"),
   btnSonido: $("btnSonido"),
+  btnAbandonar: $("btnAbandonar"),
 };
 
 dom.btnSonido.addEventListener("click", () => {
@@ -120,6 +123,19 @@ const jugadoresConfig = [
 
 // Índice del jugador que maneja este navegador.
 const YO = 0;
+
+/**
+ * Datos económicos de esta mesa, tal como los conoce el navegador.
+ *
+ * Sirven ÚNICAMENTE para redactar el aviso previo. Lo que se cobra lo decide
+ * el servidor leyendo la sala de Firestore: acá una cifra retocada sólo
+ * conseguiría mentirle al propio jugador sobre lo que va a pagar.
+ */
+const partidaEconomica = {
+  modo: salaPedida ? MODOS.LEYENDAS : MODOS.ENTRENAMIENTO,
+  entrada: null,
+  codigo: salaPedida || null,
+};
 
 let estado = crearPartida(jugadoresConfig);
 let memorias = estado.jugadores.map(() => IA.crearMemoria());
@@ -588,6 +604,74 @@ function abrirModal(html) {
 function cerrarModal() {
   dom.velo.classList.remove("abierto");
   dom.modal.innerHTML = "";
+}
+
+// ---------------------------------------------------------- abandono
+
+/**
+ * Aviso previo a abandonar.
+ *
+ * Las cifras que se muestran son informativas: sirven para que nadie pierda
+ * Leyendas sin haberlo leído antes. El cobro lo hace el servidor con la
+ * entrada real de la partida, así que si estas cifras estuvieran mal, el
+ * jugador se llevaría una sorpresa, pero no un cobro distinto del que manda
+ * el reglamento.
+ */
+function abrirModalAbandono() {
+  const costo = costoDeAbandonar(partidaEconomica);
+
+  const cuerpo = costo.esEntrenamiento
+    ? `<p class="aviso-suave">Partida de entrenamiento. No perderás Leyendas.</p>`
+    : `
+      <ul class="detalle-abandono">
+        <li><span>Tu entrada</span><b>${costo.entradaPerdida} Leyendas</b></li>
+        <li><span>Penalización por abandono</span><b>${costo.penalizacion} Leyendas</b></li>
+        <li class="destacada">
+          <span>Total adicional que perderás</span><b>${costo.adicional} Leyendas</b>
+        </li>
+      </ul>
+      <p class="aviso-suave">
+        Tu entrada ya está en el pozo y se queda ahí. La penalización se
+        descuenta aparte y no va al pozo ni a ningún otro jugador.
+      </p>`;
+
+  abrirModal(`
+    <h2>¿Seguro que querés abandonar?</h2>
+    ${cuerpo}
+    <p class="error-modal" id="errorAbandono" hidden></p>
+    <div class="botonera-modal">
+      <button class="accion sobria" data-accion="abandonar-no" type="button">Seguir jugando</button>
+      <button class="accion peligro" data-accion="abandonar-si" type="button">Abandonar</button>
+    </div>
+  `);
+}
+
+async function confirmarAbandono(boton) {
+  const costo = costoDeAbandonar(partidaEconomica);
+
+  // Entrenamiento: no hay nada que cobrar ni a quién avisarle. Se sale.
+  if (costo.esEntrenamiento) {
+    cerrarModal();
+    window.location.href = "lobby.html";
+    return;
+  }
+
+  boton.disabled = true;
+  boton.textContent = "Abandonando…";
+  try {
+    // Se manda sólo el código: el monto lo calcula el servidor.
+    const { penalizacion } = await abandonarPartida(partidaEconomica.codigo);
+    cerrarModal();
+    volverAlLobby(`Abandonaste la partida. Se te descontaron ${penalizacion} Leyendas.`);
+  } catch (e) {
+    boton.disabled = false;
+    boton.textContent = "Abandonar";
+    const aviso = document.getElementById("errorAbandono");
+    if (aviso) {
+      aviso.textContent = e instanceof ErrorDeServidor ? e.message : "No pudimos procesar el abandono.";
+      aviso.hidden = false;
+    }
+  }
 }
 
 // ------------------------------------------------------- flujo de ronda
@@ -1065,7 +1149,22 @@ function abrirModalPoder() {
   `);
 }
 
+dom.btnAbandonar.addEventListener("click", () => {
+  sonidos.clic();
+  abrirModalAbandono();
+});
+
 dom.modal.addEventListener("click", async (evento) => {
+  if (evento.target.closest('[data-accion="abandonar-no"]')) {
+    cerrarModal();
+    return;
+  }
+  const confirmar = evento.target.closest('[data-accion="abandonar-si"]');
+  if (confirmar) {
+    await confirmarAbandono(confirmar);
+    return;
+  }
+
   // 🔮 Usar poder: recién acá se tira la carta y se activa el efecto.
   const usar = evento.target.closest('[data-accion="usar-poder"]');
   if (usar) {

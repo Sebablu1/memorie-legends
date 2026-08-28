@@ -1497,3 +1497,71 @@ button.accion.con-poder {
   25% { transform: rotate(var(--giro)) translateY(var(--desvio)) translateX(-6px); }
   75% { transform: rotate(var(--giro)) translateY(var(--desvio)) translateX(6px); }
 }
+
+/* ----------------------------------------------------- aviso de abandono */
+
+.detalle-abandono {
+  list-style: none;
+  margin: 18px 0 14px;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.detalle-abandono li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  /* En pantallas angostas la cifra baja a su propia línea en vez de estirar
+     el modal: con `nowrap` y sin envolver, la fila no podía encogerse. */
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.detalle-abandono li span {
+  color: var(--texto-suave, #b9b9b9);
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.detalle-abandono li b {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Lo que se descuenta ahora: es la cifra que importa antes de confirmar. */
+.detalle-abandono li.destacada {
+  margin-top: 6px;
+  background: rgba(212, 168, 67, 0.12);
+  border: 1px solid rgba(212, 168, 67, 0.35);
+}
+
+.detalle-abandono li.destacada span {
+  color: var(--oro, #d4a843);
+  font-weight: 600;
+}
+
+.detalle-abandono li.destacada b {
+  color: var(--oro, #d4a843);
+  font-size: 1.15rem;
+}
+
+.aviso-suave {
+  margin: 12px 0 0;
+  color: var(--texto-suave, #b9b9b9);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.error-modal {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(200, 60, 60, 0.14);
+  border: 1px solid rgba(200, 60, 60, 0.4);
+  color: #ffb4b4;
+  font-size: 0.88rem;
+}
