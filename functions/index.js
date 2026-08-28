@@ -30,6 +30,16 @@ import {
 } from "./reglas/economia.js";
 
 import {
+  ENTRADAS,
+  MAX_JUGADORES,
+  ESTADOS_SALA,
+  esEntradaValida,
+  puedeUnirse,
+  generarCodigo,
+  esCodigoValido,
+} from "./reglas/salas.js";
+
+import {
   PERIODOS,
   clavesDePeriodos,
   clavePeriodo,
@@ -45,6 +55,14 @@ const db = admin.firestore();
 
 const ZONA = ZONA_POR_DEFECTO;
 
+/**
+ * Modelo de datos REAL de la aplicación. El perfil y el saldo viven en
+ * `users/{uid}.credits`, que es lo que el login viene escribiendo desde
+ * siempre. No se crea ninguna colección paralela.
+ */
+const USUARIOS = "users";
+const CAMPO_SALDO = "credits";
+
 // ------------------------------------------------------------ libro mayor
 
 /**
@@ -56,7 +74,7 @@ const ZONA = ZONA_POR_DEFECTO;
  * asiento con esa clave, la operación no hace nada.
  */
 async function moverLeyendas(tx, { uid, delta, motivo, referencia = null, idempotencia = null }) {
-  const refJugador = db.collection("jugadores").doc(uid);
+  const refJugador = db.collection(USUARIOS).doc(uid);
 
   if (idempotencia) {
     const refAsiento = db.collection("movimientos").doc(idempotencia);
@@ -65,7 +83,7 @@ async function moverLeyendas(tx, { uid, delta, motivo, referencia = null, idempo
   }
 
   const snap = await tx.get(refJugador);
-  const saldoPrevio = snap.exists ? (snap.data().leyendas ?? 0) : 0;
+  const saldoPrevio = snap.exists ? (snap.data()[CAMPO_SALDO] ?? 0) : 0;
   const saldoNuevo = saldoPrevio + delta;
 
   if (saldoNuevo < 0) {
@@ -75,7 +93,7 @@ async function moverLeyendas(tx, { uid, delta, motivo, referencia = null, idempo
     );
   }
 
-  tx.set(refJugador, { leyendas: saldoNuevo }, { merge: true });
+  tx.set(refJugador, { [CAMPO_SALDO]: saldoNuevo }, { merge: true });
 
   const refAsiento = idempotencia
     ? db.collection("movimientos").doc(idempotencia)
@@ -103,27 +121,9 @@ const exigirSesion = (context) => {
 
 // --------------------------------------------------------------- registro
 
-/** Leyendas de bienvenida, una sola vez por cuenta. */
-export const alCrearUsuario = functions.auth.user().onCreate(async (user) => {
-  await db.runTransaction(async (tx) => {
-    tx.set(
-      db.collection("jugadores").doc(user.uid),
-      {
-        uid: user.uid,
-        nombre: user.displayName ?? "Jugador",
-        email: user.email ?? null,
-        creado: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
-    await moverLeyendas(tx, {
-      uid: user.uid,
-      delta: LEYENDAS_REGISTRO,
-      motivo: MOTIVOS.REGISTRO,
-      idempotencia: `registro_${user.uid}`,
-    });
-  });
-});
+// El perfil lo crea el propio cliente al registrarse, con las 100 Leyendas
+// de bienvenida, y las reglas de Firestore fijan ese valor exacto. No se
+// duplica acá para no tener dos caminos de creación.
 
 // ------------------------------------------------------------ bono diario
 
@@ -131,7 +131,7 @@ export const reclamarBonoDiario = functions.https.onCall(async (_data, context) 
   const uid = exigirSesion(context);
 
   return db.runTransaction(async (tx) => {
-    const snap = await tx.get(db.collection("jugadores").doc(uid));
+    const snap = await tx.get(db.collection(USUARIOS).doc(uid));
     const ultimo = snap.exists ? snap.data().ultimoBonoDiario : null;
     const restante = esperaBonoDiario(ultimo?.toDate?.() ?? ultimo, Date.now());
 
@@ -144,7 +144,7 @@ export const reclamarBonoDiario = functions.https.onCall(async (_data, context) 
 
     const r = await moverLeyendas(tx, { uid, delta: BONO_DIARIO, motivo: MOTIVOS.BONO_DIARIO });
     tx.set(
-      db.collection("jugadores").doc(uid),
+      db.collection(USUARIOS).doc(uid),
       { ultimoBonoDiario: admin.firestore.FieldValue.serverTimestamp() },
       { merge: true },
     );
@@ -161,7 +161,7 @@ export const girarLaRuleta = functions.https.onCall(async (_data, context) => {
   const uid = exigirSesion(context);
 
   return db.runTransaction(async (tx) => {
-    const snap = await tx.get(db.collection("jugadores").doc(uid));
+    const snap = await tx.get(db.collection(USUARIOS).doc(uid));
     const ultimo = snap.exists ? snap.data().ultimoGiroRuleta : null;
     const restante = esperaRuleta(ultimo?.toDate?.() ?? ultimo, Date.now());
 
@@ -177,7 +177,7 @@ export const girarLaRuleta = functions.https.onCall(async (_data, context) => {
 
     const r = await moverLeyendas(tx, { uid, delta: premio, motivo: MOTIVOS.RULETA });
     tx.set(
-      db.collection("jugadores").doc(uid),
+      db.collection(USUARIOS).doc(uid),
       { ultimoGiroRuleta: admin.firestore.FieldValue.serverTimestamp() },
       { merge: true },
     );
@@ -188,28 +188,134 @@ export const girarLaRuleta = functions.https.onCall(async (_data, context) => {
 
 // -------------------------------------------------------------- apuestas
 
-/** Cobra la apuesta al entrar a una mesa y deja la Leyenda en juego. */
-export const entrarAMesa = functions.https.onCall(async (data, context) => {
-  const uid = exigirSesion(context);
-  const { mesaId, apuesta } = data ?? {};
+// ------------------------------------------------------------- salas
 
-  const nivelValido = Object.values(NIVELES_APUESTA).some((n) => n.apuesta === apuesta);
-  if (!nivelValido) {
-    throw new functions.https.HttpsError("invalid-argument", "Nivel de apuesta inválido.");
+const SALAS = "rooms";
+
+/** Azar criptográfico para los códigos de sala. */
+const azarCodigo = () => crypto.randomInt(0, 2 ** 32) / 2 ** 32;
+
+/**
+ * Crea una sala por Leyendas y cobra la entrada al creador.
+ *
+ * El código es el ID del documento: así la unicidad la garantiza Firestore
+ * (una transacción que encuentra el documento ocupado reintenta con otro
+ * código) sin necesidad de consultas, que dentro de transacciones no se
+ * pueden hacer.
+ */
+export const crearSala = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context);
+  const entrada = Number(data?.entrada);
+  const nombre = String(data?.nombre ?? "Sala").slice(0, 40);
+
+  if (!esEntradaValida(entrada)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      `Entrada inválida. Las disponibles son: ${ENTRADAS.join(", ")}.`,
+    );
   }
 
+  const perfil = await db.collection(USUARIOS).doc(uid).get();
+  const nombreJugador = perfil.exists ? (perfil.data().username ?? "Jugador") : "Jugador";
+
+  // Hasta cinco intentos por si un código ya estaba tomado.
+  for (let intento = 0; intento < 5; intento++) {
+    const codigo = generarCodigo(azarCodigo);
+    const refSala = db.collection(SALAS).doc(codigo);
+
+    try {
+      await db.runTransaction(async (tx) => {
+        if ((await tx.get(refSala)).exists) throw new Error("codigo-ocupado");
+
+        // Se cobra la entrada dentro de la MISMA transacción que crea la
+        // sala: o pasan las dos cosas, o no pasa ninguna.
+        const r = await moverLeyendas(tx, {
+          uid,
+          delta: -entrada,
+          motivo: MOTIVOS.APUESTA,
+          referencia: codigo,
+          idempotencia: `entrada_${codigo}_${uid}`,
+        });
+        if (!r.aplicado) throw new Error("ya-pagada");
+
+        tx.set(refSala, {
+          codigo,
+          nombre,
+          modo: "leyendas",
+          entrada,
+          creador: uid,
+          creadorNombre: nombreJugador,
+          jugadores: [uid],
+          jugadoresNombres: [nombreJugador],
+          maxJugadores: MAX_JUGADORES,
+          estado: ESTADOS_SALA.ESPERANDO,
+          pozo: entrada,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+
+      return { codigo, entrada };
+    } catch (e) {
+      if (e instanceof functions.https.HttpsError) throw e;
+      if (e.message === "codigo-ocupado") continue; // otro código y de nuevo
+      console.error("Error creando sala:", e);
+      throw new functions.https.HttpsError("internal", "No pudimos crear la sala.");
+    }
+  }
+
+  throw new functions.https.HttpsError("internal", "No pudimos generar un código libre.");
+});
+
+/**
+ * Suma al jugador a una sala y le cobra la entrada.
+ *
+ * Todo ocurre en una transacción: la validación del cupo, el cobro y el alta
+ * son atómicos, así que dos jugadores entrando a la vez no pueden dejar la
+ * sala en cinco ni cobrarse dos veces.
+ */
+export const unirseASala = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context);
+  const codigo = String(data?.codigo ?? "").trim().toUpperCase();
+
+  if (!esCodigoValido(codigo)) {
+    throw new functions.https.HttpsError("invalid-argument", "Código inválido.");
+  }
+
+  const perfil = await db.collection(USUARIOS).doc(uid).get();
+  const nombreJugador = perfil.exists ? (perfil.data().username ?? "Jugador") : "Jugador";
+
   return db.runTransaction(async (tx) => {
+    const refSala = db.collection(SALAS).doc(codigo);
+    const snapSala = await tx.get(refSala);
+    const sala = snapSala.exists ? snapSala.data() : null;
+
+    const snapUsuario = await tx.get(db.collection(USUARIOS).doc(uid));
+    const saldo = snapUsuario.exists ? (snapUsuario.data()[CAMPO_SALDO] ?? 0) : 0;
+
+    // La MISMA función que usa el navegador para avisar antes de intentarlo.
+    const veredicto = puedeUnirse(sala, uid, saldo);
+    if (!veredicto.puede) {
+      throw new functions.https.HttpsError("failed-precondition", veredicto.mensaje);
+    }
+
     const r = await moverLeyendas(tx, {
       uid,
-      delta: -apuesta,
+      delta: -Number(sala.entrada),
       motivo: MOTIVOS.APUESTA,
-      referencia: mesaId,
-      idempotencia: `apuesta_${mesaId}_${uid}`,
+      referencia: codigo,
+      idempotencia: `entrada_${codigo}_${uid}`,
     });
     if (!r.aplicado) {
-      throw new functions.https.HttpsError("already-exists", "Ya pagaste la entrada a esta mesa.");
+      throw new functions.https.HttpsError("already-exists", "Ya pagaste la entrada a esta sala.");
     }
-    return { saldo: r.saldo };
+
+    tx.update(refSala, {
+      jugadores: [...(sala.jugadores ?? []), uid],
+      jugadoresNombres: [...(sala.jugadoresNombres ?? []), nombreJugador],
+      pozo: Number(sala.entrada) * ((sala.jugadores ?? []).length + 1),
+    });
+
+    return { codigo, entrada: sala.entrada, saldo: r.saldo };
   });
 });
 
@@ -246,7 +352,7 @@ export const cerrarPartida = functions.https.onCall(async (data, context) => {
 
   const rachas = {};
   for (const p of humanos) {
-    const s = await db.collection("jugadores").doc(p.id).get();
+    const s = await db.collection(USUARIOS).doc(p.id).get();
     rachas[p.id] = s.exists ? (s.data().rachaActual ?? 0) : 0;
   }
 
@@ -319,7 +425,7 @@ export const cerrarPartida = functions.https.onCall(async (data, context) => {
 
     for (const r of resultados) {
       tx.set(
-        db.collection("jugadores").doc(r.jugadorId),
+        db.collection(USUARIOS).doc(r.jugadorId),
         { rachaActual: r.rayaNueva },
         { merge: true },
       );
@@ -396,7 +502,7 @@ async function cerrarPeriodo(periodo, fechaDelPeriodoQueCierra) {
       tx.set(fila.ref, { puesto, premiado: true }, { merge: true });
       if (premio.insignia) {
         tx.set(
-          db.collection("jugadores").doc(fila.id),
+          db.collection(USUARIOS).doc(fila.id),
           { insignias: admin.firestore.FieldValue.arrayUnion(premio.insignia) },
           { merge: true },
         );
@@ -552,7 +658,7 @@ export const webhookPago = functions.https.onRequest(async (req, res) => {
 
       if (paquete?.insignia) {
         tx.set(
-          db.collection("jugadores").doc(orden.uid),
+          db.collection(USUARIOS).doc(orden.uid),
           { insignias: admin.firestore.FieldValue.arrayUnion(paquete.insignia) },
           { merge: true },
         );
