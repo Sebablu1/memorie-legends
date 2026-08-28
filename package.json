@@ -7,7 +7,7 @@
     "start": "firebase serve",
     "deploy": "firebase deploy",
     "build": "echo 'No build needed'",
-    "test": "node pruebas/puntaje.mjs"
+    "test": "node pruebas/puntaje.mjs && node pruebas/salas.mjs"
   },
   "keywords": [
     "game",
