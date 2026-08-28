@@ -1,4 +1,5 @@
 import { db, auth, signOut } from "./firebase.js";
+import { crearSala, unirseASala, ErrorDeServidor } from "./servidor.js";
 import {
   collection,
   query,
@@ -82,18 +83,8 @@ function actualizarCredits(nuevosCredits) {
   localStorage.setItem("user", JSON.stringify(user));
 }
 
-function generarCodigoSala() {
-  const letras = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const numeros = "0123456789";
-  let codigo = "";
-  for (let i = 0; i < 4; i++) {
-    codigo += letras.charAt(Math.floor(Math.random() * letras.length));
-  }
-  for (let i = 0; i < 2; i++) {
-    codigo += numeros.charAt(Math.floor(Math.random() * numeros.length));
-  }
-  return codigo;
-}
+// El código de sala lo genera el servidor: es el ID del documento, así la
+// unicidad la garantiza Firestore. El navegador ya no lo inventa.
 
 // ========== TIENDA ==========
 shopBtn.addEventListener("click", () => {
@@ -143,46 +134,32 @@ rouletteBtn.addEventListener("click", () => {
 // ========== CREAR SALA ==========
 createBtn.addEventListener("click", async () => {
   try {
-    const codigo = generarCodigoSala();
     const nombre = roomNameInput.value.trim() || `Sala de ${user.username}`;
     const maxJugadores = parseInt(maxPlayersSelect.value);
     const apuesta = parseInt(betAmountSelect.value);
 
-    if ((user.credits || 0) < apuesta) {
+    // Aviso temprano usando el saldo autoritativo. El servidor vuelve a
+    // comprobarlo igual: esto es sólo cortesía, no seguridad.
+    if (saldoActual < apuesta) {
+      mostrarMensaje(`❌ Te faltan Leyendas: la entrada es de ${apuesta}.`, "error");
+      return;
+    }
+
+    // El servidor crea la sala y cobra la entrada en una sola transacción.
+    // El navegador no calcula ni escribe saldo: sólo pide y muestra.
+    let resultado;
+    try {
+      mostrarMensaje("⏳ Creando la sala…", "info");
+      resultado = await crearSala(apuesta, nombre);
+    } catch (error) {
       mostrarMensaje(
-        `❌ Necesitas ${apuesta} créditos para esta apuesta`,
+        error instanceof ErrorDeServidor ? `❌ ${error.message}` : "❌ No pudimos crear la sala.",
         "error",
       );
       return;
     }
 
-    // Cobrar la entrada acá significaría calcular el saldo en el navegador y
-    // escribirlo, que es exactamente el agujero que estamos cerrando. Las
-    // partidas por Leyendas quedan en pausa hasta que el cobro lo haga el
-    // servidor dentro de una transacción.
-    mostrarMensaje(
-      "Las partidas por Leyendas están en pausa mientras preparamos el servidor. " +
-        "Mientras tanto podés entrenar contra la máquina.",
-      "info",
-    );
-    return;
-
-    const salaRef = collection(db, "rooms");
-    await addDoc(salaRef, {
-      codigo: codigo,
-      nombre: nombre,
-      creador: user.id,
-      creadorNombre: user.username,
-      jugadores: [user.id],
-      jugadoresNombres: [user.username],
-      maxJugadores: maxJugadores,
-      apuesta: apuesta,
-      estado: "esperando",
-      createdAt: serverTimestamp(),
-    });
-
-    // El cobro de la entrada lo hará el servidor. Acá no se escribe saldo.
-
+    const codigo = resultado.codigo;
     mostrarMensaje(`✅ Sala "${nombre}" creada! Código: ${codigo}`, "exito");
 
     localStorage.setItem("roomCode", codigo);
@@ -240,24 +217,19 @@ joinBtn.addEventListener("click", async () => {
       return;
     }
 
-    // Cobrar la entrada acá significaría calcular el saldo en el navegador y
-    // escribirlo, que es exactamente el agujero que estamos cerrando. Las
-    // partidas por Leyendas quedan en pausa hasta que el cobro lo haga el
-    // servidor dentro de una transacción.
-    mostrarMensaje(
-      "Las partidas por Leyendas están en pausa mientras preparamos el servidor. " +
-        "Mientras tanto podés entrenar contra la máquina.",
-      "info",
-    );
-    return;
-
-    const salaRef = doc(db, "rooms", salaDoc.id);
-    await updateDoc(salaRef, {
-      jugadores: [...(salaData.jugadores || []), user.id],
-      jugadoresNombres: [...(salaData.jugadoresNombres || []), user.username],
-    });
-
-    // El cobro de la entrada lo hará el servidor. Acá no se escribe saldo.
+    // El servidor valida cupo, estado y saldo, y cobra la entrada, todo
+    // dentro de una transacción: dos jugadores entrando a la vez no pueden
+    // dejar la sala en cinco ni pagar dos veces.
+    try {
+      mostrarMensaje("⏳ Entrando a la sala…", "info");
+      await unirseASala(codigo);
+    } catch (error) {
+      mostrarMensaje(
+        error instanceof ErrorDeServidor ? `❌ ${error.message}` : "❌ No pudimos entrar a la sala.",
+        "error",
+      );
+      return;
+    }
 
     mostrarMensaje(`✅ Unido a sala ${codigo}`, "exito");
     roomCodeInput.value = "";

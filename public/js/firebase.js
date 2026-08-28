@@ -43,10 +43,17 @@ import {
   limit,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+import {
+  getFunctions,
+  httpsCallable,
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
+
 // Inicializar
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+// Las funciones viven en us-central1, que es la región por defecto.
+const funciones = getFunctions(app);
 
 // 🔑 Crear el proveedor de Google
 const googleProvider = new GoogleAuthProvider();
@@ -58,6 +65,8 @@ const SUPPORT_EMAIL = "soporte.memorie.legends@gmail.com";
 export {
   auth,
   db,
+  funciones,
+  httpsCallable,
   googleProvider,
   SUPPORT_EMAIL,
   createUserWithEmailAndPassword,

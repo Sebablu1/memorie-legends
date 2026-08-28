@@ -593,14 +593,16 @@ export const crearOrdenDeCompra = functions.https.onCall(async (data, context) =
  * ⚠️ La verificación de firma de abajo es genérica (HMAC-SHA256 sobre el
  * cuerpo crudo). Ajustala al algoritmo y encabezado que documente el
  * proveedor que uses; sin firma válida NO se acredita nada.
- * El secreto se configura con:  firebase functions:config:set pagos.secreto="..."
+ * El secreto se configura con:  firebase functions:secrets:set PAGOS_SECRETO
  */
 export const webhookPago = functions.https.onRequest(async (req, res) => {
   if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
 
-  const secreto = functions.config()?.pagos?.secreto;
+  // functions.config() está discontinuado: el secreto viene por variable de
+  // entorno. Se define con:  firebase functions:secrets:set PAGOS_SECRETO
+  const secreto = process.env.PAGOS_SECRETO;
   if (!secreto) {
-    console.error("Falta pagos.secreto en la configuración.");
+    console.error("Falta la variable PAGOS_SECRETO.");
     return res.status(500).send("Sin configurar");
   }
 
