@@ -54,15 +54,16 @@ ok(vistaDe(s, 0).hayLevantada === true, "pero sí saben que levantó");
 ok([0, 2, 3].every((i) => filtracionesEn(vistaDe(s, i), s).length === 0),
    "sin filtraciones para los que no juegan");
 
-console.log("\n=== Un descarte fallido sí expone esa carta a todos ===");
+console.log("\n=== Un descarte fallido expone esa carta a todos, y sólo un rato ===");
 let e = M.empezarRonda(M.crearPartida(CONFIG, { rng: mulberry32(3) }));
 e = M.terminarMirada(e);
 // se busca una posición cuya carta NO coincida con la muestra
 const muestra = e.descarte[0];
 const posMala = e.jugadores[2].mano.findIndex((c) => c && c.numero !== muestra.numero);
 e = M.intentarDescarte(e, 2, posMala);
-ok(e.infoPublica.length === 1, "quedó registrada la exposición");
-const expuesta = e.infoPublica[0].carta;
+const destapadas = e.ventanaDescarte.intentos.filter((i) => i.carta);
+ok(destapadas.length === 1, "hay exactamente una carta destapada");
+const expuesta = destapadas[0].carta;
 for (const quien of [0, 1, 2, 3]) {
   const v = vistaDe(e, quien);
   const cartaEnVista = v.jugadores[2].mano[posMala];
@@ -72,6 +73,16 @@ ok(true, "los cuatro jugadores ven la carta que se expuso");
 ok(vistaDe(e, 0).jugadores[2].mano.filter((c) => c && !c.oculta).length === 1,
    "y sólo esa: el resto de esa mano sigue tapado");
 ok(filtracionesEn(vistaDe(e, 0), e).length === 0, "exponer una carta no cuenta como filtración");
+
+// Y en cuanto se cierra la ventana, esa información desaparece de la vista:
+// no queda marca en ningún lado, sólo en la memoria de quien la vio.
+const despues = M.cerrarVentanaDescarte(e);
+ok(vistaDe(despues, 0).jugadores[2].mano[posMala]?.oculta === true,
+   "cerrada la ventana la carta vuelve a estar tapada para los demás");
+ok(vistaDe(despues, 2).jugadores[2].mano[posMala]?.oculta === true,
+   "y también para su propio dueño: nadie la tiene marcada");
+ok(vistaDe(despues, 0).revelaciones.length === 0, "la vista ya no trae revelaciones");
+ok(filtracionesEn(vistaDe(despues, 0), despues).length === 0, "y sigue sin filtrar nada");
 
 console.log("\n=== Al cortar se destapa todo, como manda el reglamento ===");
 let c = M.empezarRonda(M.crearPartida(CONFIG, { rng: mulberry32(11) }));
