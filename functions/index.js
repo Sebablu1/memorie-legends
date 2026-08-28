@@ -29,6 +29,9 @@ import {
   MONEDA,
 } from "./reglas/economia.js";
 
+import { crearMoverLeyendas } from "./leyendas.js";
+import { crearAbandonarPartida } from "./abandono.js";
+
 import {
   ENTRADAS,
   MAX_JUGADORES,
@@ -66,52 +69,23 @@ const CAMPO_SALDO = "credits";
 
 // ------------------------------------------------------------ libro mayor
 
+/** Se lanza siempre así, para que el módulo de saldo no dependa de functions. */
+const errorHttp = (codigo, mensaje) => new functions.https.HttpsError(codigo, mensaje);
+
+const marcaDeTiempo = () => admin.firestore.FieldValue.serverTimestamp();
+
 /**
- * Único punto por el que se mueven Leyendas. Escribe el saldo y un asiento
- * en el libro mayor dentro de la misma transacción, para que nunca haya
- * saldo sin respaldo ni asiento sin saldo.
- *
- * `idempotencia` evita que un reintento acredite dos veces: si ya existe un
- * asiento con esa clave, la operación no hace nada.
+ * Única puerta por la que se mueven Leyendas. La implementación vive en
+ * `leyendas.js` para poder probarla; acá sólo se le dan el Firestore y el
+ * reloj de verdad.
  */
-async function moverLeyendas(tx, { uid, delta, motivo, referencia = null, idempotencia = null }) {
-  const refJugador = db.collection(USUARIOS).doc(uid);
-
-  if (idempotencia) {
-    const refAsiento = db.collection("movimientos").doc(idempotencia);
-    const yaEstaba = await tx.get(refAsiento);
-    if (yaEstaba.exists) return { aplicado: false, saldo: null };
-  }
-
-  const snap = await tx.get(refJugador);
-  const saldoPrevio = snap.exists ? (snap.data()[CAMPO_SALDO] ?? 0) : 0;
-  const saldoNuevo = saldoPrevio + delta;
-
-  if (saldoNuevo < 0) {
-    throw new functions.https.HttpsError(
-      "failed-precondition",
-      `Saldo insuficiente: tenés ${saldoPrevio} Leyendas y hacen falta ${-delta}.`,
-    );
-  }
-
-  tx.set(refJugador, { [CAMPO_SALDO]: saldoNuevo }, { merge: true });
-
-  const refAsiento = idempotencia
-    ? db.collection("movimientos").doc(idempotencia)
-    : db.collection("movimientos").doc();
-
-  tx.set(refAsiento, {
-    uid,
-    delta,
-    motivo,
-    referencia,
-    saldoPrevio,
-    saldoNuevo,
-    creado: admin.firestore.FieldValue.serverTimestamp(),
-  });
-
-  return { aplicado: true, saldo: saldoNuevo };
-}
+const moverLeyendas = crearMoverLeyendas({
+  db,
+  usuarios: USUARIOS,
+  campoSaldo: CAMPO_SALDO,
+  marcaDeTiempo,
+  error: errorHttp,
+});
 
 const exigirSesion = (context) => {
   if (!context.auth) {
@@ -487,6 +461,33 @@ export const salirDeSalaEnEspera = functions.https.onCall(async (data, context) 
 
     return { cancelada: esCreador, devuelto: entrada };
   });
+});
+
+// ------------------------------------------------- abandono en curso
+
+/**
+ * Abandonar una partida ya empezada.
+ *
+ * La entrada ya está en el pozo y no vuelve; el pozo no se toca. Encima se
+ * cobra una penalización que no va al pozo ni a otro jugador: se retira de
+ * circulación. La lógica está en `abandono.js`, probada aparte.
+ *
+ * Del navegador llega sólo el código de sala. La entrada, el modo y la
+ * penalización se leen y se calculan acá.
+ */
+const abandono = crearAbandonarPartida({
+  db,
+  salas: SALAS,
+  moverLeyendas,
+  motivo: MOTIVOS.PENALIZACION_ABANDONO,
+  marcaDeTiempo,
+  error: errorHttp,
+  estados: ESTADOS_SALA,
+});
+
+export const abandonarPartida = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context);
+  return abandono({ uid, codigo: data?.codigo });
 });
 
 /**
