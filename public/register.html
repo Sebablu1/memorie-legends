@@ -5,6 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Memorie Legends - Registro</title>
     <link rel="stylesheet" href="css/style.css" />
+    <style>
+      .support-footer {
+        text-align: center;
+        margin-top: 25px;
+        padding-top: 15px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        color: #888;
+        font-size: 0.8rem;
+      }
+      .support-footer a {
+        color: #4285f4;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .support-footer a:hover {
+        text-decoration: underline;
+      }
+    </style>
   </head>
   <body>
     <div class="container">
@@ -29,7 +47,7 @@
           <input
             type="password"
             id="password"
-            placeholder="Contraseña"
+            placeholder="Contraseña (mínimo 6 caracteres)"
             required
           />
         </div>
@@ -39,6 +57,19 @@
       <p class="link">
         ¿Ya tienes cuenta? <a href="login.html">Inicia sesión</a>
       </p>
+
+      <!-- Footer con correo de soporte -->
+      <div class="support-footer">
+        <p>
+          ¿Necesitas ayuda?
+          <a href="mailto:soporte.memorie.legends@gmail.com">
+            soporte.memorie.legends@gmail.com
+          </a>
+        </p>
+        <p style="color: #555; font-size: 0.7rem; margin-top: 5px">
+          🃏 Memorie Legends - Tu juego de memoria favorito
+        </p>
+      </div>
     </div>
 
     <script type="module" src="js/register.js"></script>

@@ -1,4 +1,4 @@
-// 🔥 Configuración de Firebase para memorie-legends
+// 🔥 Configuración de Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyAd3EscVwcQwXOq3oudzGb3NBLK_AAAdh0",
   authDomain: "memorie-legends.firebaseapp.com",
@@ -11,15 +11,16 @@ const firebaseConfig = {
 
 // Importar Firebase
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-
 import {
   getAuth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   onAuthStateChanged,
   signOut,
+  sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
 import {
   getFirestore,
   doc,
@@ -40,20 +41,30 @@ import {
   runTransaction,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// Inicializar Firebase
+// Inicializar
 const app = initializeApp(firebaseConfig);
-
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Exportar todo
+// 🔑 Crear el proveedor de Google
+const googleProvider = new GoogleAuthProvider();
+
+// ✅ Correo de soporte
+const SUPPORT_EMAIL = "soporte.memorie.legends@gmail.com";
+
+// ✅ EXPORTAR TODO (sin duplicar SUPPORT_EMAIL)
 export {
   auth,
   db,
+  googleProvider,
+  SUPPORT_EMAIL,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   onAuthStateChanged,
   signOut,
+  sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithPopup,
   doc,
   getDoc,
   setDoc,

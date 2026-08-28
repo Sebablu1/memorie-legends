@@ -11,7 +11,8 @@ import {
   getDocs,
   deleteDoc,
   increment,
-} from "./firebase-config.js";
+} from "./firebase.js"; // ✅ Cambiado de firebase-config.js a firebase.js
+
 import { crearBaraja, barajar, calcularPuntaje, esIgual } from "./gameLogic.js";
 
 const user = JSON.parse(localStorage.getItem("user"));
