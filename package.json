@@ -6,9 +6,15 @@
   "scripts": {
     "start": "firebase serve",
     "deploy": "firebase deploy",
-    "build": "echo 'No build needed'"
+    "build": "echo 'No build needed'",
+    "test": "node pruebas/puntaje.mjs"
   },
-  "keywords": ["game", "cards", "firebase", "multijugador"],
+  "keywords": [
+    "game",
+    "cards",
+    "firebase",
+    "multijugador"
+  ],
   "author": "Tu Nombre",
   "license": "MIT",
   "devDependencies": {
