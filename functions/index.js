@@ -1,0 +1,567 @@
+/**
+ * Cloud Functions de Memorie Legends.
+ *
+ * Todo lo que toca Leyendas vive acá y NUNCA en el navegador: saldos, apuestas,
+ * ruleta, bonos, premios de ranking y acreditación de compras. El cliente sólo
+ * pide; el servidor decide y escribe.
+ *
+ * Reglas de Firestore que acompañan a esto (ver firestore.rules): las
+ * colecciones de dinero y ranking son de sólo lectura para el cliente.
+ */
+
+import functions from "firebase-functions/v1";
+import admin from "firebase-admin";
+import crypto from "node:crypto";
+
+import {
+  LEYENDAS_REGISTRO,
+  BONO_DIARIO,
+  LEYENDAS_POR_REFERIDO,
+  girarRuleta,
+  esperaRuleta,
+  esperaBonoDiario,
+  calcularReparto,
+  premioPorPuesto,
+  paquetePorId,
+  leyendasDePaquete,
+  NIVELES_APUESTA,
+  MOTIVOS,
+  MONEDA,
+} from "./reglas/economia.js";
+
+import {
+  PERIODOS,
+  clavesDePeriodos,
+  clavePeriodo,
+  esPartidaPuntuable,
+  puntosDePartida,
+  acumularFila,
+  filaVacia,
+  ZONA_POR_DEFECTO,
+} from "./reglas/ranking.js";
+
+admin.initializeApp();
+const db = admin.firestore();
+
+const ZONA = ZONA_POR_DEFECTO;
+
+// ------------------------------------------------------------ libro mayor
+
+/**
+ * Único punto por el que se mueven Leyendas. Escribe el saldo y un asiento
+ * en el libro mayor dentro de la misma transacción, para que nunca haya
+ * saldo sin respaldo ni asiento sin saldo.
+ *
+ * `idempotencia` evita que un reintento acredite dos veces: si ya existe un
+ * asiento con esa clave, la operación no hace nada.
+ */
+async function moverLeyendas(tx, { uid, delta, motivo, referencia = null, idempotencia = null }) {
+  const refJugador = db.collection("jugadores").doc(uid);
+
+  if (idempotencia) {
+    const refAsiento = db.collection("movimientos").doc(idempotencia);
+    const yaEstaba = await tx.get(refAsiento);
+    if (yaEstaba.exists) return { aplicado: false, saldo: null };
+  }
+
+  const snap = await tx.get(refJugador);
+  const saldoPrevio = snap.exists ? (snap.data().leyendas ?? 0) : 0;
+  const saldoNuevo = saldoPrevio + delta;
+
+  if (saldoNuevo < 0) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      `Saldo insuficiente: tenés ${saldoPrevio} Leyendas y hacen falta ${-delta}.`,
+    );
+  }
+
+  tx.set(refJugador, { leyendas: saldoNuevo }, { merge: true });
+
+  const refAsiento = idempotencia
+    ? db.collection("movimientos").doc(idempotencia)
+    : db.collection("movimientos").doc();
+
+  tx.set(refAsiento, {
+    uid,
+    delta,
+    motivo,
+    referencia,
+    saldoPrevio,
+    saldoNuevo,
+    creado: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { aplicado: true, saldo: saldoNuevo };
+}
+
+const exigirSesion = (context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Iniciá sesión para continuar.");
+  }
+  return context.auth.uid;
+};
+
+// --------------------------------------------------------------- registro
+
+/** Leyendas de bienvenida, una sola vez por cuenta. */
+export const alCrearUsuario = functions.auth.user().onCreate(async (user) => {
+  await db.runTransaction(async (tx) => {
+    tx.set(
+      db.collection("jugadores").doc(user.uid),
+      {
+        uid: user.uid,
+        nombre: user.displayName ?? "Jugador",
+        email: user.email ?? null,
+        creado: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+    await moverLeyendas(tx, {
+      uid: user.uid,
+      delta: LEYENDAS_REGISTRO,
+      motivo: MOTIVOS.REGISTRO,
+      idempotencia: `registro_${user.uid}`,
+    });
+  });
+});
+
+// ------------------------------------------------------------ bono diario
+
+export const reclamarBonoDiario = functions.https.onCall(async (_data, context) => {
+  const uid = exigirSesion(context);
+
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(db.collection("jugadores").doc(uid));
+    const ultimo = snap.exists ? snap.data().ultimoBonoDiario : null;
+    const restante = esperaBonoDiario(ultimo?.toDate?.() ?? ultimo, Date.now());
+
+    if (restante > 0) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        `Todavía no: faltan ${Math.ceil(restante / 60000)} minutos.`,
+      );
+    }
+
+    const r = await moverLeyendas(tx, { uid, delta: BONO_DIARIO, motivo: MOTIVOS.BONO_DIARIO });
+    tx.set(
+      db.collection("jugadores").doc(uid),
+      { ultimoBonoDiario: admin.firestore.FieldValue.serverTimestamp() },
+      { merge: true },
+    );
+    return { leyendas: BONO_DIARIO, saldo: r.saldo };
+  });
+});
+
+// ---------------------------------------------------------------- ruleta
+
+/** Aleatoriedad criptográfica: el premio no puede depender de Math.random. */
+const azarSeguro = () => crypto.randomInt(0, 2 ** 48) / 2 ** 48;
+
+export const girarLaRuleta = functions.https.onCall(async (_data, context) => {
+  const uid = exigirSesion(context);
+
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(db.collection("jugadores").doc(uid));
+    const ultimo = snap.exists ? snap.data().ultimoGiroRuleta : null;
+    const restante = esperaRuleta(ultimo?.toDate?.() ?? ultimo, Date.now());
+
+    if (restante > 0) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        `La ruleta vuelve en ${Math.ceil(restante / 3600000)} horas.`,
+      );
+    }
+
+    // El premio se sortea en el servidor: el cliente sólo recibe el resultado.
+    const { premio, rareza } = girarRuleta(azarSeguro);
+
+    const r = await moverLeyendas(tx, { uid, delta: premio, motivo: MOTIVOS.RULETA });
+    tx.set(
+      db.collection("jugadores").doc(uid),
+      { ultimoGiroRuleta: admin.firestore.FieldValue.serverTimestamp() },
+      { merge: true },
+    );
+
+    return { premio, rareza, saldo: r.saldo };
+  });
+});
+
+// -------------------------------------------------------------- apuestas
+
+/** Cobra la apuesta al entrar a una mesa y deja la Leyenda en juego. */
+export const entrarAMesa = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context);
+  const { mesaId, apuesta } = data ?? {};
+
+  const nivelValido = Object.values(NIVELES_APUESTA).some((n) => n.apuesta === apuesta);
+  if (!nivelValido) {
+    throw new functions.https.HttpsError("invalid-argument", "Nivel de apuesta inválido.");
+  }
+
+  return db.runTransaction(async (tx) => {
+    const r = await moverLeyendas(tx, {
+      uid,
+      delta: -apuesta,
+      motivo: MOTIVOS.APUESTA,
+      referencia: mesaId,
+      idempotencia: `apuesta_${mesaId}_${uid}`,
+    });
+    if (!r.aplicado) {
+      throw new functions.https.HttpsError("already-exists", "Ya pagaste la entrada a esta mesa.");
+    }
+    return { saldo: r.saldo };
+  });
+});
+
+/**
+ * Cierra una partida: reparte el pote y acumula el ranking.
+ *
+ * El resumen llega del cliente, así que hay que tratarlo como no confiable:
+ * se valida contra la mesa registrada (jugadores y apuesta) antes de pagar.
+ * Con dinero real de por medio, lo correcto es que la partida se simule
+ * también en el servidor o que el resultado lo firme un árbitro.
+ */
+export const cerrarPartida = functions.https.onCall(async (data, context) => {
+  exigirSesion(context);
+  const { mesaId, resumen } = data ?? {};
+  if (!mesaId || !resumen) {
+    throw new functions.https.HttpsError("invalid-argument", "Faltan mesaId o resumen.");
+  }
+
+  const mesaSnap = await db.collection("mesas").doc(mesaId).get();
+  if (!mesaSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "La mesa no existe.");
+  }
+  const mesa = mesaSnap.data();
+
+  const humanos = resumen.posiciones.filter((p) => !p.esIA);
+  const inscriptos = new Set(mesa.jugadores ?? []);
+  if (!humanos.every((p) => inscriptos.has(p.id))) {
+    throw new functions.https.HttpsError("permission-denied", "El resumen no coincide con la mesa.");
+  }
+
+  const partida = { id: mesaId, dePago: Boolean(mesa.dePago), apuesta: Number(mesa.apuesta) };
+  const fecha = new Date();
+  const claves = clavesDePeriodos(fecha, ZONA);
+
+  const rachas = {};
+  for (const p of humanos) {
+    const s = await db.collection("jugadores").doc(p.id).get();
+    rachas[p.id] = s.exists ? (s.data().rachaActual ?? 0) : 0;
+  }
+
+  return db.runTransaction(async (tx) => {
+    const refPartida = db.collection("partidas").doc(mesaId);
+    if ((await tx.get(refPartida)).exists) {
+      throw new functions.https.HttpsError("already-exists", "La partida ya fue cerrada.");
+    }
+
+    // --- reparto del pote ---
+    let reparto = null;
+    if (esPartidaPuntuable(partida)) {
+      reparto = calcularReparto({
+        apuesta: partida.apuesta,
+        jugadores: humanos.map((p) => p.id),
+        ganadorId: resumen.ganadorId,
+      });
+      // La apuesta ya se cobró al entrar: acá sólo se paga el premio.
+      const premio = reparto.movimientos.find((m) => m.jugadorId === resumen.ganadorId);
+      if (premio) {
+        await moverLeyendas(tx, {
+          uid: resumen.ganadorId,
+          delta: reparto.pago,
+          motivo: MOTIVOS.PREMIO_PARTIDA,
+          referencia: mesaId,
+          idempotencia: `premio_${mesaId}`,
+        });
+      }
+    }
+
+    // --- ranking (sólo partidas de pago) ---
+    const resultados = esPartidaPuntuable(partida)
+      ? humanos
+          .map((p) =>
+            puntosDePartida(
+              resumen,
+              p.id,
+              { rayaPrevia: rachas[p.id], ibaUltimo: mesa.contexto?.[p.id]?.ibaUltimo },
+              partida.apuesta,
+            ),
+          )
+          .filter(Boolean)
+      : [];
+
+    const objetivos = [];
+    for (const r of resultados) {
+      for (const periodo of PERIODOS) {
+        const ref = db
+          .collection("rankings")
+          .doc(claves[periodo])
+          .collection("jugadores")
+          .doc(r.jugadorId);
+        objetivos.push({ ref, r, previo: (await tx.get(ref)).data() ?? filaVacia() });
+      }
+    }
+
+    tx.set(refPartida, {
+      ...partida,
+      resumen,
+      claves,
+      resultados,
+      reparto,
+      creada: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    for (const { ref, r, previo } of objetivos) {
+      const nombre = humanos.find((p) => p.id === r.jugadorId)?.nombre ?? null;
+      tx.set(ref, { uid: r.jugadorId, nombre, ...acumularFila(previo, r) }, { merge: true });
+    }
+
+    for (const r of resultados) {
+      tx.set(
+        db.collection("jugadores").doc(r.jugadorId),
+        { rachaActual: r.rayaNueva },
+        { merge: true },
+      );
+    }
+
+    return { resultados, reparto };
+  });
+});
+
+// -------------------------------------------------------------- referidos
+
+export const acreditarReferido = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context);
+  const { referidoUid } = data ?? {};
+  if (!referidoUid || referidoUid === uid) {
+    throw new functions.https.HttpsError("invalid-argument", "Referido inválido.");
+  }
+
+  return db.runTransaction(async (tx) => {
+    const r = await moverLeyendas(tx, {
+      uid,
+      delta: LEYENDAS_POR_REFERIDO,
+      motivo: MOTIVOS.REFERIDO,
+      referencia: referidoUid,
+      idempotencia: `referido_${referidoUid}`,
+    });
+    if (!r.aplicado) {
+      throw new functions.https.HttpsError("already-exists", "Ese referido ya fue acreditado.");
+    }
+    return { leyendas: LEYENDAS_POR_REFERIDO, saldo: r.saldo };
+  });
+});
+
+// -------------------------------------------------- reinicio de rankings
+
+/**
+ * Los rankings no se "borran": cada período es su propio documento y la clave
+ * se deriva de la fecha. Reiniciar es, entonces, cerrar el período que termina
+ * y pagar sus premios. Esta función marca el cierre y reparte.
+ */
+async function cerrarPeriodo(periodo, fechaDelPeriodoQueCierra) {
+  const clave = clavePeriodo(periodo, fechaDelPeriodoQueCierra, ZONA);
+  const refPeriodo = db.collection("rankings").doc(clave);
+
+  const yaCerrado = await refPeriodo.get();
+  if (yaCerrado.exists && yaCerrado.data().cerrado) {
+    console.log(`El período ${clave} ya estaba cerrado.`);
+    return { clave, premiados: 0 };
+  }
+
+  const tabla = await refPeriodo
+    .collection("jugadores")
+    .orderBy("puntos", "desc")
+    .limit(50)
+    .get();
+
+  let premiados = 0;
+  for (let i = 0; i < tabla.docs.length; i++) {
+    const fila = tabla.docs[i];
+    const puesto = i + 1;
+    const premio = premioPorPuesto(puesto);
+    if (!premio) continue;
+
+    await db.runTransaction(async (tx) => {
+      const r = await moverLeyendas(tx, {
+        uid: fila.id,
+        delta: premio.leyendas,
+        motivo: MOTIVOS.PREMIO_RANKING,
+        referencia: clave,
+        idempotencia: `premio_${clave}_${fila.id}`,
+      });
+      if (!r.aplicado) return;
+
+      tx.set(fila.ref, { puesto, premiado: true }, { merge: true });
+      if (premio.insignia) {
+        tx.set(
+          db.collection("jugadores").doc(fila.id),
+          { insignias: admin.firestore.FieldValue.arrayUnion(premio.insignia) },
+          { merge: true },
+        );
+      }
+    });
+    premiados++;
+  }
+
+  await refPeriodo.set(
+    {
+      tipo: periodo,
+      clave,
+      cerrado: true,
+      cerradoEn: admin.firestore.FieldValue.serverTimestamp(),
+      premiados,
+    },
+    { merge: true },
+  );
+
+  console.log(`Período ${clave} cerrado: ${premiados} premiados.`);
+  return { clave, premiados };
+}
+
+const ayer = () => new Date(Date.now() - 86400000);
+
+export const cerrarRankingSemanal = functions.pubsub
+  .schedule("0 0 * * 1") // lunes 00:00
+  .timeZone(ZONA)
+  .onRun(() => cerrarPeriodo("semanal", ayer()));
+
+export const cerrarRankingMensual = functions.pubsub
+  .schedule("0 0 1 * *") // día 1 a las 00:00
+  .timeZone(ZONA)
+  .onRun(() => cerrarPeriodo("mensual", ayer()));
+
+export const cerrarRankingAnual = functions.pubsub
+  .schedule("0 0 1 1 *") // 1 de enero 00:00
+  .timeZone(ZONA)
+  .onRun(() => cerrarPeriodo("anual", ayer()));
+
+// ----------------------------------------------------------------- pagos
+
+/**
+ * Paso 1 de la compra: se registra la orden y se devuelve lo necesario para
+ * abrir el checkout alojado del proveedor.
+ *
+ * ⚠️ INTEGRACIÓN PENDIENTE. La llamada al SDK de Xsolla / Mercado Pago va
+ * marcada abajo: hace falta la credencial y el endpoint exacto de tu cuenta.
+ * El importe SIEMPRE se toma del catálogo del servidor, nunca del cliente:
+ * si viniera del navegador, cualquiera compraría el Pack Élite por $U 1.
+ */
+export const crearOrdenDeCompra = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context);
+  const paquete = paquetePorId(data?.paqueteId);
+  if (!paquete) {
+    throw new functions.https.HttpsError("invalid-argument", "Paquete inexistente.");
+  }
+
+  const refOrden = db.collection("ordenes").doc();
+  await refOrden.set({
+    id: refOrden.id,
+    uid,
+    paqueteId: paquete.id,
+    leyendas: leyendasDePaquete(paquete),
+    importe: paquete.precio, // del catálogo del servidor
+    moneda: MONEDA,
+    estado: "pendiente",
+    creada: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  // TODO(pagos): crear acá la sesión de checkout con el proveedor y devolver
+  // su URL. Debe enviarse `refOrden.id` como referencia externa para poder
+  // reconciliar el webhook, y el importe tomado de `paquete.precio`.
+  const urlCheckout = null;
+
+  return {
+    ordenId: refOrden.id,
+    importe: paquete.precio,
+    moneda: MONEDA,
+    leyendas: leyendasDePaquete(paquete),
+    urlCheckout,
+  };
+});
+
+/**
+ * Paso 2: el proveedor confirma el pago. Sólo acá se acreditan Leyendas.
+ *
+ * ⚠️ La verificación de firma de abajo es genérica (HMAC-SHA256 sobre el
+ * cuerpo crudo). Ajustala al algoritmo y encabezado que documente el
+ * proveedor que uses; sin firma válida NO se acredita nada.
+ * El secreto se configura con:  firebase functions:config:set pagos.secreto="..."
+ */
+export const webhookPago = functions.https.onRequest(async (req, res) => {
+  if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
+
+  const secreto = functions.config()?.pagos?.secreto;
+  if (!secreto) {
+    console.error("Falta pagos.secreto en la configuración.");
+    return res.status(500).send("Sin configurar");
+  }
+
+  const firmaRecibida = req.get("x-signature") ?? "";
+  const esperada = crypto
+    .createHmac("sha256", secreto)
+    .update(req.rawBody ?? Buffer.from(""))
+    .digest("hex");
+
+  const iguales =
+    firmaRecibida.length === esperada.length &&
+    crypto.timingSafeEqual(Buffer.from(firmaRecibida), Buffer.from(esperada));
+
+  if (!iguales) {
+    console.warn("Webhook con firma inválida.");
+    return res.status(401).send("Firma inválida");
+  }
+
+  const { ordenId, estado, transaccionId } = req.body ?? {};
+  if (!ordenId || !transaccionId) return res.status(400).send("Payload incompleto");
+  if (estado !== "pagado") {
+    await db.collection("ordenes").doc(ordenId).set({ estado }, { merge: true });
+    return res.status(200).send("ok");
+  }
+
+  try {
+    await db.runTransaction(async (tx) => {
+      const refOrden = db.collection("ordenes").doc(ordenId);
+      const snap = await tx.get(refOrden);
+      if (!snap.exists) throw new Error(`Orden ${ordenId} inexistente`);
+
+      const orden = snap.data();
+      if (orden.estado === "pagado") return; // reintento del proveedor
+
+      const paquete = paquetePorId(orden.paqueteId);
+
+      await moverLeyendas(tx, {
+        uid: orden.uid,
+        delta: orden.leyendas,
+        motivo: MOTIVOS.COMPRA,
+        referencia: transaccionId,
+        // Idempotencia por transacción: el proveedor puede reintentar el aviso.
+        idempotencia: `compra_${transaccionId}`,
+      });
+
+      tx.set(
+        refOrden,
+        {
+          estado: "pagado",
+          transaccionId,
+          pagada: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+
+      if (paquete?.insignia) {
+        tx.set(
+          db.collection("jugadores").doc(orden.uid),
+          { insignias: admin.firestore.FieldValue.arrayUnion(paquete.insignia) },
+          { merge: true },
+        );
+      }
+    });
+
+    return res.status(200).send("ok");
+  } catch (e) {
+    console.error("Error acreditando la compra:", e);
+    return res.status(500).send("Error");
+  }
+});

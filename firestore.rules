@@ -1,0 +1,79 @@
+rules_version = '2';
+
+// Memorie Legends — reglas de Firestore.
+//
+// Principio: NADA que involucre Leyendas, ranking o pagos se escribe desde el
+// navegador. Todo eso lo hacen las Cloud Functions con permisos de admin, que
+// no pasan por estas reglas. El cliente sólo lee.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function sesionIniciada() {
+      return request.auth != null;
+    }
+
+    // --- Perfil del jugador ---
+    // El saldo, la racha, las insignias y las marcas de tiempo de bono/ruleta
+    // los escribe el servidor. El jugador sólo puede tocar su nombre y avatar.
+    match /jugadores/{uid} {
+      allow read: if sesionIniciada();
+      allow update: if request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['nombre', 'avatar']);
+      allow create, delete: if false;
+
+      match /{documentoHijo=**} {
+        allow read: if request.auth.uid == uid;
+        allow write: if false;
+      }
+    }
+
+    // --- Libro mayor de Leyendas ---
+    // Cada jugador ve sus movimientos; nadie los escribe desde el cliente.
+    match /movimientos/{id} {
+      allow read: if sesionIniciada() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    // --- Rankings ---
+    // Públicos para leer, imposibles de escribir desde el navegador.
+    match /rankings/{periodo} {
+      allow read: if true;
+      allow write: if false;
+
+      match /jugadores/{uid} {
+        allow read: if true;
+        allow write: if false;
+      }
+    }
+
+    // --- Partidas cerradas y órdenes de compra ---
+    match /partidas/{id} {
+      allow read: if sesionIniciada();
+      allow write: if false;
+    }
+
+    match /ordenes/{id} {
+      allow read: if sesionIniciada() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    // --- Mesas ---
+    // Se crean y se unen desde el cliente, pero la apuesta y el estado de pago
+    // los fija el servidor al cobrar la entrada.
+    match /mesas/{id} {
+      allow read: if sesionIniciada();
+      allow create: if sesionIniciada();
+      allow update: if sesionIniciada()
+        && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['apuesta', 'dePago', 'resultados', 'reparto']);
+      allow delete: if false;
+    }
+
+    // Todo lo no contemplado queda cerrado.
+    match /{documento=**} {
+      allow read, write: if false;
+    }
+  }
+}

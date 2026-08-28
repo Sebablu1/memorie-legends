@@ -1,0 +1,3 @@
+node_modules/
+# Copia generada en cada deploy; la fuente está en public/js/reglas
+reglas/
