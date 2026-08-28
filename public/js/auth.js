@@ -51,13 +51,14 @@ onAuthStateChanged(auth, async (user) => {
         console.log("✅ Usuario de Google creado en Firestore");
       }
 
+      // El saldo NO se guarda acá. localStorage lo edita cualquiera desde la
+      // consola, así que guardarlo invita a tratarlo como cierto en algún
+      // punto. Las Leyendas se leen siempre de Firestore, con sesion.js.
       localStorage.setItem(
         "user",
         JSON.stringify({
           id: user.uid,
           username: userData.username || user.displayName || "Usuario",
-          credits: userData.credits || 100,
-          wins: userData.wins || 0,
         }),
       );
       console.log("✅ Usuario guardado en localStorage");

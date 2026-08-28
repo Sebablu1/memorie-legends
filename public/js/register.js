@@ -65,14 +65,13 @@ form.addEventListener("submit", async (e) => {
 
     console.log("✅ Usuario guardado en Firestore");
 
-    // 3. Guardar en localStorage
+    // 3. Guardar en localStorage lo que sirve para identificar, y nada más.
+    // El saldo vive en Firestore: acá sería un valor editable por el jugador.
     localStorage.setItem(
       "user",
       JSON.stringify({
         id: user.uid,
         username: username,
-        credits: 100, // ✅ 100 CRÉDITOS
-        wins: 0,
       }),
     );
 
