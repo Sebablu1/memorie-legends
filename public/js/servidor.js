@@ -64,3 +64,16 @@ export const crearSala = (entrada, nombre) => llamar("crearSala", { entrada, nom
  * @returns {Promise<{codigo: string, entrada: number, saldo: number}>}
  */
 export const unirseASala = (codigo) => llamar("unirseASala", { codigo });
+
+/**
+ * Arranca la partida. Sólo lo consigue quien creó la sala.
+ * @returns {Promise<{codigo: string, jugadores: number, pozo: number}>}
+ */
+export const iniciarPartida = (codigo) => llamar("iniciarPartida", { codigo });
+
+/**
+ * Sale de una sala que todavía no empezó, con devolución de la entrada.
+ * Si sale el creador, la sala se cancela y se devuelve a todos.
+ * @returns {Promise<{cancelada: boolean, devuelto: number}>}
+ */
+export const salirDeSalaEnEspera = (codigo) => llamar("salirDeSalaEnEspera", { codigo });

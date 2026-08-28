@@ -96,12 +96,12 @@ function mulberry32(a){return function(){a|=0;a=(a+0x6d2b79f5)|0;let t=Math.imul
 const rng = mulberry32(99);
 const vistos = new Set();
 for (let i = 0; i < 20000; i++) vistos.add(S.generarCodigo(rng));
-ok([...vistos].every((c) => c.length === S.LARGO_CODIGO), "todos de 5 caracteres");
+ok([...vistos].every((c) => c.length === S.LARGO_CODIGO), "todos de 6 caracteres");
 ok([...vistos].every(S.esCodigoValido), "todos válidos");
 ok(!/[IO01U]/.test([...vistos].join("")), "sin caracteres confusos (I, O, 0, 1, U)");
 ok(vistos.size > 19900, `20.000 códigos, ${vistos.size} distintos: colisiones despreciables`, vistos.size);
-ok(S.COMBINACIONES_CODIGO > 28_000_000, `${S.COMBINACIONES_CODIGO.toLocaleString("es-UY")} combinaciones posibles`);
-ok(!S.esCodigoValido("ABC1") && !S.esCodigoValido("ABCDEF") && !S.esCodigoValido("ABCIO"), "rechaza largos y caracteres inválidos");
+ok(S.COMBINACIONES_CODIGO > 880_000_000, `${S.COMBINACIONES_CODIGO.toLocaleString("es-UY")} combinaciones posibles`);
+ok(!S.esCodigoValido("ABC1") && !S.esCodigoValido("ABCDEFG") && !S.esCodigoValido("ABCIOP"), "rechaza largos y caracteres inválidos");
 
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);
 process.exit(fallos ? 1 : 0);

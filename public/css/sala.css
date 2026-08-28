@@ -1,0 +1,232 @@
+/* Sala de espera: código destacado, jugadores en vivo y salida. */
+
+.cargando {
+  text-align: center;
+  padding: 50px 20px;
+  color: var(--plata);
+}
+
+.sala-cabecera {
+  text-align: center;
+  padding: 26px 20px 30px;
+  margin-bottom: 22px;
+  border-radius: 20px;
+  background: linear-gradient(150deg, var(--panel-alto), rgba(10, 10, 10, 0.92));
+  border: 1px solid var(--borde);
+  box-shadow: var(--sombra-negra), 0 0 70px -40px var(--oro);
+}
+
+.etiqueta-modo {
+  color: var(--plata);
+  font-size: 0.78rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.sala-cabecera .titulo-pagina {
+  font-size: 1.7rem;
+  margin-bottom: 22px;
+}
+
+/* --- código destacado --- */
+
+.codigo-caja {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 34px;
+  border-radius: 16px;
+  background: rgba(212, 168, 67, 0.07);
+  border: 2px dashed rgba(212, 168, 67, 0.45);
+  margin-bottom: 24px;
+}
+
+.codigo-rotulo {
+  font-size: 0.72rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--plata);
+}
+
+.codigo {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(2.2rem, 8vw, 3.2rem);
+  letter-spacing: 0.5rem;
+  line-height: 1;
+  color: var(--oro-claro);
+  text-shadow: 0 0 30px rgba(212, 168, 67, 0.4);
+  /* El código se selecciona de un doble clic. */
+  user-select: all;
+}
+
+.codigo-caja .btn-plata { padding: 9px 20px; font-size: 0.82rem; }
+
+/* --- datos --- */
+
+.datos-sala {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.dato {
+  min-width: 130px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--borde-suave);
+}
+
+.dato span {
+  display: block;
+  font-size: 0.68rem;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--plata);
+  margin-bottom: 4px;
+}
+
+.dato b {
+  font-size: 1.05rem;
+  color: var(--oro-claro);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- jugadores --- */
+
+.lista-jugadores { list-style: none; padding: 0; margin: 0; }
+
+.jugador-fila {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.jugador-fila:last-child { border-bottom: none; }
+
+.avatar-inicial {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-weight: 800;
+  color: var(--negro);
+  background: linear-gradient(145deg, var(--oro-claro), var(--oro));
+}
+
+.nombre-jugador { font-weight: 600; }
+
+.jugador-fila.vacia { opacity: 0.4; }
+
+.jugador-fila.vacia .avatar-inicial {
+  background: none;
+  border: 2px dashed var(--borde-suave);
+  color: var(--plata);
+}
+
+.jugador-fila.es-mio .nombre-jugador { color: var(--oro-claro); }
+
+.jugador-fila .insignia {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(212, 168, 67, 0.12);
+  border: 1px solid rgba(212, 168, 67, 0.3);
+  color: var(--oro-claro);
+}
+
+.jugador-fila .insignia.propio {
+  background: rgba(192, 192, 192, 0.12);
+  border-color: rgba(192, 192, 192, 0.35);
+  color: var(--plata-clara);
+}
+
+/* --- estado y acciones --- */
+
+.estado-sala {
+  text-align: center;
+  color: var(--plata);
+  margin: 22px 0 18px;
+  font-size: 0.95rem;
+}
+
+.acciones-sala {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.acciones-sala .btn-oro,
+.acciones-sala .btn-plata { min-width: 200px; }
+
+.nota-sala {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 0.82rem;
+  color: var(--plata-honda);
+  font-style: italic;
+}
+
+/* --- pantalla final --- */
+
+.aviso-final { text-align: center; padding: 46px 24px; }
+.icono-final { font-size: 3rem; display: block; margin-bottom: 14px; }
+.aviso-final h2 { border: none; font-size: 1.4rem; color: var(--oro); margin-bottom: 10px; letter-spacing: 0; text-transform: none; }
+.aviso-final p { color: var(--plata); margin-bottom: 22px; }
+.aviso-final .btn-oro { display: inline-block; text-decoration: none; }
+
+/* --- modal de salida --- */
+
+.velo {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background: rgba(3, 5, 9, 0.86);
+  backdrop-filter: blur(8px);
+}
+
+.velo[hidden] { display: none; }
+
+.velo .modal {
+  width: 100%;
+  max-width: 460px;
+  padding: 28px;
+  text-align: center;
+  border-radius: 20px;
+  background: linear-gradient(170deg, #1a1a20, var(--negro));
+  border: 1px solid rgba(212, 168, 67, 0.42);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.75);
+}
+
+.velo .modal h2 {
+  font-family: "Playfair Display", Georgia, serif;
+  color: var(--oro);
+  font-size: 1.3rem;
+  margin-bottom: 10px;
+}
+
+.velo .modal p { color: var(--plata); line-height: 1.7; margin-bottom: 22px; }
+
+.botonera-modal { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.botonera-modal button { min-width: 150px; }
+
+@media (max-width: 600px) {
+  .codigo-caja { padding: 16px 20px; width: 100%; }
+  .codigo { letter-spacing: 0.3rem; }
+  .acciones-sala .btn-oro,
+  .acciones-sala .btn-plata { width: 100%; }
+}

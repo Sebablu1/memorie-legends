@@ -32,6 +32,7 @@ import {
 import {
   ENTRADAS,
   MAX_JUGADORES,
+  MIN_JUGADORES,
   ESTADOS_SALA,
   esEntradaValida,
   puedeUnirse,
@@ -316,6 +317,123 @@ export const unirseASala = functions.https.onCall(async (data, context) => {
     });
 
     return { codigo, entrada: sala.entrada, saldo: r.saldo };
+  });
+});
+
+/**
+ * Arranca la partida. Sólo el creador, y sólo con jugadores suficientes.
+ *
+ * Al arrancar se congela el pozo: a partir de acá la entrada no cambia y
+ * nadie más puede sumarse.
+ */
+export const iniciarPartida = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context);
+  const codigo = String(data?.codigo ?? "").trim().toUpperCase();
+
+  return db.runTransaction(async (tx) => {
+    const refSala = db.collection(SALAS).doc(codigo);
+    const snap = await tx.get(refSala);
+    if (!snap.exists) {
+      throw new functions.https.HttpsError("not-found", "Sala no encontrada.");
+    }
+
+    const sala = snap.data();
+    if (sala.creador !== uid) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "Sólo quien creó la sala puede empezar la partida.",
+      );
+    }
+    if (sala.estado !== ESTADOS_SALA.ESPERANDO) {
+      throw new functions.https.HttpsError("failed-precondition", "Esta sala ya no está esperando.");
+    }
+
+    const jugadores = sala.jugadores ?? [];
+    if (jugadores.length < MIN_JUGADORES) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        `Hacen falta al menos ${MIN_JUGADORES} jugadores para empezar.`,
+      );
+    }
+
+    tx.update(refSala, {
+      estado: ESTADOS_SALA.JUGANDO,
+      // El pozo queda fijado con los jugadores que efectivamente pagaron.
+      pozo: Number(sala.entrada) * jugadores.length,
+      iniciadaEn: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { codigo, jugadores: jugadores.length, pozo: Number(sala.entrada) * jugadores.length };
+  });
+});
+
+/**
+ * Salir de una sala que todavía NO empezó.
+ *
+ * Acá se devuelve la entrada completa y no hay penalización: la partida
+ * nunca arrancó, así que no habría de qué castigar. La penalización del 50%
+ * es para abandonar una partida en curso, que es otra operación.
+ *
+ * Si se va quien creó la sala, la sala se cancela y se le devuelve la
+ * entrada a todos: no se dejan Leyendas atrapadas en una sala huérfana.
+ */
+export const salirDeSalaEnEspera = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context);
+  const codigo = String(data?.codigo ?? "").trim().toUpperCase();
+
+  return db.runTransaction(async (tx) => {
+    const refSala = db.collection(SALAS).doc(codigo);
+    const snap = await tx.get(refSala);
+    if (!snap.exists) {
+      throw new functions.https.HttpsError("not-found", "Sala no encontrada.");
+    }
+
+    const sala = snap.data();
+    if (sala.estado !== ESTADOS_SALA.ESPERANDO) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "La partida ya empezó: para salir hay que abandonarla.",
+      );
+    }
+
+    const jugadores = sala.jugadores ?? [];
+    if (!jugadores.includes(uid)) {
+      throw new functions.https.HttpsError("failed-precondition", "No estás en esta sala.");
+    }
+
+    const entrada = Number(sala.entrada);
+    const esCreador = sala.creador === uid;
+    // Si se va el creador, se cancela y se devuelve a todos; si no, sólo a él.
+    const aDevolver = esCreador ? jugadores : [uid];
+
+    for (const jugador of aDevolver) {
+      await moverLeyendas(tx, {
+        uid: jugador,
+        delta: entrada,
+        motivo: MOTIVOS.APUESTA,
+        referencia: codigo,
+        idempotencia: `devolucion_${codigo}_${jugador}`,
+      });
+    }
+
+    if (esCreador) {
+      tx.update(refSala, {
+        estado: ESTADOS_SALA.CANCELADA,
+        canceladaEn: admin.firestore.FieldValue.serverTimestamp(),
+        motivoCancelacion: "el creador salió de la sala",
+      });
+    } else {
+      const indice = jugadores.indexOf(uid);
+      const nombres = [...(sala.jugadoresNombres ?? [])];
+      nombres.splice(indice, 1);
+      tx.update(refSala, {
+        jugadores: jugadores.filter((j) => j !== uid),
+        jugadoresNombres: nombres,
+        pozo: entrada * (jugadores.length - 1),
+      });
+    }
+
+    return { cancelada: esCreador, devuelto: entrada };
   });
 });
 

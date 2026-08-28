@@ -62,26 +62,15 @@ service cloud.firestore {
     }
 
     // ------------------------------------------------------- salas
-    // Las salas siguen siendo del cliente mientras no exista el servidor,
-    // pero no pueden tocar nada económico ni inflar el cupo.
+    // Las salas las escribe ÚNICAMENTE el servidor: crear, unirse, iniciar
+    // y salir pasan por Cloud Functions, que usan credenciales de admin y
+    // no pasan por estas reglas. El cliente sólo mira.
+    //
+    // Antes el navegador escribía acá directamente, y eso permitía cambiar
+    // el estado de la sala, sumarse sin pagar o iniciar la partida ajena.
     match /rooms/{salaId} {
       allow read: if autenticado();
-
-      allow create: if autenticado()
-        && request.resource.data.creador == request.auth.uid
-        && request.resource.data.maxJugadores <= 4
-        && request.resource.data.jugadores.size() <= 4;
-
-      // Al actualizar no se puede cambiar la entrada, el creador ni el
-      // código, ni pasar de cuatro jugadores.
-      allow update: if autenticado()
-        && request.resource.data.jugadores.size() <= 4
-        && request.resource.data.apuesta == resource.data.apuesta
-        && request.resource.data.creador == resource.data.creador
-        && request.resource.data.codigo == resource.data.codigo;
-
-      // Sólo el creador puede borrar su sala.
-      allow delete: if autenticado() && resource.data.creador == request.auth.uid;
+      allow write: if false;
     }
 
     // ------------------------------------- colecciones del servidor

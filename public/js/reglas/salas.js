@@ -169,7 +169,7 @@ export function puedeUnirse(sala, jugadorId, saldo) {
 
 /** Sin I, O, 0, 1 ni U: se confunden al leerlos o al dictarlos. */
 const ALFABETO = "ABCDEFGHJKLMNPQRSTVWXYZ23456789";
-export const LARGO_CODIGO = 5;
+export const LARGO_CODIGO = 6;
 
 /**
  * Código de sala. El `rng` se inyecta para poder testearlo y para que el
