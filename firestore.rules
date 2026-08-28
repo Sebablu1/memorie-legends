@@ -1,43 +1,106 @@
 rules_version = '2';
 
-// Memorie Legends — reglas de Firestore.
+// ============================================================
+// Memorie Legends — reglas de Firestore
 //
-// Principio: NADA que involucre Leyendas, ranking o pagos se escribe desde el
-// navegador. Todo eso lo hacen las Cloud Functions con permisos de admin, que
-// no pasan por estas reglas. El cliente sólo lee.
+// Escritas contra las colecciones que EXISTEN hoy (`users`, `rooms`) más
+// las que usará el servidor cuando haya Cloud Functions.
+//
+// Regla de oro: el saldo de Leyendas (`users.credits`) es de SÓLO LECTURA
+// para el navegador. Da igual lo que el usuario edite en localStorage o
+// escriba en la consola: no puede cambiar su saldo ni el de nadie.
+//
+// Las Cloud Functions usan credenciales de administrador y NO pasan por
+// estas reglas, así que podrán mover saldo cuando se desplieguen.
+// ============================================================
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function sesionIniciada() {
+    function autenticado() {
       return request.auth != null;
     }
 
-    // --- Perfil del jugador ---
-    // El saldo, la racha, las insignias y las marcas de tiempo de bono/ruleta
-    // los escribe el servidor. El jugador sólo puede tocar su nombre y avatar.
-    match /jugadores/{uid} {
-      allow read: if sesionIniciada();
-      allow update: if request.auth.uid == uid
-        && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['nombre', 'avatar']);
-      allow create, delete: if false;
+    function esDuenio(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
 
-      match /{documentoHijo=**} {
-        allow read: if request.auth.uid == uid;
+    // Campos que el jugador SÍ puede tocar de su propio perfil.
+    // Todo lo demás (saldo, estadísticas, insignias, marcas de tiempo de
+    // bonos) queda reservado al servidor.
+    function soloCamposPropios() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['username', 'avatar', 'photoURL']);
+    }
+
+    // Saldo de bienvenida permitido al crear la cuenta. Cualquier otro
+    // valor se rechaza, para que nadie se cree el perfil con un millón.
+    function saldoDeBienvenidaValido() {
+      return request.resource.data.credits == 100;
+    }
+
+    // ---------------------------------------------------- perfiles
+    match /users/{uid} {
+      // Los perfiles se leen entre jugadores: el lobby y el ranking
+      // muestran nombres. No hay datos sensibles acá.
+      allow read: if autenticado();
+
+      // La cuenta se crea una sola vez, y sólo con el saldo de bienvenida.
+      allow create: if esDuenio(uid) && saldoDeBienvenidaValido();
+
+      // El jugador sólo puede cambiar su nombre o su avatar.
+      // `credits`, `wins` y `gamesPlayed` quedan fuera de su alcance.
+      allow update: if esDuenio(uid) && soloCamposPropios();
+
+      allow delete: if false;
+
+      // Subcolecciones del perfil (rachas, historial): sólo lectura propia.
+      match /{documento=**} {
+        allow read: if esDuenio(uid);
         allow write: if false;
       }
     }
 
-    // --- Libro mayor de Leyendas ---
-    // Cada jugador ve sus movimientos; nadie los escribe desde el cliente.
+    // ------------------------------------------------------- salas
+    // Las salas siguen siendo del cliente mientras no exista el servidor,
+    // pero no pueden tocar nada económico ni inflar el cupo.
+    match /rooms/{salaId} {
+      allow read: if autenticado();
+
+      allow create: if autenticado()
+        && request.resource.data.creador == request.auth.uid
+        && request.resource.data.maxJugadores <= 4
+        && request.resource.data.jugadores.size() <= 4;
+
+      // Al actualizar no se puede cambiar la entrada, el creador ni el
+      // código, ni pasar de cuatro jugadores.
+      allow update: if autenticado()
+        && request.resource.data.jugadores.size() <= 4
+        && request.resource.data.apuesta == resource.data.apuesta
+        && request.resource.data.creador == resource.data.creador
+        && request.resource.data.codigo == resource.data.codigo;
+
+      // Sólo el creador puede borrar su sala.
+      allow delete: if autenticado() && resource.data.creador == request.auth.uid;
+    }
+
+    // ------------------------------------- colecciones del servidor
+    // Todas de sólo lectura para el cliente. Las escribe únicamente el
+    // servidor con credenciales de administrador.
+
+    // Libro mayor: cada quien ve sus propios movimientos.
     match /movimientos/{id} {
-      allow read: if sesionIniciada() && resource.data.uid == request.auth.uid;
+      allow read: if autenticado() && resource.data.uid == request.auth.uid;
       allow write: if false;
     }
 
-    // --- Rankings ---
-    // Públicos para leer, imposibles de escribir desde el navegador.
+    // Órdenes de compra: sólo las propias.
+    match /ordenes/{id} {
+      allow read: if autenticado() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    // Rankings: públicos para leer, imposibles de escribir.
     match /rankings/{periodo} {
       allow read: if true;
       allow write: if false;
@@ -48,27 +111,21 @@ service cloud.firestore {
       }
     }
 
-    // --- Partidas cerradas y órdenes de compra ---
+    // Partidas cerradas y su resultado.
     match /partidas/{id} {
-      allow read: if sesionIniciada();
+      allow read: if autenticado();
       allow write: if false;
     }
 
-    match /ordenes/{id} {
-      allow read: if sesionIniciada() && resource.data.uid == request.auth.uid;
+    // Torneos: los lee cualquiera, los administra sólo el servidor.
+    match /torneos/{id} {
+      allow read: if autenticado();
       allow write: if false;
-    }
 
-    // --- Mesas ---
-    // Se crean y se unen desde el cliente, pero la apuesta y el estado de pago
-    // los fija el servidor al cobrar la entrada.
-    match /mesas/{id} {
-      allow read: if sesionIniciada();
-      allow create: if sesionIniciada();
-      allow update: if sesionIniciada()
-        && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['apuesta', 'dePago', 'resultados', 'reparto']);
-      allow delete: if false;
+      match /{documento=**} {
+        allow read: if autenticado();
+        allow write: if false;
+      }
     }
 
     // Todo lo no contemplado queda cerrado.

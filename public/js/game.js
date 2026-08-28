@@ -305,18 +305,9 @@ async function terminarRonda() {
       ganador: ganador.id,
     });
 
-    await updateDoc(doc(db, "users", ganador.id), {
-      wins: increment(1),
-      gamesPlayed: increment(1),
-    });
-
-    for (const p of roomData.players) {
-      if (p.id !== ganador.id) {
-        await updateDoc(doc(db, "users", p.id), {
-          gamesPlayed: increment(1),
-        });
-      }
-    }
+    // Las estadísticas las llevará el servidor. Antes se escribían desde el
+    // navegador sobre los documentos de LOS DEMÁS jugadores, así que
+    // cualquiera podía inflar o borrar las victorias ajenas.
 
     document.getElementById("mensaje").textContent =
       `🏆 ¡${ganador.username} ganó la partida!`;

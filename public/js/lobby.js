@@ -30,7 +30,10 @@ if (!user.username || !user.id) {
   throw new Error("Datos de usuario inválidos");
 }
 
-console.log("✅ Usuario válido:", user.username, "Créditos:", user.credits);
+console.log("✅ Usuario válido:", user.username);
+
+/** Saldo autoritativo, tal como lo devuelve Firestore. Nunca se calcula acá. */
+let saldoActual = 0;
 
 // ========== REFERENCIAS A ELEMENTOS ==========
 const usernameEl = document.getElementById("username");
@@ -52,7 +55,15 @@ const closeShopBtn = document.getElementById("closeShopBtn");
 
 // ========== MOSTRAR INFO USUARIO ==========
 usernameEl.textContent = user.username;
-creditsEl.textContent = user.credits || 0;
+// El saldo NUNCA sale de localStorage: es el dato que el usuario puede editar.
+// La única fuente autoritativa es el documento de Firestore, y se escucha en
+// vivo para que cualquier cambio hecho por el servidor se refleje solo.
+creditsEl.textContent = "…";
+onSnapshot(doc(db, "users", user.id), (snap) => {
+  const saldo = snap.exists() ? (snap.data().credits ?? 0) : 0;
+  creditsEl.textContent = saldo;
+  saldoActual = saldo;
+});
 winsEl.textContent = user.wins || 0;
 
 // ========== FUNCIONES AUXILIARES ==========
@@ -109,61 +120,24 @@ document.querySelectorAll(".shop-item").forEach((item) => {
     );
     if (!confirmar) return;
 
-    mostrarMensaje(`⏳ Procesando compra de ${credits} créditos...`, "info");
-
-    setTimeout(async () => {
-      try {
-        const userRef = doc(db, "users", user.id);
-        await updateDoc(userRef, {
-          credits: increment(credits),
-        });
-
-        const nuevosCredits = (user.credits || 0) + credits;
-        actualizarCredits(nuevosCredits);
-        mostrarMensaje(`✅ ¡Compra exitosa! +${credits} créditos`, "exito");
-        shopModal.style.display = "none";
-      } catch (error) {
-        console.error("Error:", error);
-        mostrarMensaje("❌ Error al procesar la compra", "error");
-      }
-    }, 1500);
+    // GRIFO CERRADO. Este bloque acreditaba Leyendas con un confirm() y sin
+    // ningún pago: se podía llamar desde la consola con el importe que fuera.
+    // La compra real vive en tienda.html y sólo puede acreditar el servidor,
+    // cuando haya Cloud Functions, contra un aviso firmado del proveedor.
+    mostrarMensaje(
+      "La compra de Leyendas todavía no está disponible. Muy pronto.",
+      "info",
+    );
+    shopModal.style.display = "none";
   });
 });
 
-// ========== RULETA GRATIS ==========
-rouletteBtn.addEventListener("click", async () => {
-  try {
-    const userRef = doc(db, "users", user.id);
-    const userDoc = await getDoc(userRef);
-    const data = userDoc.data();
-
-    const now = Date.now();
-    const lastSpin = data.lastSpin || 0;
-    const twoDays = 2 * 24 * 60 * 60 * 1000;
-
-    if (now - lastSpin < twoDays) {
-      const remaining = twoDays - (now - lastSpin);
-      const hours = Math.floor(remaining / (60 * 60 * 1000));
-      const mins = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
-      mostrarMensaje(
-        `⏳ Espera ${hours}h ${mins}m para girar de nuevo`,
-        "warning",
-      );
-      return;
-    }
-
-    await updateDoc(userRef, {
-      credits: increment(5),
-      lastSpin: now,
-    });
-
-    const nuevosCredits = (user.credits || 0) + 5;
-    actualizarCredits(nuevosCredits);
-    mostrarMensaje(`🎰 ¡Ganaste 5 créditos gratis! Vuelve en 2 días`, "exito");
-  } catch (error) {
-    console.error("Error:", error);
-    mostrarMensaje("❌ Error al girar la ruleta", "error");
-  }
+// ========== RULETA ==========
+// El giro dejó de acreditar desde el navegador: cualquiera podía llamarlo
+// desde la consola. La ruleta completa vive en ruleta.html y sólo va a
+// acreditar cuando el sorteo y el saldo los maneje el servidor.
+rouletteBtn.addEventListener("click", () => {
+  window.location.href = "ruleta.html";
 });
 
 // ========== CREAR SALA ==========
@@ -182,6 +156,17 @@ createBtn.addEventListener("click", async () => {
       return;
     }
 
+    // Cobrar la entrada acá significaría calcular el saldo en el navegador y
+    // escribirlo, que es exactamente el agujero que estamos cerrando. Las
+    // partidas por Leyendas quedan en pausa hasta que el cobro lo haga el
+    // servidor dentro de una transacción.
+    mostrarMensaje(
+      "Las partidas por Leyendas están en pausa mientras preparamos el servidor. " +
+        "Mientras tanto podés entrenar contra la máquina.",
+      "info",
+    );
+    return;
+
     const salaRef = collection(db, "rooms");
     await addDoc(salaRef, {
       codigo: codigo,
@@ -196,10 +181,7 @@ createBtn.addEventListener("click", async () => {
       createdAt: serverTimestamp(),
     });
 
-    const nuevosCredits = (user.credits || 0) - apuesta;
-    const userRef = doc(db, "users", user.id);
-    await updateDoc(userRef, { credits: nuevosCredits });
-    actualizarCredits(nuevosCredits);
+    // El cobro de la entrada lo hará el servidor. Acá no se escribe saldo.
 
     mostrarMensaje(`✅ Sala "${nombre}" creada! Código: ${codigo}`, "exito");
 
@@ -258,16 +240,24 @@ joinBtn.addEventListener("click", async () => {
       return;
     }
 
+    // Cobrar la entrada acá significaría calcular el saldo en el navegador y
+    // escribirlo, que es exactamente el agujero que estamos cerrando. Las
+    // partidas por Leyendas quedan en pausa hasta que el cobro lo haga el
+    // servidor dentro de una transacción.
+    mostrarMensaje(
+      "Las partidas por Leyendas están en pausa mientras preparamos el servidor. " +
+        "Mientras tanto podés entrenar contra la máquina.",
+      "info",
+    );
+    return;
+
     const salaRef = doc(db, "rooms", salaDoc.id);
     await updateDoc(salaRef, {
       jugadores: [...(salaData.jugadores || []), user.id],
       jugadoresNombres: [...(salaData.jugadoresNombres || []), user.username],
     });
 
-    const nuevosCredits = (user.credits || 0) - apuesta;
-    const userRef = doc(db, "users", user.id);
-    await updateDoc(userRef, { credits: nuevosCredits });
-    actualizarCredits(nuevosCredits);
+    // El cobro de la entrada lo hará el servidor. Acá no se escribe saldo.
 
     mostrarMensaje(`✅ Unido a sala ${codigo}`, "exito");
     roomCodeInput.value = "";

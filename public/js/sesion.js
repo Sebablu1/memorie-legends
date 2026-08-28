@@ -53,7 +53,18 @@ export async function leerPerfil(uid) {
   };
 }
 
+/**
+ * Guarda campos del perfil.
+ *
+ * ⚠️ NO sirve para el saldo. `credits` es de sólo lectura para el cliente:
+ * lo escribe únicamente el servidor. Esta función existe para datos como el
+ * nombre o el avatar, y las reglas de Firestore rechazan cualquier intento
+ * de tocar el saldo desde acá.
+ */
 export async function guardarEnPerfil(uid, campos) {
+  if (CAMPO_SALDO in campos) {
+    throw new Error("El saldo no se escribe desde el navegador.");
+  }
   await updateDoc(doc(db, COLECCION, uid), campos);
 }
 

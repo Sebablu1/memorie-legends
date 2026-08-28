@@ -2,9 +2,7 @@ import {
   exigirSesion,
   mostrarSaldo,
   conectarBotonSalir,
-  guardarEnPerfil,
   formatearEspera,
-  CAMPO_SALDO,
 } from "./sesion.js";
 
 import {
@@ -124,27 +122,14 @@ if (sesion) {
     await esperar(5100);
     $("rueda").classList.remove("girando");
 
-    saldo += premio;
-    ultimoGiro = new Date().toISOString();
-
-    try {
-      await guardarEnPerfil(usuario.uid, {
-        [CAMPO_SALDO]: saldo,
-        lastSpin: ultimoGiro,
-      });
-    } catch (error) {
-      console.error("No se pudo guardar el giro:", error);
-      $("resultado").textContent = "El premio salió, pero no se pudo guardar. Reintentá.";
-      girando = false;
-      return;
-    }
-
-    mostrarSaldo(saldo, { animar: true });
-    $("saldoPanel").textContent = saldo.toLocaleString("es-UY");
-
+    // NO se acredita desde el navegador: el saldo sólo puede escribirlo el
+    // servidor. Hasta entonces la ruleta muestra el premio pero no lo paga,
+    // y tampoco consume el giro: sería cobrarle al jugador sin darle nada.
     const caja = $("resultado");
     caja.className = `resultado premiado rareza-${rareza}`;
-    caja.innerHTML = `<span class="cantidad">+${premio.toLocaleString("es-UY")}</span> Leyendas`;
+    caja.innerHTML =
+      `<span class="cantidad">+${premio.toLocaleString("es-UY")}</span> Leyendas` +
+      `<br><small>Se acreditarán cuando el servidor esté activo.</small>`;
 
     // Los premios grandes merecen festejo.
     if (premio >= 50) {
