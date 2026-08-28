@@ -66,6 +66,12 @@ export const crearSala = (entrada, nombre) => llamar("crearSala", { entrada, nom
 export const unirseASala = (codigo) => llamar("unirseASala", { codigo });
 
 /**
+ * Marca al jugador como listo, o le saca la marca.
+ * @returns {Promise<{listo: boolean, listos: number, jugadores: number}>}
+ */
+export const marcarListo = (codigo, listo) => llamar("marcarListo", { codigo, listo });
+
+/**
  * Arranca la partida. Sólo lo consigue quien creó la sala.
  * @returns {Promise<{codigo: string, jugadores: number, pozo: number}>}
  */

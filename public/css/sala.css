@@ -144,6 +144,31 @@
   color: var(--oro-claro);
 }
 
+/* Marca de listo, a la derecha de cada jugador. */
+.marca-listo {
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.marca-listo.si {
+  color: #8fd4b4;
+  background: rgba(61, 139, 107, 0.16);
+  border: 1px solid rgba(61, 139, 107, 0.5);
+}
+
+.marca-listo.no {
+  color: var(--plata-honda);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--borde-suave);
+}
+
+.jugador-fila.vacia .marca-listo { display: none; }
+
 .jugador-fila .insignia.propio {
   background: rgba(192, 192, 192, 0.12);
   border-color: rgba(192, 192, 192, 0.35);

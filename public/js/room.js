@@ -9,7 +9,7 @@
 
 import { db, doc, onSnapshot } from "./firebase.js";
 import { exigirSesion, mostrarSaldo } from "./sesion.js";
-import { iniciarPartida, salirDeSalaEnEspera, ErrorDeServidor } from "./servidor.js";
+import { iniciarPartida, salirDeSalaEnEspera, marcarListo, ErrorDeServidor } from "./servidor.js";
 import { ESTADOS_SALA, MIN_JUGADORES, MAX_JUGADORES } from "./reglas/salas.js";
 
 const $ = (id) => document.getElementById(id);
@@ -21,6 +21,9 @@ const codigo = (new URLSearchParams(location.search).get("code") ?? "")
 /** Deja de escuchar la sala; se llama al salir o al irse a la mesa. */
 let dejarDeEscuchar = null;
 let yaRedirigido = false;
+/** Última foto de la sala, para que los botones no dependan del texto. */
+let salaActual = null;
+let miUid = null;
 
 function mostrarFinal(icono, titulo, texto) {
   if (dejarDeEscuchar) dejarDeEscuchar();
@@ -69,7 +72,9 @@ function arrancar({ usuario, perfil }) {
 
 // -------------------------------------------------------------- pintar
 
-function pintar(sala, miUid) {
+function pintar(sala, uid) {
+  salaActual = sala;
+  miUid = uid;
   // La partida arrancó: a la mesa.
   if (sala.estado === ESTADOS_SALA.JUGANDO) {
     if (yaRedirigido) return;
@@ -103,8 +108,10 @@ function pintar(sala, miUid) {
 
   const jugadores = sala.jugadores ?? [];
   const nombres = sala.jugadoresNombres ?? [];
+  const listos = new Set(sala.listos ?? []);
   const capacidad = Math.min(sala.maxJugadores ?? MAX_JUGADORES, MAX_JUGADORES);
-  const soyCreador = sala.creador === miUid;
+  const soyCreador = sala.creador === uid;
+  const todosListos = jugadores.length > 0 && jugadores.every((j) => listos.has(j));
 
   $("tituloSala").textContent = sala.nombre ?? "Sala";
   $("codigoSala").textContent = sala.codigo ?? codigo;
@@ -113,18 +120,22 @@ function pintar(sala, miUid) {
   $("contadorJugadores").textContent = `${jugadores.length} / ${capacidad}`;
 
   // Lista: los que están, más los lugares libres.
-  const filas = jugadores.map((uid, i) => {
+  const filas = jugadores.map((jugadorUid, i) => {
     const nombre = nombres[i] ?? "Jugador";
     const inicial = nombre.trim().charAt(0).toUpperCase() || "?";
+    const estaListo = listos.has(jugadorUid);
     const etiquetas = [
-      uid === sala.creador ? '<span class="insignia">Creador</span>' : "",
-      uid === miUid ? '<span class="insignia propio">Vos</span>' : "",
+      jugadorUid === sala.creador ? '<span class="insignia">Creador</span>' : "",
+      jugadorUid === uid ? '<span class="insignia propio">Vos</span>' : "",
     ].join("");
     return `
-      <li class="jugador-fila ${uid === miUid ? "es-mio" : ""}">
+      <li class="jugador-fila ${jugadorUid === uid ? "es-mio" : ""}">
         <span class="avatar-inicial" aria-hidden="true">${inicial}</span>
         <span class="nombre-jugador">${nombre}</span>
         ${etiquetas}
+        <span class="marca-listo ${estaListo ? "si" : "no"}">
+          ${estaListo ? "✅ Listo" : "esperando"}
+        </span>
       </li>`;
   });
 
@@ -137,24 +148,41 @@ function pintar(sala, miUid) {
   }
   $("listaJugadores").innerHTML = filas.join("");
 
-  // Estado y botón de arranque.
-  const faltan = MIN_JUGADORES - jugadores.length;
-  if (faltan > 0) {
+  // --- estado ---
+  const faltanJugadores = MIN_JUGADORES - jugadores.length;
+  const cuentaListos = `${listos.size}/${jugadores.length} listos`;
+
+  if (faltanJugadores > 0) {
     $("estadoSala").textContent =
-      `Falta ${faltan} jugador${faltan === 1 ? "" : "es"} para poder empezar.`;
+      `Falta ${faltanJugadores} jugador${faltanJugadores === 1 ? "" : "es"} para poder empezar.`;
+  } else if (!todosListos) {
+    $("estadoSala").textContent = `Esperando que todos se marquen listos · ${cuentaListos}`;
   } else if (jugadores.length < capacidad) {
-    $("estadoSala").textContent = "Ya se puede empezar, o esperar a que entre alguien más.";
+    $("estadoSala").textContent = `Todos listos (${cuentaListos}). Se puede empezar, o esperar a alguien más.`;
   } else {
-    $("estadoSala").textContent = "Sala completa.";
+    $("estadoSala").textContent = `Sala completa y todos listos (${cuentaListos}).`;
   }
 
+  // --- botón de listo ---
+  const estoyListo = listos.has(uid);
+  const btnListo = $("btnListo");
+  btnListo.textContent = estoyListo ? "Estoy listo ✅ (tocá para deshacer)" : "✅ Estoy listo";
+  btnListo.classList.toggle("btn-plata", estoyListo);
+  btnListo.classList.toggle("btn-oro", !estoyListo);
+  btnListo.setAttribute("aria-pressed", String(estoyListo));
+  btnListo.disabled = false;
+
+  // --- botón de arranque ---
   const btnIniciar = $("btnIniciar");
   btnIniciar.hidden = !soyCreador;
-  btnIniciar.disabled = jugadores.length < MIN_JUGADORES;
+  btnIniciar.disabled = jugadores.length < MIN_JUGADORES || !todosListos;
+  btnIniciar.textContent = todosListos
+    ? "Comenzar partida"
+    : `Comenzar partida (${cuentaListos})`;
 
   $("notaSala").textContent = soyCreador
-    ? "Si salís de la sala, se cancela para todos y se devuelven las entradas."
-    : "Quien creó la sala es quien la empieza.";
+    ? "La partida arranca cuando todos, vos incluido, estén listos. Si salís, la sala se cancela y se devuelven las entradas."
+    : "Marcá que estás listo. Quien creó la sala es quien la empieza.";
 }
 
 // ------------------------------------------------------------ acciones
@@ -169,6 +197,20 @@ $("btnCopiar").addEventListener("click", async () => {
     $("btnCopiar").textContent = "Copialo a mano";
   }
   setTimeout(() => ($("btnCopiar").textContent = "Copiar código"), 1800);
+});
+
+$("btnListo").addEventListener("click", async () => {
+  const boton = $("btnListo");
+  const estoyListo = (salaActual?.listos ?? []).includes(miUid);
+  boton.disabled = true;
+  try {
+    await marcarListo(codigo, !estoyListo);
+    // El onSnapshot repinta solo con el estado nuevo.
+  } catch (error) {
+    boton.disabled = false;
+    $("estadoSala").textContent =
+      error instanceof ErrorDeServidor ? error.message : "No pudimos cambiar tu estado.";
+  }
 });
 
 $("btnIniciar").addEventListener("click", async () => {
@@ -189,7 +231,7 @@ $("btnIniciar").addEventListener("click", async () => {
 // --- salir, con confirmación ---
 
 $("btnSalir").addEventListener("click", () => {
-  const soyCreador = $("notaSala").textContent.startsWith("Si salís");
+  const soyCreador = salaActual?.creador === miUid;
   $("textoModal").textContent = soyCreador
     ? "Sos quien creó la sala: al salir se cancela para todos y se devuelven todas las entradas."
     : "Como la partida todavía no empezó, se te devuelve la entrada completa. No hay penalización.";

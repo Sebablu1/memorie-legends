@@ -250,6 +250,7 @@ export const crearSala = functions.https.onCall(async (data, context) => {
           jugadoresNombres: [nombreJugador],
           maxJugadores: MAX_JUGADORES,
           estado: ESTADOS_SALA.ESPERANDO,
+          listos: [],
           pozo: entrada,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
@@ -321,6 +322,42 @@ export const unirseASala = functions.https.onCall(async (data, context) => {
 });
 
 /**
+ * Marca al jugador como listo, o le saca la marca.
+ *
+ * Es una escritura sobre la sala, así que pasa por acá: las reglas dejan
+ * `rooms` de sólo lectura para el navegador. Cada quien sólo puede marcarse
+ * a sí mismo — el uid sale de la sesión, no de lo que manda el cliente.
+ */
+export const marcarListo = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context);
+  const codigo = String(data?.codigo ?? "").trim().toUpperCase();
+  const listo = data?.listo !== false;
+
+  return db.runTransaction(async (tx) => {
+    const refSala = db.collection(SALAS).doc(codigo);
+    const snap = await tx.get(refSala);
+    if (!snap.exists) {
+      throw new functions.https.HttpsError("not-found", "Sala no encontrada.");
+    }
+
+    const sala = snap.data();
+    if (sala.estado !== ESTADOS_SALA.ESPERANDO) {
+      throw new functions.https.HttpsError("failed-precondition", "Esta sala ya no está esperando.");
+    }
+    if (!(sala.jugadores ?? []).includes(uid)) {
+      throw new functions.https.HttpsError("failed-precondition", "No estás en esta sala.");
+    }
+
+    const listos = new Set(sala.listos ?? []);
+    if (listo) listos.add(uid);
+    else listos.delete(uid);
+
+    tx.update(refSala, { listos: [...listos] });
+    return { listo, listos: listos.size, jugadores: (sala.jugadores ?? []).length };
+  });
+});
+
+/**
  * Arranca la partida. Sólo el creador, y sólo con jugadores suficientes.
  *
  * Al arrancar se congela el pozo: a partir de acá la entrada no cambia y
@@ -353,6 +390,19 @@ export const iniciarPartida = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError(
         "failed-precondition",
         `Hacen falta al menos ${MIN_JUGADORES} jugadores para empezar.`,
+      );
+    }
+
+    // Todos, incluido el creador, tienen que haberse marcado listos: así
+    // nadie arranca mientras alguien todavía estaba acomodándose.
+    const listos = new Set(sala.listos ?? []);
+    const faltan = jugadores.filter((j) => !listos.has(j));
+    if (faltan.length) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        faltan.length === 1
+          ? "Falta un jugador por marcarse listo."
+          : `Faltan ${faltan.length} jugadores por marcarse listos.`,
       );
     }
 
@@ -429,6 +479,8 @@ export const salirDeSalaEnEspera = functions.https.onCall(async (data, context) 
       tx.update(refSala, {
         jugadores: jugadores.filter((j) => j !== uid),
         jugadoresNombres: nombres,
+        // Si se va, deja de contar como listo.
+        listos: (sala.listos ?? []).filter((j) => j !== uid),
         pozo: entrada * (jugadores.length - 1),
       });
     }
