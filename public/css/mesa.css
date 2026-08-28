@@ -1,0 +1,1429 @@
+/* ============================================================
+   Memorie Legends — mesa de juego
+   Paleta de casino: fieltro verde, madera y oro sobre fondo oscuro.
+   ============================================================ */
+
+:root {
+  --noche-1: #0a0a0a;
+  --noche-2: #101010;
+  --noche-3: #16161a;
+
+  --fieltro-claro: #24614a;
+  --fieltro: #1a472a;
+  --fieltro-hondo: #0d2b1a;
+
+  --madera-clara: #8a6432;
+  --madera: #4a2f16;
+  --madera-honda: #1d1108;
+
+  --oro: #d4a843;
+  --oro-claro: #f0d060;
+  --oro-hondo: #8a6d2a;
+
+  --rojo: #c0392b;
+  --verde: #3d8b6b;
+  --ambar: #f0d060;
+
+  --texto: #ffffff;
+  --texto-tenue: #c0c0c0;
+  --vidrio: rgba(18, 18, 22, 0.86);
+  --vidrio-borde: rgba(212, 168, 67, 0.18);
+
+  --carta-ancho: 56px;
+  --carta-alto: 84px;
+  --carta-radio: 6px;
+
+  --sombra-carta: 0 6px 14px rgba(0, 0, 0, 0.55), 0 2px 4px rgba(0, 0, 0, 0.4);
+  --sombra-carta-alta: 0 18px 34px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(212, 168, 67, 0.3);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: var(--texto);
+  min-height: 100vh;
+  padding: 14px;
+  overflow-x: hidden;
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 8%, rgba(212, 168, 67, 0.07), transparent 70%),
+    radial-gradient(ellipse 70% 70% at 50% 55%, rgba(18, 97, 63, 0.16), transparent 72%),
+    linear-gradient(165deg, var(--noche-2) 0%, var(--noche-1) 60%, #03050a 100%);
+  background-attachment: fixed;
+}
+
+/* Viñeta general para concentrar la vista en la mesa. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(ellipse at center, transparent 52%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+.escena {
+  position: relative;
+  z-index: 2;
+  max-width: 1360px;
+  margin: 0 auto;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-areas:
+    "cabecera cabecera"
+    "mesa     lateral"
+    "acciones lateral";
+}
+
+/* ================================================== cabecera */
+
+.cabecera {
+  grid-area: cabecera;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 20px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(28, 38, 54, 0.85), rgba(12, 17, 25, 0.85));
+  border: 1px solid var(--vidrio-borde);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.cabecera .marca {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid rgba(212, 168, 67, 0.4);
+  box-shadow: 0 0 18px rgba(212, 168, 67, 0.2);
+}
+
+.cabecera h1 {
+  font-size: 1.4rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-weight: 800;
+  background: linear-gradient(180deg, var(--oro-claro) 10%, var(--oro) 55%, var(--oro-hondo) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 6px rgba(212, 168, 67, 0.25));
+}
+
+.cabecera .lema {
+  font-size: 0.68rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--texto-tenue);
+}
+
+.cabecera .derecha {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.chip-ronda {
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--oro-claro);
+  background: rgba(212, 168, 67, 0.09);
+  border: 1px solid rgba(212, 168, 67, 0.32);
+  white-space: nowrap;
+}
+
+.chip-ronda strong {
+  font-size: 1.05rem;
+  color: #fff;
+}
+
+.btn-icono {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--vidrio-borde);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--texto);
+  font-size: 1rem;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.btn-icono:hover {
+  background: rgba(212, 168, 67, 0.16);
+  transform: translateY(-2px);
+}
+
+/* ====================================================== mesa */
+
+.mesa-zona {
+  grid-area: mesa;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 0;
+}
+
+.mesa {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 11;
+  min-height: 460px;
+  max-height: 58vh;
+  border-radius: 50% / 44%;
+
+  /* El borde hace de baranda de madera; el relleno, de fieltro. */
+  border: 16px solid transparent;
+  background:
+    radial-gradient(
+        ellipse 74% 66% at 50% 44%,
+        var(--fieltro-claro) 0%,
+        var(--fieltro) 42%,
+        #153c25 72%,
+        var(--fieltro-hondo) 100%
+      )
+      padding-box,
+    linear-gradient(
+        155deg,
+        var(--madera-clara) 0%,
+        var(--madera) 26%,
+        #6d5227 48%,
+        var(--madera-honda) 74%,
+        #5c421f 100%
+      )
+      border-box;
+  box-shadow:
+    0 40px 90px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(212, 168, 67, 0.45),
+    inset 0 0 0 2px rgba(212, 168, 67, 0.22),
+    inset 0 22px 60px rgba(0, 0, 0, 0.45);
+}
+
+/* Marca de agua sobre el fieltro. */
+.mesa::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    url("/img/claude-inspiration/logo2.png") center 46% / 30% auto no-repeat;
+  opacity: 0.07;
+  filter: grayscale(0.3);
+  pointer-events: none;
+}
+
+/* Trama sutil del paño. */
+.mesa::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.018) 0 2px, transparent 2px 4px),
+    repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.03) 0 2px, transparent 2px 4px);
+}
+
+/* ---- asientos alrededor del óvalo ---- */
+
+.asiento {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+}
+
+/* Tu mano vive fuera del óvalo, apoyada sobre la baranda. */
+.asiento-abajo {
+  position: relative;
+  margin-top: -26px;
+  z-index: 5;
+}
+
+.asiento-arriba {
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.asiento-izq {
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.asiento-der {
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* =================================================== jugador */
+
+.jugador {
+  position: relative;
+  padding: 10px 14px 12px;
+  border-radius: 16px;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(10, 16, 24, 0.86), rgba(6, 10, 16, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+  transition: border-color 0.3s, box-shadow 0.3s, opacity 0.3s, transform 0.3s;
+}
+
+.jugador.en-turno {
+  border-color: rgba(212, 168, 67, 0.75);
+  box-shadow:
+    0 0 0 1px rgba(212, 168, 67, 0.4),
+    0 0 34px rgba(212, 168, 67, 0.35),
+    0 14px 32px rgba(0, 0, 0, 0.55);
+  transform: translateY(-3px);
+}
+
+/* Halo que late mientras es tu turno. */
+.jugador.en-turno::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 22px;
+  border: 1px solid rgba(212, 168, 67, 0.35);
+  animation: latir 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes latir {
+  0%, 100% { opacity: 0.25; transform: scale(1); }
+  50%      { opacity: 0.7;  transform: scale(1.015); }
+}
+
+.jugador.eliminado {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+.jugador .cabecera-jugador {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-bottom: 8px;
+}
+
+.jugador .ficha {
+  width: 26px;
+  height: 39px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 2px solid var(--color-asiento, rgba(212, 168, 67, 0.45));
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5), 0 0 10px -3px var(--color-asiento, transparent);
+  flex-shrink: 0;
+}
+
+.jugador .datos {
+  text-align: left;
+  min-width: 0;
+}
+
+.jugador .nombre {
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.4px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.jugador .nombre::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--color-asiento, var(--oro));
+  box-shadow: 0 0 8px var(--color-asiento, var(--oro));
+}
+
+.jugador .insignia {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(212, 168, 67, 0.12);
+  border: 1px solid rgba(212, 168, 67, 0.28);
+  color: var(--oro-claro);
+}
+
+.jugador .puntos {
+  font-size: 0.74rem;
+  color: var(--texto-tenue);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.jugador .puntos b {
+  color: var(--oro-claro);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tu asiento juega con cartas más grandes. */
+.jugador.propio {
+  --carta-ancho: 86px;
+  --carta-alto: 129px;
+  padding: 12px 18px 14px;
+}
+
+.jugador.propio .nombre { font-size: 1rem; }
+
+/* ====================================================== mano */
+
+.mano {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: flex-end;
+  flex-wrap: nowrap;
+  padding-top: 10px;
+  max-width: 100%;
+}
+
+.hueco {
+  --giro: 0deg;
+  --desvio: 0px;
+  --solape: 0px;
+
+  transform-origin: 50% 130%;
+  transform: rotate(var(--giro)) translateY(var(--desvio));
+  margin-inline: calc(var(--solape) / -2);
+  width: var(--carta-ancho);
+  height: var(--carta-alto);
+  border-radius: var(--carta-radio);
+  border: 1px dashed rgba(212, 168, 67, 0.22);
+  background: rgba(0, 0, 0, 0.25);
+  position: relative;
+}
+
+.hueco.vacio::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent 0 6px,
+    rgba(212, 168, 67, 0.05) 6px 12px
+  );
+}
+
+/* ---- carta 3D ---- */
+
+.carta {
+  --giro: 0deg;
+  --desvio: 0px;
+  --solape: 0px;
+
+  width: var(--carta-ancho);
+  height: var(--carta-alto);
+  border-radius: var(--carta-radio);
+  position: relative;
+  perspective: 900px;
+  border: none;
+  padding: 0;
+  background: none;
+  cursor: default;
+  transform-origin: 50% 130%;
+  transform: rotate(var(--giro)) translateY(var(--desvio));
+  margin-inline: calc(var(--solape) / -2);
+  transition: transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1), filter 0.25s;
+}
+
+.carta.jugable { cursor: pointer; }
+
+/* La carta bajo el cursor se despega del abanico sin perder su ángulo. */
+.carta.jugable:hover {
+  transform: rotate(var(--giro)) translateY(calc(var(--desvio) - 16px)) scale(1.06);
+  z-index: 6;
+}
+
+.carta.jugable::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: calc(var(--carta-radio) + 4px);
+  border: 2px solid var(--oro);
+  box-shadow: 0 0 20px rgba(212, 168, 67, 0.55);
+  opacity: 0;
+  transition: opacity 0.22s;
+  pointer-events: none;
+}
+
+.carta.jugable:hover::after,
+.carta.seleccionada::after { opacity: 1; }
+
+.carta .lados {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.45, 0.05, 0.2, 1);
+}
+
+.carta.visible .lados { transform: rotateY(180deg); }
+
+.carta .cara,
+.carta .dorso {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: var(--carta-radio);
+  overflow: hidden;
+  background: var(--noche-3);
+  box-shadow: var(--sombra-carta);
+}
+
+.carta .cara {
+  transform: rotateY(180deg);
+  background: #f6f1e4;
+}
+
+.carta.jugable:hover .cara,
+.carta.jugable:hover .dorso { box-shadow: var(--sombra-carta-alta); }
+
+.carta img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+/* Brillo diagonal que da sensación de barniz. */
+.carta .cara::after,
+.carta .dorso::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    118deg,
+    rgba(255, 255, 255, 0.26) 0%,
+    rgba(255, 255, 255, 0.06) 22%,
+    transparent 46%,
+    rgba(0, 0, 0, 0.16) 100%
+  );
+}
+
+/* Dorsos de los asientos 3 y 4 si faltan los PNG propios. */
+/* Sólo hay dorso azul y rojo. Los asientos 3 y 4 los repiten, así que lo que
+   los identifica es este aro de color alrededor de la carta y de la ficha. */
+.asiento-color-0 { --color-asiento: #4a7fb5; }
+.asiento-color-1 { --color-asiento: #c0392b; }
+.asiento-color-2 { --color-asiento: #35c98a; }
+.asiento-color-3 { --color-asiento: #d4a843; }
+
+.carta[class*="asiento-color-"] .dorso {
+  box-shadow: var(--sombra-carta), inset 0 0 0 2px var(--color-asiento);
+}
+
+/* Los dos primeros no necesitan refuerzo: su dorso ya es único. */
+.carta.asiento-color-2 .dorso,
+.carta.asiento-color-3 .dorso {
+  box-shadow: var(--sombra-carta), inset 0 0 0 3px var(--color-asiento),
+    0 0 12px -2px var(--color-asiento);
+}
+
+.carta.recien-cambiada { animation: destello 0.65s ease-out; }
+
+@keyframes destello {
+  0%   { box-shadow: 0 0 0 0 rgba(212, 168, 67, 0.85); }
+  100% { box-shadow: 0 0 0 22px rgba(212, 168, 67, 0); }
+}
+
+.carta .marca-publica {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 3;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  font-size: 0.62rem;
+  font-weight: 900;
+  border-radius: 50%;
+  background: var(--ambar);
+  color: #2a1b02;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.posicion {
+  position: absolute;
+  bottom: 3px;
+  left: 5px;
+  z-index: 3;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+/* ==================================================== centro */
+
+.centro {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: flex-start;
+  gap: 26px;
+  z-index: 2;
+}
+
+.pila { text-align: center; }
+
+.pila .etiqueta {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: rgba(247, 231, 168, 0.6);
+  margin-bottom: 7px;
+}
+
+.pila .contador {
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 7px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pila .carta {
+  --carta-ancho: 64px;
+  --carta-alto: 96px;
+}
+
+/* El mazo se ve como una pila de varias cartas. */
+#pilaMazo .carta .dorso {
+  box-shadow:
+    var(--sombra-carta),
+    3px 3px 0 -1px rgba(255, 255, 255, 0.07),
+    6px 6px 0 -2px rgba(255, 255, 255, 0.05);
+}
+
+.levantada-caja .carta {
+  --carta-ancho: 74px;
+  --carta-alto: 111px;
+  animation: aparecer 0.4s cubic-bezier(0.2, 1.2, 0.4, 1);
+}
+
+@keyframes aparecer {
+  from { transform: translateY(22px) scale(0.82) rotateZ(-6deg); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+.levantada-caja.con-poder .carta .cara {
+  box-shadow: 0 0 0 2px var(--ambar), 0 0 26px rgba(255, 176, 32, 0.55);
+}
+
+.levantada-caja.con-poder .etiqueta { color: var(--ambar); }
+
+/* =============================================== temporizador */
+
+.temporizador {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: rgba(5, 8, 14, 0.9);
+  border: 1px solid rgba(212, 168, 67, 0.35);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+}
+
+.temporizador.activo { display: flex; }
+
+.temporizador .texto {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--oro-claro);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.temporizador .barra {
+  width: 190px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.temporizador .relleno {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: left;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--oro-claro), var(--oro));
+}
+
+.temporizador.reflejos {
+  border-color: rgba(233, 69, 96, 0.6);
+  animation: alerta 0.9s ease-in-out infinite;
+}
+
+.temporizador.reflejos .texto { color: #f0cfc9; }
+
+.temporizador.reflejos .relleno {
+  background: linear-gradient(90deg, var(--ambar), var(--rojo));
+}
+
+@keyframes alerta {
+  0%, 100% { box-shadow: 0 10px 26px rgba(0, 0, 0, 0.6), 0 0 0 0 rgba(233, 69, 96, 0.4); }
+  50%      { box-shadow: 0 10px 26px rgba(0, 0, 0, 0.6), 0 0 26px 4px rgba(233, 69, 96, 0.35); }
+}
+
+/* ============================================== reloj del turno */
+
+.reloj-turno {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(6, 9, 14, 0.9);
+  border: 1px solid rgba(212, 168, 67, 0.35);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.reloj-turno[hidden] { display: none; }
+
+.reloj-numero {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 22px;
+  text-align: center;
+  color: #d4a843;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.3s;
+}
+
+.reloj-barra {
+  width: 120px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.reloj-relleno {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f0d060, #d4a843);
+  transition: width 0.12s linear, background 0.3s;
+}
+
+/* Últimos dos segundos: rojo y latido. */
+.reloj-turno.apurado {
+  border-color: rgba(231, 76, 60, 0.7);
+  animation: relojApurado 0.7s ease-in-out infinite;
+}
+
+.reloj-turno.apurado .reloj-numero { color: #e74c3c; }
+.reloj-turno.apurado .reloj-relleno { background: linear-gradient(90deg, #e74c3c, #a93226); }
+
+@keyframes relojApurado {
+  0%, 100% { box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6), 0 0 0 0 rgba(231, 76, 60, 0.4); }
+  50% { box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6), 0 0 18px 3px rgba(231, 76, 60, 0.35); }
+}
+
+@media (max-width: 720px) {
+  .reloj-turno { padding: 6px 12px; gap: 9px; }
+  .reloj-numero { font-size: 1.25rem; }
+  .reloj-barra { width: 80px; }
+}
+
+/* ================================================== acciones */
+
+.acciones {
+  grid-area: acciones;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(28, 38, 54, 0.8), rgba(9, 13, 20, 0.88));
+  border: 1px solid var(--vidrio-borde);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.acciones .pista {
+  flex: 1 1 260px;
+  min-width: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--texto-tenue);
+}
+
+.acciones .pista b { color: var(--oro-claro); }
+
+button.accion {
+  position: relative;
+  padding: 14px 26px;
+  border: none;
+  border-radius: 11px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  color: #1a1206;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
+  background: linear-gradient(180deg, var(--oro-claro) 0%, var(--oro) 46%, var(--oro-hondo) 100%);
+  box-shadow:
+    0 6px 0 #6b530f,
+    0 14px 26px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+button.accion:hover:not(:disabled) {
+  transform: translateY(-3px);
+  box-shadow:
+    0 9px 0 #6b530f,
+    0 20px 34px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+button.accion:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 #6b530f, 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+button.accion:disabled {
+  filter: grayscale(0.85) brightness(0.6);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.4);
+  cursor: not-allowed;
+}
+
+/* Barrido de brillo en los botones habilitados. */
+button.accion:not(:disabled)::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-18deg);
+  animation: barrido 4.5s ease-in-out infinite;
+}
+
+@keyframes barrido {
+  0%, 62% { left: -60%; }
+  85%     { left: 130%; }
+  100%    { left: 130%; }
+}
+
+button.accion.peligro {
+  color: #fff;
+  background: linear-gradient(180deg, #d9604f 0%, var(--rojo) 45%, #7d241a 100%);
+  box-shadow: 0 6px 0 #5c1a13, 0 14px 26px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+button.accion.peligro:hover:not(:disabled) {
+  box-shadow: 0 9px 0 #5c1a13, 0 20px 34px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+button.accion.sobria {
+  color: #0a0a0a;
+  background: linear-gradient(180deg, var(--plata-clara, #d0d0d0) 0%, var(--plata-honda, #a0a0a0) 100%);
+  box-shadow: 0 6px 0 #6b6b6b, 0 14px 26px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+button.accion.sobria:hover:not(:disabled) {
+  background: linear-gradient(180deg, #e2e2e2 0%, var(--plata-clara, #d0d0d0) 100%);
+  box-shadow: 0 9px 0 #6b6b6b, 0 20px 34px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* =================================================== lateral */
+
+.lateral {
+  grid-area: lateral;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.tarjeta {
+  background: var(--vidrio);
+  border: 1px solid var(--vidrio-borde);
+  border-radius: 16px;
+  padding: 16px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+
+.tarjeta h2 {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 2.4px;
+  color: var(--oro);
+  margin-bottom: 13px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid rgba(212, 168, 67, 0.18);
+}
+
+.marcador-fila { margin-bottom: 13px; }
+.marcador-fila:last-child { margin-bottom: 0; }
+
+.marcador-fila .linea {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.86rem;
+  margin-bottom: 6px;
+}
+
+.marcador-fila .linea span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marcador-fila .linea b {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--oro-claro);
+}
+
+.barra-puntos {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.barra-puntos i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--verde) 0%, var(--ambar) 62%, var(--rojo) 100%);
+  transition: width 0.6s cubic-bezier(0.3, 1, 0.5, 1);
+}
+
+.marcador-fila.lider .linea b { color: var(--verde); }
+
+.marcador-fila.fuera .linea {
+  color: var(--texto-tenue);
+  text-decoration: line-through;
+}
+
+.registro {
+  max-height: 250px;
+  overflow-y: auto;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--texto-tenue);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(212, 168, 67, 0.3) transparent;
+}
+
+.registro::-webkit-scrollbar { width: 6px; }
+.registro::-webkit-scrollbar-thumb {
+  background: rgba(212, 168, 67, 0.3);
+  border-radius: 999px;
+}
+
+.registro div {
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.registro div:last-child { border-bottom: none; }
+
+.registro .destacado {
+  color: var(--oro-claro);
+  font-weight: 600;
+}
+
+/* ===================================================== modal */
+
+.velo {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background: rgba(3, 5, 9, 0.86);
+  backdrop-filter: blur(8px);
+}
+
+.velo.abierto { display: flex; animation: entrarVelo 0.28s ease-out; }
+
+@keyframes entrarVelo {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.modal {
+  width: 100%;
+  max-width: 660px;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 30px;
+  text-align: center;
+  border-radius: 22px;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(212, 168, 67, 0.14), transparent 62%),
+    linear-gradient(170deg, #1a2434 0%, #0b1119 100%);
+  border: 1px solid rgba(212, 168, 67, 0.42);
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  animation: entrarModal 0.34s cubic-bezier(0.2, 1.1, 0.4, 1);
+}
+
+@keyframes entrarModal {
+  from { transform: translateY(26px) scale(0.95); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+.modal h2 {
+  font-size: 1.45rem;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  background: linear-gradient(180deg, var(--oro-claro), var(--oro));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.modal p {
+  color: var(--texto-tenue);
+  font-size: 0.92rem;
+  margin-bottom: 20px;
+}
+
+.modal .objetivos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 22px;
+}
+
+.grupo-objetivo {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.grupo-objetivo .titulo {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: var(--oro);
+  margin-bottom: 9px;
+}
+
+.grupo-objetivo .mano {
+  --carta-ancho: 54px;
+  --carta-alto: 81px;
+}
+
+/* ====================================== efectos de los poderes */
+
+.anuncio-poder {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 30px;
+  border-radius: 18px;
+  background: rgba(6, 9, 16, 0.93);
+  border: 1px solid var(--tinte-poder, var(--oro));
+  box-shadow: 0 0 50px var(--tinte-poder, var(--oro)), 0 24px 60px rgba(0, 0, 0, 0.7);
+  animation: entrarAnuncio 0.4s cubic-bezier(0.2, 1.3, 0.4, 1);
+  pointer-events: none;
+}
+
+.anuncio-poder.saliendo {
+  animation: salirAnuncio 0.3s ease-in forwards;
+}
+
+.anuncio-poder .icono {
+  font-size: 2.6rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 14px var(--tinte-poder, var(--oro)));
+  animation: girarIcono 1.4s ease-in-out;
+}
+
+.anuncio-poder .detalle {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.anuncio-poder b {
+  font-size: 1.15rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--tinte-poder, var(--oro));
+}
+
+.anuncio-poder i {
+  font-style: normal;
+  font-size: 0.9rem;
+  color: var(--texto);
+}
+
+.anuncio-poder em {
+  font-style: normal;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--texto-tenue);
+}
+
+.anuncio-poder.poder-7 { --tinte-poder: #d4a843; }
+.anuncio-poder.poder-8 { --tinte-poder: #46c8ff; }
+.anuncio-poder.poder-9 { --tinte-poder: #b87333; }
+.anuncio-poder.poder-10 { --tinte-poder: #c0392b; }
+
+@keyframes entrarAnuncio {
+  from { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
+  to   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+@keyframes salirAnuncio {
+  to { transform: translate(-50%, -90%) scale(0.9); opacity: 0; }
+}
+
+@keyframes girarIcono {
+  0%   { transform: rotate(0) scale(1); }
+  35%  { transform: rotate(14deg) scale(1.25); }
+  70%  { transform: rotate(-10deg) scale(1.1); }
+  100% { transform: rotate(0) scale(1); }
+}
+
+/* --- efectos sobre las cartas afectadas --- */
+
+.carta.efecto-mirar .cara,
+.carta.efecto-mirar .dorso {
+  animation: escanear 1s ease-in-out;
+}
+
+@keyframes escanear {
+  0%   { box-shadow: var(--sombra-carta); }
+  35%  { box-shadow: 0 0 0 3px #d4a843, 0 0 34px 6px rgba(212, 168, 67, 0.75); }
+  100% { box-shadow: var(--sombra-carta); }
+}
+
+.carta.efecto-ciego {
+  animation: giroCiego 1.1s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 8;
+}
+
+@keyframes giroCiego {
+  0%   { transform: rotate(var(--giro)) translateY(var(--desvio)); filter: none; }
+  40%  { transform: rotate(calc(var(--giro) + 180deg)) translateY(calc(var(--desvio) - 26px)) scale(1.1);
+         filter: brightness(0.45) saturate(0.3); }
+  100% { transform: rotate(calc(var(--giro) + 360deg)) translateY(var(--desvio)); filter: none; }
+}
+
+.carta.efecto-vista {
+  animation: giroVista 1.1s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 8;
+}
+
+@keyframes giroVista {
+  0%   { transform: rotate(var(--giro)) translateY(var(--desvio)); }
+  45%  { transform: rotate(var(--giro)) translateY(calc(var(--desvio) - 32px)) scale(1.14); }
+  100% { transform: rotate(var(--giro)) translateY(var(--desvio)); }
+}
+
+.carta.efecto-vista .cara,
+.carta.efecto-vista .dorso {
+  animation: halooVista 1.1s ease-in-out;
+}
+
+@keyframes halooVista {
+  0%   { box-shadow: var(--sombra-carta); }
+  45%  { box-shadow: 0 0 0 3px #c0392b, 0 0 40px 8px rgba(255, 95, 141, 0.7); }
+  100% { box-shadow: var(--sombra-carta); }
+}
+
+/* --- paso de decisión del poder --- */
+
+.carta-poder {
+  display: grid;
+  place-items: center;
+  margin-bottom: 16px;
+}
+
+.carta-poder img {
+  width: 108px;
+  height: 162px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 0 0 2px var(--ambar), 0 18px 40px rgba(0, 0, 0, 0.65),
+    0 0 40px rgba(255, 176, 32, 0.35);
+  animation: entrarCartaPoder 0.45s cubic-bezier(0.2, 1.2, 0.4, 1);
+}
+
+@keyframes entrarCartaPoder {
+  from { transform: translateY(18px) rotateZ(-7deg) scale(0.85); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+.modal .nombre-poder {
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ambar);
+  margin-bottom: 10px;
+}
+
+.modal .aviso-poder {
+  font-size: 0.82rem;
+  font-style: italic;
+  color: var(--texto-tenue);
+  margin-bottom: 22px;
+}
+
+.botonera-poder {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.botonera-poder .accion { min-width: 200px; }
+
+/* Tercera salida del reglamento, deliberadamente discreta. */
+.enlace-modal {
+  display: block;
+  margin: 16px auto 0;
+  padding: 6px 10px;
+  border: none;
+  background: none;
+  color: var(--texto-tenue);
+  font-size: 0.8rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.enlace-modal:hover { color: var(--oro-claro); }
+
+/* El botón de tirar se vuelve el acceso al poder y llama la atención. */
+button.accion.con-poder {
+  color: #2a1b02;
+  background: linear-gradient(180deg, #ffd98a 0%, var(--ambar) 46%, #b8730a 100%);
+  box-shadow: 0 6px 0 #7c4e06, 0 14px 26px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  animation: pulsoPoder 1.5s ease-in-out infinite;
+}
+
+@keyframes pulsoPoder {
+  0%, 100% { filter: brightness(1); box-shadow: 0 6px 0 #7c4e06, 0 14px 26px rgba(0, 0, 0, 0.45), 0 0 0 0 rgba(255, 176, 32, 0.55); }
+  50%      { filter: brightness(1.12); box-shadow: 0 6px 0 #7c4e06, 0 14px 26px rgba(0, 0, 0, 0.45), 0 0 26px 6px rgba(255, 176, 32, 0.4); }
+}
+
+/* La carta levantada con poder invita a tocarla. */
+.levantada-caja.con-poder .carta { cursor: pointer; }
+
+.tabla-final {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 22px;
+  font-size: 0.9rem;
+}
+
+.tabla-final th,
+.tabla-final td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.tabla-final th {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: var(--oro);
+}
+
+.tabla-final td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla-final tr.cortador td {
+  color: var(--oro-claro);
+  font-weight: 700;
+  background: rgba(212, 168, 67, 0.07);
+}
+
+.tabla-final tr.fuera td { opacity: 0.45; }
+
+/* El ajuste del corte: verde si restó, rojo si castigó. */
+.tabla-final td.bueno { color: #8fd4b4; font-weight: 700; }
+.tabla-final td.malo { color: #d9604f; font-weight: 700; }
+
+.corona {
+  font-size: 3.2rem;
+  line-height: 1;
+  margin-bottom: 10px;
+  animation: flotar 2.6s ease-in-out infinite;
+}
+
+@keyframes flotar {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-9px); }
+}
+
+/* ================================================== confeti */
+
+#confeti {
+  position: fixed;
+  inset: 0;
+  /* El canvas es un elemento reemplazado: inset:0 no lo estira, hay que medirlo. */
+  width: 100%;
+  height: 100%;
+  z-index: 70;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+#confeti.activo { opacity: 1; }
+
+/* ============================================== adaptativo */
+
+@media (max-width: 1080px) {
+  .escena {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "cabecera"
+      "mesa"
+      "acciones"
+      "lateral";
+  }
+  .lateral { flex-direction: row; flex-wrap: wrap; }
+  .lateral .tarjeta { flex: 1 1 280px; }
+}
+
+@media (max-width: 950px) {
+  body { padding: 8px; }
+
+  :root {
+    --carta-ancho: 44px;
+    --carta-alto: 66px;
+  }
+
+  .jugador.propio {
+    --carta-ancho: 60px;
+    --carta-alto: 90px;
+  }
+
+  .cabecera { padding: 8px 12px; gap: 10px; }
+  .cabecera h1 { font-size: 1rem; letter-spacing: 1px; }
+  .cabecera .lema { display: none; }
+  .cabecera .marca { width: 36px; height: 36px; }
+
+  /* En pantallas chicas la mesa deja de ser óvalo y se apila. */
+  .mesa {
+    aspect-ratio: auto;
+    min-height: 0;
+    /* Sin esto el alto queda tope y los asientos se desbordan del paño. */
+    max-height: none;
+    border-radius: 22px;
+    border-width: 8px;
+    padding: 54px 10px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .mesa::before { background-size: 55% auto; }
+
+  .asiento {
+    position: static;
+    transform: none;
+    width: 100%;
+    margin-top: 0;
+  }
+
+  .centro {
+    position: static;
+    transform: none;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  .pila .carta { --carta-ancho: 56px; --carta-alto: 84px; }
+  .levantada-caja .carta { --carta-ancho: 62px; --carta-alto: 93px; }
+
+  .temporizador { top: 10px; padding: 7px 12px; gap: 8px; }
+  .temporizador .barra { width: 110px; }
+  .temporizador .texto { font-size: 0.72rem; }
+
+  .acciones { padding: 10px 12px; gap: 8px; }
+  .acciones .pista { flex-basis: 100%; font-size: 0.84rem; }
+  button.accion { flex: 1 1 auto; padding: 12px 16px; font-size: 0.72rem; letter-spacing: 1px; }
+
+  .modal { padding: 20px; }
+  .modal h2 { font-size: 1.15rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.05ms !important;
+  }
+}
