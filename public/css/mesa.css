@@ -552,23 +552,6 @@ body::after {
   100% { box-shadow: 0 0 0 22px rgba(212, 168, 67, 0); }
 }
 
-.carta .marca-publica {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  z-index: 3;
-  width: 16px;
-  height: 16px;
-  display: grid;
-  place-items: center;
-  font-size: 0.62rem;
-  font-weight: 900;
-  border-radius: 50%;
-  background: var(--ambar);
-  color: #2a1b02;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-}
-
 .posicion {
   position: absolute;
   bottom: 3px;

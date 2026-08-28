@@ -23,13 +23,28 @@ export const CARTA_OCULTA = { oculta: true };
 export const HUECO = null;
 
 /**
- * Posiciones que quedaron expuestas para toda la mesa por un descarte
- * fallido. Es lo único que el reglamento hace público de forma permanente.
+ * Cartas que la mesa está viendo AHORA por un descarte fallido o tardío.
+ *
+ * Nada de esto queda marcado: en cuanto se cierra la ventana de descarte, la
+ * información desaparece de la vista y sólo sobrevive en la memoria de cada
+ * jugador. Esa es toda la gracia del juego.
  */
-function posicionesPublicas(estado) {
+/**
+ * Cuánto dura la revelación. El motor no mira el reloj —tiene que seguir
+ * siendo determinista—, así que expone la revelación mientras dura la ventana
+ * y es cada cliente el que la tapa a los dos segundos.
+ */
+export const MS_REVELACION = 2000;
+
+export function revelacionesDe(estado) {
+  if (estado.fase !== "descarte") return [];
+  return (estado.ventanaDescarte?.intentos ?? []).filter((i) => i.carta);
+}
+
+function posicionesReveladas(estado) {
   const mapa = new Map();
-  for (const p of estado.infoPublica ?? []) {
-    mapa.set(`${p.indiceJugador}:${p.posicion}`, p.carta);
+  for (const r of revelacionesDe(estado)) {
+    mapa.set(`${r.indiceJugador}:${r.posicion}`, r.carta);
   }
   return mapa;
 }
@@ -38,17 +53,18 @@ function posicionesPublicas(estado) {
  * Mano tal como la ve `quienMira`.
  *
  * Al terminar la ronda se destapa todo, porque el reglamento manda revelar
- * las manos al cortar. En cualquier otro momento sólo se ven las cartas
- * expuestas por un error.
+ * las manos al cortar. En cualquier otro momento sólo se ve, y sólo mientras
+ * dura la ventana de descarte, la carta que alguien acaba de exponer.
  */
-function redactarMano(mano, indiceDuenio, publicas, rondaTerminada) {
+function redactarMano(mano, indiceDuenio, reveladas, rondaTerminada) {
   return mano.map((carta, posicion) => {
+    // Se comprueba antes que el hueco: la carta del que llegó tarde ya salió
+    // de la mano, pero la mesa igual tiene que verla un momento.
+    const revelada = reveladas.get(`${indiceDuenio}:${posicion}`);
+    if (revelada) return revelada;
+
     if (!carta) return HUECO;
     if (rondaTerminada) return carta;
-
-    const expuesta = publicas.get(`${indiceDuenio}:${posicion}`);
-    if (expuesta) return expuesta;
-
     return CARTA_OCULTA;
   });
 }
@@ -60,7 +76,7 @@ function redactarMano(mano, indiceDuenio, publicas, rondaTerminada) {
  * @param indiceQuienMira  a quién se le va a mandar
  */
 export function vistaDe(estado, indiceQuienMira) {
-  const publicas = posicionesPublicas(estado);
+  const reveladas = posicionesReveladas(estado);
   const rondaTerminada = estado.fase === "finRonda" || estado.fase === "finPartida";
 
   return {
@@ -73,7 +89,10 @@ export function vistaDe(estado, indiceQuienMira) {
     indiceCortador: estado.indiceCortador,
     desempate: estado.desempate,
     registro: estado.registro,
-    infoPublica: estado.infoPublica,
+
+    // Lo que la mesa está viendo en este instante. Se vacía solo al cerrarse
+    // la ventana de descarte: no hay ningún registro permanente.
+    revelaciones: revelacionesDe(estado),
 
     // Del mazo sólo se sabe cuántas cartas quedan. Su contenido y su ORDEN
     // son secretos: conocer el orden sería saber qué va a levantar cada uno.
@@ -99,7 +118,7 @@ export function vistaDe(estado, indiceQuienMira) {
       eliminado: jugador.eliminado,
       eliminadoEnRonda: jugador.eliminadoEnRonda,
       cartasEnMano: jugador.mano.filter(Boolean).length,
-      mano: redactarMano(jugador.mano, indice, publicas, rondaTerminada),
+      mano: redactarMano(jugador.mano, indice, reveladas, rondaTerminada),
     })),
 
     // Puntaje de la mano sólo cuando ya se reveló todo.
@@ -123,7 +142,7 @@ export function vistaDe(estado, indiceQuienMira) {
 export function filtracionesEn(vista, estadoCompleto) {
   const problemas = [];
   const rondaTerminada = vista.fase === "finRonda" || vista.fase === "finPartida";
-  const publicas = posicionesPublicas(estadoCompleto);
+  const reveladas = posicionesReveladas(estadoCompleto);
 
   // Ninguna carta del mazo puede aparecer, en ningún lado.
   const serializada = JSON.stringify(vista);
@@ -141,7 +160,7 @@ export function filtracionesEn(vista, estadoCompleto) {
     jugador.mano.forEach((carta, posicion) => {
       if (carta === null || carta?.oculta) return;
       if (rondaTerminada) return;
-      if (publicas.has(`${indice}:${posicion}`)) return;
+      if (reveladas.has(`${indice}:${posicion}`)) return;
       problemas.push(`la carta ${carta.id} de ${jugador.nombre} (posición ${posicion}) viaja destapada`);
     });
   });

@@ -45,12 +45,16 @@ export function olvidar(memoria, indiceJugador, posicion) {
 export const consultar = (memoria, indiceJugador, posicion) =>
   memoria.vistas.get(clave(indiceJugador, posicion)) ?? null;
 
-/** Lo revelado por un error de descarte lo conocen todos, sin olvido. */
-export function absorberInfoPublica(memoria, infoPublica) {
+/**
+ * Lo que se destapó en la ventana de descarte lo vio toda la mesa, así que la
+ * IA lo memoriza igual que una persona. No es información permanente: si esa
+ * carta después cambia de lugar, `olvidar` la borra como a cualquier otra.
+ */
+export function absorberRevelaciones(memoria, revelaciones) {
   const vistas = new Map(memoria.vistas);
-  infoPublica.forEach(({ indiceJugador, posicion, carta }) =>
-    vistas.set(clave(indiceJugador, posicion), carta),
-  );
+  revelaciones.forEach(({ indiceJugador, posicion, carta }) => {
+    if (carta) vistas.set(clave(indiceJugador, posicion), carta);
+  });
   return { vistas };
 }
 

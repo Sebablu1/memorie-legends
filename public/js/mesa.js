@@ -146,7 +146,6 @@ const RITMO = {
 };
 
 /** Cartas reveladas de forma temporal: claves "indiceJugador:posicion". */
-const revelaciones = new Set();
 /** Posición propia elegida para un poder de cambio, mientras se elige la rival. */
 let seleccionPropia = null;
 let temporizadorActual = null;
@@ -170,12 +169,18 @@ const claseAsiento = (indice) => `asiento-color-${indice % 4}`;
 
 const clave = (i, pos) => `${i}:${pos}`;
 
-const esPublica = (i, pos) =>
-  estado.infoPublica.some((p) => p.indiceJugador === i && p.posicion === pos);
+/**
+ * Cartas destapadas en este instante: `posición → carta`, o `null` cuando la
+ * carta ya está en la mano y sólo hace falta darla vuelta.
+ *
+ * No queda ningún registro de lo que se destapó. Pasados los dos segundos la
+ * carta se vuelve a tapar y no queda marca: quien no se acordó, la perdió.
+ */
+const revelaciones = new Map();
 
 function dibujarCarta(
   carta,
-  { visible, asiento = 0, publica = false, posicion = null, clases = "", estilo = "" },
+  { visible, asiento = 0, posicion = null, clases = "", estilo = "" },
 ) {
   if (!carta) {
     return `<div class="hueco vacio" style="${estilo}"></div>`;
@@ -186,7 +191,6 @@ function dibujarCarta(
             ${posicion != null ? `data-posicion="${posicion}"` : ""}
             style="${estilo}"
             type="button">
-      ${publica ? '<span class="marca-publica">!</span>' : ""}
       ${posicion != null ? `<span class="posicion">${posicion}</span>` : ""}
       <span class="lados">
         <span class="dorso"><img src="${dorso}" alt="Carta boca abajo" /></span>
@@ -253,14 +257,14 @@ function dibujarJugador(jugador, i) {
   const geometria = geometriaAbanico(jugador.mano.length, propio);
   const manoHTML = jugador.mano
     .map((carta, pos) => {
-      // La carta expuesta por un error se muestra un momento y se vuelve a dar
-      // vuelta: la información es pública porque todos la vieron, no porque
-      // quede boca arriba. La marca "!" recuerda qué posición se destapó.
-      const visible = rondaTerminada || revelaciones.has(clave(i, pos));
-      return dibujarCarta(carta, {
-        visible,
+      // La carta destapada se muestra dos segundos y se vuelve a tapar. La
+      // del que llegó tarde ya salió de la mano, así que se dibuja en su
+      // hueco: se la ve un momento y después desaparece.
+      const llave = clave(i, pos);
+      const destapada = revelaciones.has(llave);
+      return dibujarCarta(carta ?? revelaciones.get(llave), {
+        visible: rondaTerminada || destapada,
         asiento: i,
-        publica: esPublica(i, pos),
         posicion: pos,
         estilo: estiloAbanico(pos, jugador.mano.length, geometria),
       });
@@ -434,7 +438,7 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function revelarUnMomento(i, pos, ms = MS_MIRAR) {
   sonidos.voltear();
-  revelaciones.add(clave(i, pos));
+  revelaciones.set(clave(i, pos), null);
   dibujar();
   marcarEfecto(i, pos, "efecto-mirar", ms);
   await esperar(ms);
@@ -646,8 +650,8 @@ function faseMirada() {
   });
 }
 
-/** Cuánto se ve la carta que alguien expuso al descartar mal. */
-const MS_ERROR_PUBLICO = 3000;
+/** Cuánto se muestra a la mesa una carta que no llegó a descartarse. */
+const MS_CARTA_EXPUESTA = 2000;
 
 /**
  * Reacciona al último intento de descarte: suena, y si fue error muestra la
@@ -658,18 +662,22 @@ function resolverUltimoDescarte() {
   const ultimo = intentos[intentos.length - 1];
   if (!ultimo) return;
 
-  if (ultimo.resultado !== "error") {
+  // El primero se lleva su carta al descarte sin más trámite. A los otros dos
+  // se les destapa la carta para toda la mesa, y a los dos segundos se tapa.
+  if (ultimo.resultado === "primero") {
     sonidos.acierto();
     return;
   }
 
-  sonidos.error();
+  if (ultimo.resultado === "tarde") sonidos.aviso();
+  else sonidos.error();
+
   const llave = clave(ultimo.indiceJugador, ultimo.posicion);
-  revelaciones.add(llave);
+  revelaciones.set(llave, ultimo.carta);
   setTimeout(() => {
     revelaciones.delete(llave);
     dibujar();
-  }, MS_ERROR_PUBLICO);
+  }, MS_CARTA_EXPUESTA);
 }
 
 /** Ventana de 5 segundos en la que todos pueden descartar a la vez. */
@@ -711,7 +719,10 @@ function faseDescarte() {
         pendientes.forEach(clearTimeout);
         manejadorDescarte = null;
         cancelarTemporizador();
-        memorias = memorias.map((m) => IA.absorberInfoPublica(m, estado.infoPublica));
+        // Lo que se destapó lo vio toda la mesa, la IA incluida.
+        memorias = memorias.map((m) =>
+          IA.absorberRevelaciones(m, estado.ventanaDescarte?.intentos ?? []),
+        );
         estado = cerrarVentanaDescarte(estado);
         dibujar();
         listo();
@@ -1158,8 +1169,8 @@ dom.modal.addEventListener("click", async (evento) => {
 
   if (revelada) {
     // El cambio con vista muestra ambas cartas ya intercambiadas de posición.
-    revelaciones.add(clave(i, pos));
-    revelaciones.add(clave(YO, propiaUsada));
+    revelaciones.set(clave(i, pos), null);
+    revelaciones.set(clave(YO, propiaUsada), null);
     dibujar();
     efectoCambio("cambioConVista", YO, propiaUsada, i, pos);
     await esperar(MS_MIRAR);

@@ -23,16 +23,6 @@ export const esDescarteValido = (carta, muestra) =>
 
 const cima = (pila) => pila[0] ?? null;
 
-/**
- * Quita posiciones de la información pública.
- * Se usa cuando la carta que se había expuesto abandona esa posición: lo que
- * quede ahí es una carta que nadie vio, y mostrarla sería una filtración.
- */
-const olvidarInfoPublica = (infoPublica, pares) =>
-  infoPublica.filter(
-    (p) => !pares.some(([i, pos]) => p.indiceJugador === i && p.posicion === pos),
-  );
-
 const siguienteActivo = (jugadores, desde) => {
   for (let paso = 1; paso <= jugadores.length; paso++) {
     const i = (desde + paso) % jugadores.length;
@@ -66,7 +56,6 @@ export const crearPartida = (configuracion, { rng = Math.random } = {}) => ({
   levantada: null,
   poderPendiente: null,
   ventanaDescarte: null,
-  infoPublica: [],
   indiceCortador: null,
   ganador: null,
   desempate: false,
@@ -103,7 +92,6 @@ export function empezarRonda(estado) {
       levantada: null,
       poderPendiente: null,
       ventanaDescarte: null,
-      infoPublica: [],
       indiceCortador: null,
       turnosRonda: 0,
       indiceTurno: estado.indiceMano,
@@ -155,9 +143,16 @@ const rellenarMazo = (estado) => {
 
 /**
  * Intento de descarte durante la ventana de reflejos.
- * - Acierta y es el primero: la carta sale de la mano, sin castigo.
- * - Acierta pero llega tarde: la carta sale igual, pero recibe +1 carta.
- * - Falla: recupera la carta, recibe +1 carta y su posición queda pública.
+ *
+ * Las tres salidas están graduadas a propósito:
+ *
+ * - PRIMERO: la carta sale de la mano y no hay castigo.  → una carta menos
+ * - TARDE:   la carta sale igual, pero recibe una más.   → queda igual
+ * - ERROR:   conserva la carta, recibe una más, y su      → una carta más,
+ *            posición queda pública para toda la partida.   y expuesto
+ *
+ * Si el que llega tarde conservara su carta, acertar tarde y equivocarse
+ * tendrían la misma consecuencia y acertar dejaría de valer la pena.
  */
 export function intentarDescarte(estado, indiceJugador, posicion) {
   if (estado.fase !== "descarte" || !estado.ventanaDescarte) return estado;
@@ -174,16 +169,17 @@ export function intentarDescarte(estado, indiceJugador, posicion) {
   const mazo = [...origen.mazo];
   const descarte = [...origen.descarte];
   const mano = [...jugador.mano];
-  const infoPublica = [...estado.infoPublica];
   const cartaCastigo = () => (mazo.length ? mazo.shift() : null);
 
   if (correcto) {
+    // Acertó: la carta se va, haya llegado primero o no.
     mano[posicion] = null;
     descarte.unshift({ ...carta, visible: true });
+    // Pero si no fue el primero, el beneficio se compensa con una carta más.
     if (!fuePrimero) mano.push(cartaCastigo());
   } else {
+    // Se equivocó: la carta se queda donde estaba y encima recibe otra.
     mano.push(cartaCastigo());
-    infoPublica.push({ indiceJugador, posicion, carta });
   }
 
   const resultado = correcto ? (fuePrimero ? "primero" : "tarde") : "error";
@@ -193,13 +189,14 @@ export function intentarDescarte(estado, indiceJugador, posicion) {
       ...estado,
       mazo,
       descarte,
-      infoPublica,
       jugadores: estado.jugadores.map((j, i) => (i === indiceJugador ? { ...j, mano } : j)),
       ventanaDescarte: {
         huboPrimero: estado.ventanaDescarte.huboPrimero || fuePrimero,
         intentos: [
           ...estado.ventanaDescarte.intentos,
-          { indiceJugador, posicion, resultado },
+          // La carta viaja en el intento para que la mesa pueda mostrarla un
+          // momento. Sólo la del primero no se muestra: ya está en el descarte.
+          { indiceJugador, posicion, resultado, carta: fuePrimero ? null : carta },
         ],
       },
     },
@@ -245,8 +242,6 @@ export function cambiarCarta(estado, posicion) {
       descarte: descartada
         ? [{ ...descartada, visible: true }, ...estado.descarte]
         : estado.descarte,
-      // La carta conocida se fue de esa posición: deja de ser información pública.
-      infoPublica: olvidarInfoPublica(estado.infoPublica, [[i, posicion]]),
       levantada: null,
       fase: "postLevantada",
     },
@@ -328,11 +323,6 @@ export function usarPoderCambio(estado, posicionPropia, indiceRival, posicionRiv
         jugadores: estado.jugadores.map((j, i) =>
           i === yo ? { ...j, mano: miMano } : i === indiceRival ? { ...j, mano: manoRival } : j,
         ),
-        // Las dos cartas cambiaron de lugar: lo que se sabía de esas posiciones ya no vale.
-        infoPublica: olvidarInfoPublica(estado.infoPublica, [
-          [yo, posicionPropia],
-          [indiceRival, posicionRival],
-        ]),
       },
       `${estado.jugadores[yo].nombre} cambió su ${posicionPropia} por la ${posicionRival} de ${estado.jugadores[indiceRival].nombre}`,
     ),
