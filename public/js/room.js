@@ -44,6 +44,13 @@ if (!codigo) {
 function arrancar({ usuario, perfil }) {
   mostrarSaldo(perfil.saldo);
 
+  // Si la mesa nos devolvió acá, se explica por qué.
+  const aviso = sessionStorage.getItem("avisoSala");
+  if (aviso) {
+    $("estadoSala").textContent = aviso;
+    sessionStorage.removeItem("avisoSala");
+  }
+
   dejarDeEscuchar = onSnapshot(
     doc(db, "rooms", codigo),
     (snap) => {

@@ -83,6 +83,20 @@ const CONFIG_POR_DEFECTO = {
   ],
 };
 
+/**
+ * ¿Se llegó desde una sala? room.html manda ?sala=CODIGO.
+ *
+ * La mesa en red TODAVÍA no existe: el motor corre entero en el navegador y
+ * baraja con el azar de cada máquina, así que cuatro jugadores abriendo esta
+ * página obtendrían cuatro mazos distintos. Hasta que el estado de la partida
+ * sea compartido, acá se valida el acceso y se explica la situación, en vez
+ * de arrancar una partida contra la máquina haciéndola pasar por la partida
+ * por la que el jugador pagó su entrada.
+ */
+const salaPedida = (new URLSearchParams(location.search).get("sala") ?? "")
+  .trim()
+  .toUpperCase();
+
 function leerConfiguracion() {
   try {
     const guardada = JSON.parse(localStorage.getItem("configMesa"));
@@ -1191,4 +1205,95 @@ async function mostrarFinRonda() {
 
 // ------------------------------------------------------------- arranque
 
-arrancarRonda();
+/** Manda al lobby con un motivo que el lobby muestra al cargar. */
+function volverAlLobby(motivo) {
+  sessionStorage.setItem("avisoLobby", motivo);
+  window.location.href = "lobby.html";
+}
+
+/**
+ * Valida el acceso a una partida de sala antes de mostrar nada.
+ * Cubre: código inválido, sala inexistente, jugador ajeno, sala cancelada,
+ * sala todavía en espera y partida ya terminada.
+ */
+async function entrarDesdeSala() {
+  const { db, doc, getDoc } = await import("./firebase.js");
+  const { exigirSesion } = await import("./sesion.js");
+  const { ESTADOS_SALA, MIN_JUGADORES, esCodigoValido } = await import("./reglas/salas.js");
+
+  if (!esCodigoValido(salaPedida)) {
+    volverAlLobby("Ese código de sala no es válido.");
+    return;
+  }
+
+  const sesion = await exigirSesion();
+  if (!sesion) return; // exigirSesion ya redirigió al login
+
+  const snap = await getDoc(doc(db, "rooms", salaPedida));
+  if (!snap.exists()) {
+    volverAlLobby(`No encontramos la sala ${salaPedida}.`);
+    return;
+  }
+
+  const sala = snap.data();
+
+  if (!(sala.jugadores ?? []).includes(sesion.usuario.uid)) {
+    volverAlLobby("No estás en esa sala.");
+    return;
+  }
+
+  if (sala.estado === ESTADOS_SALA.CANCELADA) {
+    volverAlLobby("Esa sala fue cancelada. Si pagaste la entrada, ya te la devolvimos.");
+    return;
+  }
+
+  if (sala.estado === ESTADOS_SALA.TERMINADA) {
+    volverAlLobby("Esa partida ya terminó.");
+    return;
+  }
+
+  if (sala.estado === ESTADOS_SALA.ESPERANDO) {
+    const faltan = MIN_JUGADORES - (sala.jugadores ?? []).length;
+    sessionStorage.setItem(
+      "avisoSala",
+      faltan > 0
+        ? `Todavía falta ${faltan} jugador${faltan === 1 ? "" : "es"} para empezar.`
+        : "La partida todavía no arrancó.",
+    );
+    window.location.href = `room.html?code=${salaPedida}`;
+    return;
+  }
+
+  // Estado "jugando": el acceso es legítimo, pero la mesa en red no existe.
+  mostrarMesaEnRedPendiente(sala);
+}
+
+/** Pantalla honesta mientras la partida en red no esté implementada. */
+function mostrarMesaEnRedPendiente(sala) {
+  document.body.innerHTML = `
+    <div class="mesa-pendiente">
+      <img src="img/claude-inspiration/logo.png" alt="" class="logo-img grande" />
+      <h1>La mesa en red todavía no está lista</h1>
+      <p>
+        Estás en la sala <b>${salaPedida}</b> con
+        <b>${(sala.jugadores ?? []).length} jugadores</b> y un pozo de
+        <b>${sala.pozo ?? sala.entrada * (sala.jugadores ?? []).length} Leyendas</b>.
+      </p>
+      <p class="detalle">
+        El motor del juego todavía corre en cada navegador por separado, así que
+        no podemos repartir el mismo mazo a todos. Tu entrada sigue en el pozo y
+        la sala sigue abierta: nadie perdió nada.
+      </p>
+      <div class="botonera-pendiente">
+        <a class="btn-oro" href="room.html?code=${salaPedida}">Volver a la sala</a>
+        <a class="btn-plata" href="lobby.html">Ir al lobby</a>
+      </div>
+    </div>`;
+}
+
+if (salaPedida) {
+  entrarDesdeSala();
+} else {
+  // Entrenamiento contra la máquina: todo local, sin Leyendas.
+  arrancarRonda();
+}

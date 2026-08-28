@@ -3,278 +3,146 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Memorie Legends - Lobby</title>
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Jugar - Memorie Legends</title>
+    <link rel="icon" href="img/claude-inspiration/logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="css/tema.css" />
-    <link rel="stylesheet" href="css/style.css" />
-      <link rel="stylesheet" href="css/pie.css" />
-</head>
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/lobby.css" />
+    <link rel="stylesheet" href="css/pie.css" />
+  </head>
   <body>
-    <div class="container">
-      <h1 class="marca-titulo"><a href="dashboard.html"><img src="img/claude-inspiration/logo.png" alt="Memorie Legends" class="logo-img"><span class="logo-text">Memorie Legends</span></a></h1>
-
-      <!-- Info Usuario -->
-      <div id="userInfo" class="user-info">
-        <span>👤 <span id="username"></span></span>
-        <span>💰 Créditos: <span id="creditsDisplay">0</span></span>
-        <span>🏆 <span id="winsDisplay">0</span> victorias</span>
+    <header class="barra">
+      <div class="barra-contenido">
+        <a href="dashboard.html" class="marca">
+          <img src="img/claude-inspiration/logo.png" alt="Memorie Legends" class="logo-img" />
+          <span class="logo-text">Memorie Legends</span>
+        </a>
+        <nav>
+          <a href="dashboard.html">Inicio</a>
+          <a href="lobby.html" aria-current="page">Jugar</a>
+          <a href="como-se-juega.html">Cómo se juega</a>
+          <a href="ranking.html">Ranking</a>
+          <a href="tienda.html">Tienda</a>
+        </nav>
+        <div class="derecha">
+          <div class="saldo" id="saldo"><b id="saldoValor">—</b><small>Leyendas</small></div>
+          <button class="accion sobria" id="btnSalir" type="button">Salir</button>
+        </div>
       </div>
+    </header>
 
-      <!-- Acciones -->
-      <div
-        class="actions"
-        style="
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-          justify-content: center;
-        "
-      >
-        <button id="shopBtn" class="btn-warning">🛒 Tienda</button>
-        <button id="rouletteBtn" class="btn-secondary">🎰 Ruleta Gratis</button>
-      </div>
+    <main>
+      <h1 class="titulo-pagina" id="saludo">Elegí cómo jugar</h1>
+      <p class="subtitulo">
+        Entrená gratis contra la máquina, o competí con otras personas por Leyendas.
+      </p>
 
-      <hr />
+      <div class="mensaje-global" id="mensaje" role="status" aria-live="polite"></div>
 
-      <!-- Crear Sala con Configuración -->
-      <div class="lobby-section">
-        <h3>🎮 Crear Sala</h3>
+      <div class="dos-ramas">
+        <!-- ============================ ENTRENAMIENTO ============================ -->
+        <section class="rama entrenamiento">
+          <header class="rama-cabecera">
+            <span class="rama-icono">🎯</span>
+            <div>
+              <h2>Entrenamiento — vs IA</h2>
+              <p class="rama-lema">Sin Leyendas · Sin premios · Practicá gratis</p>
+            </div>
+          </header>
 
-        <div
-          style="
-            background: rgba(15, 52, 96, 0.3);
-            padding: 15px;
-            border-radius: 10px;
-            margin: 10px 0;
-          "
-        >
-          <div class="form-group" style="margin-bottom: 10px">
-            <label style="color: #aaa">🏷️ Nombre de la sala (opcional)</label>
+          <fieldset class="campo">
+            <legend>¿Contra cuántas?</legend>
+            <div class="grupo-botones" id="cantidadIAs" role="radiogroup" aria-label="Cantidad de IAs">
+              <button type="button" class="opcion" data-ias="1" role="radio" aria-checked="false">1 IA</button>
+              <button type="button" class="opcion activa" data-ias="2" role="radio" aria-checked="true">2 IAs</button>
+              <button type="button" class="opcion" data-ias="3" role="radio" aria-checked="false">3 IAs</button>
+            </div>
+          </fieldset>
+
+          <div class="campo">
+            <label for="nivelIA">Nivel</label>
+            <select id="nivelIA">
+              <option value="facil">Fácil</option>
+              <option value="medio" selected>Medio</option>
+              <option value="dificil">Difícil</option>
+              <option value="experto">Experto</option>
+            </select>
+          </div>
+
+          <button class="btn-oro ancho" id="btnEntrenar" type="button">
+            🎮 Jugar entrenamiento
+          </button>
+
+          <p class="rama-nota">
+            No se cobra entrada, no hay premio y podés abandonar cuando quieras sin
+            perder Leyendas.
+          </p>
+        </section>
+
+        <!-- ========================= PARTIDA POR LEYENDAS ========================= -->
+        <section class="rama leyendas">
+          <header class="rama-cabecera">
+            <span class="rama-icono">🏆</span>
+            <div>
+              <h2>Partida por Leyendas</h2>
+              <p class="rama-lema">Entrá con Leyendas y competí contra otros jugadores</p>
+            </div>
+          </header>
+
+          <div class="campo">
+            <label for="entradaSala">Seleccioná tu entrada en Leyendas</label>
+            <select id="entradaSala"></select>
+            <p class="ayuda" id="ayudaEntrada"></p>
+          </div>
+
+          <button class="btn-oro ancho" id="btnCrearSala" type="button">Crear sala</button>
+
+          <div class="separador"><span>o</span></div>
+
+          <div class="campo">
+            <label for="codigoSala">Unirse con un código</label>
             <input
+              id="codigoSala"
               type="text"
-              id="roomName"
-              placeholder="Ej: Torneo Legends"
-              style="width: 100%"
+              inputmode="latin"
+              autocomplete="off"
+              spellcheck="false"
+              maxlength="6"
+              placeholder="ABCDEF"
+              aria-describedby="ayudaCodigo"
             />
+            <p class="ayuda" id="ayudaCodigo">Seis caracteres, sin distinguir mayúsculas.</p>
           </div>
 
-          <div style="display: flex; gap: 15px; flex-wrap: wrap">
-            <div class="form-group" style="flex: 1">
-              <label style="color: #aaa">👥 Jugadores</label>
-              <select
-                id="maxPlayers"
-                style="
-                  width: 100%;
-                  padding: 10px;
-                  border-radius: 8px;
-                  background: rgba(15, 52, 96, 0.6);
-                  color: #fff;
-                  border: 2px solid rgba(255, 255, 255, 0.1);
-                "
-              >
-                <option value="2">2 Jugadores</option>
-                <option value="3">3 Jugadores</option>
-                <option value="4" selected>4 Jugadores</option>
-                <option value="5">5 Jugadores</option>
-                <option value="6">6 Jugadores</option>
-              </select>
-            </div>
+          <button class="btn-plata ancho" id="btnUnirse" type="button">Unirse a la sala</button>
 
-            <div class="form-group" style="flex: 1">
-              <label style="color: #aaa">💰 Apuesta</label>
-              <select
-                id="betAmount"
-                style="
-                  width: 100%;
-                  padding: 10px;
-                  border-radius: 8px;
-                  background: rgba(15, 52, 96, 0.6);
-                  color: #fff;
-                  border: 2px solid rgba(255, 255, 255, 0.1);
-                "
-              >
-                <option value="1">1 Crédito</option>
-                <option value="5">5 Créditos</option>
-                <option value="10" selected>10 Créditos</option>
-                <option value="15">15 Créditos</option>
-                <option value="20">20 Créditos</option>
-                <option value="50">50 Créditos</option>
-                <option value="100">100+ Créditos</option>
-              </select>
-            </div>
-          </div>
-
-          <button
-            id="createBtn"
-            class="btn-success"
-            style="width: 100%; margin-top: 10px"
-          >
-            ✨ Crear Sala (Gratis)
-          </button>
-        </div>
-
-        <!-- Unirse a Sala -->
-        <h3>🔗 Unirse a Sala</h3>
-        <div class="join-section">
-          <input
-            type="text"
-            id="roomCode"
-            placeholder="Código de sala"
-            style="text-transform: uppercase; flex: 1"
-          />
-          <button id="joinBtn" class="btn-primary">Unirse</button>
-        </div>
-
-        <div id="mensaje" class="mensaje"></div>
+          <p class="rama-nota">
+            El pozo se reparte 75 % para el primero y 25 % para el segundo. Hasta
+            cuatro jugadores por sala.
+          </p>
+        </section>
       </div>
 
-      <hr />
-
-      <!-- Salas Activas -->
-      <div id="salasLista" class="salas-lista">
-        <h4>📋 Salas Activas</h4>
-        <div id="salasContainer"></div>
-      </div>
-
-      <hr />
-
-      <button id="logoutBtn" class="btn-danger">Cerrar Sesión</button>
-    </div>
-
-    <!-- Modal Tienda -->
-    <div
-      id="shopModal"
-      style="
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-      "
-    >
-      <div
-        style="
-          background: #0a0a0a;
-          padding: 30px;
-          border-radius: 16px;
-          max-width: 500px;
-          width: 90%;
-        "
-      >
-        <h2 style="text-align: center">🛒 Tienda de Créditos</h2>
-        <div
-          id="shopItems"
-          style="
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin: 20px 0;
-          "
-        >
-          <button
-            class="shop-item"
-            data-credits="100"
-            data-price="10"
-            style="
-              padding: 15px;
-              background: rgba(33, 150, 243, 0.2);
-              border: 2px solid #2196f3;
-              border-radius: 10px;
-              color: #fff;
-              cursor: pointer;
-            "
-          >
-            💰 100 Créditos - 10 Reales
-          </button>
-          <button
-            class="shop-item"
-            data-credits="300"
-            data-price="25"
-            style="
-              padding: 15px;
-              background: rgba(76, 175, 80, 0.2);
-              border: 2px solid #d4a843;
-              border-radius: 10px;
-              color: #fff;
-              cursor: pointer;
-            "
-          >
-            💰 300 Créditos - 25 Reales
-          </button>
-          <button
-            class="shop-item"
-            data-credits="600"
-            data-price="45"
-            style="
-              padding: 15px;
-              background: rgba(255, 152, 0, 0.2);
-              border: 2px solid #ff9800;
-              border-radius: 10px;
-              color: #fff;
-              cursor: pointer;
-            "
-          >
-            💰 600 Créditos - 45 Reales
-          </button>
-          <button
-            class="shop-item"
-            data-credits="1200"
-            data-price="80"
-            style="
-              padding: 15px;
-              background: rgba(233, 69, 96, 0.2);
-              border: 2px solid #c0c0c0;
-              border-radius: 10px;
-              color: #fff;
-              cursor: pointer;
-            "
-          >
-            💰 1200 Créditos - 80 Reales
-          </button>
-          <button
-            class="shop-item"
-            data-credits="3000"
-            data-price="180"
-            style="
-              padding: 15px;
-              background: rgba(156, 39, 176, 0.2);
-              border: 2px solid #9c27b0;
-              border-radius: 10px;
-              color: #fff;
-              cursor: pointer;
-            "
-          >
-            💰 3000 Créditos - 180 Reales
-          </button>
+      <section class="panel" style="margin-top: 24px">
+        <h2>Salas esperando jugadores</h2>
+        <div id="listaSalas">
+          <p class="vacio-simple">Buscando salas…</p>
         </div>
-        <button
-          id="closeShopBtn"
-          style="
-            width: 100%;
-            padding: 12px;
-            background: #6c757d;
-            border: none;
-            border-radius: 8px;
-            color: #fff;
-            cursor: pointer;
-          "
-        >
-          Cerrar
-        </button>
-      </div>
-    </div>
+      </section>
+    </main>
 
-    <script type="module" src="js/lobby.js"></script>
-  
     <footer>
       <div class="footer-content">
         <div class="footer-links">
           <a href="/como-se-juega.html">📜 Cómo se Juega</a>
-          <a href="/quienes-somos.html">Quiénes Somos</a>
           <a href="/terminos.html">Términos y Condiciones</a>
           <a href="/privacidad.html">Políticas de Privacidad</a>
           <a href="/seguridad.html">Seguridad</a>
@@ -282,5 +150,7 @@
         <p>&copy; 2026 Memorie Legends. Todos los derechos reservados.</p>
       </div>
     </footer>
+
+    <script type="module" src="js/lobby.js"></script>
   </body>
 </html>

@@ -1,0 +1,229 @@
+/* Lobby: las dos ramas de juego, una al lado de la otra. */
+
+.mensaje-global {
+  display: none;
+  padding: 13px 18px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  font-size: 0.92rem;
+}
+
+.mensaje-global.visible { display: block; }
+
+.mensaje-global.info {
+  background: rgba(212, 168, 67, 0.1);
+  border: 1px solid rgba(212, 168, 67, 0.35);
+  color: var(--oro-claro);
+}
+
+.mensaje-global.error {
+  background: rgba(192, 57, 43, 0.14);
+  border: 1px solid rgba(192, 57, 43, 0.45);
+  color: #f0cfc9;
+}
+
+/* --------------------------------------------------------- las ramas */
+
+.dos-ramas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.rama {
+  display: flex;
+  flex-direction: column;
+  padding: 26px;
+  border-radius: 20px;
+  background: linear-gradient(165deg, var(--panel-alto), rgba(10, 10, 10, 0.92));
+  border: 1px solid var(--borde-suave);
+  box-shadow: var(--sombra-negra);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Franja de color que separa las dos ramas de un vistazo. */
+.rama::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--acento-rama);
+}
+
+.rama.entrenamiento { --acento-rama: var(--plata); }
+.rama.leyendas { --acento-rama: var(--oro); }
+
+.rama-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.rama-icono { font-size: 2.1rem; line-height: 1; }
+
+.rama-cabecera h2 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--acento-rama);
+  margin-bottom: 3px;
+}
+
+.rama-lema {
+  font-size: 0.82rem;
+  color: var(--plata);
+  line-height: 1.45;
+}
+
+/* ---------------------------------------------------------- campos */
+
+.campo { margin-bottom: 18px; }
+
+.campo label,
+.campo legend {
+  display: block;
+  font-size: 0.78rem;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--plata);
+  margin-bottom: 8px;
+  padding: 0;
+}
+
+fieldset.campo { border: none; padding: 0; margin-inline: 0; }
+
+.campo select,
+.campo input {
+  width: 100%;
+  padding: 13px 15px;
+  border-radius: 11px;
+  border: 1px solid var(--borde-suave);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--texto);
+  font-size: 1rem;
+  font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.campo select:focus,
+.campo input:focus {
+  outline: none;
+  border-color: var(--oro);
+  box-shadow: 0 0 0 3px rgba(212, 168, 67, 0.18);
+}
+
+.campo input::placeholder {
+  color: var(--plata-honda);
+  letter-spacing: 0.3rem;
+}
+
+#codigoSala {
+  text-align: center;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.5rem;
+  letter-spacing: 0.4rem;
+  text-transform: uppercase;
+}
+
+.ayuda {
+  margin-top: 7px;
+  font-size: 0.78rem;
+  color: var(--plata-honda);
+  line-height: 1.5;
+}
+
+/* --------------------------------------------- selector de cantidad */
+
+.grupo-botones { display: flex; gap: 8px; }
+
+.opcion {
+  flex: 1;
+  padding: 13px 8px;
+  border-radius: 11px;
+  border: 1px solid var(--borde-suave);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--plata);
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.opcion:hover { border-color: var(--plata); color: var(--texto); }
+
+.opcion.activa {
+  color: var(--negro);
+  background: linear-gradient(180deg, var(--plata-clara), var(--plata-honda));
+  border-color: transparent;
+  font-weight: 700;
+}
+
+/* --------------------------------------------------------- botones */
+
+.ancho {
+  width: 100%;
+  display: block;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.separador {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 22px 0;
+  color: var(--plata-honda);
+  font-size: 0.8rem;
+}
+
+.separador::before,
+.separador::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--borde-suave);
+}
+
+.rama-nota {
+  margin-top: auto;
+  padding-top: 18px;
+  font-size: 0.78rem;
+  color: var(--plata-honda);
+  line-height: 1.6;
+}
+
+/* ---------------------------------------------------- salas activas */
+
+.sala-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sala-fila:last-child { border-bottom: none; }
+.sala-fila b { display: block; margin-bottom: 3px; }
+
+.sala-meta {
+  font-size: 0.8rem;
+  color: var(--plata);
+  font-variant-numeric: tabular-nums;
+}
+
+.sala-fila .btn-plata { padding: 9px 20px; font-size: 0.8rem; }
+
+.vacio-simple {
+  color: var(--plata-honda);
+  text-align: center;
+  padding: 22px 10px;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 780px) {
+  .dos-ramas { grid-template-columns: minmax(0, 1fr); }
+  .rama { padding: 20px; }
+}

@@ -1,326 +1,252 @@
-import { db, auth, signOut } from "./firebase.js";
+/**
+ * Lobby unificado: las dos formas de jugar en una sola pantalla.
+ *
+ *   🎯 Entrenamiento vs IA  — gratis, no toca Leyendas jamás.
+ *   🏆 Partida por Leyendas — crear o unirse a una sala, cobrando entrada.
+ *
+ * Las dos ramas están separadas también en el código: el entrenamiento no
+ * llama a ninguna función del servidor ni mira el saldo, y la rama de
+ * Leyendas no escribe nada en Firestore: sólo pide, y el servidor decide.
+ */
+
+import { db, auth, signOut, doc, collection, query, where, onSnapshot } from "./firebase.js";
+import { exigirSesion, mostrarSaldo } from "./sesion.js";
 import { crearSala, unirseASala, ErrorDeServidor } from "./servidor.js";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  onSnapshot,
-  addDoc,
-  updateDoc,
-  doc,
-  serverTimestamp,
-  runTransaction,
-  increment,
-  getDoc,
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/salas.js";
+import { DIFICULTADES } from "./reglas/ia.js";
 
-console.log("🔍 Iniciando lobby...");
+const $ = (id) => document.getElementById(id);
 
-// ========== VERIFICAR USUARIO ==========
-const userData = localStorage.getItem("user");
-if (!userData) {
-  window.location.href = "login.html";
-  throw new Error("Usuario no autenticado");
-}
-
-const user = JSON.parse(userData);
-if (!user.username || !user.id) {
-  localStorage.removeItem("user");
-  window.location.href = "login.html";
-  throw new Error("Datos de usuario inválidos");
-}
-
-console.log("✅ Usuario válido:", user.username);
-
-/** Saldo autoritativo, tal como lo devuelve Firestore. Nunca se calcula acá. */
+/** Saldo autoritativo. Sale de Firestore, nunca de localStorage. */
 let saldoActual = 0;
+let nombreJugador = "Jugador";
 
-// ========== REFERENCIAS A ELEMENTOS ==========
-const usernameEl = document.getElementById("username");
-const creditsEl = document.getElementById("creditsDisplay");
-const winsEl = document.getElementById("winsDisplay");
-const shopBtn = document.getElementById("shopBtn");
-const rouletteBtn = document.getElementById("rouletteBtn");
-const createBtn = document.getElementById("createBtn");
-const joinBtn = document.getElementById("joinBtn");
-const roomCodeInput = document.getElementById("roomCode");
-const roomNameInput = document.getElementById("roomName");
-const maxPlayersSelect = document.getElementById("maxPlayers");
-const betAmountSelect = document.getElementById("betAmount");
-const mensajeEl = document.getElementById("mensaje");
-const salasContainer = document.getElementById("salasContainer");
-const logoutBtn = document.getElementById("logoutBtn");
-const shopModal = document.getElementById("shopModal");
-const closeShopBtn = document.getElementById("closeShopBtn");
-
-// ========== MOSTRAR INFO USUARIO ==========
-usernameEl.textContent = user.username;
-// El saldo NUNCA sale de localStorage: es el dato que el usuario puede editar.
-// La única fuente autoritativa es el documento de Firestore, y se escucha en
-// vivo para que cualquier cambio hecho por el servidor se refleje solo.
-creditsEl.textContent = "…";
-onSnapshot(doc(db, "users", user.id), (snap) => {
-  const saldo = snap.exists() ? (snap.data().credits ?? 0) : 0;
-  creditsEl.textContent = saldo;
-  saldoActual = saldo;
-});
-winsEl.textContent = user.wins || 0;
-
-// ========== FUNCIONES AUXILIARES ==========
-function mostrarMensaje(texto, tipo = "info") {
-  mensajeEl.textContent = texto;
-  mensajeEl.className = `mensaje ${tipo}`;
-  setTimeout(() => {
-    mensajeEl.textContent = "";
-    mensajeEl.className = "mensaje";
-  }, 4000);
+function avisar(texto, tipo = "info") {
+  const caja = $("mensaje");
+  caja.textContent = texto;
+  caja.className = `mensaje-global visible ${tipo}`;
 }
 
-function actualizarCredits(nuevosCredits) {
-  user.credits = nuevosCredits;
-  creditsEl.textContent = nuevosCredits;
-  localStorage.setItem("user", JSON.stringify(user));
+const limpiarAviso = () => ($("mensaje").className = "mensaje-global");
+
+// =====================================================================
+// 🎯 ENTRENAMIENTO — no toca Leyendas en ningún punto
+// =====================================================================
+
+const NOMBRES_IA = ["Nara", "Bruno", "Vex"];
+let cantidadIAs = 2;
+
+// Las dificultades salen del módulo de IA, para no repetir las etiquetas.
+$("nivelIA").innerHTML = Object.entries(DIFICULTADES)
+  .map(
+    ([clave, d]) =>
+      `<option value="${clave}"${clave === "medio" ? " selected" : ""}>${d.etiqueta}</option>`,
+  )
+  .join("");
+
+$("cantidadIAs").addEventListener("click", (evento) => {
+  const boton = evento.target.closest(".opcion");
+  if (!boton) return;
+  cantidadIAs = Number(boton.dataset.ias);
+  $("cantidadIAs")
+    .querySelectorAll(".opcion")
+    .forEach((b) => {
+      const activa = b === boton;
+      b.classList.toggle("activa", activa);
+      b.setAttribute("aria-checked", String(activa));
+    });
+});
+
+$("btnEntrenar").addEventListener("click", () => {
+  const dificultad = $("nivelIA").value;
+
+  // `modo: entrenamiento` es lo que garantiza que ninguna parte del sistema
+  // la trate como partida con entrada. Aun sin ese campo, usaLeyendas()
+  // devolvería false: hace falta modo explícito Y entrada válida.
+  localStorage.setItem(
+    "configMesa",
+    JSON.stringify({
+      modo: "entrenamiento",
+      humanos: [{ nombre: nombreJugador }],
+      ias: NOMBRES_IA.slice(0, cantidadIAs).map((nombre) => ({ nombre, dificultad })),
+    }),
+  );
+  localStorage.removeItem("roomCode");
+  window.location.href = "mesa.html";
+});
+
+// =====================================================================
+// 🏆 PARTIDA POR LEYENDAS
+// =====================================================================
+
+// El desplegable se arma desde la lista compartida: agregar una entrada en
+// salas.js la hace aparecer acá sin tocar el HTML.
+$("entradaSala").innerHTML = ENTRADAS.map(
+  (e) => `<option value="${e}">${e} Leyendas</option>`,
+).join("");
+
+function actualizarAyudaEntrada() {
+  const entrada = Number($("entradaSala").value);
+  const pozo = entrada * MAX_JUGADORES;
+  const primero = Math.floor(pozo * 0.75);
+  $("ayudaEntrada").textContent =
+    `Con la sala llena el pozo llega a ${pozo} Leyendas: ${primero} para el primero ` +
+    `y ${pozo - primero} para el segundo.`;
 }
 
-// El código de sala lo genera el servidor: es el ID del documento, así la
-// unicidad la garantiza Firestore. El navegador ya no lo inventa.
+$("entradaSala").addEventListener("change", actualizarAyudaEntrada);
+actualizarAyudaEntrada();
 
-// ========== TIENDA ==========
-shopBtn.addEventListener("click", () => {
-  shopModal.style.display = "flex";
-});
+$("btnCrearSala").addEventListener("click", async () => {
+  const entrada = Number($("entradaSala").value);
+  const boton = $("btnCrearSala");
 
-closeShopBtn.addEventListener("click", () => {
-  shopModal.style.display = "none";
-});
-
-shopModal.addEventListener("click", (e) => {
-  if (e.target === shopModal) {
-    shopModal.style.display = "none";
-  }
-});
-
-document.querySelectorAll(".shop-item").forEach((item) => {
-  item.addEventListener("click", async () => {
-    const credits = parseInt(item.dataset.credits);
-    const price = parseInt(item.dataset.price);
-
-    const confirmar = confirm(
-      `💳 ¿Comprar ${credits} créditos por $${price} reales?`,
-    );
-    if (!confirmar) return;
-
-    // GRIFO CERRADO. Este bloque acreditaba Leyendas con un confirm() y sin
-    // ningún pago: se podía llamar desde la consola con el importe que fuera.
-    // La compra real vive en tienda.html y sólo puede acreditar el servidor,
-    // cuando haya Cloud Functions, contra un aviso firmado del proveedor.
-    mostrarMensaje(
-      "La compra de Leyendas todavía no está disponible. Muy pronto.",
-      "info",
-    );
-    shopModal.style.display = "none";
-  });
-});
-
-// ========== RULETA ==========
-// El giro dejó de acreditar desde el navegador: cualquiera podía llamarlo
-// desde la consola. La ruleta completa vive en ruleta.html y sólo va a
-// acreditar cuando el sorteo y el saldo los maneje el servidor.
-rouletteBtn.addEventListener("click", () => {
-  window.location.href = "ruleta.html";
-});
-
-// ========== CREAR SALA ==========
-createBtn.addEventListener("click", async () => {
-  try {
-    const nombre = roomNameInput.value.trim() || `Sala de ${user.username}`;
-    const maxJugadores = parseInt(maxPlayersSelect.value);
-    const apuesta = parseInt(betAmountSelect.value);
-
-    // Aviso temprano usando el saldo autoritativo. El servidor vuelve a
-    // comprobarlo igual: esto es sólo cortesía, no seguridad.
-    if (saldoActual < apuesta) {
-      mostrarMensaje(`❌ Te faltan Leyendas: la entrada es de ${apuesta}.`, "error");
-      return;
-    }
-
-    // El servidor crea la sala y cobra la entrada en una sola transacción.
-    // El navegador no calcula ni escribe saldo: sólo pide y muestra.
-    let resultado;
-    try {
-      mostrarMensaje("⏳ Creando la sala…", "info");
-      resultado = await crearSala(apuesta, nombre);
-    } catch (error) {
-      mostrarMensaje(
-        error instanceof ErrorDeServidor ? `❌ ${error.message}` : "❌ No pudimos crear la sala.",
-        "error",
-      );
-      return;
-    }
-
-    const codigo = resultado.codigo;
-    mostrarMensaje(`✅ Sala "${nombre}" creada! Código: ${codigo}`, "exito");
-
-    localStorage.setItem("roomCode", codigo);
-    setTimeout(() => {
-      window.location.href = `room.html?code=${codigo}`;
-    }, 1500);
-  } catch (error) {
-    console.error("Error al crear sala:", error);
-    mostrarMensaje("❌ Error al crear la sala", "error");
-  }
-});
-
-// ========== UNIRSE A SALA ==========
-joinBtn.addEventListener("click", async () => {
-  const codigo = roomCodeInput.value.trim().toUpperCase();
-  if (!codigo) {
-    mostrarMensaje("⚠️ Ingresa un código de sala", "info");
+  // Aviso temprano por cortesía. El servidor lo vuelve a comprobar igual.
+  if (saldoActual < entrada) {
+    avisar(`Te faltan Leyendas: la entrada es de ${entrada} y tenés ${saldoActual}.`, "error");
     return;
   }
 
+  boton.disabled = true;
+  boton.textContent = "Creando…";
+  limpiarAviso();
+
   try {
-    const roomsRef = collection(db, "rooms");
-    const q = query(
-      roomsRef,
-      where("codigo", "==", codigo),
-      where("estado", "==", "esperando"),
-    );
-    const querySnapshot = await getDocs(q);
-
-    if (querySnapshot.empty) {
-      mostrarMensaje("❌ Sala no encontrada o ya está en juego", "error");
-      return;
-    }
-
-    const salaDoc = querySnapshot.docs[0];
-    const salaData = salaDoc.data();
-    const apuesta = salaData.apuesta || 10;
-
-    if ((user.credits || 0) < apuesta) {
-      mostrarMensaje(`❌ Necesitas ${apuesta} créditos para unirte`, "error");
-      return;
-    }
-
-    if (
-      salaData.jugadores &&
-      salaData.jugadores.length >= salaData.maxJugadores
-    ) {
-      mostrarMensaje("❌ Sala llena", "error");
-      return;
-    }
-
-    if (salaData.jugadores && salaData.jugadores.includes(user.id)) {
-      mostrarMensaje("⚠️ Ya estás en esta sala", "info");
-      window.location.href = `room.html?code=${codigo}`;
-      return;
-    }
-
-    // El servidor valida cupo, estado y saldo, y cobra la entrada, todo
-    // dentro de una transacción: dos jugadores entrando a la vez no pueden
-    // dejar la sala en cinco ni pagar dos veces.
-    try {
-      mostrarMensaje("⏳ Entrando a la sala…", "info");
-      await unirseASala(codigo);
-    } catch (error) {
-      mostrarMensaje(
-        error instanceof ErrorDeServidor ? `❌ ${error.message}` : "❌ No pudimos entrar a la sala.",
-        "error",
-      );
-      return;
-    }
-
-    mostrarMensaje(`✅ Unido a sala ${codigo}`, "exito");
-    roomCodeInput.value = "";
+    const { codigo } = await crearSala(entrada, `Sala de ${nombreJugador}`);
     localStorage.setItem("roomCode", codigo);
-
-    setTimeout(() => {
-      window.location.href = `room.html?code=${codigo}`;
-    }, 1500);
+    window.location.href = `room.html?code=${codigo}`;
   } catch (error) {
-    console.error("Error al unirse:", error);
-    mostrarMensaje("❌ Error al unirse a la sala", "error");
+    avisar(error instanceof ErrorDeServidor ? error.message : "No pudimos crear la sala.", "error");
+    boton.disabled = false;
+    boton.textContent = "Crear sala";
   }
 });
 
-// ========== ESCUCHAR SALAS ACTIVAS ==========
-function escucharSalasActivas() {
-  const roomsRef = collection(db, "rooms");
-  const q = query(roomsRef, where("estado", "==", "esperando"));
+$("codigoSala").addEventListener("input", (evento) => {
+  evento.target.value = evento.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+});
 
-  onSnapshot(
-    q,
-    (snapshot) => {
-      salasContainer.innerHTML = "";
+$("codigoSala").addEventListener("keydown", (evento) => {
+  if (evento.key === "Enter") $("btnUnirse").click();
+});
 
-      if (snapshot.empty) {
-        salasContainer.innerHTML =
-          "<p style='color: #999;'>No hay salas activas</p>";
+$("btnUnirse").addEventListener("click", async () => {
+  const codigo = $("codigoSala").value.trim().toUpperCase();
+  const boton = $("btnUnirse");
+
+  if (!esCodigoValido(codigo)) {
+    avisar("El código tiene que ser de seis caracteres.", "error");
+    $("codigoSala").focus();
+    return;
+  }
+
+  boton.disabled = true;
+  boton.textContent = "Entrando…";
+  limpiarAviso();
+
+  try {
+    await unirseASala(codigo);
+    localStorage.setItem("roomCode", codigo);
+    window.location.href = `room.html?code=${codigo}`;
+  } catch (error) {
+    avisar(
+      error instanceof ErrorDeServidor ? error.message : "No pudimos entrar a la sala.",
+      "error",
+    );
+    boton.disabled = false;
+    boton.textContent = "Unirse a la sala";
+  }
+});
+
+// =====================================================================
+// Salas abiertas, en vivo
+// =====================================================================
+
+let dejarDeEscucharSalas = null;
+
+function escucharSalas() {
+  const consulta = query(collection(db, "rooms"), where("estado", "==", ESTADOS_SALA.ESPERANDO));
+
+  dejarDeEscucharSalas = onSnapshot(
+    consulta,
+    (snap) => {
+      const salas = snap.docs
+        .map((d) => d.data())
+        .filter((s) => (s.jugadores ?? []).length < MAX_JUGADORES);
+
+      if (!salas.length) {
+        $("listaSalas").innerHTML =
+          '<p class="vacio-simple">No hay salas esperando. Creá una y pasale el código a alguien.</p>';
         return;
       }
 
-      snapshot.forEach((doc) => {
-        const sala = doc.data();
-        const jugadores = sala.jugadores ? sala.jugadores.length : 0;
-        const maxJugadores = sala.maxJugadores || 4;
-        const apuesta = sala.apuesta || 10;
-
-        const salaDiv = document.createElement("div");
-        salaDiv.className = "sala-item";
-        salaDiv.innerHTML = `
-        <div class="sala-info">
-          <strong>${sala.nombre || "Sala"}</strong>
-          <span>📋 ${sala.codigo}</span>
-          <span>👤 ${jugadores}/${maxJugadores}</span>
-          <span>💰 ${apuesta} créditos</span>
-          <span>Creador: ${sala.creadorNombre || "Anónimo"}</span>
-        </div>
-        <button class="btn-join-sala" data-codigo="${sala.codigo}">
-          Unirse
-        </button>
-      `;
-
-        const joinBtnSala = salaDiv.querySelector(".btn-join-sala");
-        joinBtnSala.addEventListener("click", () => {
-          roomCodeInput.value = sala.codigo;
-          joinBtn.click();
-        });
-
-        salasContainer.appendChild(salaDiv);
-      });
+      $("listaSalas").innerHTML = salas
+        .sort((a, b) => a.entrada - b.entrada)
+        .map((s) => {
+          const ocupados = (s.jugadores ?? []).length;
+          return `
+            <div class="sala-fila">
+              <div>
+                <b>${s.nombre ?? "Sala"}</b>
+                <span class="sala-meta">${s.entrada} Leyendas · ${ocupados}/${MAX_JUGADORES} jugadores</span>
+              </div>
+              <button class="btn-plata" data-codigo="${s.codigo}" type="button">Entrar</button>
+            </div>`;
+        })
+        .join("");
     },
     (error) => {
-      console.error("Error al escuchar salas:", error);
+      console.error("No se pudieron leer las salas:", error);
+      $("listaSalas").innerHTML = '<p class="vacio-simple">No pudimos cargar las salas.</p>';
     },
   );
 }
 
-escucharSalasActivas();
-
-// ========== CERRAR SESIÓN ==========
-logoutBtn.addEventListener("click", async () => {
-  console.log("🔍 Cerrando sesión...");
-
-  try {
-    await signOut(auth);
-    console.log("✅ Sesión cerrada en Firebase");
-    localStorage.removeItem("user");
-    localStorage.removeItem("roomCode");
-    console.log("✅ localStorage limpiado");
-    window.location.href = "login.html";
-  } catch (error) {
-    console.error("❌ Error al cerrar sesión:", error);
-    localStorage.removeItem("user");
-    window.location.href = "login.html";
-  }
+$("listaSalas").addEventListener("click", (evento) => {
+  const boton = evento.target.closest("[data-codigo]");
+  if (!boton) return;
+  $("codigoSala").value = boton.dataset.codigo;
+  $("btnUnirse").click();
 });
 
-// ========== PERMITIR ENTER EN INPUT ==========
-roomCodeInput.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") {
-    joinBtn.click();
-  }
+// Los listeners se cortan al irse: si no, quedan abiertos consumiendo lecturas.
+let dejarDeEscucharSaldo = null;
+window.addEventListener("pagehide", () => {
+  if (dejarDeEscucharSalas) dejarDeEscucharSalas();
+  if (dejarDeEscucharSaldo) dejarDeEscucharSaldo();
 });
 
-console.log("✅ Lobby inicializado correctamente");
+// =====================================================================
+// Arranque
+// =====================================================================
+
+$("btnSalir").addEventListener("click", async () => {
+  await signOut(auth);
+  localStorage.removeItem("user");
+  localStorage.removeItem("roomCode");
+  window.location.href = "login.html";
+});
+
+// Si la mesa o la sala nos devolvieron acá, se explica por qué.
+const avisoPendiente = sessionStorage.getItem("avisoLobby");
+if (avisoPendiente) {
+  avisar(avisoPendiente, "error");
+  sessionStorage.removeItem("avisoLobby");
+}
+
+const sesion = await exigirSesion();
+if (sesion) {
+  nombreJugador = sesion.perfil.nombre;
+  saldoActual = sesion.perfil.saldo;
+
+  $("saludo").textContent = `Hola, ${nombreJugador}`;
+  mostrarSaldo(saldoActual);
+
+  // El saldo se sigue en vivo: si el servidor lo mueve, se ve al instante.
+  dejarDeEscucharSaldo = onSnapshot(doc(db, "users", sesion.usuario.uid), (snap) => {
+    saldoActual = snap.exists() ? (snap.data().credits ?? 0) : 0;
+    mostrarSaldo(saldoActual);
+  });
+
+  escucharSalas();
+}

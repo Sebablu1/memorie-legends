@@ -1427,3 +1427,54 @@ button.accion.con-poder {
     transition-duration: 0.05ms !important;
   }
 }
+
+
+/* Pantalla que se muestra al entrar a una partida de sala mientras la mesa
+   en red no exista. Reemplaza el tablero entero: no se simula una partida. */
+.mesa-pendiente {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 16px;
+  padding: 40px 22px;
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+.mesa-pendiente .logo-img.grande {
+  width: 96px;
+  height: 96px;
+  border-radius: 22px;
+  border: 2px solid var(--oro);
+  box-shadow: 0 0 34px -8px var(--oro);
+}
+
+.mesa-pendiente h1 {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.6rem;
+  color: var(--oro);
+}
+
+.mesa-pendiente p { color: var(--texto); line-height: 1.7; }
+.mesa-pendiente p b { color: var(--oro-claro); }
+
+.mesa-pendiente .detalle {
+  color: var(--plata);
+  font-size: 0.92rem;
+  border-top: 1px solid var(--borde);
+  padding-top: 16px;
+  margin-top: 6px;
+}
+
+.botonera-pendiente {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.botonera-pendiente a { text-decoration: none; }
