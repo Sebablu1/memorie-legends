@@ -25,6 +25,7 @@ import { LIMITE_ELIMINACION, puntosMano } from "./reglas/puntaje.js";
 import * as IA from "./reglas/ia.js";
 import { MODOS, costoDeAbandonar } from "./reglas/salas.js";
 import * as Red from "./partida-red.js";
+import { elegibleParaPoder, pasoDelPoder } from "./reglas/red.js";
 import { abandonarPartida, ErrorDeServidor } from "./servidor.js";
 import { sonidos, alternarSilencio } from "./sonidos.js";
 import { lanzarConfeti } from "./confeti.js";
@@ -427,6 +428,13 @@ function dibujar() {
 
 /** Marca como pulsables sólo las cartas que la fase actual permite tocar. */
 function marcarCartasJugables() {
+  // Con un poder en curso lo elegible no es la mano propia sino lo que la
+  // regla del poder permita, que puede estar en la mesa de otro.
+  if (eligiendoPoder) {
+    marcarElegiblesDelPoder();
+    return;
+  }
+
   const miMano = document.querySelector(`.jugador[data-jugador="${YO}"] .mano`);
   if (!miMano) return;
 
@@ -438,6 +446,42 @@ function marcarCartasJugables() {
 
   if (!habilitar) return;
   miMano.querySelectorAll(".carta").forEach((el) => el.classList.add("jugable"));
+}
+
+/**
+ * Resalta las cartas que el poder en curso permite tocar, y apaga el resto.
+ *
+ * No revela nada: marca posiciones, no cartas. Quién puede ser objetivo del
+ * 8, 9 o 10 ya se sabe con sólo mirar la mesa —son los otros jugadores— y
+ * cuántas cartas tiene cada uno también.
+ */
+function marcarElegiblesDelPoder() {
+  const puede = elegibleParaPoder({
+    numero: eligiendoPoder.numero,
+    yo: YO,
+    jugadores: estado.jugadores,
+    propiaElegida: eligiendoPoder.propia,
+  });
+
+  document.querySelectorAll(".jugador[data-jugador]").forEach((jugadorEl) => {
+    const i = Number(jugadorEl.dataset.jugador);
+    jugadorEl.querySelectorAll(".carta[data-posicion]").forEach((cartaEl) => {
+      const pos = Number(cartaEl.dataset.posicion);
+      const elegible = puede(i, pos);
+      cartaEl.classList.toggle("elegible-poder", elegible);
+      // Lo no elegible se apaga: se ve que existe, pero que no es para ahora.
+      cartaEl.classList.toggle("apagada", !elegible);
+    });
+  });
+
+  // La que ya se eligió queda marcada, para no perderla de vista.
+  if (eligiendoPoder.propia !== null) {
+    const propia = document.querySelector(
+      `.jugador[data-jugador="${YO}"] .carta[data-posicion="${eligiendoPoder.propia}"]`,
+    );
+    propia?.classList.add("elegida-poder");
+    propia?.classList.remove("apagada");
+  }
 }
 
 function actualizarBotones() {
@@ -1213,8 +1257,10 @@ dom.modal.addEventListener("click", async (evento) => {
     cerrarModal();
     // Elegir el objetivo es un clic sobre la mesa, no otro modal: se marca
     // qué se puede tocar y el clic siguiente manda la jugada.
-    eligiendoPoder = { numero: miVista?.poderPendiente?.numero, propia: null };
-    pista("Tocá la carta sobre la que querés usar el poder.");
+    const numero = miVista?.poderPendiente?.numero;
+    eligiendoPoder = { numero, propia: null };
+    dibujar();
+    pista(pasoDelPoder({ numero, propiaElegida: null }));
     return;
   }
 
@@ -1500,6 +1546,9 @@ function pistaDeRed(vista) {
 function pintarVista(vista) {
   miVista = vista;
   YO = vista.yo;
+  // Si la fase dejó de ser la del poder —porque se resolvió, o porque a un
+  // ausente se lo saltearon— la elección en curso ya no tiene sentido.
+  if (vista.fase !== "poder" && eligiendoPoder) eligiendoPoder = null;
   estado = comoEstado(vista);
   dibujar();
   pista(pistaDeRed(vista));
@@ -1618,10 +1667,23 @@ async function clicEnCartaDeRed(indiceJugador, posicion) {
   if (eligiendoPoder && miVista.fase === "poder") {
     const numero = eligiendoPoder.numero;
 
+    // La misma regla que pinta las cartas decide si el clic vale. Si fueran
+    // dos reglas distintas, tarde o temprano una carta se vería elegible y
+    // al tocarla no pasaría nada.
+    const puede = elegibleParaPoder({
+      numero, yo: YO, jugadores: estado.jugadores, propiaElegida: eligiendoPoder.propia,
+    });
+    if (!puede(indiceJugador, posicion)) {
+      sonidos.error();
+      pista(`⚠️ Esa carta no. ${pasoDelPoder({ numero, propiaElegida: eligiendoPoder.propia })}`);
+      return;
+    }
+
     // 7 y 8: un solo clic, sobre la carta a mirar.
     if (numero === 7 || numero === 8) {
       const objetivo = { indice: indiceJugador };
       eligiendoPoder = null;
+      dibujar();
       const r = await pedir("poder", () => Red.accion(salaPedida, "poderMirar", { posicion, objetivo }));
       if (r?.carta) mostrarUnMomento(indiceJugador, posicion, r.carta);
       return;
@@ -1629,15 +1691,15 @@ async function clicEnCartaDeRed(indiceJugador, posicion) {
 
     // 9 y 10: primero una carta propia, después una ajena.
     if (eligiendoPoder.propia === null) {
-      if (indiceJugador !== YO) { pista("Primero elegí una carta <b>tuya</b>."); return; }
       eligiendoPoder.propia = posicion;
-      pista("Ahora tocá la carta del <b>rival</b> con la que querés cambiarla.");
+      dibujar();
+      pista(pasoDelPoder({ numero, propiaElegida: posicion }));
       return;
     }
-    if (indiceJugador === YO) { pista("Tiene que ser la carta de <b>otro</b> jugador."); return; }
 
     const propia = eligiendoPoder.propia;
     eligiendoPoder = null;
+    dibujar();
     const r = await pedir("poder", () => Red.accion(salaPedida, "poderCambio", {
       posicion: propia, objetivo: { indice: indiceJugador, posicion },
     }));

@@ -1565,3 +1565,43 @@ button.accion.con-poder {
   color: #ffb4b4;
   font-size: 0.88rem;
 }
+
+/* ------------------------------------------- elegir objetivo de un poder */
+
+/* Lo que se puede tocar ahora mismo: aro dorado y un latido suave. */
+.carta.elegible-poder {
+  cursor: pointer;
+  outline: 2px solid var(--oro, #d4a843);
+  outline-offset: 2px;
+  border-radius: 8px;
+  animation: latir-elegible 1.6s ease-in-out infinite;
+  z-index: 4;
+}
+
+.carta.elegible-poder:hover {
+  transform: translateY(-8px) scale(1.04);
+}
+
+@keyframes latir-elegible {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 168, 67, 0.5); }
+  50% { box-shadow: 0 0 14px 4px rgba(212, 168, 67, 0.35); }
+}
+
+/* Lo que NO se puede tocar: se ve que está, pero que no es para ahora. */
+.carta.apagada {
+  filter: grayscale(0.7) brightness(0.55);
+  cursor: not-allowed;
+}
+
+/* La carta propia ya elegida, mientras se busca con cuál cambiarla. */
+.carta.elegida-poder {
+  outline: 3px solid var(--plata, #c0c0c0);
+  outline-offset: 2px;
+  filter: none;
+  animation: none;
+  z-index: 5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carta.elegible-poder { animation: none; box-shadow: 0 0 12px 3px rgba(212, 168, 67, 0.4); }
+}

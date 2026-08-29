@@ -217,6 +217,67 @@ export function ordenarIntentos(ventana, margenMs = MS_EMPATE_TECNICO) {
 export const esEmpateTecnico = (a, b, margenMs = MS_EMPATE_TECNICO) =>
   Math.abs(a.efectivo - b.efectivo) < margenMs;
 
+// --------------------------------------------------- poderes: elegibles
+
+/**
+ * Qué cartas puede tocar quien está usando un poder.
+ *
+ * Es una regla de INTERFAZ, no de seguridad. El servidor valida lo mismo por
+ * su cuenta en `exigirPosiciones` y rechaza cualquier cosa que no cumpla; esto
+ * existe para que el jugador vea de antemano qué puede tocar, en vez de
+ * probar y comerse un error.
+ *
+ * Las cuatro reglas salen del reglamento:
+ *
+ *   7   mirarPropia      una carta propia
+ *   8   mirarRival       una carta de otro
+ *   9   cambioCiego      primero una propia, después una de otro
+ *   10  cambioConVista   igual que el 9, pero se ven las dos
+ *
+ * Un hueco —una posición de la que ya salió la carta— nunca es elegible: no
+ * hay nada ahí que mirar ni que cambiar.
+ *
+ * @param numero          7, 8, 9 o 10
+ * @param yo              índice del que usa el poder
+ * @param jugadores       los jugadores tal como los ve la vista
+ * @param propiaElegida   para el 9 y el 10: la posición propia ya elegida,
+ *                        o null si todavía falta elegirla
+ * @returns {(indiceJugador: number, posicion: number) => boolean}
+ */
+export function elegibleParaPoder({ numero, yo, jugadores, propiaElegida = null }) {
+  const hayCarta = (i, pos) => Boolean(jugadores?.[i]?.mano?.[pos]);
+  const enJuego = (i) => Boolean(jugadores?.[i]) && !jugadores[i].eliminado;
+
+  return (indiceJugador, posicion) => {
+    if (!hayCarta(indiceJugador, posicion)) return false;
+    if (!enJuego(indiceJugador)) return false;
+
+    // El 7 mira una carta propia; el 8, una ajena.
+    if (numero === 7) return indiceJugador === yo;
+    if (numero === 8) return indiceJugador !== yo;
+
+    if (numero === 9 || numero === 10) {
+      // Primero la propia, después la del rival. Nunca dos propias: cambiar
+      // una carta consigo mismo no es una jugada.
+      return propiaElegida === null ? indiceJugador === yo : indiceJugador !== yo;
+    }
+
+    return false;
+  };
+}
+
+/** Qué hay que pedirle al jugador ahora mismo. */
+export function pasoDelPoder({ numero, propiaElegida = null }) {
+  if (numero === 7) return "Tocá una carta <b>tuya</b> para mirarla.";
+  if (numero === 8) return "Tocá una carta de <b>otro jugador</b> para mirarla.";
+  if (numero === 9 || numero === 10) {
+    return propiaElegida === null
+      ? "Elegí una carta <b>tuya</b> para cambiar."
+      : "Ahora elegí con qué carta de <b>otro jugador</b> la cambiás.";
+  }
+  return "";
+}
+
 // ------------------------------------------------- orden de las vistas
 
 /**
