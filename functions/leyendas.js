@@ -43,7 +43,85 @@ export function crearMoverLeyendas({
    *
    * @returns {Promise<{aplicado: boolean, saldo: number|null, saldoPrevio: number|null}>}
    */
-  return async function moverLeyendas(
+  const refJugador = (uid) => db.collection(usuarios).doc(uid);
+  const refAsiento = (clave) =>
+    clave ? db.collection(movimientos).doc(clave) : db.collection(movimientos).doc();
+
+  /**
+   * Varios movimientos en una sola transacción.
+   *
+   * Existe porque Firestore exige que TODAS las lecturas de una transacción
+   * ocurran antes de cualquier escritura. Llamar a `moverLeyendas` dos veces
+   * seguidas viola esa regla: la segunda lee después de que la primera
+   * escribió, y la transacción entera falla.
+   *
+   * No es teórico. `salirDeSalaEnEspera` lo hacía en bucle: cuando el creador
+   * salía de una sala con dos o más jugadores, la devolución de las entradas
+   * reventaba. Nadie perdía Leyendas —la transacción no llega a confirmar—
+   * pero tampoco las recuperaba.
+   *
+   * Acá se leen primero todos los saldos y todos los asientos, y recién
+   * después se escribe. Si dos movimientos son del mismo jugador, el saldo se
+   * va acumulando en memoria: no se lee dos veces ni se pisa.
+   */
+  async function moverVarias(tx, lista) {
+    // --- fase 1: todas las lecturas ---
+    const saldos = new Map();
+    const yaAsentado = new Map();
+
+    for (const m of lista) {
+      if (!m.uid) throw error("internal", "Falta el jugador al mover Leyendas.");
+      if (!Number.isInteger(m.delta)) {
+        throw error("internal", "Las Leyendas se mueven en números enteros.");
+      }
+      if (m.idempotencia && !yaAsentado.has(m.idempotencia)) {
+        yaAsentado.set(m.idempotencia, (await tx.get(refAsiento(m.idempotencia))).exists);
+      }
+      if (!saldos.has(m.uid)) {
+        const snap = await tx.get(refJugador(m.uid));
+        saldos.set(m.uid, snap.exists ? (snap.data()[campoSaldo] ?? 0) : 0);
+      }
+    }
+
+    // --- fase 2: todas las escrituras ---
+    const resultados = [];
+    for (const m of lista) {
+      if (m.idempotencia && yaAsentado.get(m.idempotencia)) {
+        resultados.push({ aplicado: false, saldo: null, saldoPrevio: null });
+        continue;
+      }
+      const saldoPrevio = saldos.get(m.uid);
+      const saldoNuevo = saldoPrevio + m.delta;
+
+      if (saldoNuevo < 0) {
+        throw error(
+          "failed-precondition",
+          `Saldo insuficiente: tenés ${saldoPrevio} Leyendas y hacen falta ${-m.delta}.`,
+        );
+      }
+
+      saldos.set(m.uid, saldoNuevo);
+      // Dos movimientos con la misma clave en un mismo lote: el segundo se
+      // salta, igual que si llegara en otra llamada.
+      if (m.idempotencia) yaAsentado.set(m.idempotencia, true);
+
+      tx.set(refJugador(m.uid), { [campoSaldo]: saldoNuevo }, { merge: true });
+      tx.set(refAsiento(m.idempotencia), {
+        uid: m.uid,
+        delta: m.delta,
+        motivo: m.motivo,
+        referencia: m.referencia ?? null,
+        saldoPrevio,
+        saldoNuevo,
+        creado: marcaDeTiempo(),
+      });
+
+      resultados.push({ aplicado: true, saldo: saldoNuevo, saldoPrevio });
+    }
+    return resultados;
+  }
+
+  async function moverLeyendas(
     tx,
     { uid, delta, motivo, referencia = null, idempotencia = null },
   ) {
@@ -88,5 +166,10 @@ export function crearMoverLeyendas({
     });
 
     return { aplicado: true, saldo: saldoNuevo, saldoPrevio };
-  };
+  }
+
+  /** Varios movimientos a la vez, respetando lecturas-antes-de-escrituras. */
+  moverLeyendas.varias = moverVarias;
+
+  return moverLeyendas;
 }

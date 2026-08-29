@@ -648,12 +648,26 @@ export function crearMotorEnRed({
       const t = ahora();
       const plazo = partida.plazo;
 
-      if (!plazo) return { hizo: null, motivo: "sin_plazo", fase: partida.estado.fase };
-      // El plazo es de otra fase: quedó viejo, lo va a rehacer la publicación
-      // siguiente. No se actúa sobre un plazo que ya no corresponde.
-      if (plazo.fase !== partida.estado.fase) {
-        return { hizo: null, motivo: "plazo_viejo", fase: partida.estado.fase };
+      // Un plazo que no corresponde a la fase actual sería una partida
+      // colgada para siempre: el orquestador no actuaría nunca y nadie
+      // recalcularía el plazo. No debería ocurrir —toda mutación pasa por
+      // `publicar`, que lo recalcula— pero si ocurriera, la partida quedaría
+      // muerta sin que nada lo señale. Se arregla republicando: `publicar`
+      // pone el plazo que corresponde y el golpe siguiente ya puede actuar.
+      const desfasado = plazo && plazo.fase !== partida.estado.fase;
+      const faltaPlazo = !plazo && plazoDe(partida.estado, partida.ventana, null, t);
+
+      if (desfasado || faltaPlazo) {
+        publicar(tx, codigo, { ...partida, plazo: null, version: partida.version + 1 });
+        return {
+          hizo: "recalcularPlazo",
+          motivo: desfasado ? "plazo_desfasado" : "plazo_faltante",
+          fase: partida.estado.fase,
+          version: partida.version + 1,
+        };
       }
+
+      if (!plazo) return { hizo: null, motivo: "sin_plazo", fase: partida.estado.fase };
       if (t < plazo.hasta) {
         return { hizo: null, motivo: "todavia_no", faltanMs: plazo.hasta - t, fase: partida.estado.fase };
       }
@@ -806,6 +820,58 @@ export function crearMotorEnRed({
   }
 
   /**
+   * Lee la partida para que `abandonarPartida` pueda cobrar y marcar el
+   * abandono en UNA sola transacción.
+   *
+   * Existe separada de la escritura por una razón concreta: Firestore exige
+   * que todas las lecturas de una transacción ocurran ANTES de cualquier
+   * escritura. `moverLeyendas` lee y escribe, así que la partida hay que
+   * leerla antes de que él toque nada, o la transacción falla en producción
+   * —no en las pruebas, si las pruebas no lo comprueban.
+   */
+  async function leerPartidaParaAbandono(tx, codigo) {
+    const snap = await tx.get(refPartida(codigo));
+    return snap.exists ? snap.data() : null;
+  }
+
+  /**
+   * Efecto del abandono sobre la mesa, con la partida YA leída. Sólo escribe.
+   *
+   * Su entrada ya está en el pozo y se queda. Se lo marca eliminado para que
+   * los turnos lo salteen, y `abandono: true` lo distingue de un eliminado
+   * por puntos: no es lo mismo perder que irse.
+   *
+   * @returns true si cambió algo; false si ya estaba abandonado
+   */
+  function marcarAbandonoEn(tx, codigo, partida, uid) {
+    if (!partida) return false;
+    const indice = partida.jugadores.indexOf(uid);
+    if (indice < 0) return false;
+    if ((partida.abandonaron ?? []).includes(uid)) return false;
+
+    const estado = {
+      ...partida.estado,
+      jugadores: partida.estado.jugadores.map((j, i) =>
+        i === indice ? { ...j, eliminado: true, abandono: true } : j,
+      ),
+    };
+    // Si le tocaba a él, el turno pasa al siguiente que siga jugando: la
+    // partida tiene que poder continuar sin el que se fue.
+    const enJuego = ["finRonda", "finPartida"].includes(estado.fase);
+    const conTurno = estado.indiceTurno === indice && !enJuego
+      ? motor.saltarTurno(estado)
+      : estado;
+
+    publicar(tx, codigo, {
+      ...partida,
+      estado: conTurno,
+      abandonaron: [...(partida.abandonaron ?? []), uid],
+      version: partida.version + 1,
+    });
+    return true;
+  }
+
+  /**
    * Marca que un jugador abandonó. El cobro de la penalización NO ocurre acá:
    * lo hace `abandonarPartida`, que es la única función que mueve Leyendas.
    * Esto es sólo el efecto sobre la mesa.
@@ -851,6 +917,8 @@ export function crearMotorEnRed({
   return {
     repartir,
     repartirEn,
+    leerPartidaParaAbandono,
+    marcarAbandonoEn,
     avanzarPartida,
     cerrarMirada,
     abrirVentana,

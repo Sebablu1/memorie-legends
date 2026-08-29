@@ -32,6 +32,13 @@ import { MODOS, usaLeyendas, penalizacionAbandono } from "./reglas/salas.js";
  * @param {Function} deps.error           (codigo, mensaje) => Error
  * @param {object} deps.estados           ESTADOS_SALA
  */
+/**
+ * @param deps.partidaEnRed  Opcional. Si se le pasa `{ leer, marcar }`, el
+ *   abandono cobra la penalización Y saca al jugador de la mesa dentro de la
+ *   MISMA transacción. Sin esto eran dos operaciones separadas, y entre una y
+ *   otra existía un instante —o un fallo— en el que al jugador se le había
+ *   cobrado el 50 % y seguía sentado a la mesa con su turno.
+ */
 export function crearAbandonarPartida({
   db,
   salas,
@@ -40,6 +47,7 @@ export function crearAbandonarPartida({
   marcaDeTiempo,
   error,
   estados,
+  partidaEnRed = null,
 }) {
   return async function abandonarPartida({ uid, codigo }) {
     if (!uid) throw error("unauthenticated", "Iniciá sesión para continuar.");
@@ -58,6 +66,11 @@ export function crearAbandonarPartida({
         throw error("not-found", "No encontramos esa partida.");
       }
       const sala = snap.data();
+
+      // Se lee ACÁ, antes de que `moverLeyendas` escriba nada. Firestore no
+      // admite una lectura después de una escritura dentro de la misma
+      // transacción, y este orden es lo único que lo garantiza.
+      const partida = partidaEnRed ? await partidaEnRed.leer(tx, codigoLimpio) : null;
 
       // --- el jugador pertenece a la partida ---
       const jugadores = sala.jugadores ?? [];
@@ -117,6 +130,13 @@ export function crearAbandonarPartida({
         idempotencia: `abandono_${codigoLimpio}_${uid}`,
       });
 
+      // Y acá se lo saca de la mesa, en la misma transacción que le cobró.
+      // O pasan las dos cosas o no pasa ninguna: nunca queda cobrado y
+      // sentado, ni sacado y sin cobrar.
+      const salioDeLaMesa = partidaEnRed
+        ? partidaEnRed.marcar(tx, codigoLimpio, partida, uid)
+        : false;
+
       tx.update(refSala, {
         abandonaron: [...abandonaron, uid],
         abandonosDetalle: {
@@ -131,6 +151,7 @@ export function crearAbandonarPartida({
       return {
         codigo: codigoLimpio,
         entradaPerdida: entrada,
+        salioDeLaMesa,
         penalizacion,
         // Lo que se descuenta AHORA. La entrada ya se había cobrado al entrar.
         descontadoAhora: penalizacion,

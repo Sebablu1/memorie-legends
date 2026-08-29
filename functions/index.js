@@ -20,11 +20,9 @@ import {
   girarRuleta,
   esperaRuleta,
   esperaBonoDiario,
-  calcularReparto,
   premioPorPuesto,
   paquetePorId,
   leyendasDePaquete,
-  NIVELES_APUESTA,
   MOTIVOS,
   MONEDA,
 } from "./reglas/economia.js";
@@ -32,6 +30,8 @@ import {
 import { crearMoverLeyendas } from "./leyendas.js";
 import { crearAbandonarPartida } from "./abandono.js";
 import { crearMotorEnRed } from "./partida-red.js";
+import { crearCerrarPartida } from "./cierre.js";
+import { crearSalirDeSalaEnEspera } from "./salida.js";
 
 import {
   ENTRADAS,
@@ -45,13 +45,7 @@ import {
 } from "./reglas/salas.js";
 
 import {
-  PERIODOS,
-  clavesDePeriodos,
   clavePeriodo,
-  esPartidaPuntuable,
-  puntosDePartida,
-  acumularFila,
-  filaVacia,
   ZONA_POR_DEFECTO,
 } from "./reglas/ranking.js";
 
@@ -406,75 +400,26 @@ export const iniciarPartida = functions.https.onCall(async (data, context) => {
 });
 
 /**
- * Salir de una sala que todavía NO empezó.
+ * Salir de una sala que todavía no empezó. Devuelve la entrada entera y sin
+ * penalización: la partida nunca llegó a jugarse.
  *
- * Acá se devuelve la entrada completa y no hay penalización: la partida
- * nunca arrancó, así que no habría de qué castigar. La penalización del 50%
- * es para abandonar una partida en curso, que es otra operación.
- *
- * Si se va quien creó la sala, la sala se cancela y se le devuelve la
- * entrada a todos: no se dejan Leyendas atrapadas en una sala huérfana.
+ * La lógica vive en `salida.js` para poder probarla. Ahí tenía un bug que
+ * ninguna prueba podía ver desde acá: devolvía en bucle, y Firestore prohíbe
+ * leer después de escribir dentro de una transacción.
  */
+const salida = crearSalirDeSalaEnEspera({
+  db,
+  salas: SALAS,
+  moverLeyendas,
+  motivo: MOTIVOS.APUESTA,
+  marcaDeTiempo,
+  error: errorHttp,
+  estados: ESTADOS_SALA,
+});
+
 export const salirDeSalaEnEspera = functions.https.onCall(async (data, context) => {
   const uid = exigirSesion(context);
-  const codigo = String(data?.codigo ?? "").trim().toUpperCase();
-
-  return db.runTransaction(async (tx) => {
-    const refSala = db.collection(SALAS).doc(codigo);
-    const snap = await tx.get(refSala);
-    if (!snap.exists) {
-      throw new functions.https.HttpsError("not-found", "Sala no encontrada.");
-    }
-
-    const sala = snap.data();
-    if (sala.estado !== ESTADOS_SALA.ESPERANDO) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        "La partida ya empezó: para salir hay que abandonarla.",
-      );
-    }
-
-    const jugadores = sala.jugadores ?? [];
-    if (!jugadores.includes(uid)) {
-      throw new functions.https.HttpsError("failed-precondition", "No estás en esta sala.");
-    }
-
-    const entrada = Number(sala.entrada);
-    const esCreador = sala.creador === uid;
-    // Si se va el creador, se cancela y se devuelve a todos; si no, sólo a él.
-    const aDevolver = esCreador ? jugadores : [uid];
-
-    for (const jugador of aDevolver) {
-      await moverLeyendas(tx, {
-        uid: jugador,
-        delta: entrada,
-        motivo: MOTIVOS.APUESTA,
-        referencia: codigo,
-        idempotencia: `devolucion_${codigo}_${jugador}`,
-      });
-    }
-
-    if (esCreador) {
-      tx.update(refSala, {
-        estado: ESTADOS_SALA.CANCELADA,
-        canceladaEn: admin.firestore.FieldValue.serverTimestamp(),
-        motivoCancelacion: "el creador salió de la sala",
-      });
-    } else {
-      const indice = jugadores.indexOf(uid);
-      const nombres = [...(sala.jugadoresNombres ?? [])];
-      nombres.splice(indice, 1);
-      tx.update(refSala, {
-        jugadores: jugadores.filter((j) => j !== uid),
-        jugadoresNombres: nombres,
-        // Si se va, deja de contar como listo.
-        listos: (sala.listos ?? []).filter((j) => j !== uid),
-        pozo: entrada * (jugadores.length - 1),
-      });
-    }
-
-    return { cancelada: esCreador, devuelto: entrada };
-  });
+  return salida({ uid, codigo: data?.codigo });
 });
 
 // ------------------------------------------------------ partida en red
@@ -606,11 +551,43 @@ const abandono = crearAbandonarPartida({
   marcaDeTiempo,
   error: errorHttp,
   estados: ESTADOS_SALA,
+  // Cobrar y salir de la mesa son la misma operación. Si fueran dos, entre
+  // una y otra habría un instante en el que al jugador se le cobró el 50 % y
+  // seguía sentado, con su turno bloqueando a los demás.
+  partidaEnRed: {
+    leer: enRed.leerPartidaParaAbandono,
+    marcar: enRed.marcarAbandonoEn,
+  },
 });
 
 export const abandonarPartida = functions.https.onCall(async (data, context) => {
   const uid = exigirSesion(context);
   return abandono({ uid, codigo: data?.codigo });
+});
+
+/**
+ * Cierre de la partida y reparto del pozo.
+ *
+ * La versión anterior de esta función recibía del cliente quién había ganado.
+ * Está reemplazada entera, no parcheada: ver `cierre.js`.
+ *
+ * Del navegador llega sólo el código. El ganador, las posiciones, el pozo y
+ * los premios salen del estado autoritativo del servidor.
+ */
+const cierre = crearCerrarPartida({
+  db,
+  salas: SALAS,
+  partidas: "partidas",
+  moverLeyendas,
+  motivo: MOTIVOS.PREMIO_PARTIDA,
+  marcaDeTiempo,
+  error: errorHttp,
+  estados: ESTADOS_SALA,
+});
+
+export const cerrarPartida = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context);
+  return cierre({ uid, codigo: data?.codigo });
 });
 
 /**
@@ -621,114 +598,6 @@ export const abandonarPartida = functions.https.onCall(async (data, context) => 
  * Con dinero real de por medio, lo correcto es que la partida se simule
  * también en el servidor o que el resultado lo firme un árbitro.
  */
-export const cerrarPartida = functions.https.onCall(async (data, context) => {
-  exigirSesion(context);
-  const { mesaId, resumen } = data ?? {};
-  if (!mesaId || !resumen) {
-    throw new functions.https.HttpsError("invalid-argument", "Faltan mesaId o resumen.");
-  }
-
-  const mesaSnap = await db.collection("mesas").doc(mesaId).get();
-  if (!mesaSnap.exists) {
-    throw new functions.https.HttpsError("not-found", "La mesa no existe.");
-  }
-  const mesa = mesaSnap.data();
-
-  const humanos = resumen.posiciones.filter((p) => !p.esIA);
-  const inscriptos = new Set(mesa.jugadores ?? []);
-  if (!humanos.every((p) => inscriptos.has(p.id))) {
-    throw new functions.https.HttpsError("permission-denied", "El resumen no coincide con la mesa.");
-  }
-
-  const partida = { id: mesaId, dePago: Boolean(mesa.dePago), apuesta: Number(mesa.apuesta) };
-  const fecha = new Date();
-  const claves = clavesDePeriodos(fecha, ZONA);
-
-  const rachas = {};
-  for (const p of humanos) {
-    const s = await db.collection(USUARIOS).doc(p.id).get();
-    rachas[p.id] = s.exists ? (s.data().rachaActual ?? 0) : 0;
-  }
-
-  return db.runTransaction(async (tx) => {
-    const refPartida = db.collection("partidas").doc(mesaId);
-    if ((await tx.get(refPartida)).exists) {
-      throw new functions.https.HttpsError("already-exists", "La partida ya fue cerrada.");
-    }
-
-    // --- reparto del pote ---
-    let reparto = null;
-    if (esPartidaPuntuable(partida)) {
-      reparto = calcularReparto({
-        apuesta: partida.apuesta,
-        jugadores: humanos.map((p) => p.id),
-        ganadorId: resumen.ganadorId,
-      });
-      // La apuesta ya se cobró al entrar: acá sólo se paga el premio.
-      const premio = reparto.movimientos.find((m) => m.jugadorId === resumen.ganadorId);
-      if (premio) {
-        await moverLeyendas(tx, {
-          uid: resumen.ganadorId,
-          delta: reparto.pago,
-          motivo: MOTIVOS.PREMIO_PARTIDA,
-          referencia: mesaId,
-          idempotencia: `premio_${mesaId}`,
-        });
-      }
-    }
-
-    // --- ranking (sólo partidas de pago) ---
-    const resultados = esPartidaPuntuable(partida)
-      ? humanos
-          .map((p) =>
-            puntosDePartida(
-              resumen,
-              p.id,
-              { rayaPrevia: rachas[p.id], ibaUltimo: mesa.contexto?.[p.id]?.ibaUltimo },
-              partida.apuesta,
-            ),
-          )
-          .filter(Boolean)
-      : [];
-
-    const objetivos = [];
-    for (const r of resultados) {
-      for (const periodo of PERIODOS) {
-        const ref = db
-          .collection("rankings")
-          .doc(claves[periodo])
-          .collection("jugadores")
-          .doc(r.jugadorId);
-        objetivos.push({ ref, r, previo: (await tx.get(ref)).data() ?? filaVacia() });
-      }
-    }
-
-    tx.set(refPartida, {
-      ...partida,
-      resumen,
-      claves,
-      resultados,
-      reparto,
-      creada: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    for (const { ref, r, previo } of objetivos) {
-      const nombre = humanos.find((p) => p.id === r.jugadorId)?.nombre ?? null;
-      tx.set(ref, { uid: r.jugadorId, nombre, ...acumularFila(previo, r) }, { merge: true });
-    }
-
-    for (const r of resultados) {
-      tx.set(
-        db.collection(USUARIOS).doc(r.jugadorId),
-        { rachaActual: r.rayaNueva },
-        { merge: true },
-      );
-    }
-
-    return { resultados, reparto };
-  });
-});
-
 // -------------------------------------------------------------- referidos
 
 export const acreditarReferido = functions.https.onCall(async (data, context) => {
