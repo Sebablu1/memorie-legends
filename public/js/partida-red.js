@@ -19,7 +19,7 @@
 import { db, doc, onSnapshot } from "./firebase.js";
 import { funciones, httpsCallable } from "./firebase.js";
 import { ErrorDeServidor } from "./servidor.js";
-import { estimarReloj, muestraDeReloj } from "./reglas/red.js";
+import { crearFiltroDeVersion, estimarReloj, muestraDeReloj } from "./reglas/red.js";
 
 /** Identificador único de acción, para que un reintento no cuente dos veces. */
 export function nuevoIdDeAccion() {
@@ -93,18 +93,16 @@ export const ahoraDelServidor = () => Date.now() + reloj.desfase;
 export function escucharMiVista(codigo, miUid, alCambiar, alFallar) {
   if (!codigo || !miUid) throw new Error("Hace falta el código de la partida y el uid propio.");
 
-  let ultimaVersion = -1;
+  // Firestore reenvía al suscribirse, repite versiones y tras una reconexión
+  // puede entregar fuera de orden. La lógica está en reglas/red.js, probada.
+  const esNueva = crearFiltroDeVersion();
 
   return onSnapshot(
     doc(db, "partidas", codigo, "vistas", miUid),
     (snap) => {
       if (!snap.exists()) return;
       const vista = snap.data();
-      // Firestore puede reenviar una versión ya vista, o entregarlas fuera de
-      // orden tras una reconexión. Pintar una vista vieja encima de una nueva
-      // haría reaparecer cartas que ya se jugaron.
-      if (typeof vista.version === "number" && vista.version <= ultimaVersion) return;
-      ultimaVersion = vista.version ?? ultimaVersion;
+      if (!esNueva(vista)) return;
       alCambiar(vista);
     },
     (error) => {

@@ -217,6 +217,33 @@ export function ordenarIntentos(ventana, margenMs = MS_EMPATE_TECNICO) {
 export const esEmpateTecnico = (a, b, margenMs = MS_EMPATE_TECNICO) =>
   Math.abs(a.efectivo - b.efectivo) < margenMs;
 
+// ------------------------------------------------- orden de las vistas
+
+/**
+ * Descarta las vistas que llegan viejas o repetidas.
+ *
+ * Firestore reenvía el documento actual al suscribirse, puede repetir una
+ * versión ya entregada y, después de una reconexión, puede entregar
+ * actualizaciones fuera de orden. Pintar una vista vieja encima de una nueva
+ * haría reaparecer cartas ya jugadas y devolvería el turno a quien ya jugó:
+ * el jugador vería la partida retroceder.
+ *
+ * Una vista sin número de versión se acepta —no hay con qué compararla— pero
+ * no baja el listón para las que sí lo traen.
+ *
+ * @returns {(vista: object) => boolean} true si hay que pintarla
+ */
+export function crearFiltroDeVersion() {
+  let ultima = -Infinity;
+  return (vista) => {
+    const v = vista?.version;
+    if (typeof v !== "number") return true;
+    if (v <= ultima) return false;
+    ultima = v;
+    return true;
+  };
+}
+
 // ------------------------------------------------------------- registro
 
 export const RECHAZO_INTENTO = {

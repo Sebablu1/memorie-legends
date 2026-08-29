@@ -24,6 +24,7 @@ import { dorsoDeAsiento } from "./reglas/baraja.js";
 import { LIMITE_ELIMINACION, puntosMano } from "./reglas/puntaje.js";
 import * as IA from "./reglas/ia.js";
 import { MODOS, costoDeAbandonar } from "./reglas/salas.js";
+import * as Red from "./partida-red.js";
 import { abandonarPartida, ErrorDeServidor } from "./servidor.js";
 import { sonidos, alternarSilencio } from "./sonidos.js";
 import { lanzarConfeti } from "./confeti.js";
@@ -121,8 +122,28 @@ const jugadoresConfig = [
   })),
 ];
 
-// Índice del jugador que maneja este navegador.
-const YO = 0;
+/**
+ * Índice del jugador que maneja este navegador.
+ *
+ * En entrenamiento siempre es el 0, porque la partida se arma acá. En una
+ * partida por Leyendas lo dice la vista que manda el servidor: el orden de
+ * los jugadores lo fijó él al repartir, y este navegador no elige su lugar.
+ */
+let YO = 0;
+
+/**
+ * Cómo corre esta mesa.
+ *
+ *   "entrenamiento"  el motor corre acá, contra la máquina, sin Leyendas.
+ *   "leyendas"       el motor corre en el servidor. Acá sólo se dibuja lo
+ *                    que llega y se piden acciones.
+ *
+ * Los dos caminos están separados a propósito. La mesa de entrenamiento
+ * funciona hoy y no hay ninguna razón para tocarla; la de red no puede
+ * reutilizar su bucle de turnos porque acá no se decide nada.
+ */
+const MODO = salaPedida ? "leyendas" : "entrenamiento";
+const enRed = () => MODO === "leyendas";
 
 /**
  * Datos económicos de esta mesa, tal como los conoce el navegador.
@@ -202,6 +223,23 @@ function dibujarCarta(
     return `<div class="hueco vacio" style="${estilo}"></div>`;
   }
   const dorso = dorsoDeAsiento(asiento);
+
+  // El servidor manda las cartas ajenas como un marcador sin palo, número ni
+  // imagen. No es que no se dibuje la cara: es que la cara NO VIAJÓ. Dibujar
+  // un `<img>` con src vacío dejaría un hueco roto, y peor, sugeriría que el
+  // dato está y sólo falta mostrarlo.
+  if (carta.oculta) {
+    return `
+      <button class="carta ${claseAsiento(asiento)} ${clases}"
+              ${posicion != null ? `data-posicion="${posicion}"` : ""}
+              style="${estilo}"
+              type="button">
+        ${posicion != null ? `<span class="posicion">${posicion}</span>` : ""}
+        <span class="lados">
+          <span class="dorso"><img src="${dorso}" alt="Carta boca abajo" /></span>
+        </span>
+      </button>`;
+  }
   return `
     <button class="carta ${visible ? "visible" : ""} ${claseAsiento(asiento)} ${clases}"
             ${posicion != null ? `data-posicion="${posicion}"` : ""}
@@ -944,6 +982,7 @@ async function poderDeIA(i) {
 // ------------------------------------------------- acciones del humano
 
 dom.btnLevantar.addEventListener("click", () => {
+  if (enRed()) { pedir("levantar", () => Red.levantar(salaPedida)); return; }
   if (estado.fase !== "turno" || estado.indiceTurno !== YO) return;
   sonidos.voltear();
   estado = levantar(estado);
@@ -962,6 +1001,7 @@ dom.btnLevantar.addEventListener("click", () => {
 });
 
 dom.btnTirar.addEventListener("click", async () => {
+  if (enRed()) { await pedir("tirar", () => Red.tirarCarta(salaPedida)); return; }
   if (estado.fase !== "levantada" || estado.indiceTurno !== YO) return;
   if (PODERES[estado.levantada?.numero]) {
     sonidos.poder();
@@ -975,6 +1015,7 @@ dom.btnTirar.addEventListener("click", async () => {
 });
 
 dom.btnCortar.addEventListener("click", async () => {
+  if (enRed()) { await pedir("cortar", () => Red.cortar(salaPedida)); return; }
   if (estado.fase !== "postLevantada" || estado.indiceTurno !== YO) return;
   sonidos.corte();
   estado = cortar(estado);
@@ -984,6 +1025,7 @@ dom.btnCortar.addEventListener("click", async () => {
 });
 
 dom.btnPasar.addEventListener("click", () => {
+  if (enRed()) { pedir("pasar", () => Red.pasarTurno(salaPedida)); return; }
   if (estado.fase !== "postLevantada" || estado.indiceTurno !== YO) return;
   sonidos.clic();
   estado = pasarTurno(estado);
@@ -993,6 +1035,7 @@ dom.btnPasar.addEventListener("click", () => {
 
 // Clic en el mazo equivale a levantar.
 dom.mazoCarta.addEventListener("click", () => {
+  if (enRed()) { pedir("levantar", () => Red.levantar(salaPedida)); return; }
   if (!dom.btnLevantar.disabled) dom.btnLevantar.click();
 });
 
@@ -1016,6 +1059,12 @@ document.addEventListener("click", async (evento) => {
 
   const indiceJugador = Number(jugadorEl.dataset.jugador);
   const posicion = Number(cartaEl.dataset.posicion);
+
+  // En red no se decide nada acá: se pide y se espera la vista nueva.
+  if (enRed()) {
+    await clicEnCartaDeRed(indiceJugador, posicion);
+    return;
+  }
 
   if (estado.fase === "mirar" && indiceJugador === YO) {
     if (manejadorMirada) {
@@ -1350,6 +1399,183 @@ async function mostrarFinRonda() {
   `);
 }
 
+// ==================================================================
+// MODO LEYENDAS — el motor corre en el servidor
+// ==================================================================
+//
+// Acá NO se juega: se dibuja lo que llega y se piden acciones. Este bloque
+// no importa el motor, no calcula puntajes, no decide turnos y no toca
+// Firestore para escribir. Si alguna de esas cosas apareciera acá, sería la
+// señal de que el cliente volvió a ser autoridad de algo.
+
+let dejarDeEscuchar = null;
+let dejarDeLatir = null;
+/** Última vista recibida del servidor. La única fuente de verdad. */
+let miVista = null;
+
+/**
+ * Traduce una vista del servidor a la forma que ya dibuja `dibujar()`.
+ *
+ * La vista y el estado del motor tienen casi la misma forma —`vistaDe` es un
+ * recorte, no una traducción— así que el adaptador es corto. Lo que cambia
+ * son tres cosas que en la vista viajan resumidas:
+ *
+ *   mazo      del mazo sólo se sabe CUÁNTAS cartas quedan
+ *   descarte  sólo viaja la cima, que es la muestra, y el tamaño
+ *   levantada sólo viene si es tu turno
+ *
+ * Se rellenan con marcadores tapados para que el contador y la pila se vean
+ * igual que en la mesa local. Son marcadores, no cartas: no hay nada que
+ * destapar en ellos.
+ */
+function comoEstado(vista) {
+  const tapada = { oculta: true };
+  const restoDelDescarte = Math.max(0, (vista.cartasEnDescarte ?? 1) - 1);
+
+  return {
+    fase: vista.fase,
+    ronda: vista.ronda,
+    indiceMano: vista.indiceMano,
+    indiceTurno: vista.indiceTurno,
+    turnosRonda: vista.turnosRonda,
+    indiceCortador: vista.indiceCortador,
+    desempate: vista.desempate,
+    registro: vista.registro ?? [],
+    jugadores: vista.jugadores,
+    descarte: vista.muestra
+      ? [vista.muestra, ...Array.from({ length: restoDelDescarte }, () => tapada)]
+      : [],
+    mazo: Array.from({ length: vista.cartasEnMazo ?? 0 }, () => tapada),
+    levantada: vista.levantada ?? null,
+    poderPendiente: vista.poderPendiente ?? null,
+    ganador: null,
+    eventos: [],
+  };
+}
+
+/** Texto de la situación, para el modo red. */
+function pistaDeRed(vista) {
+  if (vista.abandonaron?.includes(miUid)) return "Abandonaste esta partida.";
+  const miTurno = vista.indiceTurno === vista.yo;
+  const quien = vista.jugadores[vista.indiceTurno]?.nombre ?? "alguien";
+
+  switch (vista.fase) {
+    case "mirar":
+      return "Tocá <b>una</b> carta tuya para memorizarla.";
+    case "descarte":
+      return "<b>¡Reflejos!</b> Tocá una carta que creas igual a la muestra.";
+    case "turno":
+      return miTurno ? "Es tu turno. <b>Levantá</b> del mazo." : `Juega <b>${quien}</b>.`;
+    case "levantada":
+      return miTurno ? "Cambiala por una tuya, o tirala." : `<b>${quien}</b> está decidiendo.`;
+    case "poder":
+      return miTurno ? "Levantaste un poder." : `<b>${quien}</b> tiene un poder.`;
+    case "postLevantada":
+      return miTurno ? "Podés <b>cortar</b> o <b>pasar</b>." : `<b>${quien}</b> decide si corta.`;
+    case "finRonda":
+      return `Ronda ${vista.ronda} terminada.`;
+    case "finPartida":
+      return "Partida terminada.";
+    default:
+      return "";
+  }
+}
+
+/** Pinta la vista que acaba de llegar. */
+function pintarVista(vista) {
+  miVista = vista;
+  YO = vista.yo;
+  estado = comoEstado(vista);
+  dibujar();
+  pista(pistaDeRed(vista));
+}
+
+/**
+ * Manda una acción y deja que la vista nueva llegue sola por el listener.
+ *
+ * No se toca `estado` acá: el resultado lo publica el servidor. Pintar un
+ * resultado optimista sería adivinar, y en la ventana de reflejos adivinar
+ * mal es lo más probable — el resultado depende de lo que hagan los otros.
+ */
+async function pedir(accion, ejecutar) {
+  if (pidiendo) return;
+  pidiendo = true;
+  try {
+    return await ejecutar();
+  } catch (error) {
+    pista(`⚠️ ${error?.message ?? "No pudimos enviar la jugada."}`);
+    sonidos.error();
+  } finally {
+    pidiendo = false;
+  }
+}
+let pidiendo = false;
+
+/** Clic sobre una carta, en modo red. */
+async function clicEnCartaDeRed(indiceJugador, posicion) {
+  if (!miVista) return;
+
+  if (miVista.fase === "mirar" && indiceJugador === YO) {
+    const r = await pedir("mirar", () => Red.mirar(salaPedida, posicion));
+    // El servidor devuelve la carta SÓLO a quien la miró. No queda en la
+    // partida: se muestra dos segundos y se olvida, como en la mesa local.
+    if (r?.carta) {
+      const llave = clave(YO, posicion);
+      revelaciones.set(llave, r.carta);
+      dibujar();
+      setTimeout(() => { revelaciones.delete(llave); dibujar(); }, MS_MIRAR);
+    }
+    return;
+  }
+
+  if (miVista.fase === "descarte" && indiceJugador === YO) {
+    const ventana = miVista.ventana;
+    if (!ventana || ventana.cerrada) return;
+    // Se manda el instante del CLIC, no el del envío.
+    const tocadoEn = Date.now();
+    await pedir("descartar", () => Red.intentarDescarte(salaPedida, ventana, posicion, tocadoEn));
+    return;
+  }
+
+  if (miVista.fase === "levantada" && miVista.indiceTurno === YO && indiceJugador === YO) {
+    await pedir("cambiar", () => Red.cambiarCarta(salaPedida, posicion));
+  }
+}
+
+/**
+ * Arranca la mesa en modo Leyendas.
+ *
+ * Un refresco del navegador entra por acá igual que la primera vez. No crea
+ * ninguna partida ni cobra ninguna entrada: la partida ya existe, y lo único
+ * que se hace es volver a escuchar la vista propia. Crear la partida es
+ * trabajo de `iniciarPartida`, que se llama desde la sala y una sola vez.
+ */
+async function arrancarModoLeyendas(sala, uid) {
+  miUid = uid;
+
+  // El reloj se sincroniza antes de la primera ventana de reflejos: sin esto
+  // el servidor asume la peor incertidumbre posible y todo empate se resuelve
+  // por sorteo en vez de por reacción.
+  Red.sincronizarReloj().catch(() => {});
+
+  dejarDeEscuchar = Red.escucharMiVista(
+    salaPedida,
+    uid,
+    (vista) => pintarVista(vista),
+    () => pista("⚠️ Se cortó la conexión con la partida. Reintentando…"),
+  );
+  dejarDeLatir = Red.mantenerVivo(salaPedida);
+
+  window.addEventListener("pagehide", () => {
+    dejarDeEscuchar?.();
+    dejarDeLatir?.();
+  });
+
+  pista("Conectando con la partida…");
+}
+
+let miUid = null;
+
 // ------------------------------------------------------------- arranque
 
 /** Manda al lobby con un motivo que el lobby muestra al cargar. */
@@ -1411,8 +1637,9 @@ async function entrarDesdeSala() {
     return;
   }
 
-  // Estado "jugando": el acceso es legítimo, pero la mesa en red no existe.
-  mostrarMesaEnRedPendiente(sala);
+  // Estado "jugando": la partida existe en el servidor. Se escucha la vista
+  // propia y se dibuja lo que llegue.
+  await arrancarModoLeyendas(sala, sesion.usuario.uid);
 }
 
 /** Pantalla honesta mientras la partida en red no esté implementada. */
