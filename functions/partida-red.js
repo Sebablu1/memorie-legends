@@ -434,6 +434,12 @@ export function crearMotorEnRed({
         throw error("failed-precondition", "Esa jugada no cambia nada.");
       }
 
+      // Lo que este jugador tiene derecho a VER por haber hecho esta jugada.
+      // Viaja en la RESPUESTA, no en la partida: se muestra unos segundos en
+      // su pantalla y se olvida. Guardarlo en el estado sería reinventar
+      // `infoPublica`, que se sacó justamente para que no quedara rastro.
+      const revelado = queRevela(partida.estado, indice, accion, { posicion, objetivo });
+
       const siguiente = {
         ...partida,
         estado,
@@ -443,7 +449,7 @@ export function crearMotorEnRed({
         version: partida.version + 1,
       };
       publicar(tx, codigo, siguiente);
-      return { duplicado: false, version: siguiente.version, fase: estado.fase };
+      return { duplicado: false, version: siguiente.version, fase: estado.fase, ...revelado };
     });
   }
 
@@ -452,6 +458,31 @@ export function crearMotorEnRed({
     const claves = Object.keys(aplicadas);
     if (claves.length <= 40) return aplicadas;
     return Object.fromEntries(claves.slice(-40).map((k) => [k, true]));
+  }
+
+  /**
+   * Qué ve el jugador que hizo la jugada, y sólo él.
+   *
+   * Mirar una carta propia al empezar la ronda, o usar un poder de mirada,
+   * son jugadas cuyo resultado es información privada. El estado publicado no
+   * la lleva —ninguna vista, ni la suya— porque ahí quedaría escrita; viaja
+   * una sola vez, en la respuesta a quien la pidió.
+   */
+  function queRevela(estado, indice, accion, { posicion, objetivo }) {
+    if (accion === ACCIONES.MIRAR) {
+      return { carta: estado.jugadores[indice].mano[posicion] ?? null };
+    }
+    if (accion === ACCIONES.PODER_MIRAR) {
+      const objetivoIndice = objetivo?.indice ?? indice;
+      return { carta: estado.jugadores[objetivoIndice]?.mano[posicion] ?? null };
+    }
+    if (accion === ACCIONES.PODER_CAMBIO) {
+      const { revelada } = motor.usarPoderCambio(
+        estado, posicion, objetivo?.indice, objetivo?.posicion,
+      );
+      return { revelada: revelada ?? null };
+    }
+    return {};
   }
 
   function aplicar(estado, indice, accion, { posicion, objetivo }) {
