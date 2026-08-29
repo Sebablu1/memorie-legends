@@ -1204,6 +1204,20 @@ dom.btnAbandonar.addEventListener("click", () => {
 });
 
 dom.modal.addEventListener("click", async (evento) => {
+  if (evento.target.closest('[data-accion="red-saltar-poder"]')) {
+    cerrarModal();
+    await pedir("saltarPoder", () => Red.saltarPoder(salaPedida));
+    return;
+  }
+  if (evento.target.closest('[data-accion="red-elegir-objetivo"]')) {
+    cerrarModal();
+    // Elegir el objetivo es un clic sobre la mesa, no otro modal: se marca
+    // qué se puede tocar y el clic siguiente manda la jugada.
+    eligiendoPoder = { numero: miVista?.poderPendiente?.numero, propia: null };
+    pista("Tocá la carta sobre la que querés usar el poder.");
+    return;
+  }
+
   if (evento.target.closest('[data-accion="abandonar-no"]')) {
     cerrarModal();
     return;
@@ -1410,6 +1424,7 @@ async function mostrarFinRonda() {
 
 let dejarDeEscuchar = null;
 let dejarDeLatir = null;
+let dejarDeAvanzar = null;
 /** Última vista recibida del servidor. La única fuente de verdad. */
 let miVista = null;
 
@@ -1488,6 +1503,88 @@ function pintarVista(vista) {
   estado = comoEstado(vista);
   dibujar();
   pista(pistaDeRed(vista));
+  modalesDeRed(vista);
+}
+
+/**
+ * Los modales que dependen de la fase.
+ *
+ * Se abren y se cierran mirando la vista, no guardando estado propio: si el
+ * modal recordara por su cuenta que está abierto, una reconexión que trae
+ * otra fase lo dejaría abierto sobre una partida que ya siguió.
+ */
+let faseMostrada = null;
+function modalesDeRed(vista) {
+  const clave = `${vista.fase}:${vista.ronda}:${vista.version}`;
+  if (clave === faseMostrada) return;
+
+  const eraPoder = faseMostrada?.startsWith("poder:");
+  faseMostrada = clave;
+
+  if (vista.fase === "poder" && vista.indiceTurno === YO) {
+    abrirModalPoderDeRed(vista);
+    return;
+  }
+  if (eraPoder) cerrarModal();
+
+  if (vista.fase === "finRonda" || vista.fase === "finPartida") {
+    abrirModalFinDeRed(vista);
+  }
+}
+
+/**
+ * El poder recién levantado. Se ofrece usarlo o no; la decisión se manda al
+ * servidor y lo que se ve después es lo que él publique.
+ */
+function abrirModalPoderDeRed(vista) {
+  const numero = vista.poderPendiente?.numero;
+  const explicacion = {
+    7: "Mirá una carta <b>tuya</b>.",
+    8: "Mirá una carta de <b>otro jugador</b>.",
+    9: "Cambiá una carta tuya por una de otro, <b>a ciegas</b>.",
+    10: "Cambiá una carta tuya por una de otro, <b>viendo las dos</b>.",
+  }[numero] ?? "";
+
+  abrirModal(`
+    <h2>🔮 Levantaste un ${numero}</h2>
+    <p class="aviso-poder">${explicacion}</p>
+    <p class="aviso-suave">Usar el poder es opcional.</p>
+    <div class="botonera-modal">
+      <button class="accion sobria" data-accion="red-saltar-poder" type="button">No usarlo</button>
+      <button class="accion" data-accion="red-elegir-objetivo" type="button">🔮 Usar poder</button>
+    </div>
+  `);
+}
+
+/** Resultado de la ronda o de la partida, con lo que publicó el servidor. */
+function abrirModalFinDeRed(vista) {
+  const filas = vista.jugadores
+    .map((j, i) => {
+      const enMano = vista.puntosDeMano?.[i];
+      return `<tr${i === YO ? ' class="propio"' : ""}>
+        <td>${j.nombre}</td>
+        <td>${enMano ?? "—"}</td>
+        <td>${j.puntos}</td>
+        <td>${j.eliminado ? "eliminado" : ""}</td>
+      </tr>`;
+    })
+    .join("");
+
+  const tabla = `<table class="tabla-resultado">
+    <thead><tr><th>Jugador</th><th>En mano</th><th>Total</th><th></th></tr></thead>
+    <tbody>${filas}</tbody></table>`;
+
+  if (vista.fase === "finPartida") {
+    const gane = vista.jugadores[YO] && !vista.jugadores[YO].eliminado;
+    abrirModal(`<h2>${gane ? "🏆 ¡Ganaste!" : "Partida terminada"}</h2>${tabla}
+      <p class="aviso-suave">Volvé al lobby para jugar otra.</p>`);
+    if (gane) { sonidos.victoria(); lanzarConfeti(dom.confeti); } else sonidos.derrota();
+    return;
+  }
+
+  const cortador = vista.jugadores[vista.indiceCortador]?.nombre ?? "alguien";
+  abrirModal(`<h2>✂️ Cortó ${cortador}</h2>
+    <p>Ronda ${vista.ronda} terminada. La siguiente arranca sola.</p>${tabla}`);
 }
 
 /**
@@ -1512,8 +1609,43 @@ async function pedir(accion, ejecutar) {
 let pidiendo = false;
 
 /** Clic sobre una carta, en modo red. */
+/** Poder en curso: qué se está eligiendo. */
+let eligiendoPoder = null;
+
 async function clicEnCartaDeRed(indiceJugador, posicion) {
   if (!miVista) return;
+
+  if (eligiendoPoder && miVista.fase === "poder") {
+    const numero = eligiendoPoder.numero;
+
+    // 7 y 8: un solo clic, sobre la carta a mirar.
+    if (numero === 7 || numero === 8) {
+      const objetivo = { indice: indiceJugador };
+      eligiendoPoder = null;
+      const r = await pedir("poder", () => Red.accion(salaPedida, "poderMirar", { posicion, objetivo }));
+      if (r?.carta) mostrarUnMomento(indiceJugador, posicion, r.carta);
+      return;
+    }
+
+    // 9 y 10: primero una carta propia, después una ajena.
+    if (eligiendoPoder.propia === null) {
+      if (indiceJugador !== YO) { pista("Primero elegí una carta <b>tuya</b>."); return; }
+      eligiendoPoder.propia = posicion;
+      pista("Ahora tocá la carta del <b>rival</b> con la que querés cambiarla.");
+      return;
+    }
+    if (indiceJugador === YO) { pista("Tiene que ser la carta de <b>otro</b> jugador."); return; }
+
+    const propia = eligiendoPoder.propia;
+    eligiendoPoder = null;
+    const r = await pedir("poder", () => Red.accion(salaPedida, "poderCambio", {
+      posicion: propia, objetivo: { indice: indiceJugador, posicion },
+    }));
+    // El 10 muestra las dos cartas; el 9 no muestra ninguna.
+    if (r?.revelada?.propia) mostrarUnMomento(YO, propia, r.revelada.propia);
+    if (r?.revelada?.rival) mostrarUnMomento(indiceJugador, posicion, r.revelada.rival);
+    return;
+  }
 
   if (miVista.fase === "mirar" && indiceJugador === YO) {
     const r = await pedir("mirar", () => Red.mirar(salaPedida, posicion));
@@ -1543,6 +1675,19 @@ async function clicEnCartaDeRed(indiceJugador, posicion) {
 }
 
 /**
+ * Muestra una carta unos segundos y la vuelve a tapar.
+ *
+ * Lo revelado vino en la RESPUESTA del servidor, no en el estado. Se muestra
+ * y se olvida: acá tampoco queda registro.
+ */
+function mostrarUnMomento(indiceJugador, posicion, carta, ms = MS_MIRAR) {
+  const llave = clave(indiceJugador, posicion);
+  revelaciones.set(llave, carta);
+  dibujar();
+  setTimeout(() => { revelaciones.delete(llave); dibujar(); }, ms);
+}
+
+/**
  * Arranca la mesa en modo Leyendas.
  *
  * Un refresco del navegador entra por acá igual que la primera vez. No crea
@@ -1565,10 +1710,14 @@ async function arrancarModoLeyendas(sala, uid) {
     () => pista("⚠️ Se cortó la conexión con la partida. Reintentando…"),
   );
   dejarDeLatir = Red.mantenerVivo(salaPedida);
+  // Todos los jugadores golpean la puerta. Si dependiera de uno solo, su
+  // desconexión congelaría la mesa para los demás.
+  dejarDeAvanzar = Red.mantenerEnMarcha(salaPedida);
 
   window.addEventListener("pagehide", () => {
     dejarDeEscuchar?.();
     dejarDeLatir?.();
+    dejarDeAvanzar?.();
   });
 
   pista("Conectando con la partida…");

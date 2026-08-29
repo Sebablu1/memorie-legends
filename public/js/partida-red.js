@@ -114,6 +114,49 @@ export function escucharMiVista(codigo, miUid, alCambiar, alFallar) {
 
 // ------------------------------------------------------------ acciones
 
+/**
+ * Golpea la puerta: si algo venció, el servidor lo hace avanzar.
+ *
+ * No decide nada. El plazo vive en la partida, con el reloj del servidor, y
+ * esta llamada sólo pregunta si ya se cumplió. Llegar temprano no adelanta
+ * la ventana de nadie.
+ */
+export const avanzarPartida = (codigo) => llamar("avanzarPartida", { codigo });
+
+/** Cada cuánto se golpea la puerta mientras la pestaña está a la vista. */
+export const MS_ENTRE_GOLPES = 900;
+
+/**
+ * Mantiene la partida avanzando.
+ *
+ * Todos los jugadores golpean, y está bien que sea así: si dependiera de uno
+ * solo, su desconexión congelaría la mesa para los demás. Que sobren llamadas
+ * no es un problema —el servidor contesta "todavía no" sin tocar nada— y que
+ * lleguen a la vez tampoco: la transacción deja pasar una.
+ *
+ * Con la pestaña oculta se deja de golpear: el navegador estrangula los
+ * temporizadores en segundo plano y no tiene sentido insistir. Al volver,
+ * la primera llamada pone la partida al día de una vez.
+ *
+ * @returns función para dejar de golpear
+ */
+export function mantenerEnMarcha(codigo) {
+  let corriendo = false;
+  const golpe = async () => {
+    if (corriendo || document.hidden) return;
+    corriendo = true;
+    try { await avanzarPartida(codigo); } catch { /* el siguiente golpe reintenta */ }
+    finally { corriendo = false; }
+  };
+  const t = setInterval(golpe, MS_ENTRE_GOLPES);
+  document.addEventListener("visibilitychange", golpe);
+  golpe();
+  return () => {
+    clearInterval(t);
+    document.removeEventListener("visibilitychange", golpe);
+  };
+}
+
 /** Abre la ventana de reflejos. Idempotente: si ya hay una, devuelve esa. */
 export const abrirVentanaDescarte = (codigo) => llamar("abrirVentanaDescarte", { codigo });
 
