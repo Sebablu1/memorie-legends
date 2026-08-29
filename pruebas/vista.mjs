@@ -20,7 +20,7 @@ const CONFIG = [
 ];
 
 console.log("\n=== Una vista recién repartida ===");
-let s = M.empezarRonda(M.crearPartida(CONFIG, { rng: mulberry32(7) }));
+let s = M.empezarRonda(M.crearPartida(CONFIG, { semilla: 7 }));
 const v0 = vistaDe(s, 0);
 
 ok(v0.jugadores.every((j) => j.mano.every((c) => c === null || c.oculta)),
@@ -55,7 +55,7 @@ ok([0, 2, 3].every((i) => filtracionesEn(vistaDe(s, i), s).length === 0),
    "sin filtraciones para los que no juegan");
 
 console.log("\n=== Un descarte fallido expone esa carta a todos, y sólo un rato ===");
-let e = M.empezarRonda(M.crearPartida(CONFIG, { rng: mulberry32(3) }));
+let e = M.empezarRonda(M.crearPartida(CONFIG, { semilla: 3 }));
 e = M.terminarMirada(e);
 // se busca una posición cuya carta NO coincida con la muestra
 const muestra = e.descarte[0];
@@ -85,7 +85,7 @@ ok(vistaDe(despues, 0).revelaciones.length === 0, "la vista ya no trae revelacio
 ok(filtracionesEn(vistaDe(despues, 0), despues).length === 0, "y sigue sin filtrar nada");
 
 console.log("\n=== Al cortar se destapa todo, como manda el reglamento ===");
-let c = M.empezarRonda(M.crearPartida(CONFIG, { rng: mulberry32(11) }));
+let c = M.empezarRonda(M.crearPartida(CONFIG, { semilla: 11 }));
 c = M.cortar({ ...c, fase: "postLevantada", indiceTurno: 0 });
 const vc = vistaDe(c, 3);
 ok(vc.fase === "finRonda" || vc.fase === "finPartida", "la ronda terminó", vc.fase);
@@ -98,7 +98,7 @@ console.log("\n=== Partidas completas: se revisa cada paso ===");
 let pasos = 0, sinFiltrar = 0;
 for (let semilla = 1; semilla <= 12; semilla++) {
   const rng = mulberry32(semilla);
-  let g = M.crearPartida(CONFIG.map((j, i) => ({ ...j, esIA: i > 0, dificultad: "medio" })), { rng });
+  let g = M.crearPartida(CONFIG.map((j, i) => ({ ...j, esIA: i > 0, dificultad: "medio" })), { semilla });
   let mem = g.jugadores.map(() => IA.crearMemoria());
   g = M.empezarRonda(g);
   let guarda = 0;
