@@ -1,5 +1,6 @@
 import { crearBaraja, barajar, TAM_MANO } from "./baraja.js";
 import { resolverCorte, aplicarEliminacion, comprobarFinPartida, cartasVivas } from "./puntaje.js";
+import { azarDesde, semillaAleatoria } from "./azar.js";
 
 export const MS_MIRAR = 2000;
 export const MS_DESCARTE = 5000;
@@ -44,7 +45,12 @@ export const crearJugador = ({ id, nombre, esIA = false, dificultad = "medio" })
   posicionMirada: null,
 });
 
-export const crearPartida = (configuracion, { rng = Math.random } = {}) => ({
+/**
+ * Estado inicial. Todo lo que devuelve es JSON puro: números, cadenas,
+ * booleanos, arrays y objetos planos. Ninguna función, ningún Map, ninguna
+ * instancia de clase. Eso es lo que permite guardarlo y recuperarlo tal cual.
+ */
+export const crearPartida = (configuracion, { semilla = semillaAleatoria() } = {}) => ({
   fase: "inicio",
   ronda: 0,
   indiceMano: 0,
@@ -62,7 +68,9 @@ export const crearPartida = (configuracion, { rng = Math.random } = {}) => ({
   registro: [],
   // Hechos puntuables de la partida, que consume el ranking.
   eventos: [],
-  rng,
+  // El azar es un número, no una función: avanza con cada barajada y viaja
+  // con el estado. Ver azar.js.
+  semilla: semilla >>> 0,
 });
 
 const anotar = (estado, texto) => ({
@@ -73,7 +81,8 @@ const anotar = (estado, texto) => ({
 // --------------------------------------------------------------- reparto
 
 export function empezarRonda(estado) {
-  const mazo = barajar(crearBaraja(), estado.rng);
+  const azar = azarDesde(estado.semilla);
+  const mazo = barajar(crearBaraja(), azar);
   const jugadores = estado.jugadores.map((j) =>
     j.eliminado
       ? { ...j, mano: [], posicionMirada: null }
@@ -95,6 +104,9 @@ export function empezarRonda(estado) {
       indiceCortador: null,
       turnosRonda: 0,
       indiceTurno: estado.indiceMano,
+      // La semilla avanza con la barajada: la ronda siguiente no repite el
+      // mismo reparto.
+      semilla: azar.semilla(),
     },
     estado.desempate
       ? "Ronda de desempate"
@@ -131,14 +143,11 @@ const rellenarMazo = (estado) => {
   if (estado.mazo.length) return estado;
   const [muestra, ...resto] = estado.descarte;
   if (!resto.length) return estado;
-  return {
-    ...estado,
-    mazo: barajar(
-      resto.map((c) => ({ ...c, visible: false })),
-      estado.rng,
-    ),
-    descarte: [muestra],
-  };
+  const azar = azarDesde(estado.semilla);
+  const mazo = barajar(resto.map((c) => ({ ...c, visible: false })), azar);
+  // La semilla avanzada vuelve al estado: si no, la próxima barajada
+  // repetiría exactamente la misma mezcla.
+  return { ...estado, mazo, descarte: [muestra], semilla: azar.semilla() };
 };
 
 /**

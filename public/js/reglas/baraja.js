@@ -36,7 +36,18 @@ export function crearBaraja() {
   return baraja;
 }
 
-export function barajar(baraja, rng = Math.random) {
+/**
+ * Mezcla de Fisher-Yates.
+ *
+ * El `rng` es OBLIGATORIO a propósito. Tenía un valor por defecto de
+ * `Math.random`, y eso era una trampa: quien se olvidara de pasar la fuente
+ * de azar de la partida no habría visto ningún error, sólo una partida que
+ * deja de ser reproducible. Sin defecto, olvidarse revienta en el acto.
+ */
+export function barajar(baraja, rng) {
+  if (typeof rng !== "function") {
+    throw new TypeError("barajar necesita una fuente de azar explícita (ver reglas/azar.js)");
+  }
   const copia = [...baraja];
   for (let i = copia.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
