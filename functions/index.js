@@ -31,6 +31,7 @@ import {
 
 import { crearMoverLeyendas } from "./leyendas.js";
 import { crearAbandonarPartida } from "./abandono.js";
+import { crearMotorEnRed } from "./partida-red.js";
 
 import {
   ENTRADAS,
@@ -380,6 +381,19 @@ export const iniciarPartida = functions.https.onCall(async (data, context) => {
       );
     }
 
+    // El reparto va en ESTA transacción, no en otra. Si fueran dos, la sala
+    // podría quedar en "jugando" sin partida detrás —o con una partida que
+    // nadie inició— y no habría forma de saber cuál de las dos pasó.
+    //
+    // El mazo se baraja acá, en el servidor, con una semilla que también
+    // elige el servidor. Si la eligiera el cliente podría probar semillas
+    // hasta dar con un reparto que le convenga.
+    await enRed.repartirEn(tx, {
+      codigo,
+      jugadores,
+      nombres: sala.jugadoresNombres ?? [],
+    });
+
     tx.update(refSala, {
       estado: ESTADOS_SALA.JUGANDO,
       // El pozo queda fijado con los jugadores que efectivamente pagaron.
@@ -461,6 +475,103 @@ export const salirDeSalaEnEspera = functions.https.onCall(async (data, context) 
 
     return { cancelada: esCreador, devuelto: entrada };
   });
+});
+
+// ------------------------------------------------------ partida en red
+
+/**
+ * Motor en red. El estado completo vive en `partidas/{codigo}`, que NADIE
+ * puede leer, y a cada jugador se le escribe su vista recortada en
+ * `partidas/{codigo}/vistas/{uid}`.
+ *
+ * El navegador nunca escribe estado de partida: pide una acción, el servidor
+ * la valida, la aplica y publica las vistas nuevas.
+ */
+const enRed = crearMotorEnRed({
+  db,
+  partidas: "partidas",
+  ahora: () => Date.now(),
+  idAleatorio: () => crypto.randomBytes(9).toString("base64url"),
+  marcaDeTiempo,
+  error: errorHttp,
+  // La semilla del mazo sale de una fuente criptográfica: es lo que impide
+  // que se pueda adivinar el reparto. No es un secreto de seguridad —para eso
+  // está la redacción de vistas— pero regalarla sería absurdo.
+  semillaDe: () => crypto.randomBytes(4).readUInt32BE(0),
+});
+
+/**
+ * Reloj del servidor, para que el cliente estime su desfase.
+ *
+ * Devuelve el momento en que se atendió el pedido. El cliente hace varias
+ * pasadas y se queda con la de viaje más corto; ver reglas/red.js.
+ */
+export const horaDelServidor = functions.https.onCall(async (_data, context) => {
+  exigirSesion(context);
+  return { ahora: Date.now() };
+});
+
+/** Abre la ventana de reflejos. La hora y el identificador los pone el servidor. */
+export const abrirVentanaDescarte = functions.https.onCall(async (data, context) => {
+  exigirSesion(context);
+  return enRed.abrirVentana({ codigo: String(data?.codigo ?? "").trim().toUpperCase() });
+});
+
+/**
+ * Anota un intento de descarte. NO resuelve: eso pasa al cerrar la ventana.
+ *
+ * Si resolviera acá, "el primero" sería el primero en LLEGAR, y ganaría
+ * siempre la mejor conexión. Ver PROTOCOLO-REFLEJOS.md.
+ */
+export const intentarDescarte = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context);
+  return enRed.intentarDescarte({
+    uid,
+    codigo: String(data?.codigo ?? "").trim().toUpperCase(),
+    windowId: String(data?.windowId ?? ""),
+    posicion: Number(data?.posicion),
+    clientActionId: String(data?.clientActionId ?? ""),
+    declarado: Number(data?.declarado),
+    latencia: Number(data?.latencia),
+    incertidumbre: Number(data?.incertidumbre),
+  });
+});
+
+/** Cierra la ventana y aplica los intentos en orden de reacción. */
+export const cerrarVentanaDescarte = functions.https.onCall(async (data, context) => {
+  exigirSesion(context);
+  return enRed.cerrarVentana({ codigo: String(data?.codigo ?? "").trim().toUpperCase() });
+});
+
+/** Cierra la fase de mirar. La decide el servidor con su reloj. */
+export const cerrarMirada = functions.https.onCall(async (data, context) => {
+  exigirSesion(context);
+  return enRed.cerrarMirada({ codigo: String(data?.codigo ?? "").trim().toUpperCase() });
+});
+
+/** Cualquier acción de turno. La lista de acciones válidas es blanca. */
+export const accionDePartida = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context);
+  return enRed.accionDeTurno({
+    uid,
+    codigo: String(data?.codigo ?? "").trim().toUpperCase(),
+    accion: String(data?.accion ?? ""),
+    clientActionId: String(data?.clientActionId ?? ""),
+    posicion: data?.posicion == null ? undefined : Number(data.posicion),
+    objetivo: data?.objetivo ?? undefined,
+  });
+});
+
+/** Señal de vida. Caerse no cuesta Leyendas; sólo hace que te salten el turno. */
+export const latir = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context);
+  return enRed.latir({ uid, codigo: String(data?.codigo ?? "").trim().toUpperCase() });
+});
+
+/** Saltea el turno de quien lleva rato sin dar señales. */
+export const saltarAusente = functions.https.onCall(async (data, context) => {
+  exigirSesion(context);
+  return enRed.saltarAusente({ codigo: String(data?.codigo ?? "").trim().toUpperCase() });
 });
 
 // ------------------------------------------------- abandono en curso

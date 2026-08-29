@@ -207,36 +207,44 @@ export function crearMotorEnRed({
    * Reparte en el servidor. El mazo se baraja acá y su orden no sale nunca:
    * es la diferencia entre un juego de memoria y una lista pública de cartas.
    */
-  async function repartir({ codigo, jugadores, nombres }) {
-    return db.runTransaction(async (tx) => {
-      const snap = await tx.get(refPartida(codigo));
-      // Idempotente: repartir dos veces la misma partida no la reinicia.
-      if (snap.exists) return { codigo, yaExistia: true, version: snap.data().version };
+  /**
+   * Reparto DENTRO de una transacción que ya está abierta.
+   *
+   * Existe separado de `repartir` porque `iniciarPartida` tiene que cobrar la
+   * entrada y crear la partida en la MISMA transacción. Si fueran dos, una
+   * partida podría quedar iniciada sin documento maestro —o al revés— y no
+   * habría forma de saber cuál de las dos cosas pasó.
+   */
+  async function repartirEn(tx, { codigo, jugadores, nombres }) {
+    const snap = await tx.get(refPartida(codigo));
+    // Idempotente: repartir dos veces la misma partida no la reinicia.
+    if (snap.exists) return { codigo, yaExistia: true, version: snap.data().version };
 
-      const configuracion = jugadores.map((uid, i) => ({
-        id: uid,
-        nombre: nombres?.[i] ?? `Jugador ${i + 1}`,
-        esIA: false,
-      }));
+    const configuracion = jugadores.map((uid, i) => ({
+      id: uid,
+      nombre: nombres?.[i] ?? `Jugador ${i + 1}`,
+      esIA: false,
+    }));
 
-      const partida = {
-        codigo,
-        jugadores,
-        // La semilla la elige el SERVIDOR. Si la mandara el cliente, podría
-        // probar semillas hasta dar con un reparto que le convenga.
-        estado: motor.empezarRonda(motor.crearPartida(configuracion, { semilla: semillaDe() })),
-        ventana: null,
-        latidos: Object.fromEntries(jugadores.map((uid) => [uid, ahora()])),
-        ausentes: [],
-        abandonaron: [],
-        version: 1,
-        creada: marcaDeTiempo(),
-      };
+    const partida = {
+      codigo,
+      jugadores,
+      // La semilla la elige el SERVIDOR. Si la mandara el cliente, podría
+      // probar semillas hasta dar con un reparto que le convenga.
+      estado: motor.empezarRonda(motor.crearPartida(configuracion, { semilla: semillaDe() })),
+      ventana: null,
+      latidos: Object.fromEntries(jugadores.map((uid) => [uid, ahora()])),
+      ausentes: [],
+      abandonaron: [],
+      version: 1,
+      creada: marcaDeTiempo(),
+    };
 
-      publicar(tx, codigo, partida);
-      return { codigo, yaExistia: false, version: 1 };
-    });
+    publicar(tx, codigo, partida);
+    return { codigo, yaExistia: false, version: 1 };
   }
+
+  const repartir = (datos) => db.runTransaction((tx) => repartirEn(tx, datos));
 
   // ------------------------------------------------------- ventana
 
@@ -576,6 +584,7 @@ export function crearMotorEnRed({
 
   return {
     repartir,
+    repartirEn,
     cerrarMirada,
     abrirVentana,
     intentarDescarte,
