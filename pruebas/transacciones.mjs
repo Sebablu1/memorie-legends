@@ -76,13 +76,30 @@ function transaccionesDe(texto, archivo) {
   return bloques;
 }
 
-/** La secuencia ordenada de operaciones dentro de un bloque. */
+/**
+ * La secuencia ordenada de operaciones dentro de un bloque.
+ *
+ * Se incluyen los `return` porque este escáner lee de arriba abajo y no
+ * entiende de ramas. Un patrón así es correcto y frecuentísimo:
+ *
+ *     if (algoRaro) { publicar(tx, …); return …; }   ← escribe y SALE
+ *     const datos = await leer(tx, …);               ← nunca en el mismo camino
+ *
+ * Sin marcar la salida, el escáner vería «escritura, después lectura» y
+ * gritaría por un problema que no existe. Un `return` cierra ese camino: lo
+ * que se escribió antes ya no puede estar antes de esta lectura.
+ */
 function secuenciaDe(cuerpo) {
   const eventos = [];
   for (const op of OPERACIONES) {
     op.patron.lastIndex = 0;
     let m;
     while ((m = op.patron.exec(cuerpo))) eventos.push({ pos: m.index, ...op });
+  }
+  const salidas = /\breturn\b|\bthrow\b/g;
+  let m;
+  while ((m = salidas.exec(cuerpo))) {
+    eventos.push({ pos: m.index, lee: false, escribe: false, sale: true, nombre: "return" });
   }
   return eventos.sort((a, b) => a.pos - b.pos);
 }
@@ -113,6 +130,9 @@ console.log("\n=== 1. Ninguna lectura después de una escritura ===");
       transacciones++;
       let yaEscribio = null;
       for (const ev of secuenciaDe(bloque.cuerpo)) {
+        // Un `return` o un `throw` cierra ese camino: lo que se escribió antes
+        // quedó en una rama que ya salió y no puede preceder a esta lectura.
+        if (ev.sale) { yaEscribio = null; continue; }
         if (ev.lee && yaEscribio) {
           violaciones.push({
             archivo: bloque.archivo,
@@ -129,14 +149,27 @@ console.log("\n=== 1. Ninguna lectura después de una escritura ===");
   console.log(`  ${transacciones} transacciones revisadas en ${archivos.length} archivos`);
   ok(violaciones.length === 0, "ninguna lee después de escribir", violaciones);
 
-  // La prueba de la prueba: que el detector detecte de verdad.
+  // La prueba de la prueba: que el detector detecte, y que no exagere.
+  const revisar = (fuente) => {
+    let escribio = false, detecto = false;
+    for (const e of secuenciaDe(transaccionesDe(fuente, "falso")[0].cuerpo)) {
+      if (e.sale) { escribio = false; continue; }
+      if (e.lee && escribio) detecto = true;
+      if (e.escribe) escribio = true;
+    }
+    return detecto;
+  };
+
   const roto = "db.runTransaction(async (tx) => {\n  tx.set(ref, {a: 1});\n  await tx.get(otra);\n})";
-  let escribio = false, detecto = false;
-  for (const e of secuenciaDe(transaccionesDe(roto, "falso")[0].cuerpo)) {
-    if (e.lee && escribio) detecto = true;
-    if (e.escribe) escribio = true;
-  }
-  ok(detecto, "el detector reconoce el patrón roto cuando se lo muestra");
+  ok(revisar(roto), "el detector reconoce el patrón roto cuando se lo muestra");
+
+  // Y NO marca una escritura en una rama que sale antes de la lectura. Es el
+  // patrón de `avanzarPartida`: si el plazo quedó desfasado, republica y se
+  // va; el cierre lee sólo en el camino que siguió.
+  const conSalida = "db.runTransaction(async (tx) => {\n" +
+    "  if (raro) { publicar(tx, x); return 1; }\n" +
+    "  const d = await leer(tx, y);\n})";
+  ok(!revisar(conSalida), "y NO marca una escritura en una rama que termina en return");
 }
 
 // ============================ 2. movimientos de saldo dentro de bucles

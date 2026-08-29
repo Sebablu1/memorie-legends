@@ -15,7 +15,7 @@
  */
 
 import { crearMoverLeyendas } from "../functions/leyendas.js";
-import { crearCerrarPartida } from "../functions/cierre.js";
+import { crearCierre } from "../functions/cierre.js";
 import { crearMotorEnRed } from "../functions/partida-red.js";
 import { crearAbandonarPartida } from "../functions/abandono.js";
 import { ESTADOS_SALA, MODOS, repartirPozo } from "../public/js/reglas/salas.js";
@@ -136,11 +136,13 @@ function montar({ orden = CUATRO, abandonaron = [], pozo = POZO, entrada = ENTRA
   const moverLeyendas = crearMoverLeyendas({
     db, usuarios: "users", campoSaldo: "credits", marcaDeTiempo: () => "T", error,
   });
-  const cerrar = crearCerrarPartida({
+  // La callable pública. Se prueba por acá a propósito: si el contrato
+  // cambiara, esta suite —escrita antes de partir el módulo— se pondría roja.
+  const { cerrarPartida } = crearCierre({
     db, salas: "rooms", partidas: "partidas", moverLeyendas,
     motivo: "premio_partida", marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
   });
-  return { db, cerrar, moverLeyendas };
+  return { db, cerrar: cerrarPartida, moverLeyendas };
 }
 
 const capturar = async (fn) => {
@@ -444,7 +446,7 @@ console.log("\n=== 9. Cierre después de un abandono real ===");
     marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
     partidaEnRed: { leer: enRed.leerPartidaParaAbandono, marcar: enRed.marcarAbandonoEn },
   });
-  const cerrar = crearCerrarPartida({
+  const { cerrarPartida: cerrar } = crearCierre({
     db, salas: "rooms", partidas: "partidas", moverLeyendas,
     motivo: "premio_partida", marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
   });

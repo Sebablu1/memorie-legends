@@ -492,11 +492,23 @@ console.log("\n=== 8. Final de partida ===");
   const fin = db.leer(`partidas/${CODIGO}`);
   ok(fin.estado.fase === "finPartida", "la partida termina", fin.estado.fase);
   ok(fin.estado.ganador?.id === "ana", "con su ganador", fin.estado.ganador?.id);
-  ok(plazo(db) === null, "y sin ningún plazo pendiente", plazo(db));
+  // Ya no queda "sin plazo": una partida terminada pide su cierre. Eso se
+  // comprueba abajo.
 
-  const golpes = await Promise.all(CUATRO.map(() => capturar(() => red.avanzarPartida({ codigo: CODIGO }))));
-  ok(golpes.every((g) => g.valor?.hizo === null), "golpear una partida terminada no hace nada",
-     golpes.map((g) => g.valor?.hizo));
+  // Antes esta prueba afirmaba que golpear una partida terminada "no hace
+  // nada", y eso era exactamente el bug: la partida se quedaba viva para
+  // siempre con el pozo retenido. Ahora `finPartida` tiene su propio plazo.
+  ok(plazo(db)?.que === "cerrarPartida", "una partida terminada pide su cierre", plazo(db));
+
+  const temprano = await red.avanzarPartida({ codigo: CODIGO });
+  ok(temprano.hizo === null, "pero no se cierra antes de tiempo", temprano.motivo);
+
+  // Este montaje no tiene las primitivas de cierre inyectadas: se comprueba
+  // que lo diga en vez de fingir que no había nada que hacer.
+  reloj += 10000;
+  const sinCierre = await red.avanzarPartida({ codigo: CODIGO });
+  ok(sinCierre.motivo === "sin_cierre_configurado",
+     "sin economía configurada, el motor lo dice claramente", sinCierre);
   ok(db.leer(`partidas/${CODIGO}`).estado.ronda === fin.estado.ronda, "no se reparte otra ronda");
 
   // Y no se puede seguir jugando.

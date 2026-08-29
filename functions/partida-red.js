@@ -51,6 +51,15 @@ export const MS_MIRAR = 2000;
 export const MS_ENTRE_RONDAS = 6000;
 
 /**
+ * Lo que se muestra el resultado final antes de repartir el pozo.
+ *
+ * Corto a propósito: el dinero de la gente no puede quedar esperando. Pero no
+ * cero, para que los cuatro alcancen a recibir la vista con el resultado antes
+ * de que la sala pase a terminada.
+ */
+export const MS_ANTES_DE_CERRAR = 4000;
+
+/**
  * Acciones que un jugador puede pedir. Cualquier otra cosa se rechaza sin
  * mirarla: la lista es blanca a propósito.
  */
@@ -90,6 +99,16 @@ const EXIGEN_TURNO = new Set([
 
 export function crearMotorEnRed({
   db, partidas, ahora, idAleatorio, marcaDeTiempo, error, semillaDe = semillaAleatoria,
+  /**
+   * Las tres primitivas de `cierre.js`. Se inyectan para que el cierre pueda
+   * ocurrir DENTRO de la transacción que abre `avanzarPartida`: llamar a la
+   * callable desde acá abriría una segunda transacción, que Firestore no
+   * admite anidar.
+   *
+   * Sin ellas el motor funciona igual, pero una partida que llegue a
+   * `finPartida` se queda ahí. Es lo que pasaba hasta ahora.
+   */
+  cierre = null,
 }) {
   const refPartida = (codigo) => db.collection(partidas).doc(codigo);
   const refVista = (codigo, uid) =>
@@ -135,7 +154,10 @@ export function crearMotorEnRed({
    */
   function publicar(tx, codigo, partida) {
     const { estado, jugadores } = partida;
-    partida = { ...partida, plazo: plazoDe(estado, partida.ventana, partida.plazo, ahora()) };
+    partida = {
+      ...partida,
+      plazo: plazoDe(estado, partida.ventana, partida.plazo, ahora(), Boolean(partida.cerrada)),
+    };
 
     jugadores.forEach((uid, indice) => {
       const vista = vistaDe(estado, indice);
@@ -194,7 +216,7 @@ export function crearMotorEnRed({
    * reloj de turno no se agotaría nunca: bastaría con respirar para congelar
    * la partida.
    */
-  function plazoDe(estado, ventana, previo, ahoraMs) {
+  function plazoDe(estado, ventana, previo, ahoraMs, cerrada = false) {
     const nuevo = (fase, marca, hasta, que) => {
       // Mismo plazo que ya estaba: se conserva su vencimiento original.
       if (previo && previo.fase === fase && previo.marca === marca) return previo;
@@ -219,6 +241,18 @@ export function crearMotorEnRed({
 
       case "finRonda":
         return nuevo("finRonda", `r${estado.ronda}`, ahoraMs + MS_ENTRE_RONDAS, "siguienteRonda");
+
+      case "finPartida":
+        // Una partida terminada NO es un estado final: falta repartir el pozo.
+        // Que este caso devolviera `null` —cayendo en el `default`— es lo que
+        // dejaba la partida viva para siempre, con las entradas cobradas y el
+        // pozo retenido, esperando a alguien que nunca iba a llamar.
+        //
+        // El plazo es corto pero no cero: son los segundos en que los cuatro
+        // jugadores ven el resultado antes de que la sala se cierre. Y una vez
+        // cerrada vuelve a ser `null`, porque ahí sí no queda nada que hacer.
+        if (cerrada) return null;
+        return nuevo("finPartida", `r${estado.ronda}`, ahoraMs + MS_ANTES_DE_CERRAR, "cerrarPartida");
 
       // Levantada, poder y postLevantada no tienen reloj, igual que en la mesa
       // local: esas decisiones se toman sin apuro. Si el jugador desaparece,
@@ -655,7 +689,12 @@ export function crearMotorEnRed({
       // muerta sin que nada lo señale. Se arregla republicando: `publicar`
       // pone el plazo que corresponde y el golpe siguiente ya puede actuar.
       const desfasado = plazo && plazo.fase !== partida.estado.fase;
-      const faltaPlazo = !plazo && plazoDe(partida.estado, partida.ventana, null, t);
+      // Con `cerrada`, igual que en `publicar`. Sin ese dato, una partida ya
+      // cerrada calcularía un plazo de cierre, se creería desfasada y se
+      // republicaría en CADA golpe: cinco documentos escritos por segundo,
+      // para siempre. Lo destapó la prueba del cierre repetido.
+      const faltaPlazo =
+        !plazo && plazoDe(partida.estado, partida.ventana, null, t, Boolean(partida.cerrada));
 
       if (desfasado || faltaPlazo) {
         publicar(tx, codigo, { ...partida, plazo: null, version: partida.version + 1 });
@@ -670,6 +709,56 @@ export function crearMotorEnRed({
       if (!plazo) return { hizo: null, motivo: "sin_plazo", fase: partida.estado.fase };
       if (t < plazo.hasta) {
         return { hizo: null, motivo: "todavia_no", faltanMs: plazo.hasta - t, fase: partida.estado.fase };
+      }
+
+      // El cierre es la única transición que necesita LEER otro documento —la
+      // sala, por el pozo— y mover Leyendas. Por eso no pasa por `transicion`,
+      // que es sincrónica y sólo transforma el estado: va acá, donde todavía
+      // no se escribió nada y las lecturas siguen siendo legales.
+      if (plazo.que === "cerrarPartida") {
+        if (!cierre) {
+          // Sin las primitivas de cierre inyectadas no se puede repartir. Se
+          // dice, en vez de fingir que no había nada que hacer.
+          return { hizo: null, motivo: "sin_cierre_configurado", fase: partida.estado.fase };
+        }
+
+        // 1. LEER: la sala, con el pozo y los abandonos.
+        const datos = await cierre.leer(tx, codigo);
+
+        // 2. PENSAR: quién cobra y cuánto. Puro, sin tocar nada.
+        const plan = cierre.planificar(datos);
+        if (plan.yaEstaba) {
+          // Otro golpe llegó primero. Se republica para que el plazo se
+          // recalcule a null y esta partida deje de pedir cierre.
+          publicar(tx, codigo, { ...partida, cerrada: true, version: partida.version + 1 });
+          return { hizo: "cerrarPartida", yaEstaba: true, fase: partida.estado.fase };
+        }
+
+        // 3. ESCRIBIR: pagar y cerrar la sala.
+        const { cierre: registro } = await cierre.aplicar(tx, {
+          ...datos,
+          plan,
+          // No lo pidió ningún jugador: lo disparó el vencimiento del plazo.
+          cerradaPor: "servidor",
+        });
+
+        publicar(tx, codigo, {
+          ...partida,
+          cerrada: true,
+          cierre: registro,
+          version: partida.version + 1,
+        });
+
+        return {
+          hizo: "cerrarPartida",
+          yaEstaba: false,
+          fase: partida.estado.fase,
+          version: partida.version + 1,
+          pozo: registro.pozo,
+          repartido: registro.repartido,
+          sobrante: registro.sobrante,
+          premios: registro.premios,
+        };
       }
 
       const siguiente = transicion(partida, plazo, t);

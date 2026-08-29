@@ -285,7 +285,11 @@ console.log("\n=== 5. La partida termina ===");
   ok(fin.fase === "finPartida", "la partida termina", fin.fase);
   ok(fin.ganador != null, "con un ganador", fin.ganador?.nombre);
   ok(fin.desempate === false, "y sin desempate pendiente", fin.desempate);
-  ok(maestro().plazo === null, "sin ningún plazo abierto", maestro().plazo);
+  // Ya no queda "sin plazo": una partida terminada pide su cierre, que es
+  // justamente el agujero que se cerró. Este montaje no tiene el cierre
+  // inyectado, así que se comprueba el plazo, no el reparto.
+  ok(maestro().plazo?.que === "cerrarPartida",
+     "y pide su cierre, en vez de quedarse viva para siempre", maestro().plazo);
 
   // El ganador es el del puntaje más bajo entre los que jugaron el desempate.
   const jugaronElExtra = fin.jugadores.filter((j) => j.eliminadoEnRonda === fin.ronda || j.id === fin.ganador.id);

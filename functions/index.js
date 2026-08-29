@@ -30,7 +30,7 @@ import {
 import { crearMoverLeyendas } from "./leyendas.js";
 import { crearAbandonarPartida } from "./abandono.js";
 import { crearMotorEnRed } from "./partida-red.js";
-import { crearCerrarPartida } from "./cierre.js";
+import { crearCierre } from "./cierre.js";
 import { crearSalirDeSalaEnEspera } from "./salida.js";
 
 import {
@@ -432,6 +432,38 @@ export const salirDeSalaEnEspera = functions.https.onCall(async (data, context) 
  * El navegador nunca escribe estado de partida: pide una acción, el servidor
  * la valida, la aplica y publica las vistas nuevas.
  */
+/**
+ * Cierre de la partida y reparto del pozo.
+ *
+ * Se monta ANTES que el motor en red porque éste lo necesita: cuando una
+ * partida vence en `finPartida`, `avanzarPartida` reparte el pozo dentro de
+ * su propia transacción usando estas mismas primitivas. Llamar a la callable
+ * desde ahí abriría una segunda transacción, y Firestore no las anida.
+ *
+ * La versión anterior de esta función recibía del cliente quién había ganado.
+ * Está reemplazada entera, no parcheada: ver `cierre.js`.
+ */
+const cierre = crearCierre({
+  db,
+  salas: SALAS,
+  partidas: "partidas",
+  moverLeyendas,
+  motivo: MOTIVOS.PREMIO_PARTIDA,
+  marcaDeTiempo,
+  error: errorHttp,
+  estados: ESTADOS_SALA,
+});
+
+/**
+ * Cierre pedido a mano. El normal lo dispara el orquestador al vencer el
+ * plazo; esto queda para reintentos y como salida de emergencia. Los dos
+ * caminos usan las mismas primitivas, así que no pueden divergir.
+ */
+export const cerrarPartida = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context);
+  return cierre.cerrarPartida({ uid, codigo: data?.codigo });
+});
+
 const enRed = crearMotorEnRed({
   db,
   partidas: "partidas",
@@ -443,6 +475,9 @@ const enRed = crearMotorEnRed({
   // que se pueda adivinar el reparto. No es un secreto de seguridad —para eso
   // está la redacción de vistas— pero regalarla sería absurdo.
   semillaDe: () => crypto.randomBytes(4).readUInt32BE(0),
+  // Con esto, una partida que llega a `finPartida` se cierra sola al vencer
+  // su plazo. Sin esto se quedaba viva para siempre.
+  cierre: { leer: cierre.leer, planificar: cierre.planificar, aplicar: cierre.aplicar },
 });
 
 /**
@@ -565,39 +600,6 @@ export const abandonarPartida = functions.https.onCall(async (data, context) => 
   return abandono({ uid, codigo: data?.codigo });
 });
 
-/**
- * Cierre de la partida y reparto del pozo.
- *
- * La versión anterior de esta función recibía del cliente quién había ganado.
- * Está reemplazada entera, no parcheada: ver `cierre.js`.
- *
- * Del navegador llega sólo el código. El ganador, las posiciones, el pozo y
- * los premios salen del estado autoritativo del servidor.
- */
-const cierre = crearCerrarPartida({
-  db,
-  salas: SALAS,
-  partidas: "partidas",
-  moverLeyendas,
-  motivo: MOTIVOS.PREMIO_PARTIDA,
-  marcaDeTiempo,
-  error: errorHttp,
-  estados: ESTADOS_SALA,
-});
-
-export const cerrarPartida = functions.https.onCall(async (data, context) => {
-  const uid = exigirSesion(context);
-  return cierre({ uid, codigo: data?.codigo });
-});
-
-/**
- * Cierra una partida: reparte el pote y acumula el ranking.
- *
- * El resumen llega del cliente, así que hay que tratarlo como no confiable:
- * se valida contra la mesa registrada (jugadores y apuesta) antes de pagar.
- * Con dinero real de por medio, lo correcto es que la partida se simule
- * también en el servidor o que el resultado lo firme un árbitro.
- */
 // -------------------------------------------------------------- referidos
 
 export const acreditarReferido = functions.https.onCall(async (data, context) => {
