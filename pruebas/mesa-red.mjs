@@ -11,7 +11,7 @@
  */
 
 import { crearMotorEnRed } from "../functions/partida-red.js";
-import { crearFiltroDeVersion } from "../public/js/reglas/red.js";
+import { crearFiltroDeVersion, elegibleParaPoder, pasoDelPoder } from "../public/js/reglas/red.js";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -373,7 +373,94 @@ console.log("\n=== 5. Un refresco del navegador no crea otra partida ===");
   M2.desconectar();
 }
 
-// ============================= 6. el adaptador no se separó de mesa.js
+// ================================ 6. qué cartas se pueden tocar con un poder
+
+console.log("\n=== 6. Cartas elegibles con un poder ===");
+{
+  const jugadores = [
+    { nombre: "yo",   mano: [{ oculta: true }, { oculta: true }, null, { oculta: true }] },
+    { nombre: "otro", mano: [{ oculta: true }, null, { oculta: true }, { oculta: true }] },
+    { nombre: "tres", mano: [{ oculta: true }, { oculta: true }, { oculta: true }, { oculta: true }] },
+    { nombre: "fuera", eliminado: true, mano: [] },
+  ];
+  const YO = 0;
+
+  // --- 7: sólo cartas propias ---
+  const p7 = elegibleParaPoder({ numero: 7, yo: YO, jugadores });
+  ok(p7(0, 0) === true, "7: una carta propia es elegible");
+  ok(p7(1, 0) === false, "7: la de otro NO");
+  ok(p7(0, 2) === false, "7: un hueco propio tampoco: no hay nada que mirar");
+
+  // --- 8: sólo cartas ajenas ---
+  const p8 = elegibleParaPoder({ numero: 8, yo: YO, jugadores });
+  ok(p8(1, 0) === true, "8: la carta de otro es elegible");
+  ok(p8(0, 0) === false, "8: la propia NO");
+  ok(p8(1, 1) === false, "8: un hueco ajeno tampoco");
+  ok(p8(3, 0) === false, "8: un jugador eliminado no es objetivo");
+
+  // --- 9 y 10: primero propia, después ajena ---
+  for (const numero of [9, 10]) {
+    const primero = elegibleParaPoder({ numero, yo: YO, jugadores, propiaElegida: null });
+    ok(primero(0, 1) === true, `${numero}: primero se elige una propia`);
+    ok(primero(1, 0) === false, `${numero}: todavía no se puede tocar la de otro`);
+    ok(primero(0, 2) === false, `${numero}: ni un hueco propio`);
+
+    const segundo = elegibleParaPoder({ numero, yo: YO, jugadores, propiaElegida: 1 });
+    ok(segundo(1, 0) === true, `${numero}: después sí la de otro`);
+    ok(segundo(0, 0) === false, `${numero}: y ya NO otra propia: no se cambia una carta consigo misma`);
+    ok(segundo(0, 1) === false, `${numero}: ni la que ya eligió`);
+    ok(segundo(3, 0) === false, `${numero}: ni la de un eliminado`);
+  }
+
+  // --- un poder que no existe no habilita nada ---
+  const raro = elegibleParaPoder({ numero: 5, yo: YO, jugadores });
+  ok([0, 1, 2].every((i) => [0, 1, 2, 3].every((p) => raro(i, p) === false)),
+     "un número que no es poder no habilita ninguna carta");
+
+  // --- los mensajes acompañan el paso ---
+  ok(/tuya/.test(pasoDelPoder({ numero: 7 })), "el 7 pide una carta propia");
+  ok(/otro/.test(pasoDelPoder({ numero: 8 })), "el 8 pide una ajena");
+  ok(/tuya/.test(pasoDelPoder({ numero: 9, propiaElegida: null })), "el 9 empieza por la propia");
+  ok(/otro/.test(pasoDelPoder({ numero: 9, propiaElegida: 2 })), "y sigue por la ajena");
+
+  // --- y lo no elegible sigue bloqueado en el servidor, que es lo que importa ---
+  reloj = 100000;
+  const { db, red } = montar();
+  await red.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
+  const base = db.leer(`partidas/${CODIGO}`);
+  await db.runTransaction(async (tx) => {
+    tx.set({ ruta: `partidas/${CODIGO}` }, {
+      ...base,
+      estado: {
+        ...base.estado,
+        fase: "poder",
+        indiceTurno: 0,
+        poderPendiente: { numero: 10, tipo: "cambioConVista", indiceJugador: 0 },
+      },
+      version: base.version + 1,
+    });
+  });
+
+  // Cambiar una carta propia por OTRA PROPIA: el cliente ni la resalta, y el
+  // servidor la rechaza igual. Las dos barreras, no una sola.
+  const consigoMismo = await capturar(() => red.accionDeTurno({
+    uid: "ana", codigo: CODIGO, accion: "poderCambio", clientActionId: "auto",
+    posicion: 0, objetivo: { indice: 0, posicion: 1 },
+  }));
+  ok(Boolean(consigoMismo.error), "el servidor rechaza cambiar una carta consigo misma",
+     consigoMismo.error?.message);
+
+  const fueraDeRango = await capturar(() => red.accionDeTurno({
+    uid: "ana", codigo: CODIGO, accion: "poderCambio", clientActionId: "rango",
+    posicion: 0, objetivo: { indice: 1, posicion: 99 },
+  }));
+  ok(Boolean(fueraDeRango.error), "y una posición que no existe", fueraDeRango.error?.message);
+
+  ok(db.leer(`partidas/${CODIGO}`).estado.fase === "poder",
+     "tras los rechazos la partida sigue esperando la jugada buena");
+}
+
+// ============================= 7. el adaptador no se separó de mesa.js
 
 console.log("\n=== 6. El adaptador duplicado sigue siendo el mismo ===");
 {

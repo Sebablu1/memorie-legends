@@ -7,7 +7,7 @@
     "start": "firebase serve",
     "deploy": "firebase deploy",
     "build": "echo 'No build needed'",
-    "test": "node pruebas/puntaje.mjs && node pruebas/salas.mjs && node pruebas/vista.mjs && node pruebas/descarte.mjs && node pruebas/estado.mjs && node pruebas/abandono.mjs && node pruebas/red.mjs && node pruebas/orquestador.mjs && node pruebas/red-e2e.mjs && node pruebas/mesa-red.mjs && node pruebas/filtraciones.mjs"
+    "test": "node pruebas/puntaje.mjs && node pruebas/salas.mjs && node pruebas/vista.mjs && node pruebas/descarte.mjs && node pruebas/estado.mjs && node pruebas/abandono.mjs && node pruebas/red.mjs && node pruebas/orquestador.mjs && node pruebas/red-e2e.mjs && node pruebas/mesa-red.mjs && node pruebas/desempate-red.mjs && node pruebas/filtraciones.mjs"
   },
   "keywords": [
     "game",
