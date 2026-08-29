@@ -1,5 +1,13 @@
 # Despliegue
 
+> **Actualizado el 2026-08-28.** Se desplegó `firestore.rules` con
+> `firebase deploy --only firestore:rules`. La salida del comando dice
+> `released rules firestore.rules to cloud.firestore`, así que en ese momento
+> el archivo de este repositorio pasó a ser el ruleset activo. Todo lo que
+> sigue vale igual para la próxima vez: sigue sin poder LEERSE el ruleset
+> activo desde este entorno, y cualquier edición hecha en la consola después
+> de esa fecha no se vería reflejada acá.
+
 ## Las reglas locales y las desplegadas pueden no ser las mismas
 
 `firestore.rules` es el archivo de este repositorio. **No es prueba de nada
