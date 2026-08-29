@@ -101,9 +101,28 @@ service cloud.firestore {
     }
 
     // Partidas cerradas y su resultado.
+    // ------------------------------------------------- partidas en red
+    //
+    // El documento de una partida contiene el estado COMPLETO del motor: las
+    // manos de los cuatro jugadores y el mazo con su orden. Si un jugador
+    // pudiera leerlo, el juego se termina: abre la consola y ve todo.
+    //
+    // Por eso NADIE lo lee. Cada jugador lee sólo su propia vista recortada,
+    // que el servidor escribe con `vistaDe` en la misma transacción.
     match /partidas/{id} {
-      allow read: if autenticado();
+      allow read: if false;
       allow write: if false;
+
+      // Lo que ese jugador puede saber, y sólo él.
+      match /vistas/{uid} {
+        allow read: if esDuenio(uid);
+        allow write: if false;
+      }
+
+      // Cualquier otra subcolección que aparezca queda negada por omisión.
+      match /{resto=**} {
+        allow read, write: if false;
+      }
     }
 
     // Torneos: los lee cualquiera, los administra sólo el servidor.
