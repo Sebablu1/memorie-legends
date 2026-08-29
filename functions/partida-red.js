@@ -34,6 +34,7 @@ import {
   crearVentana,
   registrarIntento,
   resolverVentana,
+  venceEn,
   yaVencio,
 } from "./reglas/red.js";
 
@@ -42,6 +43,12 @@ export const MS_SIN_SENALES = 15000;
 
 /** Lo que espera la mesa a que alguien levante antes de saltarle el turno. */
 export const MS_TURNO = 8000;
+
+/** Lo que dura la mirada del principio de la ronda. */
+export const MS_MIRAR = 2000;
+
+/** Lo que se muestran los resultados antes de repartir la ronda siguiente. */
+export const MS_ENTRE_RONDAS = 6000;
 
 /**
  * Acciones que un jugador puede pedir. Cualquier otra cosa se rechaza sin
@@ -128,6 +135,7 @@ export function crearMotorEnRed({
    */
   function publicar(tx, codigo, partida) {
     const { estado, jugadores } = partida;
+    partida = { ...partida, plazo: plazoDe(estado, partida.ventana, partida.plazo, ahora()) };
 
     jugadores.forEach((uid, indice) => {
       const vista = vistaDe(estado, indice);
@@ -171,6 +179,55 @@ export function crearMotorEnRed({
     };
   }
 
+  // -------------------------------------------------------------- plazos
+
+  /**
+   * Cuándo vence lo que la partida está esperando.
+   *
+   * ACÁ ESTÁ LA AUTORIDAD DEL TIEMPO. El plazo se guarda en la partida, con el
+   * reloj del servidor, y desde ese momento existe independientemente de que
+   * haya alguien mirando. Los clientes sólo golpean la puerta con
+   * `avanzarPartida`; no pueden hacer que el tiempo pase ni que no pase.
+   *
+   * `marca` es lo que distingue un plazo de otro dentro de la misma fase. Sin
+   * ella, cada publicación —un latido, por ejemplo— recalcularía `hasta` y el
+   * reloj de turno no se agotaría nunca: bastaría con respirar para congelar
+   * la partida.
+   */
+  function plazoDe(estado, ventana, previo, ahoraMs) {
+    const nuevo = (fase, marca, hasta, que) => {
+      // Mismo plazo que ya estaba: se conserva su vencimiento original.
+      if (previo && previo.fase === fase && previo.marca === marca) return previo;
+      return { fase, marca, hasta, que };
+    };
+
+    switch (estado.fase) {
+      case "mirar":
+        return nuevo("mirar", `r${estado.ronda}`, ahoraMs + MS_MIRAR, "cerrarMirada");
+
+      case "descarte":
+        // Sin ventana abierta, lo que corresponde es abrirla, y ya.
+        if (!ventana || ventana.cerrada) {
+          return nuevo("descarte", `abrir-r${estado.ronda}`, ahoraMs, "abrirVentana");
+        }
+        return nuevo("descarte", ventana.id, venceEn(ventana), "cerrarVentana");
+
+      case "turno":
+        // El reloj corre por turno, no por publicación.
+        return nuevo("turno", `t${estado.turnosRonda}-${estado.indiceTurno}`,
+                     ahoraMs + MS_TURNO, "saltarTurno");
+
+      case "finRonda":
+        return nuevo("finRonda", `r${estado.ronda}`, ahoraMs + MS_ENTRE_RONDAS, "siguienteRonda");
+
+      // Levantada, poder y postLevantada no tienen reloj, igual que en la mesa
+      // local: esas decisiones se toman sin apuro. Si el jugador desaparece,
+      // lo resuelve `saltarAusente`, que exige 15 segundos de silencio.
+      default:
+        return null;
+    }
+  }
+
   // ---------------------------------------------------------- validación
 
   function exigirPartida(snap, codigo) {
@@ -188,6 +245,55 @@ export function crearMotorEnRed({
       throw error("failed-precondition", "Quedaste eliminado de esta partida.");
     }
     return indice;
+  }
+
+  /**
+   * Posiciones y objetivos dentro de rango.
+   *
+   * `usarPoderCambio` no comprueba los índices: si le llega una posición que
+   * no existe, mete `undefined` dentro de una mano y la partida queda con una
+   * carta fantasma. En la mesa local eso no podía pasar porque las posiciones
+   * salían de un clic sobre una carta dibujada; acá llegan por la red y hay
+   * que comprobarlas.
+   */
+  function exigirPosiciones(partida, indice, accion, { posicion, objetivo }) {
+    const manoDe = (i) => partida.estado.jugadores[i]?.mano;
+    const enRango = (i, pos) =>
+      Number.isInteger(pos) && pos >= 0 && pos < (manoDe(i)?.length ?? 0);
+
+    if (accion === ACCIONES.MIRAR || accion === ACCIONES.CAMBIAR) {
+      if (!enRango(indice, posicion)) {
+        throw error("invalid-argument", "Esa posición no existe en tu mano.");
+      }
+    }
+
+    if (accion === ACCIONES.PODER_MIRAR || accion === ACCIONES.PODER_CAMBIO) {
+      const poder = partida.estado.poderPendiente;
+      // El poder es de quien lo levantó, y de nadie más. `usarPoderCambio`
+      // toma al dueño del poder como sujeto sin mirar quién llamó, así que si
+      // esto no estuviera, un jugador podría disparar el poder de otro.
+      if (!poder || poder.indiceJugador !== indice) {
+        throw error("permission-denied", "Ese poder no es tuyo.");
+      }
+      const otro = objetivo?.indice;
+      if (!Number.isInteger(otro) || otro < 0 || otro >= partida.jugadores.length) {
+        throw error("invalid-argument", "Ese jugador no está en la partida.");
+      }
+      if (partida.estado.jugadores[otro]?.eliminado) {
+        throw error("failed-precondition", "Ese jugador ya no está en juego.");
+      }
+      if (accion === ACCIONES.PODER_MIRAR && !enRango(otro, posicion)) {
+        throw error("invalid-argument", "Esa posición no existe.");
+      }
+      if (accion === ACCIONES.PODER_CAMBIO) {
+        if (!enRango(indice, posicion)) {
+          throw error("invalid-argument", "Esa posición no existe en tu mano.");
+        }
+        if (!enRango(otro, objetivo?.posicion)) {
+          throw error("invalid-argument", "Esa posición no existe en la mano del otro.");
+        }
+      }
+    }
   }
 
   function exigirFase(partida, accion) {
@@ -429,6 +535,8 @@ export function crearMotorEnRed({
         throw error("failed-precondition", "No es tu turno.");
       }
 
+      exigirPosiciones(partida, indice, accion, { posicion, objetivo });
+
       const estado = aplicar(partida.estado, indice, accion, { posicion, objetivo });
       if (estado === partida.estado) {
         throw error("failed-precondition", "Esa jugada no cambia nada.");
@@ -508,6 +616,112 @@ export function crearMotorEnRed({
     }
   }
 
+  // ------------------------------------------------------ orquestador
+
+  /**
+   * Hace avanzar la partida si algo venció. La llaman los clientes.
+   *
+   * Que la llamen los clientes NO significa que decidan ellos. En Firebase no
+   * hay un proceso vivo esperando, así que alguien tiene que golpear la
+   * puerta; pero quien mira el reloj es el servidor, y mira el suyo. Golpear
+   * temprano no adelanta nada —se contesta "todavía no"— y golpear mil veces
+   * es lo mismo que golpear una: el plazo está guardado y sólo se cumple
+   * cuando se cumple.
+   *
+   * De ahí salen las cuatro garantías que hacen falta:
+   *
+   *   - no se duplica una ventana: abrirla dos veces devuelve la misma;
+   *   - no se cierra dos veces: lo primero que se mira es si ya está cerrada;
+   *   - no se avanza dos rondas: la transición cambia la fase, y el plazo
+   *     siguiente ya es otro;
+   *   - no se crean dos estados: todo pasa dentro de una transacción, y dos
+   *     llamadas simultáneas chocan y una reintenta.
+   *
+   * Hace UNA transición por llamada. Es a propósito: cada paso publica vistas,
+   * y encadenar varios en una transacción dejaría a los jugadores sin ver los
+   * pasos intermedios.
+   */
+  async function avanzarPartida({ codigo }) {
+    return db.runTransaction(async (tx) => {
+      const snap = await tx.get(refPartida(codigo));
+      const partida = exigirPartida(snap, codigo);
+      const t = ahora();
+      const plazo = partida.plazo;
+
+      if (!plazo) return { hizo: null, motivo: "sin_plazo", fase: partida.estado.fase };
+      // El plazo es de otra fase: quedó viejo, lo va a rehacer la publicación
+      // siguiente. No se actúa sobre un plazo que ya no corresponde.
+      if (plazo.fase !== partida.estado.fase) {
+        return { hizo: null, motivo: "plazo_viejo", fase: partida.estado.fase };
+      }
+      if (t < plazo.hasta) {
+        return { hizo: null, motivo: "todavia_no", faltanMs: plazo.hasta - t, fase: partida.estado.fase };
+      }
+
+      const siguiente = transicion(partida, plazo, t);
+      if (!siguiente) return { hizo: null, motivo: "nada_que_hacer", fase: partida.estado.fase };
+
+      publicar(tx, codigo, { ...siguiente, version: partida.version + 1 });
+      return {
+        hizo: plazo.que,
+        fase: siguiente.estado.fase,
+        version: partida.version + 1,
+        ...(siguiente.extra ?? {}),
+      };
+    });
+  }
+
+  /** La transición concreta que toca. Devuelve la partida nueva, o null. */
+  function transicion(partida, plazo, t) {
+    switch (plazo.que) {
+      case "cerrarMirada":
+        return { ...partida, estado: motor.terminarMirada(partida.estado) };
+
+      case "abrirVentana": {
+        const ventana = crearVentana({
+          id: `v_${idAleatorio()}`,
+          abiertaEn: t,
+          duracionMs: MS_VENTANA,
+        });
+        return { ...partida, ventana };
+      }
+
+      case "cerrarVentana": {
+        const indiceDe = (u) => {
+          const i = partida.jugadores.indexOf(u);
+          return i < 0 ? null : i;
+        };
+        const { estado, orden } = resolverVentana(
+          partida.estado, partida.ventana, indiceDe, motor.intentarDescarte,
+        );
+        return {
+          ...partida,
+          estado: motor.cerrarVentanaDescarte(estado),
+          ventana: { ...partida.ventana, cerrada: true, resueltaEn: t },
+          extra: { orden: orden.map((o) => ({ uid: o.uid, posicion: o.posicion, resultado: o.resultado })) },
+        };
+      }
+
+      case "saltarTurno":
+        return { ...partida, estado: motor.saltarTurno(partida.estado) };
+
+      case "siguienteRonda": {
+        // Si la partida terminó, no hay ronda siguiente que repartir.
+        if (partida.estado.fase === "finPartida") return null;
+        return {
+          ...partida,
+          estado: motor.siguienteRonda(partida.estado),
+          ventana: null,
+          // Las jugadas recordadas eran de la ronda anterior.
+          aplicadas: {},
+        };
+      }
+
+      default:
+        return null;
+    }
+  }
+
   // -------------------------------------------------- desconexiones
 
   /**
@@ -531,6 +745,15 @@ export function crearMotorEnRed({
       const ausentes = partida.jugadores.filter(
         (u) => u !== uid && t - (latidos[u] ?? 0) > MS_SIN_SENALES,
       );
+
+      // Sólo se republican las vistas si CAMBIÓ quién está ausente. Un latido
+      // cada cinco segundos por cuatro jugadores serían miles de escrituras
+      // por partida, y encima cada publicación recalcularía plazos.
+      const cambio = JSON.stringify(ausentes) !== JSON.stringify(partida.ausentes ?? []);
+      if (!cambio) {
+        tx.set(refPartida(codigo), { ...partida, latidos, actualizado: marcaDeTiempo() });
+        return { ausentes, version: partida.version };
+      }
 
       const siguiente = { ...partida, latidos, ausentes, version: partida.version + 1 };
       publicar(tx, codigo, siguiente);
@@ -556,13 +779,25 @@ export function crearMotorEnRed({
       if (silencio <= MS_SIN_SENALES) {
         throw error("failed-precondition", "El jugador en turno sigue conectado.");
       }
-      if (partida.estado.fase !== "turno") {
-        throw error("failed-precondition", "Sólo se puede saltar la levantada.");
+
+      // Levantada, poder y postLevantada no tienen reloj: se decide sin apuro.
+      // Pero si el que decide no está, la mesa no puede quedarse esperando
+      // para siempre. Se resuelve por él de la forma más neutra posible: sin
+      // usar el poder, sin cambiar cartas y sin cortar.
+      const estado = partida.estado;
+      let avanzado;
+      switch (estado.fase) {
+        case "turno": avanzado = motor.saltarTurno(estado); break;
+        case "levantada": avanzado = motor.pasarTurno(motor.tirarCarta(estado)); break;
+        case "poder": avanzado = motor.saltarPoder(estado); break;
+        case "postLevantada": avanzado = motor.pasarTurno(estado); break;
+        default:
+          throw error("failed-precondition", "No hay nada que saltar en esta fase.");
       }
 
       const siguiente = {
         ...partida,
-        estado: motor.saltarTurno(partida.estado),
+        estado: avanzado,
         version: partida.version + 1,
       };
       publicar(tx, codigo, siguiente);
@@ -616,6 +851,7 @@ export function crearMotorEnRed({
   return {
     repartir,
     repartirEn,
+    avanzarPartida,
     cerrarMirada,
     abrirVentana,
     intentarDescarte,

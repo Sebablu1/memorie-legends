@@ -543,6 +543,18 @@ export const cerrarVentanaDescarte = functions.https.onCall(async (data, context
   return enRed.cerrarVentana({ codigo: String(data?.codigo ?? "").trim().toUpperCase() });
 });
 
+/**
+ * Hace avanzar la partida si algo venció.
+ *
+ * La llaman los clientes porque en Firebase no hay un proceso vivo esperando,
+ * pero quien mira el reloj es el servidor y mira el suyo. Llamarla temprano
+ * no adelanta nada; llamarla mil veces es lo mismo que llamarla una.
+ */
+export const avanzarPartida = functions.https.onCall(async (data, context) => {
+  exigirSesion(context);
+  return enRed.avanzarPartida({ codigo: String(data?.codigo ?? "").trim().toUpperCase() });
+});
+
 /** Cierra la fase de mirar. La decide el servidor con su reloj. */
 export const cerrarMirada = functions.https.onCall(async (data, context) => {
   exigirSesion(context);
