@@ -15,6 +15,7 @@
  * el JSON entero encuentra también la que se cuele en un campo nuevo.
  */
 import { crearMotorEnRed } from "../functions/partida-red.js";
+import { MS_REVELACION } from "../public/js/reglas/vista.js";
 
 class E extends Error { constructor(c, m) { super(m); this.codigo = c; } }
 const error = (c, m) => new E(c, m);
@@ -78,11 +79,19 @@ function auditar(etiqueta) {
     // Ninguna carta en mano ajena ni propia, salvo al terminar la ronda o
     // por una revelación en curso de la ventana de descarte.
     if (!rondaTerminada) {
-      const reveladas = new Set(
-        (maestro.ventana && !maestro.ventana.cerrada
+      // Cartas que la regla del juego SÍ permite que viajen destapadas: las
+      // que alguien expuso al descartar mal o tarde. Se leen de los intentos
+      // aplicados, que son datos, no de la función que se está auditando.
+      // Y sólo valen mientras la fase siga siendo `descarte`: en cuanto se
+      // cierra la revelación, cualquier carta visible vuelve a ser una fuga.
+      const reveladas = new Set([
+        ...(maestro.ventana && !maestro.ventana.cerrada
           ? Object.values(maestro.ventana.intentos ?? {}) : []
         ).map((x) => maestro.estado.jugadores[CUATRO.indexOf(x.uid)]?.mano[x.posicion]?.id).filter(Boolean),
-      );
+        ...(maestro.estado.fase === "descarte"
+          ? (maestro.estado.ventanaDescarte?.intentos ?? []).map((x) => x.carta?.id).filter(Boolean)
+          : []),
+      ]);
       for (const [j, jug] of maestro.estado.jugadores.entries()) {
         for (const c of jug.mano) {
           if (!c || reveladas.has(c.id)) continue;
@@ -124,6 +133,13 @@ for (let ronda = 0; ronda < 3; ronda++) {
   }
   reloj += 8000;
   await red.cerrarVentana({ codigo: "ABCDEF" });
+  // Con la ventana recién cerrada la mesa está viendo lo que se expuso: la
+  // fase sigue en `descarte` y esas cartas viajan a propósito.
+  auditar(`revelación r${ronda}`);
+
+  reloj += MS_REVELACION;
+  await red.avanzarPartida({ codigo: "ABCDEF" });
+  // Terminada la revelación no puede quedar ni una carta destapada.
   auditar(`ventana cerrada r${ronda}`);
 
   for (let t = 0; t < 30; t++) {

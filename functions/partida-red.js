@@ -26,7 +26,7 @@
  * Por eso la comprobación está también en las pruebas.
  */
 
-import { vistaDe, filtracionesEn } from "./reglas/vista.js";
+import { vistaDe, filtracionesEn, MS_REVELACION } from "./reglas/vista.js";
 import * as motor from "./reglas/motor.js";
 import { semillaAleatoria } from "./reglas/azar.js";
 import {
@@ -228,8 +228,16 @@ export function crearMotorEnRed({
         return nuevo("mirar", `r${estado.ronda}`, ahoraMs + MS_MIRAR, "cerrarMirada");
 
       case "descarte":
-        // Sin ventana abierta, lo que corresponde es abrirla, y ya.
-        if (!ventana || ventana.cerrada) {
+        // Ventana ya resuelta: la mesa está viendo las cartas que se
+        // expusieron. La fase sigue siendo `descarte` a propósito, porque es
+        // la condición con la que `vistaDe` deja viajar esas cartas. Pasados
+        // los dos segundos se cierra de verdad y todo vuelve a taparse.
+        if (ventana?.cerrada) {
+          return nuevo("descarte", `revelacion-${ventana.id}`,
+                       ventana.resueltaEn + MS_REVELACION, "cerrarRevelacion");
+        }
+        // Sin ventana, lo que corresponde es abrirla, y ya.
+        if (!ventana) {
           return nuevo("descarte", `abrir-r${estado.ronda}`, ahoraMs, "abrirVentana");
         }
         return nuevo("descarte", ventana.id, venceEn(ventana), "cerrarVentana");
@@ -503,9 +511,11 @@ export function crearMotorEnRed({
         motor.intentarDescarte,
       );
 
+      // La fase sigue en `descarte` los dos segundos de la revelación; el
+      // plazo `cerrarRevelacion` la termina. Ver `plazoDe`.
       const siguiente = {
         ...partida,
-        estado: motor.cerrarVentanaDescarte(estado),
+        estado,
         ventana: { ...partida.ventana, cerrada: true, resueltaEn: ahora() },
         version: partida.version + 1,
       };
@@ -797,13 +807,24 @@ export function crearMotorEnRed({
         const { estado, orden } = resolverVentana(
           partida.estado, partida.ventana, indiceDe, motor.intentarDescarte,
         );
+        // NO se cierra la fase todavía. Los intentos ya están aplicados, y las
+        // cartas que se expusieron sólo viajan mientras la fase sea
+        // `descarte`: cerrar acá las escondería antes de que nadie las viera.
         return {
           ...partida,
-          estado: motor.cerrarVentanaDescarte(estado),
+          estado,
           ventana: { ...partida.ventana, cerrada: true, resueltaEn: t },
           extra: { orden: orden.map((o) => ({ uid: o.uid, posicion: o.posicion, resultado: o.resultado })) },
         };
       }
+
+      // Se acabaron los dos segundos: se tapa todo y arranca el turno.
+      case "cerrarRevelacion":
+        return {
+          ...partida,
+          estado: motor.cerrarVentanaDescarte(partida.estado),
+          ventana: null,
+        };
 
       case "saltarTurno":
         return { ...partida, estado: motor.saltarTurno(partida.estado) };

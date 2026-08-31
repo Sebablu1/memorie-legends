@@ -14,6 +14,7 @@
 
 import { crearMotorEnRed, MS_MIRAR, MS_ENTRE_RONDAS } from "../functions/partida-red.js";
 import { MS_VENTANA, MS_GRACIA } from "../public/js/reglas/red.js";
+import { MS_REVELACION } from "../public/js/reglas/vista.js";
 import { LIMITE_ELIMINACION } from "../public/js/reglas/puntaje.js";
 
 let fallos = 0;
@@ -260,7 +261,12 @@ console.log("\n=== 4. La ronda extra se juega y resuelve ===");
 
   reloj = v.abiertaEn + MS_VENTANA + MS_GRACIA + 1;
   await red.avanzarPartida({ codigo: CODIGO });
-  ok(maestro().estado.fase === "turno", "y se cierra sola", maestro().estado.fase);
+  ok(maestro().estado.fase === "descarte",
+     "se cierra sola y la mesa ve lo expuesto", maestro().estado.fase);
+
+  reloj += MS_REVELACION;
+  await red.avanzarPartida({ codigo: CODIGO });
+  ok(maestro().estado.fase === "turno", "y pasados los 2 s empieza el turno", maestro().estado.fase);
 
   // Se fuerza un resultado distinto para romper el empate.
   const empatados = maestro().estado.jugadores.filter((j) => !j.eliminado);

@@ -14,6 +14,7 @@ import { readFileSync } from "node:fs";
 import * as R from "../public/js/reglas/red.js";
 import * as motor from "../public/js/reglas/motor.js";
 import { crearMotorEnRed } from "../functions/partida-red.js";
+import { MS_REVELACION } from "../public/js/reglas/vista.js";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -343,6 +344,18 @@ async function partidaEnDescarte() {
   return { db, red, ventana };
 }
 
+/**
+ * Deja pasar los dos segundos en los que la mesa ve lo que se expuso.
+ *
+ * Cerrar la ventana ya no lleva a `turno` de un salto: la fase se queda en
+ * `descarte` mientras dura la revelación, que es la condición con la que esas
+ * cartas pueden viajar. El turno empieza cuando vence ese plazo.
+ */
+async function pasarRevelacion(red, codigo = "ABCDEF") {
+  reloj += MS_REVELACION;
+  return red.avanzarPartida({ codigo });
+}
+
 // ==================================== 1. modelo de datos y secreto
 
 console.log("\n=== 1. Modelo de datos: el estado maestro es secreto ===");
@@ -438,6 +451,7 @@ console.log("\n=== 4b. Sólo juega quien tiene el turno ===");
   const { db, red, ventana } = await partidaEnDescarte();
   reloj = 108000;
   await red.cerrarVentana({ codigo: "ABCDEF" });
+  await pasarRevelacion(red);
   const enTurno = db.leer("partidas/ABCDEF").estado.indiceTurno;
   const otro = CUATRO[(enTurno + 1) % 4];
 
@@ -477,6 +491,7 @@ console.log("\n=== 7c. Idempotencia de las acciones de turno ===");
   const { db, red } = await partidaEnDescarte();
   reloj = 108000;
   await red.cerrarVentana({ codigo: "ABCDEF" });
+  await pasarRevelacion(red);
   const enTurno = CUATRO[db.leer("partidas/ABCDEF").estado.indiceTurno];
 
   const a = await red.accionDeTurno({ uid: enTurno, codigo: "ABCDEF", accion: "levantar", clientActionId: "L1" });
@@ -523,7 +538,12 @@ console.log("\n=== 10. Concurrencia ===");
   ok(resolvieron.length === 1, "una sola ejecución resuelve la ventana", resolvieron.length);
   ok(repetidos.length === 3, "las otras tres se encuentran con que ya estaba", repetidos.length);
   ok(db.leer("partidas/ABCDEF").ventana.cerrada === true, "la ventana queda cerrada");
-  ok(db.leer("partidas/ABCDEF").estado.fase === "turno", "y la partida avanza a los turnos");
+  ok(db.leer("partidas/ABCDEF").estado.fase === "descarte",
+     "la fase sigue en descarte: la mesa está viendo lo que se expuso",
+     db.leer("partidas/ABCDEF").estado.fase);
+
+  await pasarRevelacion(red);
+  ok(db.leer("partidas/ABCDEF").estado.fase === "turno", "y pasados los 2 s avanza a los turnos");
 
   // Se resolvió por reacción declarada, no por orden de llegada.
   const orden = resolvieron[0].valor.orden.map((o) => o.uid);
@@ -547,6 +567,7 @@ console.log("\n=== 8. Desconexiones ===");
   const { db, red } = await partidaEnDescarte();
   reloj = 108000;
   await red.cerrarVentana({ codigo: "ABCDEF" });
+  await pasarRevelacion(red);
   const enTurno = CUATRO[db.leer("partidas/ABCDEF").estado.indiceTurno];
   const otro = CUATRO.find((u) => u !== enTurno);
 
@@ -580,6 +601,7 @@ console.log("\n=== 9. Jugador que abandona ===");
   const { db, red, ventana } = await partidaEnDescarte();
   reloj = 108000;
   await red.cerrarVentana({ codigo: "ABCDEF" });
+  await pasarRevelacion(red);
   const enTurno = CUATRO[db.leer("partidas/ABCDEF").estado.indiceTurno];
 
   const r = await red.marcarAbandono({ codigo: "ABCDEF", uid: enTurno });

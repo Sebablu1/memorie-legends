@@ -16,6 +16,7 @@
 import { crearMoverLeyendas } from "../functions/leyendas.js";
 import { crearAbandonarPartida } from "../functions/abandono.js";
 import { crearMotorEnRed } from "../functions/partida-red.js";
+import { MS_REVELACION } from "../public/js/reglas/vista.js";
 import { ESTADOS_SALA, MODOS } from "../public/js/reglas/salas.js";
 
 let fallos = 0;
@@ -192,6 +193,10 @@ console.log("\n=== 2. La partida puede continuar sin él ===");
   const { ventana } = await enRed.abrirVentana({ codigo: CODIGO });
   reloj = ventana.abiertaEn + 20000;
   await enRed.cerrarVentana({ codigo: CODIGO });
+  // Los dos segundos en que la mesa ve lo que se expuso; recién después
+  // empieza el turno.
+  reloj += MS_REVELACION;
+  await enRed.avanzarPartida({ codigo: CODIGO });
 
   const enTurno = CUATRO[partidaDe(db).estado.indiceTurno];
   const iTurno = CUATRO.indexOf(enTurno);

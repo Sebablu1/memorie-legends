@@ -26,6 +26,7 @@ import * as IA from "./reglas/ia.js";
 import { MODOS, costoDeAbandonar } from "./reglas/salas.js";
 import * as Red from "./partida-red.js";
 import { elegibleParaPoder, pasoDelPoder } from "./reglas/red.js";
+import { MS_REVELACION } from "./reglas/vista.js";
 import { abandonarPartida, ErrorDeServidor } from "./servidor.js";
 import { sonidos, alternarSilencio } from "./sonidos.js";
 import { lanzarConfeti } from "./confeti.js";
@@ -1612,6 +1613,52 @@ function pistaDeRed(vista) {
 }
 
 /** Pinta la vista que acaba de llegar. */
+/**
+ * Revelaciones ya mostradas, para no volver a destaparlas.
+ *
+ * El servidor mantiene la fase en `descarte` durante los dos segundos, así
+ * que en ese lapso pueden llegar varias vistas con la misma revelación. Sin
+ * esta marca, cada una rearmaría el temporizador y la carta se quedaría
+ * destapada mientras siguieran llegando.
+ */
+const yaRevelado = new Set();
+
+/**
+ * Destapa lo que el servidor expuso, y lo tapa a los dos segundos.
+ *
+ * El servidor no puede tapar por reloj —el motor es determinista y no lo
+ * mira—, así que expone las cartas mientras dura la revelación y es cada
+ * mesa la que las tapa. Que después el servidor cierre la fase es la segunda
+ * red: aunque este temporizador no llegara a correr, la vista siguiente ya
+ * viene tapada.
+ */
+function mostrarRevelaciones(vista) {
+  if (vista.fase !== "descarte") {
+    // Fuera de la fase no hay nada expuesto, y las marcas de la ventana
+    // anterior ya no sirven para nada.
+    yaRevelado.clear();
+    return;
+  }
+
+  const idVentana = vista.ventana?.id ?? `r${vista.ronda}`;
+
+  for (const r of vista.revelaciones ?? []) {
+    const llave = clave(r.indiceJugador, r.posicion);
+    const marca = `${idVentana}:${llave}`;
+    if (yaRevelado.has(marca)) continue;
+    yaRevelado.add(marca);
+
+    // Se guarda la carta, no `null`: al cerrarse la ventana el servidor deja
+    // un hueco donde estaba la del que llegó tarde, y sin la carta guardada
+    // no quedaría nada que dibujar.
+    revelaciones.set(llave, r.carta);
+    setTimeout(() => {
+      revelaciones.delete(llave);
+      dibujar();
+    }, MS_REVELACION);
+  }
+}
+
 function pintarVista(vista) {
   miVista = vista;
   YO = vista.yo;
@@ -1619,6 +1666,8 @@ function pintarVista(vista) {
   // ausente se lo saltearon— la elección en curso ya no tiene sentido.
   if (vista.fase !== "poder" && eligiendoPoder) eligiendoPoder = null;
   estado = comoEstado(vista);
+  // Antes de dibujar: si algo se expuso, tiene que verse en este mismo pintado.
+  mostrarRevelaciones(vista);
   dibujar();
   pista(pistaDeRed(vista));
   modalesDeRed(vista);

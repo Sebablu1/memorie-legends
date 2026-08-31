@@ -15,6 +15,7 @@
 
 import { crearMotorEnRed, MS_MIRAR, MS_TURNO, MS_ENTRE_RONDAS } from "../functions/partida-red.js";
 import { MS_VENTANA, MS_GRACIA } from "../public/js/reglas/red.js";
+import { MS_REVELACION } from "../public/js/reglas/vista.js";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -179,8 +180,15 @@ console.log("\n=== 2. La ventana se cierra sola y resuelve A/B/C ===");
   ok(cierre.hizo === "cerrarVentana", "pasada la gracia, se cierra sola", cierre.hizo);
   ok(cierre.orden.length === 3, "y resuelve los tres intentos", cierre.orden?.length);
   ok(cierre.orden[0].uid === "ana", "en orden de reacción", cierre.orden.map((o) => o.uid));
-  ok(fase(db) === "turno", "y la partida pasa a los turnos", fase(db));
+  ok(fase(db) === "descarte", "la fase se queda en descarte los 2 s de la revelación", fase(db));
   ok(db.leer(`partidas/${CODIGO}`).ventana.cerrada === true, "la ventana queda cerrada");
+  ok(plazo(db).que === "cerrarRevelacion", "con un plazo para taparlas", plazo(db).que);
+
+  reloj += MS_REVELACION;
+  const tapar = await red.avanzarPartida({ codigo: CODIGO });
+  ok(tapar.hizo === "cerrarRevelacion", "que vence y las tapa", tapar.hizo);
+  ok(fase(db) === "turno", "y ahí sí la partida pasa a los turnos", fase(db));
+  ok(db.leer(`partidas/${CODIGO}`).ventana === null, "y la ventana se retira");
 }
 
 // ======================================= 3. dos cierres simultáneos
@@ -197,7 +205,10 @@ console.log("\n=== 3. Los cuatro golpean a la vez ===");
   const golpes = await Promise.all(CUATRO.map(() => capturar(() => red.avanzarPartida({ codigo: CODIGO }))));
   const cerraron = golpes.filter((g) => g.valor?.hizo === "cerrarVentana");
   ok(cerraron.length === 1, "una sola llamada cierra la ventana", cerraron.length);
-  ok(fase(db) === "turno", "y la fase avanzó una sola vez", fase(db));
+  ok(fase(db) === "descarte", "y la fase avanzó una sola vez", fase(db));
+  reloj += MS_REVELACION;
+  await red.avanzarPartida({ codigo: CODIGO });
+  ok(fase(db) === "turno", "pasada la revelación, empieza el turno", fase(db));
   ok(db.leer(`partidas/${CODIGO}`).estado.turnosRonda === 0, "sin turnos de más", db.leer(`partidas/${CODIGO}`).estado.turnosRonda);
 
   // Y las que no cerraron no rompieron nada: dijeron que no había qué hacer.
@@ -290,6 +301,8 @@ console.log("\n=== 5. El reloj de turno ===");
   await red.avanzarPartida({ codigo: CODIGO });
   const v = db.leer(`partidas/${CODIGO}`).ventana;
   reloj = v.abiertaEn + MS_VENTANA + MS_GRACIA + 1;
+  await red.avanzarPartida({ codigo: CODIGO });
+  reloj += MS_REVELACION;
   await red.avanzarPartida({ codigo: CODIGO });
 
   ok(fase(db) === "turno", "empieza el turno", fase(db));
@@ -529,6 +542,8 @@ console.log("\n=== 9. El estado sigue sano después de todo esto ===");
   const v = db.leer(`partidas/${CODIGO}`).ventana;
   reloj = v.abiertaEn + MS_VENTANA + MS_GRACIA + 1;
   await red.avanzarPartida({ codigo: CODIGO });
+  reloj += MS_REVELACION;
+  await red.avanzarPartida({ codigo: CODIGO });
 
   const maestro = db.leer(`partidas/${CODIGO}`);
   const malos = [];
@@ -553,6 +568,78 @@ console.log("\n=== 9. El estado sigue sano después de todo esto ===");
   const versiones = CUATRO.map((u) => db.leer(`partidas/${CODIGO}/vistas/${u}`).version);
   ok(new Set(versiones).size === 1, "los cuatro en la misma versión", versiones);
   ok(db.rutas().length === 5, "cinco documentos: el maestro y cuatro vistas", db.rutas().length);
+}
+
+// ============================== 11. la carta mal descartada se ve, y se tapa
+
+/**
+ * La regla dice que quien se equivoca expone su carta a TODA la mesa un
+ * momento. Eso no puede quedarse en el motor: tiene que llegar a la vista de
+ * los demás, que es lo único que un jugador recibe.
+ *
+ * Y tiene que irse. Si sobreviviera, la posición quedaría marcada para
+ * siempre y el juego dejaría de depender de la memoria.
+ */
+console.log("\n=== 11. Lo que se expone se ve, y después se tapa ===");
+{
+  const { db, red } = await nueva();
+  const mira = espectador(db, "beto");          // beto NO es el que se equivoca
+
+  reloj += MS_MIRAR;
+  await red.avanzarPartida({ codigo: CODIGO }); // cierra la mirada
+  await red.avanzarPartida({ codigo: CODIGO }); // abre la ventana
+
+  const maestro = () => db.leer(`partidas/${CODIGO}`);
+  const v = maestro().ventana;
+  const muestra = maestro().estado.descarte[0];
+
+  // Ana toca una carta que no coincide: fallo garantizado.
+  const manoDeAna = maestro().estado.jugadores[0].mano;
+  const pos = manoDeAna.findIndex((c) => c && c.numero !== muestra.numero);
+  const equivocada = manoDeAna[pos];
+  ok(Boolean(equivocada), "ana tiene una carta que no sirve para descartar");
+
+  reloj = v.abiertaEn + 700;
+  await red.intentarDescarte({
+    uid: "ana", codigo: CODIGO, windowId: v.id, posicion: pos,
+    clientActionId: "mal-1", declarado: 700, latencia: 40, incertidumbre: 20,
+  });
+
+  // Mientras la ventana sigue abierta nadie ve nada: los intentos no se
+  // resuelven hasta cerrarla.
+  ok(!JSON.stringify(mira.ultima).includes(`"${equivocada.id}"`),
+     "durante la ventana, beto todavía no ve la carta de ana");
+
+  reloj = v.abiertaEn + MS_VENTANA + MS_GRACIA + 1;
+  await red.avanzarPartida({ codigo: CODIGO });
+
+  const durante = mira.ultima;
+  ok(durante.fase === "descarte", "cerrada la ventana, la fase se queda en descarte", durante.fase);
+  ok(durante.jugadores[0].mano[pos]?.id === equivocada.id,
+     "y beto SÍ ve la carta que ana descartó mal, en su posición",
+     durante.jugadores[0].mano[pos]);
+  ok((durante.revelaciones ?? []).some((r) => r.carta?.id === equivocada.id),
+     "que además viaja en el campo de revelaciones");
+
+  // Las demás cartas de ana siguen tapadas: se expone una, no la mano.
+  const otras = durante.jugadores[0].mano.filter((c, i) => i !== pos && c);
+  ok(otras.every((c) => c.oculta), "el resto de la mano de ana sigue tapada", otras.length);
+
+  reloj += MS_REVELACION;
+  await red.avanzarPartida({ codigo: CODIGO });
+
+  const despues = mira.ultima;
+  ok(despues.fase === "turno", "pasados los 2 segundos empieza el turno", despues.fase);
+  ok(!JSON.stringify(despues).includes(`"${equivocada.id}"`),
+     "y la carta desaparece de la vista: no queda ninguna marca");
+  ok((despues.revelaciones ?? []).length === 0, "sin revelaciones en pie");
+
+  // Ni siquiera reconstruyendo desde cero: lo guardado tampoco la expone.
+  const vistaNueva = db.leer(`partidas/${CODIGO}/vistas/beto`);
+  ok(!JSON.stringify(vistaNueva).includes(`"${equivocada.id}"`),
+     "quien entre después tampoco la encuentra");
+
+  mira.dejar();
 }
 
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);

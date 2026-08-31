@@ -13,6 +13,7 @@
  */
 
 import { crearMotorEnRed } from "../functions/partida-red.js";
+import { MS_REVELACION } from "../public/js/reglas/vista.js";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -273,7 +274,12 @@ console.log("\n=== 5. La ventana de reflejos, de punta a punta ===");
   const orden = cierre.orden.map((o) => o.uid);
   ok(orden[0] === "ana",
      "y gana A, que reaccionó antes aunque su pedido llegó casi 200 ms después", orden);
-  ok(A.vista.fase === "turno" && B.vista.fase === "turno", "la partida avanza a los turnos");
+  ok(A.vista.fase === "descarte" && B.vista.fase === "descarte",
+     "los dos siguen en descarte durante la revelación", [A.vista.fase, B.vista.fase]);
+
+  reloj += MS_REVELACION;
+  await red.avanzarPartida({ codigo: CODIGO });
+  ok(A.vista.fase === "turno" && B.vista.fase === "turno", "y pasados los 2 s avanzan a los turnos");
 }
 
 // ============================ 6. reconstruir el estado desde Firestore

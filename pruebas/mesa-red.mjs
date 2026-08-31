@@ -11,6 +11,7 @@
  */
 
 import { crearMotorEnRed } from "../functions/partida-red.js";
+import { MS_REVELACION } from "../public/js/reglas/vista.js";
 import { crearFiltroDeVersion, elegibleParaPoder, pasoDelPoder } from "../public/js/reglas/red.js";
 
 let fallos = 0;
@@ -270,7 +271,20 @@ console.log("\n=== 3. Cuatro jugadores, una ronda completa ===");
   ok(cierre.orden.length === 4, "se resuelven los cuatro", cierre.orden.length);
   ok(cierre.orden[0].uid === "ana", "en orden de reacción", cierre.orden.map((o) => o.uid));
   ok(cierre.orden.filter((o) => o.resultado === "primero").length <= 1, "a lo sumo uno se salva");
-  ok(M.every((m) => m.estado.fase === "turno"), "y la mesa avanza a los turnos");
+  ok(M.every((m) => m.estado.fase === "descarte"),
+     "las cuatro mesas siguen en descarte, viendo lo que se expuso",
+     M.map((m) => m.estado.fase));
+
+  // Las cartas expuestas llegan a TODAS las mesas, no sólo a la de su dueño.
+  const expuestas = M.map((m) => (m.vista.revelaciones ?? []).length);
+  ok(expuestas.every((n) => n === expuestas[0] && n > 0),
+     "y las cuatro reciben las mismas revelaciones", expuestas);
+
+  reloj += MS_REVELACION;
+  await red.avanzarPartida({ codigo: CODIGO });
+  ok(M.every((m) => m.estado.fase === "turno"), "pasados los 2 s, la mesa avanza a los turnos");
+  ok(M.every((m) => (m.vista.revelaciones ?? []).length === 0),
+     "y no queda ninguna revelación en pie");
   ok(new Set(M.map((m) => m.vista.version)).size === 1, "los cuatro en la misma versión",
      M.map((m) => m.vista.version));
 
@@ -304,6 +318,8 @@ console.log("\n=== 4. Desconexión y reconexión ===");
   const { ventana } = await red.abrirVentana({ codigo: CODIGO });
   reloj = 109000;
   await red.cerrarVentana({ codigo: CODIGO });
+  reloj += MS_REVELACION;
+  await red.avanzarPartida({ codigo: CODIGO });
 
   const enTurno = CUATRO[M[0].estado.indiceTurno];
   const iCaido = CUATRO.indexOf(enTurno);
