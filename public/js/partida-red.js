@@ -175,7 +175,7 @@ export const cerrarMirada = (codigo) => llamar("cerrarMirada", { codigo });
  *                  diferencia importa: entre uno y otro puede haber una
  *                  animación, y el jugador reaccionó en el primero.
  */
-export function intentarDescarte(codigo, ventana, posicion, tocadoEn = Date.now()) {
+export function intentarDescarte(codigo, ventana, posicion, tocadoEn = Date.now(), rival = null) {
   const declarado = tocadoEn + reloj.desfase - ventana.abiertaEn;
   return llamar("intentarDescarte", {
     codigo,
@@ -185,6 +185,10 @@ export function intentarDescarte(codigo, ventana, posicion, tocadoEn = Date.now(
     declarado,
     latencia: Math.round((reloj.viaje ?? 0) / 2),
     incertidumbre: Math.round(reloj.incertidumbre),
+    // Contra la mano de un rival: a quién se apunta y qué carta propia se
+    // entrega si acierta. Van POSICIONES y un uid, nunca un valor: la carta
+    // real la saca el servidor del estado maestro.
+    ...(rival ? { objetivo: rival.objetivo, posicionEntrega: rival.posicionEntrega } : {}),
   });
 }
 

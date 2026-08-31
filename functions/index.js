@@ -514,6 +514,10 @@ export const intentarDescarte = functions.https.onCall(async (data, context) => 
     declarado: Number(data?.declarado),
     latencia: Number(data?.latencia),
     incertidumbre: Number(data?.incertidumbre),
+    // Contra la mano de un rival: a quién y qué carta propia se entrega si
+    // acierta. Sólo posiciones y un uid; el servidor deriva todo lo demás.
+    objetivo: data?.objetivo ? String(data.objetivo) : null,
+    posicionEntrega: data?.posicionEntrega == null ? null : Number(data.posicionEntrega),
   });
 });
 

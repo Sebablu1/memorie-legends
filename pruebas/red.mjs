@@ -201,9 +201,40 @@ console.log("\n=== 7. Idempotencia del intento ===");
   ok(Object.keys(dos.ventana.intentos).length === 1, "no se anota dos veces");
   ok(dos.ventana.intentos.c1.posicion === 1, "y no se puede cambiar la jugada reenviándola", dos.ventana.intentos.c1.posicion);
 
-  const otro = R.registrarIntento(uno.ventana, { windowId: "vX", clientActionId: "c2", uid: "ana", posicion: 2, declarado: 500 },
+  // Un identificador NUEVO del mismo jugador sobre su PROPIA mano es un
+  // segundo intento humano, y sobre lo propio no se permite: el descarte es
+  // una carrera de reflejos, hay un tiro. Sin esto, tocar tres cartas costaba
+  // tres castigos.
+  const otraSuya = R.registrarIntento(uno.ventana, { windowId: "vX", clientActionId: "c2", uid: "ana", posicion: 2, declarado: 500 },
     { ahora: 900, cantidadDeCartas: 4 });
-  ok(Object.keys(otro.ventana.intentos).length === 2, "un identificador nuevo sí se anota");
+  ok(otraSuya.ok === false && otraSuya.motivo === R.RECHAZO_INTENTO.YA_INTENTO,
+     "un segundo intento humano sobre la mano propia se rechaza", otraSuya.motivo);
+  ok(Object.keys(uno.ventana.intentos).length === 1, "y no queda anotado");
+
+  // Pero el límite es POR JUGADOR: no puede frenar a los demás.
+  const deOtro = R.registrarIntento(uno.ventana, { windowId: "vX", clientActionId: "c3", uid: "beto", posicion: 2, declarado: 500 },
+    { ahora: 900, cantidadDeCartas: 4 });
+  ok(deOtro.ok && Object.keys(deOtro.ventana.intentos).length === 2,
+     "otro jugador sí se anota en la misma ventana");
+
+  // Y NO alcanza a la mano de un rival. Buscar una carta que se conoce por un
+  // poder es lo contrario de una carrera: se falla, se paga con una carta y se
+  // vuelve a intentar. Todavía no hay intentos sobre rival; la regla se
+  // comprueba igual para que no se pierda cuando los haya.
+  const v1 = R.registrarIntento(R.crearVentana({ id: "vY", abiertaEn: 0 }),
+    { windowId: "vY", clientActionId: "r1", uid: "ana", objetivo: "beto", posicion: 0, declarado: 300 },
+    { ahora: 400, cantidadDeCartas: 4 });
+  const v2 = R.registrarIntento(v1.ventana,
+    { windowId: "vY", clientActionId: "r2", uid: "ana", objetivo: "beto", posicion: 2, declarado: 500 },
+    { ahora: 900, cantidadDeCartas: 4 });
+  ok(v2.ok && Object.keys(v2.ventana.intentos).length === 2,
+     "sobre la mano de un rival sí se puede insistir", v2.motivo);
+
+  // Y quien ya buscó en un rival conserva su tiro propio.
+  const v3 = R.registrarIntento(v2.ventana,
+    { windowId: "vY", clientActionId: "r3", uid: "ana", posicion: 1, declarado: 600 },
+    { ahora: 900, cantidadDeCartas: 4 });
+  ok(v3.ok, "buscar en un rival no consume el intento sobre la mano propia", v3.motivo);
 }
 
 // ============================================ Las reglas A/B/C intactas

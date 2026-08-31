@@ -476,6 +476,21 @@ body::after {
 
 .carta.jugable { cursor: pointer; }
 
+/* Mano de un rival sobre la que un poder 8 o 10 dejó conocimiento.
+   Se marca la mano ENTERA, a propósito: el servidor manda a quién se puede
+   atacar y jamás dónde está la carta. Señalar una posición sería regalar
+   justo lo que el jugador tiene que recordar. */
+.carta.atacable::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: calc(var(--carta-radio) + 3px);
+  border: 2px dashed rgba(240, 208, 96, 0.55);
+  pointer-events: none;
+}
+
+.carta.atacable:hover::before { border-color: var(--oro-claro); }
+
 /* La carta bajo el cursor se despega del abanico sin perder su ángulo. */
 .carta.jugable:hover {
   transform: rotate(var(--giro)) translateY(calc(var(--desvio) - 16px)) scale(1.06);

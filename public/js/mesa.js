@@ -455,11 +455,32 @@ function marcarCartasJugables() {
   const miMano = document.querySelector(`.jugador[data-jugador="${YO}"] .mano`);
   if (!miMano) return;
 
+  // La carta que ya mandé en esta ventana queda resaltada. Es la única señal
+  // que tiene el jugador de que su toque salió: en red el resultado no se
+  // sabe hasta que la ventana cierra, hasta siete segundos después.
+  if (posicionEnviada != null && estado.fase === "descarte") {
+    miMano
+      .querySelector(`.carta[data-posicion="${posicionEnviada}"]`)
+      ?.classList.add("seleccionada");
+  }
+
   const miTurno = estado.indiceTurno === YO;
   const habilitar =
     (estado.fase === "mirar" && estado.jugadores[YO].posicionMirada == null) ||
     estado.fase === "descarte" ||
     (estado.fase === "levantada" && miTurno);
+
+  // Manos ajenas sobre las que un poder 8 o 10 dejó conocimiento. Se marca la
+  // mano ENTERA: el servidor manda a quién se puede atacar y nunca dónde está
+  // la carta, así que marcar una posición sería inventarse un dato que no
+  // tenemos —y regalar el juego, que consiste justamente en acordarse.
+  if (estado.fase === "descarte") {
+    for (const objetivo of miVista?.puedeAtacar ?? []) {
+      document
+        .querySelectorAll(`.jugador[data-jugador="${objetivo}"] .carta[data-posicion]`)
+        .forEach((el) => el.classList.add("jugable", "atacable"));
+    }
+  }
 
   if (!habilitar) return;
   miMano.querySelectorAll(".carta").forEach((el) => el.classList.add("jugable"));
@@ -1112,6 +1133,32 @@ dom.levantadaCarta.addEventListener("click", () => {
 let manejadorMirada = null;
 let manejadorDescarte = null;
 
+/**
+ * Última carta que mandé, para mostrarla resaltada mientras se resuelve.
+ *
+ * NO es un candado: un jugador puede intentar varias veces en la misma
+ * ventana, y debe poder. Con los poderes 8 y 10 uno sabe QUÉ carta tiene el
+ * rival pero no DÓNDE, así que equivocarse de posición y volver a probar
+ * —pagando un castigo por cada error— es parte de la mecánica.
+ */
+let posicionEnviada = null;
+
+/**
+ * Ataque a una mano ajena a medio armar: ya se eligió la posición del rival y
+ * falta elegir qué carta propia se entrega. Vive sólo en la pantalla; el
+ * servidor no se entera hasta que el intento sale completo.
+ */
+let atacando = null;
+
+/** Nunca hay una entrega preseleccionada: se elige en el momento, a ciegas. */
+const entregaElegida = null;
+
+/** Deja marcada la carta que salió hacia el servidor. */
+function marcarEnviada(posicion) {
+  posicionEnviada = posicion;
+  dibujar();
+}
+
 document.addEventListener("click", async (evento) => {
   const cartaEl = evento.target.closest(".carta[data-posicion]");
   if (!cartaEl) return;
@@ -1121,9 +1168,20 @@ document.addEventListener("click", async (evento) => {
   const indiceJugador = Number(jugadorEl.dataset.jugador);
   const posicion = Number(cartaEl.dataset.posicion);
 
+  // Descartar exige DOS toques. `detail` lo cuenta el navegador con su propia
+  // noción de doble clic —la del sistema operativo—, así que no hace falta
+  // ningún temporizador nuestro. El primer toque llega con detail 1 y no
+  // descarta: un roce accidental dejó de costar una carta de castigo.
+  //
+  // Es `=== 2`, no `>= 2`. Una ráfaga de tres clics llega como detail 1, 2 y
+  // 3: con `>= 2` se dispararían DOS intentos y el jugador se comería dos
+  // castigos por un triple clic. `=== 2` es el segundo toque de la ráfaga, y
+  // hay exactamente uno por ráfaga, sea de dos clics o de diez.
+  const dobleClic = evento.detail === 2;
+
   // En red no se decide nada acá: se pide y se espera la vista nueva.
   if (enRed()) {
-    await clicEnCartaDeRed(indiceJugador, posicion);
+    await clicEnCartaDeRed(indiceJugador, posicion, dobleClic);
     return;
   }
 
@@ -1149,6 +1207,10 @@ document.addEventListener("click", async (evento) => {
   }
 
   if (estado.fase === "descarte" && manejadorDescarte && indiceJugador === YO) {
+    if (!dobleClic) {
+      pista("Tocá <b>dos veces</b> para descartar.");
+      return;
+    }
     manejadorDescarte(posicion);
     return;
   }
@@ -1762,15 +1824,56 @@ function abrirModalFinDeRed(vista) {
  * resultado optimista sería adivinar, y en la ventana de reflejos adivinar
  * mal es lo más probable — el resultado depende de lo que hagan los otros.
  */
+/** Lo que se espera por una respuesta antes de devolverle la mesa al jugador. */
+const MS_ESPERA_MAXIMA = 15000;
+
+/** Marca de que se venció la espera. No dice nada sobre lo que hizo el servidor. */
+class EsperaVencida extends Error {}
+
+/**
+ * Manda una jugada y devuelve el control pase lo que pase.
+ *
+ * El plazo de 15 segundos es SÓLO de interfaz. Que venza no significa que la
+ * jugada no se haya aplicado: el pedido puede seguir vivo y llegar al
+ * servidor igual. Por eso al vencer no se reintenta, no se revierte nada y no
+ * se toca ni una carta. La autoridad sigue siendo la vista que publica el
+ * servidor; lo único que se recupera acá es la posibilidad de volver a tocar.
+ */
 async function pedir(accion, ejecutar) {
-  if (pidiendo) return;
+  if (pidiendo) {
+    pista("⏳ Esperá a que termine la acción anterior.");
+    return;
+  }
   pidiendo = true;
+  pista("Procesando…");
+
+  let reloj = null;
   try {
-    return await ejecutar();
+    const respuesta = ejecutar();
+    // Si la espera vence primero, este pedido queda huérfano. Se le engancha
+    // un catch para que su rechazo tardío no salga por consola como un error
+    // sin dueño.
+    respuesta.catch(() => {});
+
+    const vencimiento = new Promise((_, rechazar) => {
+      reloj = setTimeout(() => rechazar(new EsperaVencida()), MS_ESPERA_MAXIMA);
+    });
+
+    return await Promise.race([respuesta, vencimiento]);
   } catch (error) {
-    pista(`⚠️ ${error?.message ?? "No pudimos enviar la jugada."}`);
-    sonidos.error();
+    if (error instanceof EsperaVencida) {
+      console.warn(
+        `Sin respuesta de "${accion}" tras ${MS_ESPERA_MAXIMA} ms. ` +
+          "La jugada PUEDE haberse aplicado igual: no se reintenta.",
+      );
+      pista("⌛ No pudimos confirmar la acción. Esperá un momento.");
+    } else {
+      console.error(`Falló "${accion}":`, error);
+      pista(`⚠️ ${error?.message ?? "No pudimos enviar la jugada."}`);
+      sonidos.error();
+    }
   } finally {
+    clearTimeout(reloj);
     pidiendo = false;
   }
 }
@@ -1841,12 +1944,75 @@ async function clicEnCartaDeRed(indiceJugador, posicion) {
     return;
   }
 
+  // Mano de un rival sobre el que un poder dejó conocimiento.
+  if (
+    miVista.fase === "descarte" &&
+    indiceJugador !== YO &&
+    (miVista.puedeAtacar ?? []).includes(indiceJugador)
+  ) {
+    const ventana = miVista.ventana;
+    if (!ventana || ventana.cerrada) return;
+
+    if (!dobleClic) {
+      pista("Tocá <b>dos veces</b> la carta del rival que creas que es la tuya conocida.");
+      return;
+    }
+
+    // Buscar en la mano ajena no es gratis: si se acierta hay que entregar
+    // una carta propia, y se elige AHORA, a ciegas, antes de saber si estaba
+    // bien. Si se falla no se entrega nada, pero igual se paga con una carta.
+    if (entregaElegida == null) {
+      atacando = { indiceJugador, posicion };
+      dibujar();
+      pista("Ahora tocá <b>una carta tuya</b>: es la que le darías si acertás.");
+      return;
+    }
+    return;
+  }
+
+  // Elegir la carta propia que se entrega, con un ataque ya apuntado.
+  if (miVista.fase === "descarte" && atacando && indiceJugador === YO) {
+    const objetivo = atacando;
+    const ventana = miVista.ventana;
+    atacando = null;
+    dibujar();
+    if (!ventana || ventana.cerrada) return;
+
+    const tocadoEn = Date.now();
+    const r = await pedir("descartar", () => Red.intentarDescarte(
+      salaPedida, ventana, objetivo.posicion, tocadoEn,
+      { objetivo: miVista.jugadores[objetivo.indiceJugador]?.id, posicionEntrega: posicion },
+    ));
+    if (r?.anotado) {
+      sonidos.aviso();
+      pista("Jugada registrada. Se resuelve al cerrar la ventana.");
+    }
+    return;
+  }
+
   if (miVista.fase === "descarte" && indiceJugador === YO) {
     const ventana = miVista.ventana;
     if (!ventana || ventana.cerrada) return;
+
+    if (!dobleClic) {
+      pista("Tocá <b>dos veces</b> para descartar.");
+      return;
+    }
+
     // Se manda el instante del CLIC, no el del envío.
     const tocadoEn = Date.now();
-    await pedir("descartar", () => Red.intentarDescarte(salaPedida, ventana, posicion, tocadoEn));
+    const r = await pedir("descartar", () =>
+      Red.intentarDescarte(salaPedida, ventana, posicion, tocadoEn));
+
+    if (r?.anotado) {
+      // Anotada, no descartada. En red los intentos se resuelven todos juntos
+      // al cerrar la ventana, así que hasta entonces no se sabe quién llegó
+      // primero. Decir "descartada" acá sería inventar un resultado que
+      // todavía no existe.
+      sonidos.aviso();
+      marcarEnviada(posicion);
+      pista("Carta registrada. Se resolverá al cerrar la ventana.");
+    }
     return;
   }
 

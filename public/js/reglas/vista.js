@@ -15,6 +15,7 @@
  */
 
 import { puntosCarta } from "./baraja.js";
+import { objetivosDe } from "./motor.js";
 
 /** Marcador de carta tapada. No lleva palo, número ni imagen. */
 export const CARTA_OCULTA = { oculta: true };
@@ -109,6 +110,13 @@ export function vistaDe(estado, indiceQuienMira) {
     // El poder pendiente es público (todos ven que alguien lo activó).
     poderPendiente: estado.poderPendiente,
 
+    // A quién puede atacar QUIEN MIRA, y nada más.
+    //
+    // Viaja el permiso, nunca el número conocido: si viajara, el navegador
+    // sabría dónde buscar y el poder dejaría de depender de la memoria. Ni
+    // siquiera se dice cuántas cartas conoce, que ya sería una pista.
+    puedeAtacar: objetivosDe(estado, indiceQuienMira),
+
     // --- los jugadores ---
     jugadores: estado.jugadores.map((jugador, indice) => ({
       id: jugador.id,
@@ -168,6 +176,33 @@ export function filtracionesEn(vista, estadoCompleto) {
   // La carta levantada es de quien juega.
   if (vista.levantada && estadoCompleto.indiceTurno !== vista.yo) {
     problemas.push("la carta levantada viaja a alguien que no está en turno");
+  }
+
+  // El conocimiento de los poderes 8 y 10 NO viaja: sólo el permiso.
+  //
+  // Si el número conocido llegara al navegador, el jugador no tendría que
+  // recordar nada —le bastaría con leerlo— y buscar en la mano del rival
+  // dejaría de ser un ejercicio de memoria para volverse un trámite.
+  // Buscar el número suelto no serviría: un 9 aparece legítimamente en la
+  // muestra, en la levantada y en las cartas propias reveladas. Lo que se
+  // comprueba es la FORMA: que no viaje ninguna estructura de conocimiento,
+  // ni entera ni disfrazada bajo otro nombre.
+  (function buscarConocimiento(v, ruta) {
+    if (!v || typeof v !== "object") return;
+    if (Array.isArray(v)) return v.forEach((x, i) => buscarConocimiento(x, `${ruta}[${i}]`));
+    const claves = Object.keys(v);
+    if (claves.includes("objetivo") && claves.includes("numero") && claves.includes("actor")) {
+      problemas.push(`la vista lleva un conocimiento de mano ajena en ${ruta}`);
+    }
+    for (const [k, x] of Object.entries(v)) {
+      if (k === "conocimientos") problemas.push(`la vista incluye el modelo de conocimiento en ${ruta}`);
+      buscarConocimiento(x, `${ruta}.${k}`);
+    }
+  })(vista, "vista");
+
+  // Y que `puedeAtacar` sea sólo eso: una lista de índices, sin nada dentro.
+  if (vista.puedeAtacar && !vista.puedeAtacar.every((x) => Number.isInteger(x))) {
+    problemas.push("puedeAtacar lleva algo más que índices");
   }
 
   return problemas;

@@ -314,6 +314,7 @@ export const RECHAZO_INTENTO = {
   NO_JUGADOR: "no_jugador",
   POSICION_INVALIDA: "posicion_invalida",
   FALTA_IDENTIFICADOR: "falta_identificador",
+  YA_INTENTO: "ya_intento",
 };
 
 /**
@@ -339,9 +340,36 @@ export function registrarIntento(ventana, intento, { ahora, cantidadDeCartas }) 
     return { ok: false, motivo: RECHAZO_INTENTO.POSICION_INVALIDA };
   }
 
-  // Duplicado: se contesta que sí, sin volver a anotar.
+  // Reintento TÉCNICO: el mismo pedido mandado dos veces porque se perdió la
+  // respuesta. Se contesta que sí, sin volver a anotar. Un reintento de red no
+  // puede costar una carta de castigo.
+  //
+  // Ojo: esto NO limita al jugador a un intento por ventana, y no debe
+  // hacerlo. Con los poderes 8 y 10 uno sabe QUÉ carta tiene el rival pero no
+  // DÓNDE, así que puede equivocarse de posición varias veces —sumando un
+  // castigo por cada error— y seguir buscando. Un identificador nuevo es un
+  // intento humano nuevo, y es legítimo.
   if (ventana.intentos[clientActionId]) {
     return { ok: true, ventana, duplicado: true };
+  }
+
+  // Y ACÁ, EN CAMBIO, SÍ SE LIMITA: pero sólo contra la mano PROPIA.
+  //
+  // Sobre lo propio el descarte es una carrera de reflejos: hay un tiro y se
+  // vive con él. Sin este límite, tocar tres cartas costaba tres castigos —lo
+  // reproduje: cuatro cartas antes, siete después— porque cada clic llegaba
+  // con un identificador nuevo y al cerrar la ventana se aplicaban todos.
+  //
+  // Sobre la mano de un RIVAL no se limita, por lo que dice el comentario de
+  // arriba: buscar una carta conocida por un poder es lo contrario de una
+  // carrera. Hoy no existen los intentos sobre rival; la distinción queda
+  // escrita para que cuando existan no choquen contra esto.
+  const contraSuPropiaMano = (intento.objetivo ?? uid) === uid;
+  const yaJugoLoSuyo = Object.values(ventana.intentos)
+    .some((x) => x.uid === uid && (x.objetivo ?? x.uid) === x.uid);
+
+  if (contraSuPropiaMano && yaJugoLoSuyo) {
+    return { ok: false, motivo: RECHAZO_INTENTO.YA_INTENTO };
   }
 
   const llegada = ahora - ventana.abiertaEn;
@@ -368,7 +396,16 @@ export function registrarIntento(ventana, intento, { ahora, cantidadDeCartas }) 
         [clientActionId]: {
           clientActionId,
           uid,
+          // De quién es la mano que se toca: la propia, o la de un rival
+          // sobre el que se tiene un poder 8/10.
+          objetivo: intento.objetivo ?? uid,
           posicion,
+          // Qué carta propia se entrega si el intento sobre un rival acierta.
+          // Es una POSICIÓN elegida a ciegas: el jugador no sabe cuál es.
+          // Sobre la mano propia no significa nada y viaja como null.
+          posicionEntrega: Number.isInteger(intento.posicionEntrega)
+            ? intento.posicionEntrega
+            : null,
           declarado: Number.isFinite(intento.declarado) ? intento.declarado : null,
           llegada,
           efectivo,
@@ -392,7 +429,7 @@ export function registrarIntento(ventana, intento, { ahora, cantidadDeCartas }) 
  * @param indiceDe      uid → índice del jugador en el motor
  * @param intentarDescarte  la función del motor, inyectada para no acoplar
  */
-export function resolverVentana(estado, ventana, indiceDe, intentarDescarte) {
+export function resolverVentana(estado, ventana, indiceDe, intentarDescarte, intentarRival) {
   const orden = ordenarIntentos(ventana);
   let siguiente = estado;
   const aplicados = [];
@@ -401,7 +438,16 @@ export function resolverVentana(estado, ventana, indiceDe, intentarDescarte) {
     const indice = indiceDe(intento.uid);
     if (indice == null || indice < 0) continue;
     const antes = siguiente;
-    siguiente = intentarDescarte(siguiente, indice, intento.posicion);
+
+    // Sobre la mano de otro va por el camino del poder, que valida la
+    // autorización y puede terminar en transferencia. Sobre la propia, el
+    // descarte de siempre.
+    const objetivo = indiceDe(intento.objetivo ?? intento.uid);
+    if (intentarRival && objetivo != null && objetivo >= 0 && objetivo !== indice) {
+      siguiente = intentarRival(siguiente, indice, objetivo, intento.posicion, intento.posicionEntrega);
+    } else {
+      siguiente = intentarDescarte(siguiente, indice, intento.posicion);
+    }
     // Si el motor no cambió nada (posición ya vacía, por ejemplo) no se
     // inventa un resultado: se deja constancia de que no se aplicó.
     const ultimo = siguiente.ventanaDescarte?.intentos?.at(-1);

@@ -432,7 +432,10 @@ export function crearMotorEnRed({
    * "el primero" sería el primero en llegar, y ganaría siempre la mejor
    * conexión. Se junta todo y se ordena al cerrar.
    */
-  async function intentarDescarte({ uid, codigo, windowId, posicion, clientActionId, declarado, latencia, incertidumbre }) {
+  async function intentarDescarte({
+    uid, codigo, windowId, posicion, clientActionId, declarado, latencia, incertidumbre,
+    objetivo = null, posicionEntrega = null,
+  }) {
     return db.runTransaction(async (tx) => {
       const snap = await tx.get(refPartida(codigo));
       const partida = exigirPartida(snap, codigo);
@@ -441,10 +444,43 @@ export function crearMotorEnRed({
 
       if (!partida.ventana) throw error("failed-precondition", "No hay ninguna ventana abierta.");
 
+      // ¿Va contra la mano de otro? Todo se deriva del estado maestro: del
+      // cliente sólo se aceptan POSICIONES y a quién apunta. Nada de valores,
+      // ni de ids, ni de "yo conozco su carta".
+      const contraRival = objetivo && objetivo !== uid;
+      let indiceObjetivo = indice;
+
+      if (contraRival) {
+        indiceObjetivo = partida.jugadores.indexOf(objetivo);
+        if (indiceObjetivo < 0) {
+          throw error("not-found", "Ese jugador no está en la partida.");
+        }
+        if (partida.estado.jugadores[indiceObjetivo].eliminado) {
+          throw error("failed-precondition", "Ese jugador ya no está en juego.");
+        }
+        // LA autorización: la da el estado, no el navegador.
+        if (!motor.puedeAtacarA(partida.estado, indice, indiceObjetivo)) {
+          throw error("permission-denied", "No sabés nada de esa mano.");
+        }
+        // La carta que se entregaría tiene que existir de verdad.
+        const miMano = partida.estado.jugadores[indice].mano;
+        if (!Number.isInteger(posicionEntrega) || !miMano[posicionEntrega]) {
+          throw error("invalid-argument", "Elegí una carta tuya para entregar.");
+        }
+      }
+
       const resultado = registrarIntento(
         partida.ventana,
-        { windowId, clientActionId, uid, posicion, declarado, latencia, incertidumbre },
-        { ahora: ahora(), cantidadDeCartas: partida.estado.jugadores[indice].mano.length },
+        {
+          windowId, clientActionId, uid, posicion, declarado, latencia, incertidumbre,
+          objetivo: contraRival ? objetivo : uid,
+          posicionEntrega: contraRival ? posicionEntrega : null,
+        },
+        {
+          ahora: ahora(),
+          // El rango se mide contra la mano que se toca, no siempre la propia.
+          cantidadDeCartas: partida.estado.jugadores[indiceObjetivo].mano.length,
+        },
       );
 
       if (!resultado.ok) {
@@ -476,6 +512,7 @@ export function crearMotorEnRed({
     posicion_invalida: "Esa posición no existe en tu mano.",
     falta_identificador: "A la jugada le falta su identificador.",
     no_jugador: "No estás jugando esta partida.",
+    ya_intento: "Ya registraste una carta en esta ventana.",
   })[motivo] ?? "No pudimos registrar la jugada.";
 
   /**
@@ -509,6 +546,7 @@ export function crearMotorEnRed({
         partida.ventana,
         indiceDe,
         motor.intentarDescarte,
+        motor.intentarDescarteRival,
       );
 
       // La fase sigue en `descarte` los dos segundos de la revelación; el
@@ -806,6 +844,7 @@ export function crearMotorEnRed({
         };
         const { estado, orden } = resolverVentana(
           partida.estado, partida.ventana, indiceDe, motor.intentarDescarte,
+          motor.intentarDescarteRival,
         );
         // NO se cierra la fase todavía. Los intentos ya están aplicados, y las
         // cartas que se expusieron sólo viajan mientras la fase sea

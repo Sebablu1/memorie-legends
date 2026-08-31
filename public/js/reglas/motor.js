@@ -68,6 +68,21 @@ export const crearPartida = (configuracion, { semilla = semillaAleatoria() } = {
   registro: [],
   // Hechos puntuables de la partida, que consume el ranking.
   eventos: [],
+  /**
+   * Lo que cada jugador SABE de las manos ajenas, por haber usado un poder.
+   *
+   *   { actor, objetivo, numero, origen, ronda }
+   *
+   * Guarda el NÚMERO, no la posición: ésa es toda la mecánica. Ver un 5 en la
+   * mano de otro no es saber dónde está el 5 dentro de un rato, porque las
+   * cartas se mueven y la memoria falla. Por eso conocer una carta habilita a
+   * intentar sobre CUALQUIER posición de esa mano, y equivocarse cuesta.
+   *
+   * Es un array de objetos planos: viaja con el estado y sobrevive el JSON.
+   * NUNCA sale hacia una vista: al cliente sólo le llega a quién puede
+   * atacar, jamás qué número conoce. Ver `vista.js`.
+   */
+  conocimientos: [],
   // El azar es un número, no una función: avanza con cada barajada y viaja
   // con el estado. Ver azar.js.
   semilla: semilla >>> 0,
@@ -104,6 +119,9 @@ export function empezarRonda(estado) {
       indiceCortador: null,
       turnosRonda: 0,
       indiceTurno: estado.indiceMano,
+      // Se reparte de nuevo: lo que alguien sabía de la mano de otro ya no
+      // corresponde a ninguna carta que siga ahí.
+      conocimientos: [],
       // La semilla avanza con la barajada: la ronda siguiente no repite el
       // mismo reparto.
       semilla: azar.semilla(),
@@ -213,6 +231,115 @@ export function intentarDescarte(estado, indiceJugador, posicion) {
   );
 }
 
+/**
+ * ¿Puede `actor` intentar sobre la mano de `objetivo`?
+ *
+ * Basta con conocer UNA carta suya. Conocer un número no es conocer una
+ * posición, así que el derecho es sobre la mano entera: si el permiso se
+ * limitara a la posición donde se vio, el poder sería un acierto garantizado
+ * y no habría nada que recordar.
+ */
+export const puedeAtacarA = (estado, actor, objetivo) =>
+  actor !== objetivo &&
+  !estado.jugadores[objetivo]?.eliminado &&
+  (estado.conocimientos ?? []).some((c) => c.actor === actor && c.objetivo === objetivo);
+
+/** A quién puede atacar cada jugador. Es lo ÚNICO de esto que puede viajar. */
+export const objetivosDe = (estado, actor) =>
+  estado.jugadores
+    .map((_, i) => i)
+    .filter((i) => puedeAtacarA(estado, actor, i));
+
+/**
+ * Intento de descarte sobre la mano de OTRO, habilitado por un poder 8 o 10.
+ *
+ * `posicionObjetivo` es una apuesta, no una afirmación: el jugador cree que
+ * ahí está la carta que vio. `posicionEntrega` es la carta propia que va a
+ * dar a cambio SI acierta, elegida por posición y a ciegas —no sabe cuál es—.
+ *
+ * ACIERTO: la carta del rival se va al descarte y la carta propia ocupa
+ *          EXACTAMENTE ese hueco, boca abajo. Nadie ve su valor, ni siquiera
+ *          quien la entregó. El conocimiento de ese número se consume.
+ *
+ * ERROR:   la carta del rival no se mueve, se expone un momento a la mesa, y
+ *          el atacante recibe una carta de castigo. El conocimiento queda:
+ *          equivocarse de posición no borra lo que se vio, así que puede
+ *          seguir buscando y cada error vuelve a costar.
+ */
+export function intentarDescarteRival(
+  estado, actor, objetivo, posicionObjetivo, posicionEntrega,
+) {
+  if (estado.fase !== "descarte" || !estado.ventanaDescarte) return estado;
+  if (!puedeAtacarA(estado, actor, objetivo)) return estado;
+
+  const manoObjetivo = [...estado.jugadores[objetivo].mano];
+  const manoActor = [...estado.jugadores[actor].mano];
+  const carta = manoObjetivo[posicionObjetivo];
+  if (!carta) return estado;
+
+  const muestra = cima(estado.descarte);
+  const correcto = esDescarteValido(carta, muestra);
+
+  const origen = rellenarMazo(estado);
+  const mazo = [...origen.mazo];
+  const descarte = [...origen.descarte];
+
+  let conocimientos = estado.conocimientos ?? [];
+
+  if (correcto) {
+    // La entrega tiene que ser una carta que exista de verdad.
+    const entregada = manoActor[posicionEntrega];
+    if (!entregada) return estado;
+
+    // La transferencia, en una sola transición y sin desplazar nada:
+    // la del rival se va al descarte y la propia ocupa ese mismo hueco.
+    descarte.unshift({ ...carta, visible: true });
+    manoObjetivo[posicionObjetivo] = { ...entregada, visible: false };
+    manoActor[posicionEntrega] = null;
+
+    // El número encontrado ya no está en esa mano: el conocimiento se gastó.
+    // Lo que se entregó NO hereda nada: quien la dio no sabe cuál era.
+    conocimientos = conocimientos.filter(
+      (c) => !(c.actor === actor && c.objetivo === objetivo && c.numero === carta.numero),
+    );
+  } else {
+    // Se equivocó de posición: la carta del rival no se toca y paga con una.
+    manoActor.push(mazo.length ? mazo.shift() : null);
+  }
+
+  return anotar(
+    {
+      ...estado,
+      mazo,
+      descarte,
+      conocimientos,
+      jugadores: estado.jugadores.map((j, i) =>
+        i === actor ? { ...j, mano: manoActor }
+          : i === objetivo ? { ...j, mano: manoObjetivo }
+          : j,
+      ),
+      ventanaDescarte: {
+        ...estado.ventanaDescarte,
+        intentos: [
+          ...estado.ventanaDescarte.intentos,
+          {
+            indiceJugador: objetivo,
+            posicion: posicionObjetivo,
+            actor,
+            resultado: correcto ? "rivalAcierto" : "rivalError",
+            // Sólo la fallada se expone a la mesa. La acertada se fue al
+            // descarte, donde ya se ve; la entregada no se muestra jamás.
+            carta: correcto ? null : carta,
+          },
+        ],
+      },
+    },
+    correcto
+      ? `${estado.jugadores[actor].nombre} encontró el ${carta.numero} de ${estado.jugadores[objetivo].nombre}`
+      : `${estado.jugadores[actor].nombre} se equivocó buscando en ${estado.jugadores[objetivo].nombre}`,
+  );
+}
+
 export const cerrarVentanaDescarte = (estado) => ({
   ...estado,
   fase: "turno",
@@ -285,6 +412,23 @@ export function tirarCarta(estado) {
 }
 
 /** Poderes 7 y 8: mirar. Devuelve la carta para que la UI la muestre un instante. */
+/**
+ * Anota que `actor` sabe que `objetivo` tiene una carta de ese número.
+ *
+ * Se guarda el número y no la carta ni su posición: es lo único que el
+ * jugador se lleva de verdad. Repetido no se duplica —saber dos veces lo
+ * mismo no da dos derechos— pero sí se guardan números distintos.
+ */
+function recordar(estado, { actor, objetivo, numero, origen }) {
+  if (actor === objetivo || !Number.isInteger(numero)) return estado.conocimientos ?? [];
+  const previos = estado.conocimientos ?? [];
+  const repetido = previos.some(
+    (c) => c.actor === actor && c.objetivo === objetivo && c.numero === numero,
+  );
+  if (repetido) return previos;
+  return [...previos, { actor, objetivo, numero, origen, ronda: estado.ronda }];
+}
+
 export function usarPoderMirar(estado, indiceObjetivo, posicion) {
   const poder = estado.poderPendiente;
   if (estado.fase !== "poder" || !poder) return { estado, revelada: null };
@@ -295,13 +439,20 @@ export function usarPoderMirar(estado, indiceObjetivo, posicion) {
     return { estado, revelada: null };
   }
 
+  const carta = estado.jugadores[indiceObjetivo].mano[posicion];
+
+  // El 8 mira la mano de otro: de ahí sale el conocimiento. El 7 mira la
+  // propia y no genera ninguno —saber lo tuyo no te autoriza sobre nadie.
+  const conocimientos = recordar(estado, {
+    actor: poder.indiceJugador,
+    objetivo: indiceObjetivo,
+    numero: carta?.numero,
+    origen: "poder8",
+  });
+
   return {
-    estado: { ...estado, fase: "postLevantada", poderPendiente: null },
-    revelada: {
-      indiceJugador: indiceObjetivo,
-      posicion,
-      carta: estado.jugadores[indiceObjetivo].mano[posicion],
-    },
+    estado: { ...estado, fase: "postLevantada", poderPendiente: null, conocimientos },
+    revelada: { indiceJugador: indiceObjetivo, posicion, carta },
   };
 }
 
@@ -323,12 +474,31 @@ export function usarPoderCambio(estado, posicionPropia, indiceRival, posicionRiv
   miMano[posicionPropia] = manoRival[posicionRival];
   manoRival[posicionRival] = mia;
 
+  // Qué conocimiento deja el 10, derivado de lo que REALMENTE pasó:
+  //
+  // El 10 muestra las dos cartas y después las intercambia. La que era del
+  // rival ahora es propia, así que saber su número ya no es saber nada de
+  // nadie. Pero la carta que uno entregó SÍ quedó en la mano del rival, y su
+  // número se vio. Ése es el conocimiento que queda: "el rival tiene esto".
+  //
+  // El 9 cambia a ciegas —`revelada` es null— y por eso no deja ninguno: no
+  // se puede recordar lo que no se vio.
+  const conocimientos = revelada
+    ? recordar(estado, {
+        actor: yo,
+        objetivo: indiceRival,
+        numero: mia?.numero,
+        origen: "poder10",
+      })
+    : (estado.conocimientos ?? []);
+
   return {
     estado: anotar(
       {
         ...estado,
         fase: "postLevantada",
         poderPendiente: null,
+        conocimientos,
         jugadores: estado.jugadores.map((j, i) =>
           i === yo ? { ...j, mano: miMano } : i === indiceRival ? { ...j, mano: manoRival } : j,
         ),
