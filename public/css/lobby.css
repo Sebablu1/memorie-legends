@@ -104,6 +104,32 @@ fieldset.campo { border: none; padding: 0; margin-inline: 0; }
   font-size: 1rem;
   font-family: inherit;
   transition: border-color 0.2s, box-shadow 0.2s;
+  /* El menú desplegable NO lo dibuja la página: lo dibuja el navegador con
+     el tema del sistema, y en Windows ese tema es claro. El `background` de
+     acá no llega al menú, pero el `color` sí se hereda: blanco sobre blanco.
+     `color-scheme` es la forma de decirle al navegador que este control es
+     oscuro, y con eso pinta el menú, la barra de desplazamiento y el
+     resaltado en oscuro. */
+  color-scheme: dark;
+}
+
+/* Las opciones del menú abierto se pintan aparte: no heredan el fondo del
+   select. Con `color-scheme: dark` ya quedarían legibles, pero declararlas
+   explícitamente fija el gris del tema en vez del gris que elija el
+   navegador, y cubre a los que todavía no soportan `color-scheme`. */
+.campo select option {
+  background-color: var(--negro-3);
+  color: var(--texto);
+}
+
+/* La opción elegida, en dorado.
+   El degradado no es un adorno: Chromium pinta el resaltado con un gradiente
+   propio que tapa un `background-color` liso, y un degradado de un solo color
+   es lo único que lo sobrescribe. */
+.campo select option:checked {
+  background: var(--oro) linear-gradient(0deg, var(--oro) 0%, var(--oro) 100%);
+  color: var(--negro);
+  font-weight: 600;
 }
 
 .campo select:focus,
