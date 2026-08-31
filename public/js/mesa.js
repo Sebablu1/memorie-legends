@@ -68,6 +68,9 @@ const dom = {
   confeti: $("confeti"),
   btnSonido: $("btnSonido"),
   btnAbandonar: $("btnAbandonar"),
+  btnRegistro: $("btnRegistro"),
+  panelRegistro: $("panelRegistro"),
+  btnCerrarRegistro: $("btnCerrarRegistro"),
 };
 
 dom.btnSonido.addEventListener("click", () => {
@@ -75,6 +78,24 @@ dom.btnSonido.addEventListener("click", () => {
   dom.btnSonido.textContent = callado ? "🔇" : "🔊";
   dom.btnSonido.title = callado ? "Activar sonidos" : "Silenciar sonidos";
   if (!callado) sonidos.clic();
+});
+
+// El registro sigue teniendo todo lo que tenía; sólo dejó de estar abierto
+// permanentemente al lado de la mesa. Cerrado no ocupa nada del paño.
+const alternarRegistro = (abrir) => {
+  dom.panelRegistro.hidden = !abrir;
+  dom.btnRegistro.title = abrir ? "Cerrar el registro" : "Ver el registro de jugadas";
+};
+
+dom.btnRegistro.addEventListener("click", () => {
+  alternarRegistro(dom.panelRegistro.hidden);
+  sonidos.clic();
+});
+
+dom.btnCerrarRegistro.addEventListener("click", () => alternarRegistro(false));
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !dom.panelRegistro.hidden) alternarRegistro(false);
 });
 
 // -------------------------------------------------------------- montaje
@@ -346,20 +367,15 @@ function dibujarJugador(jugador, i) {
     </div>`;
 }
 
+/** Puntos de la ronda y nada más: es un dato de consulta al costado del paño. */
 function dibujarMarcador() {
-  const menor = Math.min(
-    ...estado.jugadores.filter((j) => !j.eliminado).map((j) => j.puntos),
-  );
   dom.marcador.innerHTML = estado.jugadores
-    .map((j) => {
-      const ancho = Math.min(100, (j.puntos / LIMITE_ELIMINACION) * 100);
-      const lider = !j.eliminado && j.puntos === menor;
-      return `
-        <div class="marcador-fila ${j.eliminado ? "fuera" : ""} ${lider ? "lider" : ""}">
-          <div class="linea"><span>${j.nombre}</span><b>${j.puntos}</b></div>
-          <div class="barra-puntos"><i style="width:${Math.max(0, ancho)}%"></i></div>
-        </div>`;
-    })
+    .map(
+      (j) => `
+        <div class="marcador-fila ${j.eliminado ? "fuera" : ""}">
+          <span>${j.nombre}</span><b>${j.puntos}</b>
+        </div>`,
+    )
     .join("");
 }
 

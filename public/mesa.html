@@ -8,7 +8,6 @@
     <link rel="icon" href="img/claude-inspiration/logo.png" />
     <link rel="stylesheet" href="css/tema.css" />
     <link rel="stylesheet" href="css/mesa.css" />
-      <link rel="stylesheet" href="css/pie.css" />
 </head>
   <body>
     <div class="escena">
@@ -20,6 +19,7 @@
         </div>
         <div class="derecha">
           <div class="chip-ronda">Ronda <strong id="numeroRonda">-</strong></div>
+          <button id="btnRegistro" class="btn-icono" type="button" title="Ver el registro de jugadas">📜</button>
           <button id="btnSonido" class="btn-icono" type="button" title="Silenciar sonidos">🔊</button>
           <button id="btnAbandonar" class="btn-icono" type="button" title="Abandonar la partida">🚪</button>
         </div>
@@ -27,11 +27,6 @@
 
       <div class="mesa-zona">
         <main class="mesa" id="mesa">
-          <div class="temporizador" id="temporizador">
-            <span class="texto" id="temporizadorTexto"></span>
-            <span class="barra"><i class="relleno" id="temporizadorRelleno"></i></span>
-          </div>
-
           <div class="asiento asiento-arriba" id="asientoArriba"></div>
           <div class="asiento asiento-izq" id="asientoIzq"></div>
           <div class="asiento asiento-der" id="asientoDer"></div>
@@ -56,13 +51,22 @@
             </div>
           </div>
 
+          <!-- Tu mano es un asiento más del paño: si vive fuera del óvalo
+               empuja hacia abajo todo lo que viene después. -->
+          <div class="asiento asiento-abajo" id="asientoAbajo"></div>
         </main>
-
-        <div class="asiento asiento-abajo" id="asientoAbajo"></div>
       </div>
 
       <div class="acciones">
         <div class="pista" id="pista">Preparando la partida…</div>
+
+        <!-- La cuenta atrás de la mirada y de los reflejos vive acá, junto a la
+             instrucción que la explica. Sobre el paño tapaba la ficha del
+             jugador de enfrente justo cuando hay que mirar la mesa. -->
+        <div class="temporizador" id="temporizador">
+          <span class="texto" id="temporizadorTexto"></span>
+          <span class="barra"><i class="relleno" id="temporizadorRelleno"></i></span>
+        </div>
 
         <div class="reloj-turno" id="relojTurno" hidden>
           <span class="reloj-numero" id="relojNumero">8</span>
@@ -76,14 +80,20 @@
 
       <aside class="lateral">
         <section class="tarjeta">
-          <h2>Marcador</h2>
+          <h2>Ronda</h2>
           <div id="marcador"></div>
         </section>
-        <section class="tarjeta">
-          <h2>Registro</h2>
-          <div class="registro" id="registro"></div>
-        </section>
       </aside>
+    </div>
+
+    <!-- El registro sigue completo, pero fuera del paño: cerrado no ocupa
+         nada, y abierto se desliza por encima con su propio scroll. -->
+    <div class="panel-registro" id="panelRegistro" hidden>
+      <div class="panel-cabecera">
+        <h2>Registro de jugadas</h2>
+        <button id="btnCerrarRegistro" class="btn-icono" type="button" title="Cerrar el registro">✕</button>
+      </div>
+      <div class="registro" id="registro"></div>
     </div>
 
     <canvas id="confeti"></canvas>
@@ -93,18 +103,5 @@
     </div>
 
     <script type="module" src="js/mesa.js"></script>
-  
-    <footer>
-      <div class="footer-content">
-        <div class="footer-links">
-          <a href="/como-se-juega.html">📜 Cómo se Juega</a>
-          <a href="/quienes-somos.html">Quiénes Somos</a>
-          <a href="/terminos.html">Términos y Condiciones</a>
-          <a href="/privacidad.html">Políticas de Privacidad</a>
-          <a href="/seguridad.html">Seguridad</a>
-        </div>
-        <p>&copy; 2026 Memorie Legends. Todos los derechos reservados.</p>
-      </div>
-    </footer>
   </body>
 </html>
