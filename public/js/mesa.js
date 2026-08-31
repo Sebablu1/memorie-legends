@@ -1487,6 +1487,59 @@ async function mostrarFinRonda() {
 let dejarDeEscuchar = null;
 let dejarDeLatir = null;
 let dejarDeAvanzar = null;
+let dejarDeRescatar = null;
+
+/**
+ * Las tres fases que no tienen reloj.
+ *
+ * Levantar, usar un poder y decidir si cortar se piensan sin apuro: no hay
+ * plazo que las venza, y eso es deliberado. Pero si el jugador que tiene que
+ * decidir desapareció, la mesa se queda esperando a alguien que no va a
+ * volver, y la partida no termina nunca. Pasó en producción el 29/08: la
+ * última acción de turno fue a las 16:28:59 y nadie jugó más.
+ *
+ * El servidor ya tiene la red de seguridad —`saltarAusente`— y ya sabe quién
+ * está ausente: `latir` lo calcula y lo publica en la vista. Lo único que
+ * faltaba era que alguien tocara el timbre.
+ */
+const FASES_SIN_RELOJ = new Set(["levantada", "poder", "postLevantada"]);
+
+/** Cada cuánto, como mucho, se pide un rescate. */
+const MS_ENTRE_RESCATES = 5000;
+let ultimoRescate = 0;
+
+/**
+ * Pide que salteen al jugador ausente, si de verdad lo está.
+ *
+ * NO decide nada: la condición que se mira acá —`ausentes`, calculado por el
+ * servidor— es la misma que el servidor vuelve a comprobar antes de actuar,
+ * y si no se cumple rechaza el pedido. Duplicar la validación sería inventar
+ * una segunda autoridad sobre quién está conectado.
+ */
+async function rescatarSiHayAusente() {
+  const vista = miVista;
+  if (!vista || !FASES_SIN_RELOJ.has(vista.fase)) return;
+
+  const enTurno = vista.jugadores[vista.indiceTurno]?.id;
+  // Si el que "falta" soy yo, evidentemente estoy: este código se está
+  // ejecutando. Pedir que me salteen a mí mismo no tendría sentido.
+  if (!enTurno || enTurno === miUid) return;
+  if (!(vista.ausentes ?? []).includes(enTurno)) return;
+
+  // Con cuatro clientes mirando lo mismo, sin freno serían cuatro pedidos por
+  // segundo. Uno cada cinco alcanza: el servidor resuelve el primero que
+  // llegue y a los demás les contesta que ya no hay nada que saltar.
+  const ahora = Date.now();
+  if (ahora - ultimoRescate < MS_ENTRE_RESCATES) return;
+  ultimoRescate = ahora;
+
+  try {
+    await Red.saltarAusente(salaPedida);
+  } catch {
+    // El servidor decide. Si dice que el jugador sigue conectado, o que en
+    // esta fase no hay nada que saltar, es la respuesta correcta.
+  }
+}
 /** Última vista recibida del servidor. La única fuente de verdad. */
 let miVista = null;
 
@@ -1569,6 +1622,7 @@ function pintarVista(vista) {
   dibujar();
   pista(pistaDeRed(vista));
   modalesDeRed(vista);
+  rescatarSiHayAusente();
 }
 
 /**
@@ -1792,10 +1846,17 @@ async function arrancarModoLeyendas(sala, uid) {
   // desconexión congelaría la mesa para los demás.
   dejarDeAvanzar = Red.mantenerEnMarcha(salaPedida);
 
+  // Además de con cada vista nueva, por reloj: si el ausente ya estaba
+  // marcado antes de entrar en la fase sin reloj, `latir` no republica
+  // —`ausentes` no cambió— y sin este intervalo nadie tocaría el timbre.
+  const rescate = setInterval(rescatarSiHayAusente, MS_ENTRE_RESCATES);
+  dejarDeRescatar = () => clearInterval(rescate);
+
   window.addEventListener("pagehide", () => {
     dejarDeEscuchar?.();
     dejarDeLatir?.();
     dejarDeAvanzar?.();
+    dejarDeRescatar?.();
   });
 
   pista("Conectando con la partida…");
