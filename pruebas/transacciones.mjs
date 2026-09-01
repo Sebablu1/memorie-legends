@@ -318,5 +318,38 @@ console.log("\n=== 5. Los imports de index.js resuelven ===");
   ok(rotos.length === 0, `los ${revisados} imports de index.js resuelven`, rotos);
 }
 
+// ================================ los tiempos, en un solo sitio cada uno
+
+/**
+ * Las duraciones del juego no pueden estar escritas dos veces.
+ *
+ * Ya pasó: alguien puso `MS_MIRAR = 4000` en el motor mientras la red seguía
+ * con su propia copia en 2000, y el entrenamiento pasó a medir el doble que
+ * las partidas por Leyendas. Las 22 suites siguieron en verde, porque cada
+ * modo miraba su propia constante.
+ *
+ * `MS_MIRAR` ya no está duplicado. `MS_VENTANA` y `MS_DESCARTE` todavía sí
+ * —una es del protocolo de red y la otra de las reglas—, así que al menos se
+ * comprueba que digan lo mismo.
+ */
+console.log("\n=== Los tiempos coinciden entre modos ===");
+{
+  const motor = await import("../public/js/reglas/motor.js");
+  const red = await import("../public/js/reglas/red.js");
+  const enRed = await import("../functions/partida-red.js");
+
+  ok(enRed.MS_MIRAR === motor.MS_MIRAR,
+     "la mirada dura lo mismo en los dos modos",
+     { motor: motor.MS_MIRAR, red: enRed.MS_MIRAR });
+
+  ok(red.MS_VENTANA === motor.MS_DESCARTE,
+     "y la ventana de reflejos también",
+     { motor: motor.MS_DESCARTE, red: red.MS_VENTANA });
+
+  ok(motor.MS_DESCARTE_TRAS_TIRAR < motor.MS_DESCARTE,
+     "la ventana que reabre tirar es más corta que la de la ronda",
+     { tirar: motor.MS_DESCARTE_TRAS_TIRAR, ronda: motor.MS_DESCARTE });
+}
+
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);
 process.exit(fallos ? 1 : 0);

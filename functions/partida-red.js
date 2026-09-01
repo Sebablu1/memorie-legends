@@ -44,8 +44,15 @@ export const MS_SIN_SENALES = 15000;
 /** Lo que espera la mesa a que alguien levante antes de saltarle el turno. */
 export const MS_TURNO = 8000;
 
-/** Lo que dura la mirada del principio de la ronda. */
-export const MS_MIRAR = 2000;
+/**
+ * Lo que dura la mirada del principio de la ronda.
+ *
+ * Se re-exporta la del motor en vez de declarar otra. Tenerlo escrito dos
+ * veces ya nos costó una divergencia silenciosa: alguien cambió el del motor a
+ * 4000 y el entrenamiento pasó a medir el doble que las partidas por Leyendas,
+ * con las pruebas en verde porque cada modo miraba su propia copia.
+ */
+export const MS_MIRAR = motor.MS_MIRAR;
 
 /** Lo que se muestran los resultados antes de repartir la ronda siguiente. */
 export const MS_ENTRE_RONDAS = 6000;
