@@ -29,20 +29,21 @@
  * desfase y armar el intento) y el servidor (que es el que decide).
  */
 
-import { MS_DESCARTE } from "./motor.js";
+import { MS_DESCARTE, MS_REAPERTURA } from "./motor.js";
 
 // ------------------------------------------------------------ constantes
 
 /**
- * Lo que dura la ventana de reflejos.
+ * Lo que duran las ventanas de reflejos: la de la ronda y las reaperturas.
  *
- * Se re-exporta la del motor en vez de escribir el número otra vez. Tenerlo
- * duplicado ya nos costó una divergencia silenciosa —el entrenamiento midiendo
- * el doble que las partidas por Leyendas, con las pruebas en verde porque cada
- * modo leía su propia copia— y no hay razón para volver a arriesgarlo: las dos
- * ventanas SON la misma regla.
+ * Las dos se re-exportan del motor en vez de escribir los números otra vez.
+ * Tenerlos duplicados ya nos costó una divergencia silenciosa —el
+ * entrenamiento midiendo el doble que las partidas por Leyendas, con las
+ * pruebas en verde porque cada modo leía su propia copia—. Son la misma regla
+ * y tienen que salir del mismo lugar.
  */
 export const MS_VENTANA = MS_DESCARTE;
+export const MS_VENTANA_REAPERTURA = MS_REAPERTURA;
 
 /**
  * Margen extra en el que todavía se aceptan intentos ya enviados.

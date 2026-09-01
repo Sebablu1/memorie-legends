@@ -18,6 +18,7 @@ import {
   PODERES,
   MS_MIRAR,
   MS_DESCARTE,
+  MS_REAPERTURA,
 } from "./reglas/motor.js";
 
 import { dorsoDeAsiento } from "./reglas/baraja.js";
@@ -957,7 +958,9 @@ const MS_MARCA_PODER = 1000;
  */
 async function reflejosTrasTirar() {
   if (estado.fase !== "descarte") return;
-  await faseDescarte(null);
+  // Dos segundos, no cinco: ésta es una reapertura. La de la ronda dura más
+  // porque ahí se viene de memorizar y hay que buscar en cuatro manos.
+  await faseDescarte(null, MS_REAPERTURA);
 }
 
 /**

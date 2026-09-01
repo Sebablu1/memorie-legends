@@ -346,21 +346,24 @@ console.log("\n=== Los tiempos coinciden entre modos ===");
      "y la ventana de reflejos también",
      { motor: motor.MS_DESCARTE, red: red.MS_VENTANA });
 
-  // Hubo dos duraciones distintas —una para la ventana de la ronda y otra,
-  // más corta, para la que reabría tirar—. Ahora hay una sola, porque la
-  // muestra cambia en cada tiro y en cada cambio y todas las ventanas piden
-  // el mismo gesto. Que no vuelva a aparecer una segunda por la puerta de
-  // atrás.
-  ok(motor.MS_DESCARTE_TRAS_TIRAR === undefined,
-     "no hay una segunda duración de ventana dando vueltas",
-     { sobrante: motor.MS_DESCARTE_TRAS_TIRAR });
+  ok(red.MS_VENTANA_REAPERTURA === motor.MS_REAPERTURA,
+     "y la de las reaperturas, que es la otra",
+     { motor: motor.MS_REAPERTURA, red: red.MS_VENTANA_REAPERTURA });
 
-  // Y un piso: por debajo de esto no alcanza para reaccionar y que el pedido
-  // llegue. El tiempo de reacción humano ronda los 250 ms y la latencia
-  // doméstica agrega tranquilamente otros 200.
-  ok(motor.MS_DESCARTE >= 1500,
-     "la ventana deja tiempo para reaccionar y para que el pedido viaje",
-     { ventana: motor.MS_DESCARTE });
+  // Son dos a propósito: en la de la ronda se viene de memorizar una sola
+  // carta y hay que buscar en cuatro manos; en las reaperturas la mesa ya está
+  // mirando la muestra. Que la de la ronda sea la más larga es la regla.
+  ok(motor.MS_REAPERTURA < motor.MS_DESCARTE,
+     "la reapertura es más corta que la de la ronda",
+     { reapertura: motor.MS_REAPERTURA, ronda: motor.MS_DESCARTE });
+
+  // Y un piso para las dos: por debajo de esto no alcanza para reaccionar y
+  // que el pedido llegue. El tiempo de reacción humano ronda los 250 ms y la
+  // latencia doméstica agrega tranquilamente otros 200.
+  for (const [nombre, ms] of [["la de la ronda", motor.MS_DESCARTE],
+                              ["la reapertura", motor.MS_REAPERTURA]]) {
+    ok(ms >= 1500, `${nombre} deja tiempo para reaccionar y para que el pedido viaje`, { ms });
+  }
 }
 
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);

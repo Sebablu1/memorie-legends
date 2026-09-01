@@ -5,16 +5,27 @@ import { azarDesde, semillaAleatoria } from "./azar.js";
 export const MS_MIRAR = 2000;
 
 /**
- * Lo que dura cualquier ventana de reflejos.
+ * La ventana del principio de la ronda.
  *
- * Una sola, para todas. Antes había dos —una para la ventana del principio de
- * la ronda y otra, más corta, para la que reabre tirar— con el argumento de
- * que en la primera se viene de memorizar y hay que buscar en cuatro manos.
- * Ahora la muestra cambia en cada tiro y en cada cambio, así que hay muchas
- * más ventanas por ronda y todas piden lo mismo: reconocer un número y tocar.
- * Dos duraciones distintas para el mismo gesto sólo confundían.
+ * Cinco segundos, y son necesarios: se viene de memorizar una sola carta y hay
+ * que buscar en cuatro manos a la vez. Es el único momento de la ronda en que
+ * nadie tiene todavía ninguna referencia.
+ *
+ * Se probó unificarla con la de las reaperturas en 2 s y el juego se volvía
+ * frenético: entre la mirada y esta ventana el ciclo de apertura caía de 7 s a
+ * 4, sin que nadie hubiera pedido eso.
  */
-export const MS_DESCARTE = 2000;
+export const MS_DESCARTE = 5000;
+
+/**
+ * Las ventanas que abren tirar y cambiar.
+ *
+ * Dos segundos, más cortas a propósito. Acá la mesa ya está mirando la muestra
+ * y sólo tiene que reaccionar al número nuevo: no hay que reconstruir nada. Y
+ * ocurren varias veces por ronda —una por tiro y una por cambio—, así que cada
+ * segundo de más se paga muchas veces.
+ */
+export const MS_REAPERTURA = 2000;
 
 export const PODERES = {
   7: "mirarPropia",

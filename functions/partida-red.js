@@ -31,6 +31,7 @@ import * as motor from "./reglas/motor.js";
 import { semillaAleatoria } from "./reglas/azar.js";
 import {
   MS_VENTANA,
+  MS_VENTANA_REAPERTURA,
   crearVentana,
   registrarIntento,
   resolverVentana,
@@ -391,6 +392,23 @@ export function crearMotorEnRed({
     Boolean(estado.ventanaDescarte) &&
     (!partida.ventana || partida.ventana.cerrada);
 
+  /**
+   * Cuánto dura la ventana que corresponde abrir ahora.
+   *
+   * No son todas iguales. La del principio de la ronda dura 5 s: se viene de
+   * memorizar una sola carta y hay que buscar en cuatro manos. Las que abren
+   * tirar y cambiar duran 2: la mesa ya está mirando la muestra y sólo tiene
+   * que reaccionar al número nuevo, y encima ocurren varias veces por ronda.
+   *
+   * Se distinguen por `volverA`, que es la marca que el motor ya le pone a las
+   * reaperturas para saber adónde devolver el turno: la de la ronda no lo
+   * lleva —desemboca en `turno`— y las otras sí. Preguntárselo al estado es
+   * más seguro que confiar en desde qué línea se llamó, porque los dos sitios
+   * genéricos de abajo abren tanto una como la otra.
+   */
+  const duracionDeVentana = (estado) =>
+    estado?.ventanaDescarte?.volverA ? MS_VENTANA_REAPERTURA : MS_VENTANA;
+
   function exigirFase(partida, accion) {
     const esperada = FASE_DE[accion];
     if (!esperada) throw error("invalid-argument", "Acción desconocida.");
@@ -472,7 +490,7 @@ export function crearMotorEnRed({
       const ventana = crearVentana({
         id: `v_${idAleatorio()}`,
         abiertaEn: ahora(),
-        duracionMs: MS_VENTANA,
+        duracionMs: duracionDeVentana(partida.estado),
       });
 
       const siguiente = { ...partida, ventana, version: partida.version + 1 };
@@ -698,7 +716,7 @@ export function crearMotorEnRed({
           ? crearVentana({
               id: `v_${idAleatorio()}`,
               abiertaEn: ahora(),
-              duracionMs: MS_VENTANA,
+              duracionMs: duracionDeVentana(estado),
             })
           : partida.ventana,
         latidos: { ...partida.latidos, [uid]: ahora() },
@@ -900,7 +918,7 @@ export function crearMotorEnRed({
         const ventana = crearVentana({
           id: `v_${idAleatorio()}`,
           abiertaEn: t,
-          duracionMs: MS_VENTANA,
+          duracionMs: duracionDeVentana(partida.estado),
         });
         return { ...partida, ventana };
       }
@@ -1042,7 +1060,7 @@ export function crearMotorEnRed({
           ? crearVentana({
               id: `v_${idAleatorio()}`,
               abiertaEn: ahora(),
-              duracionMs: MS_VENTANA,
+              duracionMs: duracionDeVentana(avanzado),
             })
           : partida.ventana,
         version: partida.version + 1,

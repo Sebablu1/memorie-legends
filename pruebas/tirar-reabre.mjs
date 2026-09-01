@@ -33,7 +33,7 @@
 
 import * as M from "../public/js/reglas/motor.js";
 import { crearMotorEnRed, MS_MIRAR } from "../functions/partida-red.js";
-import { MS_VENTANA, MS_GRACIA } from "../public/js/reglas/red.js";
+import { MS_VENTANA, MS_VENTANA_REAPERTURA, MS_GRACIA } from "../public/js/reglas/red.js";
 import { MS_REVELACION } from "../public/js/reglas/vista.js";
 
 let fallos = 0;
@@ -256,11 +256,13 @@ console.log("\n=== 5. En red: tirar abre una ventana NUEVA ===");
     ok(Boolean(p.ventana) && !p.ventana.cerrada, "con una ventana de red abierta");
     ok(p.ventana.id !== primera.id, "que NO es la de la ronda", [p.ventana.id, primera.id]);
     ok(p.ventana.abiertaEn === reloj, "abierta en el instante del tiro", p.ventana.abiertaEn - reloj);
-    // Dura MS_VENTANA a secas. La de la ronda dura MS_MIRAR + MS_VENTANA
-    // porque tiene que cubrir además la mirada; ésta no tiene nada que cubrir.
-    ok(p.ventana.duracionMs === MS_VENTANA,
-       "y dura una ventana sola, sin la mirada encima",
-       [p.ventana.duracionMs, MS_VENTANA]);
+    // Dura lo de una reapertura, que es MENOS que la de la ronda: la de la
+    // ronda cubre además la mirada (MS_MIRAR + MS_VENTANA) y da cinco segundos
+    // para buscar en cuatro manos; acá la mesa ya está mirando la muestra.
+    ok(p.ventana.duracionMs === MS_VENTANA_REAPERTURA,
+       "y dura lo de una reapertura, no lo de la ronda",
+       [p.ventana.duracionMs, MS_VENTANA_REAPERTURA, MS_VENTANA]);
+    ok(p.ventana.duracionMs < MS_VENTANA, "que es estrictamente más corta");
     ok(p.plazo.que === "cerrarVentana", "con su plazo de cierre", p.plazo.que);
 
     // Un intento con el windowId viejo no se cuela.
