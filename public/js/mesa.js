@@ -1974,9 +1974,14 @@ function abrirModalFinDeRed(vista) {
     return;
   }
 
+  // El aviso de que la ronda siguiente arranca sola va DEBAJO de la tabla y en
+  // voz baja: lo que el jugador vino a mirar son los puntajes. Pero no se
+  // quita del todo, porque en entrenamiento sí hay un botón "Siguiente ronda"
+  // y sin este renglón uno se queda esperando a que aparezca.
   const cortador = vista.jugadores[vista.indiceCortador]?.nombre ?? "alguien";
   abrirModal(`<h2>✂️ Cortó ${cortador}</h2>
-    <p>Ronda ${vista.ronda} terminada. La siguiente arranca sola.</p>${tabla}`);
+    <p>Ronda ${vista.ronda} terminada.</p>${tabla}
+    <p class="aviso-suave">La ronda ${vista.ronda + 1} empieza sola.</p>`);
 }
 
 /**
