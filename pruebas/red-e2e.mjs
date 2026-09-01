@@ -104,6 +104,14 @@ function jugador(db, codigo, uid) {
 // ================================================================ montaje
 
 let reloj = 100000;
+
+/** El momento en que la ventana de esta partida ya se puede cerrar.
+ *  No se escribe a mano: la ventana abre con la mirada y su duración
+ *  vive en ella, así que hay que preguntársela. */
+function trasLaGracia(db) {
+  const v = db.leer(`partidas/${CODIGO}`).ventana;
+  return v.abiertaEn + v.duracionMs + v.graciaMs + 1;
+}
 const db = crearFirestore();
 const red = crearMotorEnRed({
   db, partidas: "partidas",
@@ -269,7 +277,7 @@ console.log("\n=== 5. La ventana de reflejos, de punta a punta ===");
   ok(!JSON.stringify(A.vista).includes("b-descarta"), "A no se entera de que B intentó");
   ok(!JSON.stringify(B.vista).includes("a-descarta"), "ni B de que intentó A");
 
-  reloj = 109000;
+  reloj = trasLaGracia(db);
   const cierre = await red.cerrarVentana({ codigo: CODIGO });
   const orden = cierre.orden.map((o) => o.uid);
   ok(orden[0] === "ana",

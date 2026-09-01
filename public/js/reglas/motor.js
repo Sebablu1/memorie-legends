@@ -5,6 +5,16 @@ import { azarDesde, semillaAleatoria } from "./azar.js";
 export const MS_MIRAR = 2000;
 export const MS_DESCARTE = 5000;
 
+/**
+ * Lo que dura la ventana que reabre tirar una carta.
+ *
+ * Más corta que la del principio de la ronda, y a propósito: en aquélla se
+ * viene de memorizar y hay que buscar en cuatro manos; en ésta la mesa ya está
+ * mirando la muestra y sólo tiene que reaccionar al número nuevo. Además ocurre
+ * una vez por turno, así que cada segundo se paga cuatro veces por ronda.
+ */
+export const MS_DESCARTE_TRAS_TIRAR = 3000;
+
 export const PODERES = {
   7: "mirarPropia",
   8: "mirarRival",
@@ -340,9 +350,16 @@ export function intentarDescarteRival(
   );
 }
 
+/**
+ * Cierra la ventana de reflejos y devuelve la mesa a donde corresponda.
+ *
+ * La del principio de la ronda desemboca en el turno. La que abre `tirarCarta`
+ * lleva `volverA: "postLevantada"`, porque el que tiró todavía tiene que
+ * decidir si corta.
+ */
 export const cerrarVentanaDescarte = (estado) => ({
   ...estado,
-  fase: "turno",
+  fase: estado.ventanaDescarte?.volverA ?? "turno",
   ventanaDescarte: null,
 });
 
@@ -395,7 +412,24 @@ export function tirarCarta(estado) {
     levantada: null,
   };
 
-  if (!esPoder(carta)) return { ...siguiente, fase: "postLevantada" };
+  // La carta tirada es la muestra nueva, así que la mesa vuelve a tener algo
+  // a lo que reaccionar: se abre otra ventana de reflejos antes de que el que
+  // tiró decida si corta. Sin esto, cambiar la muestra no le servía a nadie
+  // más que a él.
+  //
+  // `volverA` es lo que hace que esto no le robe el turno: al cerrarse, esta
+  // ventana devuelve a `postLevantada` —donde él corta o pasa— y no a `turno`,
+  // que es adonde vuelve la ventana del principio de la ronda.
+  if (!esPoder(carta)) {
+    return anotar(
+      {
+        ...siguiente,
+        fase: "descarte",
+        ventanaDescarte: { huboPrimero: false, intentos: [], volverA: "postLevantada" },
+      },
+      `${estado.jugadores[estado.indiceTurno].nombre} tiró un ${carta.numero}`,
+    );
+  }
 
   return anotar(
     {
@@ -510,9 +544,22 @@ export function usarPoderCambio(estado, posicionPropia, indiceRival, posicionRiv
 }
 
 /** El jugador decidió no usar el poder: la carta queda descartada sin efecto. */
+/**
+ * Renunciar al poder: la carta queda como una carta más.
+ *
+ * Y como cualquier otra carta tirada, ya cambió la muestra. Así que la mesa
+ * recupera sus reflejos igual que si el jugador hubiera tirado un número
+ * cualquiera: renunciar al poder no puede quitarle a los demás una
+ * oportunidad que el mismo tiro les habría dado.
+ */
 export function saltarPoder(estado) {
   const poder = estado.poderPendiente;
-  const siguiente = { ...estado, fase: "postLevantada", poderPendiente: null };
+  const siguiente = {
+    ...estado,
+    fase: "descarte",
+    poderPendiente: null,
+    ventanaDescarte: { huboPrimero: false, intentos: [], volverA: "postLevantada" },
+  };
   if (!poder) return siguiente;
   return anotar(
     siguiente,

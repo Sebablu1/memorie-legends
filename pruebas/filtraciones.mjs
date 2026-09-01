@@ -51,6 +51,14 @@ function db0() {
 
 const CUATRO = ["ana", "beto", "caro", "dani"];
 let reloj = 100000;
+
+/** El momento en que la ventana de esta partida ya se puede cerrar.
+ *  No se escribe a mano: la ventana abre con la mirada y su duración
+ *  vive en ella, así que hay que preguntársela. */
+function trasLaGracia(db) {
+  const v = db.leer("partidas/ABCDEF").ventana;
+  return v.abiertaEn + v.duracionMs + v.graciaMs + 1;
+}
 const db = db0();
 const red = crearMotorEnRed({
   db, partidas: "partidas", ahora: () => reloj,
@@ -131,7 +139,7 @@ for (let ronda = 0; ronda < 3; ronda++) {
     } catch {}
     auditar(`descarte r${ronda} ${uid}`);
   }
-  reloj += 8000;
+  reloj = trasLaGracia(db);
   await red.cerrarVentana({ codigo: "ABCDEF" });
   // Con la ventana recién cerrada la mesa está viendo lo que se expuso: la
   // fase sigue en `descarte` y esas cartas viajan a propósito.

@@ -76,10 +76,31 @@ export const ACCIONES = {
   PASAR: "pasar",
 };
 
-/** En qué fase del motor tiene sentido cada acción. */
+/**
+ * La ventana de descarte arranca cuando arranca la MIRADA, no después.
+ *
+ * La muestra puede ser justo la carta que acabás de memorizar, y hasta ahora
+ * ese descarte era imposible: la fase todavía era `mirar` y no existía
+ * ninguna ventana a la que pertenecer.
+ *
+ *   0 s ───────── 2 s ───────────────── 7 s ──── 9 s
+ *        MIRAR          DESCARTE          gracia
+ *        └───────── una sola ventana ────────┘
+ *
+ * Son 7 segundos porque cubre los 2 de la mirada más los 5 de descarte de
+ * siempre. Lo que vive el jugador no cambia: sólo cambia dónde empieza a
+ * contar la ventana.
+ */
+const MS_VENTANA_TOTAL = MS_MIRAR + MS_VENTANA;
+
+/**
+ * En qué fase del motor tiene sentido cada acción.
+ *
+ * Descartar vale en dos, por lo de arriba. Las demás siguen atadas a una.
+ */
 const FASE_DE = {
   [ACCIONES.MIRAR]: "mirar",
-  [ACCIONES.DESCARTAR]: "descarte",
+  [ACCIONES.DESCARTAR]: ["mirar", "descarte"],
   [ACCIONES.LEVANTAR]: "turno",
   [ACCIONES.CAMBIAR]: "levantada",
   [ACCIONES.TIRAR]: "levantada",
@@ -225,7 +246,10 @@ export function crearMotorEnRed({
 
     switch (estado.fase) {
       case "mirar":
-        return nuevo("mirar", `r${estado.ronda}`, ahoraMs + MS_MIRAR, "cerrarMirada");
+        // Los dos segundos se cuentan desde que abrió la ventana, no desde
+        // este golpe: si no, una publicación posterior recortaría la mirada.
+        return nuevo("mirar", `r${estado.ronda}`,
+                     (ventana?.abiertaEn ?? ahoraMs) + MS_MIRAR, "cerrarMirada");
 
       case "descarte":
         // Ventana ya resuelta: la mesa está viendo las cartas que se
@@ -338,10 +362,34 @@ export function crearMotorEnRed({
     }
   }
 
+  /**
+   * Ventana de una ronda: se abre con la mirada y dura hasta el final del
+   * descarte.
+   *
+   * Va acá y no en un plazo `abrirVentana` a propósito. Si la abriera un golpe
+   * posterior, `abiertaEn` sería el momento de ese golpe —hasta 900 ms
+   * después, que es cada cuánto golpean los clientes— y la mirada perdería esa
+   * porción de sus dos segundos.
+   */
+  const ventanaDeRonda = (t) =>
+    crearVentana({ id: `v_${idAleatorio()}`, abiertaEn: t, duracionMs: MS_VENTANA_TOTAL });
+
+  /**
+   * ¿El motor acaba de abrir una ventana de reflejos que la red todavía no
+   * tiene? Pasa al tirar una carta: la muestra cambia y la mesa vuelve a
+   * reaccionar, pero la ventana de la ronda ya se cerró.
+   */
+  const reabreDescarte = (partida, estado) =>
+    estado.fase === "descarte" &&
+    Boolean(estado.ventanaDescarte) &&
+    (!partida.ventana || partida.ventana.cerrada);
+
   function exigirFase(partida, accion) {
     const esperada = FASE_DE[accion];
     if (!esperada) throw error("invalid-argument", "Acción desconocida.");
-    if (partida.estado.fase !== esperada) {
+    // Casi todas las acciones valen en una sola fase; descartar vale en dos.
+    const validas = Array.isArray(esperada) ? esperada : [esperada];
+    if (!validas.includes(partida.estado.fase)) {
       throw error(
         "failed-precondition",
         `Eso no se puede hacer ahora: la partida está en "${partida.estado.fase}".`,
@@ -380,7 +428,8 @@ export function crearMotorEnRed({
       // La semilla la elige el SERVIDOR. Si la mandara el cliente, podría
       // probar semillas hasta dar con un reparto que le convenga.
       estado: motor.empezarRonda(motor.crearPartida(configuracion, { semilla: semillaDe() })),
-      ventana: null,
+      // La ventana nace con la mirada, no con el descarte: ver arriba.
+      ventana: ventanaDeRonda(ahora()),
       latidos: Object.fromEntries(jugadores.map((uid) => [uid, ahora()])),
       ausentes: [],
       abandonaron: [],
@@ -633,6 +682,17 @@ export function crearMotorEnRed({
       const siguiente = {
         ...partida,
         estado,
+        // Tirar una carta cambia la muestra y el motor vuelve a abrir una
+        // ventana de reflejos. Necesita la SUYA en la red: la de la ronda ya
+        // está cerrada, y su plazo de revelación —vencido hace rato— cerraría
+        // esta al primer golpe. Dura 5 s porque acá no hay mirada que cubrir.
+        ventana: reabreDescarte(partida, estado)
+          ? crearVentana({
+              id: `v_${idAleatorio()}`,
+              abiertaEn: ahora(),
+              duracionMs: motor.MS_DESCARTE_TRAS_TIRAR,
+            })
+          : partida.ventana,
         latidos: { ...partida.latidos, [uid]: ahora() },
         // Se recuerdan las últimas jugadas para poder reconocer un reintento.
         aplicadas: recortar({ ...(partida.aplicadas ?? {}), [clientActionId]: true }),
@@ -874,7 +934,8 @@ export function crearMotorEnRed({
         return {
           ...partida,
           estado: motor.siguienteRonda(partida.estado),
-          ventana: null,
+          // La ronda nueva empieza mirando, así que su ventana abre acá.
+          ventana: ventanaDeRonda(t),
           // Las jugadas recordadas eran de la ronda anterior.
           aplicadas: {},
         };
@@ -951,7 +1012,12 @@ export function crearMotorEnRed({
       let avanzado;
       switch (estado.fase) {
         case "turno": avanzado = motor.saltarTurno(estado); break;
-        case "levantada": avanzado = motor.pasarTurno(motor.tirarCarta(estado)); break;
+        // Se le tira la carta al ausente. Eso cambia la muestra y reabre los
+        // reflejos, así que acá NO se pasa el turno: la mesa reacciona, la
+        // ventana se cierra sola y la partida queda en `postLevantada`, donde
+        // un segundo rescate —el ausente sigue en silencio— pasa el turno.
+        // Encadenar `pasarTurno` acá no haría nada: desde `descarte` no avanza.
+        case "levantada": avanzado = motor.tirarCarta(estado); break;
         case "poder": avanzado = motor.saltarPoder(estado); break;
         case "postLevantada": avanzado = motor.pasarTurno(estado); break;
         default:
@@ -961,6 +1027,16 @@ export function crearMotorEnRed({
       const siguiente = {
         ...partida,
         estado: avanzado,
+        // Tirarle la carta al ausente reabre los reflejos, igual que si la
+        // hubiera tirado él. La ventana se crea acá y no en el golpe siguiente
+        // para que `abiertaEn` sea el momento del tiro y no el del golpe.
+        ventana: reabreDescarte(partida, avanzado)
+          ? crearVentana({
+              id: `v_${idAleatorio()}`,
+              abiertaEn: ahora(),
+              duracionMs: motor.MS_DESCARTE_TRAS_TIRAR,
+            })
+          : partida.ventana,
         version: partida.version + 1,
       };
       publicar(tx, codigo, siguiente);

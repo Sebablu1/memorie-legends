@@ -19,6 +19,10 @@
 import * as M from "../public/js/reglas/motor.js";
 import * as V from "../public/js/reglas/vista.js";
 
+/** Cuándo vence una ventana. Su duración ya no es fija: abre con la
+ *  mirada, así que hay que preguntársela a ella y no a la constante. */
+const vence = (v) => v.abiertaEn + v.duracionMs + v.graciaMs;
+
 let fallos = 0;
 const ok = (c, m, x) => {
   if (c) console.log("  ✓", m);
@@ -435,7 +439,7 @@ console.log("\n=== 10. El servidor no cree en la palabra del cliente ===");
      "el segundo sobre la propia se rechaza", propio2.error?.message);
 
   // Y al cerrar, la mesa queda coherente.
-  reloj = v.abiertaEn + MS_VENTANA + MS_GRACIA + 1;
+  reloj = vence(v) + 1;
   await red.avanzarPartida({ codigo: C });
   reloj += MS_REVELACION;
   await red.avanzarPartida({ codigo: C });

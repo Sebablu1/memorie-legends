@@ -20,6 +20,10 @@ import { crearMotorEnRed, MS_SIN_SENALES, MS_MIRAR } from "../functions/partida-
 import { MS_VENTANA, MS_GRACIA } from "../public/js/reglas/red.js";
 import { MS_REVELACION } from "../public/js/reglas/vista.js";
 
+/** Cuándo vence una ventana. Su duración ya no es fija: abre con la
+ *  mirada, así que hay que preguntársela a ella y no a la constante. */
+const vence = (v) => v.abiertaEn + v.duracionMs + v.graciaMs;
+
 let fallos = 0;
 const ok = (c, m, x) => {
   if (c) console.log("  ✓", m);
@@ -340,7 +344,7 @@ console.log("\n=== 8. Reproducción: se va el jugador activo, sigue el otro ==="
   await red.avanzarPartida({ codigo: CODIGO });   // cierra la mirada
   await red.avanzarPartida({ codigo: CODIGO });   // abre la ventana
   const v = partida(db).ventana;
-  reloj = v.abiertaEn + MS_VENTANA + MS_GRACIA + 1;
+  reloj = vence(v) + 1;
   await red.avanzarPartida({ codigo: CODIGO });   // cierra la ventana y resuelve
   reloj += MS_REVELACION;
   await red.avanzarPartida({ codigo: CODIGO });   // tapa lo expuesto → turno
@@ -366,6 +370,23 @@ console.log("\n=== 8. Reproducción: se va el jugador activo, sigue el otro ==="
 
   const rescate = await capturar(() => red.saltarAusente({ codigo: CODIGO }));
   ok(rescate.valor?.salteado === enTurno, "se lo saltea", rescate.error?.message);
+
+  // Tirarle la carta al ausente cambia la muestra, y eso reabre los reflejos
+  // para el que sigue jugando. El turno pasa cuando esa ventana se cierra.
+  ok(partida(db).estado.fase === "descarte",
+     "se le tira la carta y la mesa recupera sus reflejos", partida(db).estado.fase);
+
+  const v2 = partida(db).ventana;
+  reloj = v2.abiertaEn + v2.duracionMs + v2.graciaMs + 1;
+  await red.avanzarPartida({ codigo: CODIGO });   // cierra y resuelve
+  reloj += MS_REVELACION;
+  await red.avanzarPartida({ codigo: CODIGO });   // tapa lo expuesto
+  ok(partida(db).estado.fase === "postLevantada",
+     "cerrada la ventana, queda su decisión de cortar", partida(db).estado.fase);
+
+  // El ausente sigue sin dar señales, así que un segundo rescate pasa el turno.
+  const segundo = await capturar(() => red.saltarAusente({ codigo: CODIGO }));
+  ok(segundo.valor?.salteado === enTurno, "un segundo rescate lo saltea", segundo.error?.message);
 
   const despues = partida(db);
   ok(despues.estado.fase === "turno", "la partida CONTINÚA", despues.estado.fase);

@@ -13,7 +13,7 @@
 import { readFileSync } from "node:fs";
 import * as R from "../public/js/reglas/red.js";
 import * as motor from "../public/js/reglas/motor.js";
-import { crearMotorEnRed } from "../functions/partida-red.js";
+import { crearMotorEnRed, MS_MIRAR } from "../functions/partida-red.js";
 import { MS_REVELACION } from "../public/js/reglas/vista.js";
 
 let fallos = 0;
@@ -347,6 +347,14 @@ function crearFirestore(inicial = {}) {
 }
 
 let reloj = 100000;
+
+/** El momento en que la ventana de esta partida ya se puede cerrar.
+ *  No se escribe a mano: la ventana abre con la mirada y su duración
+ *  vive en ella, así que hay que preguntársela. */
+function trasLaGracia(db) {
+  const v = db.leer("partidas/ABCDEF").ventana;
+  return v.abiertaEn + v.duracionMs + v.graciaMs + 1;
+}
 let contadorId = 0;
 function montar() {
   const db = crearFirestore();
@@ -430,7 +438,19 @@ console.log("\n=== 2. Modelo de la ventana ===");
   const { db, red, ventana } = await partidaEnDescarte();
   ok(typeof ventana.id === "string" && ventana.id.startsWith("v_"), "tiene identificador", ventana.id);
   ok(ventana.abiertaEn === 100000, "y hora de apertura del SERVIDOR", ventana.abiertaEn);
-  ok(ventana.duracionMs === R.MS_VENTANA, "y duración", ventana.duracionMs);
+
+  // D2: la ventana abre con la MIRADA, no con el descarte. Por eso su hora de
+  // apertura es la del reparto —100000, antes de `cerrarMirada`— y su duración
+  // cubre los 2 s de mirar más los 5 de descartar.
+  ok(ventana.duracionMs === MS_MIRAR + R.MS_VENTANA,
+     "y duración: 2 s de mirada + 5 s de descarte", ventana.duracionMs);
+
+  // Y es UNA sola: `abrirVentana` después de la mirada devuelve la que ya
+  // estaba, no una nueva. Si creara otra, el jugador que descartó durante la
+  // mirada perdería su intento.
+  const otra = await red.abrirVentana({ codigo: "ABCDEF" });
+  ok(otra.yaEstaba === true, "abrirVentana no crea una segunda", otra.yaEstaba);
+  ok(otra.ventana.id === ventana.id, "es la misma ventana", [otra.ventana.id, ventana.id]);
 
   const repetida = await red.abrirVentana({ codigo: "ABCDEF" });
   ok(repetida.yaEstaba && repetida.ventana.id === ventana.id, "abrirla dos veces devuelve la misma");
@@ -480,7 +500,7 @@ console.log("\n=== 4. Validaciones del servidor ===");
 console.log("\n=== 4b. Sólo juega quien tiene el turno ===");
 {
   const { db, red, ventana } = await partidaEnDescarte();
-  reloj = 108000;
+  reloj = trasLaGracia(db);
   await red.cerrarVentana({ codigo: "ABCDEF" });
   await pasarRevelacion(red);
   const enTurno = db.leer("partidas/ABCDEF").estado.indiceTurno;
@@ -520,7 +540,7 @@ console.log("\n=== 7b. Idempotencia contra el servidor ===");
 console.log("\n=== 7c. Idempotencia de las acciones de turno ===");
 {
   const { db, red } = await partidaEnDescarte();
-  reloj = 108000;
+  reloj = trasLaGracia(db);
   await red.cerrarVentana({ codigo: "ABCDEF" });
   await pasarRevelacion(red);
   const enTurno = CUATRO[db.leer("partidas/ABCDEF").estado.indiceTurno];
@@ -561,7 +581,7 @@ console.log("\n=== 10. Concurrencia ===");
       clientActionId: `c_${uid}`, declarado: 300 + i * 400, latencia: 50, incertidumbre: 25,
     });
   }
-  reloj = 108000;
+  reloj = trasLaGracia(db);
   const cierres = await Promise.all(CUATRO.map(() => capturar(() => red.cerrarVentana({ codigo: "ABCDEF" }))));
 
   const resolvieron = cierres.filter((c) => c.valor && !c.valor.yaEstaba);
@@ -596,7 +616,7 @@ console.log("\n=== 10. Concurrencia ===");
 console.log("\n=== 8. Desconexiones ===");
 {
   const { db, red } = await partidaEnDescarte();
-  reloj = 108000;
+  reloj = trasLaGracia(db);
   await red.cerrarVentana({ codigo: "ABCDEF" });
   await pasarRevelacion(red);
   const enTurno = CUATRO[db.leer("partidas/ABCDEF").estado.indiceTurno];
@@ -630,7 +650,7 @@ console.log("\n=== 8. Desconexiones ===");
 console.log("\n=== 9. Jugador que abandona ===");
 {
   const { db, red, ventana } = await partidaEnDescarte();
-  reloj = 108000;
+  reloj = trasLaGracia(db);
   await red.cerrarVentana({ codigo: "ABCDEF" });
   await pasarRevelacion(red);
   const enTurno = CUATRO[db.leer("partidas/ABCDEF").estado.indiceTurno];
@@ -719,6 +739,11 @@ function noSerializable(valor, ruta = "estado", visto = new Set()) {
   ok(g.fase === "levantada" && g.levantada, "y levantar del mazo", g.fase);
   ok(g.mazo.length === antesDelMazo - 1, "el mazo baja una carta");
   g = motor.tirarCarta(g);
+  // Tirar cambia la muestra, y eso reabre los reflejos para toda la mesa. El
+  // que tiró recupera su decisión de cortar cuando esa ventana se cierra.
+  ok(g.fase === "descarte", "tirar reabre la ventana de reflejos", g.fase);
+  g = motor.cerrarVentanaDescarte(g);
+  ok(g.fase === "postLevantada", "y al cerrarse vuelve a su decisión", g.fase);
   g = motor.pasarTurno(g);
   ok(g.fase === "turno", "y pasar el turno", g.fase);
 

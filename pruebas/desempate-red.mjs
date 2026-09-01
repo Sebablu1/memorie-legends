@@ -17,6 +17,10 @@ import { MS_VENTANA, MS_GRACIA } from "../public/js/reglas/red.js";
 import { MS_REVELACION } from "../public/js/reglas/vista.js";
 import { LIMITE_ELIMINACION } from "../public/js/reglas/puntaje.js";
 
+/** Cuándo vence una ventana. Su duración ya no es fija: abre con la
+ *  mirada, así que hay que preguntársela a ella y no a la constante. */
+const vence = (v) => v.abiertaEn + v.duracionMs + v.graciaMs;
+
 let fallos = 0;
 const ok = (c, m, x) => {
   if (c) console.log("  ✓", m);
@@ -259,7 +263,7 @@ console.log("\n=== 4. La ronda extra se juega y resuelve ===");
   const v = maestro().ventana;
   ok(v && !v.cerrada, "se abre la ventana de reflejos");
 
-  reloj = v.abiertaEn + MS_VENTANA + MS_GRACIA + 1;
+  reloj = vence(v) + 1;
   await red.avanzarPartida({ codigo: CODIGO });
   ok(maestro().estado.fase === "descarte",
      "se cierra sola y la mesa ve lo expuesto", maestro().estado.fase);

@@ -18,6 +18,7 @@ import {
   PODERES,
   MS_MIRAR,
   MS_DESCARTE,
+  MS_DESCARTE_TRAS_TIRAR,
 } from "./reglas/motor.js";
 
 import { dorsoDeAsiento } from "./reglas/baraja.js";
@@ -85,7 +86,9 @@ dom.btnSonido.addEventListener("click", () => {
 // permanentemente al lado de la mesa. Cerrado no ocupa nada del paño.
 const alternarRegistro = (abrir) => {
   dom.panelRegistro.hidden = !abrir;
-  dom.btnRegistro.title = abrir ? "Cerrar el registro" : "Ver el registro de jugadas";
+  dom.btnRegistro.title = abrir
+    ? "Cerrar el registro"
+    : "Ver el registro de jugadas";
 };
 
 dom.btnRegistro.addEventListener("click", () => {
@@ -136,7 +139,11 @@ function leerConfiguracion() {
 
 const config = leerConfiguracion();
 const jugadoresConfig = [
-  ...config.humanos.map((h, i) => ({ id: `h${i}`, nombre: h.nombre, esIA: false })),
+  ...config.humanos.map((h, i) => ({
+    id: `h${i}`,
+    nombre: h.nombre,
+    esIA: false,
+  })),
   ...config.ias.map((a, i) => ({
     id: `ia${i}`,
     nombre: a.nombre,
@@ -291,7 +298,9 @@ function geometriaAbanico(cantidad, propio) {
   // Los asientos laterales tienen menos lugar antes de tocar el centro de la
   // mesa, así que sus cartas se montan más rápido que las propias.
   const solape =
-    cantidad <= 4 ? 0 : Math.min(propio ? 46 : 40, (cantidad - 4) * (propio ? 11 : 14));
+    cantidad <= 4
+      ? 0
+      : Math.min(propio ? 46 : 40, (cantidad - 4) * (propio ? 11 : 14));
 
   return { anguloTotal, arco, solape };
 }
@@ -329,7 +338,8 @@ function asientosParaMesa(total) {
 function dibujarJugador(jugador, i) {
   const enTurno = i === estado.indiceTurno && !jugador.eliminado;
   const propio = i === YO;
-  const rondaTerminada = estado.fase === "finRonda" || estado.fase === "finPartida";
+  const rondaTerminada =
+    estado.fase === "finRonda" || estado.fase === "finPartida";
 
   const geometria = geometriaAbanico(jugador.mano.length, propio);
   const manoHTML = jugador.mano
@@ -351,7 +361,6 @@ function dibujarJugador(jugador, i) {
   const insignia = jugador.esIA
     ? `<span class="insignia">${IA.DIFICULTADES[jugador.dificultad]?.etiqueta ?? "IA"}</span>`
     : "";
-
 
   return `
     <div class="jugador ${claseAsiento(i)} ${enTurno ? "en-turno" : ""} ${propio ? "propio" : ""} ${jugador.eliminado ? "eliminado" : ""}"
@@ -414,11 +423,14 @@ function dibujar() {
 
   const puedeLevantar = estado.fase === "turno" && estado.indiceTurno === YO;
   dom.mazoCarta.innerHTML = estado.mazo.length
-    ? dibujarCarta({ imagen: "", numero: "", palo: "" }, {
-        visible: false,
-        asiento: 0,
-        clases: puedeLevantar ? "jugable" : "",
-      })
+    ? dibujarCarta(
+        { imagen: "", numero: "", palo: "" },
+        {
+          visible: false,
+          asiento: 0,
+          clases: puedeLevantar ? "jugable" : "",
+        },
+      )
     : `<div class="hueco vacio"></div>`;
   dom.mazoContador.textContent = `${estado.mazo.length} cartas`;
 
@@ -428,7 +440,9 @@ function dibujar() {
       visible: estado.indiceTurno === YO,
       asiento: estado.indiceTurno,
     });
-    dom.levantadaNota.textContent = poder ? `poder ${estado.levantada.numero}` : "";
+    dom.levantadaNota.textContent = poder
+      ? `poder ${estado.levantada.numero}`
+      : "";
     dom.pilaLevantada.classList.toggle("con-poder", Boolean(poder));
   } else {
     dom.levantadaCarta.innerHTML = `<div class="hueco vacio"></div>`;
@@ -477,13 +491,17 @@ function marcarCartasJugables() {
   if (estado.fase === "descarte") {
     for (const objetivo of miVista?.puedeAtacar ?? []) {
       document
-        .querySelectorAll(`.jugador[data-jugador="${objetivo}"] .carta[data-posicion]`)
+        .querySelectorAll(
+          `.jugador[data-jugador="${objetivo}"] .carta[data-posicion]`,
+        )
         .forEach((el) => el.classList.add("jugable", "atacable"));
     }
   }
 
   if (!habilitar) return;
-  miMano.querySelectorAll(".carta").forEach((el) => el.classList.add("jugable"));
+  miMano
+    .querySelectorAll(".carta")
+    .forEach((el) => el.classList.add("jugable"));
 }
 
 /**
@@ -529,7 +547,9 @@ function actualizarBotones() {
 
   // Con un 7/8/9/10 en la mano el botón se convierte en el acceso al poder.
   const poderDisponible =
-    estado.fase === "levantada" && miTurno && Boolean(PODERES[estado.levantada?.numero]);
+    estado.fase === "levantada" &&
+    miTurno &&
+    Boolean(PODERES[estado.levantada?.numero]);
   dom.btnTirar.classList.toggle("con-poder", poderDisponible);
   dom.btnTirar.textContent = poderDisponible ? "🔮 Poder" : "Tirar";
   dom.btnCortar.disabled = !(estado.fase === "postLevantada" && miTurno);
@@ -652,7 +672,8 @@ function resolverPorTiempo(indice) {
  */
 function sincronizarReloj() {
   // Sólo la levantada tiene reloj.
-  const activo = estado.fase === "turno" && !estado.jugadores[estado.indiceTurno]?.eliminado;
+  const activo =
+    estado.fase === "turno" && !estado.jugadores[estado.indiceTurno]?.eliminado;
 
   if (!activo) {
     if (relojTurno) cancelarRelojTurno();
@@ -660,7 +681,9 @@ function sincronizarReloj() {
   }
 
   const mismaDecision =
-    relojTurno && relojTurno.fase === estado.fase && relojTurno.indice === estado.indiceTurno;
+    relojTurno &&
+    relojTurno.fase === estado.fase &&
+    relojTurno.indice === estado.indiceTurno;
 
   if (!mismaDecision) iniciarRelojTurno(estado.fase, estado.indiceTurno);
   else pintarReloj();
@@ -689,7 +712,10 @@ function marcarEfecto(i, pos, clase, ms = 900) {
 async function anunciarPoder(poder, nombre) {
   if (!poder) return;
   sonidos.poder();
-  const { icono, clase } = ESTILO_PODER[poder.tipo] ?? { icono: "✨", clase: "" };
+  const { icono, clase } = ESTILO_PODER[poder.tipo] ?? {
+    icono: "✨",
+    clase: "",
+  };
 
   const cartel = document.createElement("div");
   cartel.className = `anuncio-poder ${clase}`;
@@ -782,13 +808,18 @@ async function confirmarAbandono(boton) {
     // Se manda sólo el código: el monto lo calcula el servidor.
     const { penalizacion } = await abandonarPartida(partidaEconomica.codigo);
     cerrarModal();
-    volverAlLobby(`Abandonaste la partida. Se te descontaron ${penalizacion} Leyendas.`);
+    volverAlLobby(
+      `Abandonaste la partida. Se te descontaron ${penalizacion} Leyendas.`,
+    );
   } catch (e) {
     boton.disabled = false;
     boton.textContent = "Abandonar";
     const aviso = document.getElementById("errorAbandono");
     if (aviso) {
-      aviso.textContent = e instanceof ErrorDeServidor ? e.message : "No pudimos procesar el abandono.";
+      aviso.textContent =
+        e instanceof ErrorDeServidor
+          ? e.message
+          : "No pudimos procesar el abandono.";
       aviso.hidden = false;
     }
   }
@@ -814,7 +845,13 @@ function faseMirada() {
       if (jugador.eliminado || !jugador.esIA) return;
       const pos = Math.floor(Math.random() * jugador.mano.length);
       estado = mirar(estado, i, pos);
-      memorias[i] = IA.recordar(memorias[i], jugador.dificultad, i, pos, jugador.mano[pos]);
+      memorias[i] = IA.recordar(
+        memorias[i],
+        jugador.dificultad,
+        i,
+        pos,
+        jugador.mano[pos],
+      );
     });
 
     if (estado.jugadores[YO].eliminado) {
@@ -844,7 +881,7 @@ function faseMirada() {
 
       estado = terminarMirada(estado);
       dibujar();
-      await faseDescarte();
+      await faseDescarte(cicloTurnos);
       listo();
     };
 
@@ -884,14 +921,31 @@ function resolverUltimoDescarte() {
   }, MS_CARTA_EXPUESTA);
 }
 
-/** Ventana de 5 segundos en la que todos pueden descartar a la vez. */
-function faseDescarte() {
+/**
+ * Si tirar acaba de reabrir los reflejos, los corre y espera a que cierren.
+ *
+ * Es el mismo hueco que en red: la carta tirada es la muestra nueva y la mesa
+ * tiene que poder reaccionar a ella antes de que el que tiró decida si corta.
+ */
+async function reflejosTrasTirar() {
+  if (estado.fase !== "descarte") return;
+  await faseDescarte(null, MS_DESCARTE_TRAS_TIRAR);
+}
+
+/**
+ * Ventana de 5 segundos en la que todos pueden descartar a la vez.
+ *
+ * @param alCerrar  qué hacer al cerrarse. La ventana de la ronda encadena el
+ *                  ciclo de turnos; la que abre tirar una carta no, porque
+ *                  vuelve a `postLevantada` y el turno sigue siendo del mismo.
+ */
+function faseDescarte(alCerrar, duracion = MS_DESCARTE) {
   return new Promise((listo) => {
     pista(
       "<b>¡Reflejos!</b> Tocá una carta que creas igual a la muestra. Sólo el primero se salva; " +
         "equivocarse suma una carta. Podés no hacer nada.",
     );
-    correrTemporizador(MS_DESCARTE, "Descarte", { reflejos: true });
+    correrTemporizador(duracion, "Descarte", { reflejos: true });
     sonidos.aviso();
     dibujar();
 
@@ -899,7 +953,7 @@ function faseDescarte() {
     estado.jugadores.forEach((jugador, i) => {
       if (jugador.eliminado || !jugador.esIA) return;
       const retraso = IA.retrasoReaccion(jugador.dificultad);
-      if (retraso >= MS_DESCARTE) return;
+      if (retraso >= duracion) return;
       pendientes.push(
         setTimeout(() => {
           const pos = IA.decidirDescarte(estado, i, memorias[i]);
@@ -930,8 +984,11 @@ function faseDescarte() {
         estado = cerrarVentanaDescarte(estado);
         dibujar();
         listo();
-        cicloTurnos();
-      }, MS_DESCARTE),
+        // Quién sigue lo decide quien abrió la ventana: la de la ronda
+        // encadena el ciclo de turnos, la que abre `tirarCarta` devuelve a la
+        // decisión de cortar y no tiene que encadenar nada.
+        if (alCerrar) alCerrar();
+      }, duracion),
     );
   });
 }
@@ -989,11 +1046,15 @@ async function turnoDeIA(i) {
     sonidos.whoosh();
   }
   dibujar();
+  await reflejosTrasTirar();
   await esperar(RITMO.trasDecidir);
 
   if (estado.fase === "poder") {
     await anunciarPoder(estado.poderPendiente, jugador.nombre);
     await poderDeIA(i);
+    // Si la IA renunció al poder, su carta quedó como una carta más y la
+    // muestra cambió: la mesa recupera sus reflejos antes de que decida cortar.
+    await reflejosTrasTirar();
     await esperar(RITMO.trasPoder);
   }
 
@@ -1013,7 +1074,12 @@ async function poderDeIA(i) {
   const memoria = memorias[i];
 
   if (tipo === "mirarPropia" || tipo === "mirarRival") {
-    const objetivo = IA.decidirObjetivoMirada(estado, i, memoria, tipo === "mirarPropia");
+    const objetivo = IA.decidirObjetivoMirada(
+      estado,
+      i,
+      memoria,
+      tipo === "mirarPropia",
+    );
     if (!objetivo) {
       estado = saltarPoder(estado);
       return;
@@ -1035,12 +1101,22 @@ async function poderDeIA(i) {
     // Se ve QUÉ posición miró, pero no la carta.
     dibujar();
     sonidos.voltear();
-    marcarEfecto(objetivo.indiceJugador, objetivo.posicion, "efecto-mirar", 1100);
+    marcarEfecto(
+      objetivo.indiceJugador,
+      objetivo.posicion,
+      "efecto-mirar",
+      1100,
+    );
     await esperar(1100);
     return;
   }
 
-  const objetivo = IA.decidirObjetivoCambio(estado, i, memoria, tipo === "cambioCiego");
+  const objetivo = IA.decidirObjetivoCambio(
+    estado,
+    i,
+    memoria,
+    tipo === "cambioCiego",
+  );
   if (!objetivo) {
     estado = saltarPoder(estado);
     return;
@@ -1053,18 +1129,31 @@ async function poderDeIA(i) {
   );
   estado = r.estado;
   memorias = memorias.map((m) =>
-    IA.olvidar(IA.olvidar(m, i, objetivo.posicionPropia), objetivo.indiceRival, objetivo.posicionRival),
+    IA.olvidar(
+      IA.olvidar(m, i, objetivo.posicionPropia),
+      objetivo.indiceRival,
+      objetivo.posicionRival,
+    ),
   );
   dibujar();
   sonidos.whoosh();
-  efectoCambio(tipo, i, objetivo.posicionPropia, objetivo.indiceRival, objetivo.posicionRival);
+  efectoCambio(
+    tipo,
+    i,
+    objetivo.posicionPropia,
+    objetivo.indiceRival,
+    objetivo.posicionRival,
+  );
   await esperar(1100);
 }
 
 // ------------------------------------------------- acciones del humano
 
 dom.btnLevantar.addEventListener("click", () => {
-  if (enRed()) { pedir("levantar", () => Red.levantar(salaPedida)); return; }
+  if (enRed()) {
+    pedir("levantar", () => Red.levantar(salaPedida));
+    return;
+  }
   if (estado.fase !== "turno" || estado.indiceTurno !== YO) return;
   sonidos.voltear();
   estado = levantar(estado);
@@ -1083,7 +1172,10 @@ dom.btnLevantar.addEventListener("click", () => {
 });
 
 dom.btnTirar.addEventListener("click", async () => {
-  if (enRed()) { await pedir("tirar", () => Red.tirarCarta(salaPedida)); return; }
+  if (enRed()) {
+    await pedir("tirar", () => Red.tirarCarta(salaPedida));
+    return;
+  }
   if (estado.fase !== "levantada" || estado.indiceTurno !== YO) return;
   if (PODERES[estado.levantada?.numero]) {
     sonidos.poder();
@@ -1093,11 +1185,17 @@ dom.btnTirar.addEventListener("click", async () => {
   sonidos.whoosh();
   estado = tirarCarta(estado);
   dibujar();
-  pista("Podés <b>cortar</b> o <b>pasar</b> el turno.");
+  await reflejosTrasTirar();
+  if (estado.fase === "postLevantada") {
+    pista("Podés <b>cortar</b> o <b>pasar</b> el turno.");
+  }
 });
 
 dom.btnCortar.addEventListener("click", async () => {
-  if (enRed()) { await pedir("cortar", () => Red.cortar(salaPedida)); return; }
+  if (enRed()) {
+    await pedir("cortar", () => Red.cortar(salaPedida));
+    return;
+  }
   if (estado.fase !== "postLevantada" || estado.indiceTurno !== YO) return;
   sonidos.corte();
   estado = cortar(estado);
@@ -1107,7 +1205,10 @@ dom.btnCortar.addEventListener("click", async () => {
 });
 
 dom.btnPasar.addEventListener("click", () => {
-  if (enRed()) { pedir("pasar", () => Red.pasarTurno(salaPedida)); return; }
+  if (enRed()) {
+    pedir("pasar", () => Red.pasarTurno(salaPedida));
+    return;
+  }
   if (estado.fase !== "postLevantada" || estado.indiceTurno !== YO) return;
   sonidos.clic();
   estado = pasarTurno(estado);
@@ -1117,7 +1218,10 @@ dom.btnPasar.addEventListener("click", () => {
 
 // Clic en el mazo equivale a levantar.
 dom.mazoCarta.addEventListener("click", () => {
-  if (enRed()) { pedir("levantar", () => Red.levantar(salaPedida)); return; }
+  if (enRed()) {
+    pedir("levantar", () => Red.levantar(salaPedida));
+    return;
+  }
   if (!dom.btnLevantar.disabled) dom.btnLevantar.click();
 });
 
@@ -1215,7 +1319,11 @@ document.addEventListener("click", async (evento) => {
     return;
   }
 
-  if (estado.fase === "levantada" && estado.indiceTurno === YO && indiceJugador === YO) {
+  if (
+    estado.fase === "levantada" &&
+    estado.indiceTurno === YO &&
+    indiceJugador === YO
+  ) {
     sonidos.voltear();
     estado = cambiarCarta(estado, posicion);
     pista("Podés <b>cortar</b> o <b>pasar</b> el turno.");
@@ -1253,15 +1361,19 @@ const TITULOS_PODER = {
 const EFECTOS_PODER = {
   mirarPropia: "Mirás una carta tuya, la hayas visto antes o no.",
   mirarRival: "Mirás una carta de cualquier otro jugador.",
-  cambioCiego: "Intercambiás una carta tuya por una de un rival, sin ver ninguna de las dos.",
-  cambioConVista: "Intercambiás una carta tuya por una de un rival, viendo ambas antes.",
+  cambioCiego:
+    "Intercambiás una carta tuya por una de un rival, sin ver ninguna de las dos.",
+  cambioConVista:
+    "Intercambiás una carta tuya por una de un rival, viendo ambas antes.",
 };
 
 const INSTRUCCIONES_PODER = {
   mirarPropia: "Elegí una de tus posiciones. La verás 2 segundos.",
   mirarRival: "Elegí una carta de otro jugador. La verás 2 segundos.",
-  cambioCiego: "Elegí una carta tuya y una de un rival. No verás ninguna de las dos.",
-  cambioConVista: "Elegí una carta tuya y una de un rival. Verás ambas antes del cambio.",
+  cambioCiego:
+    "Elegí una carta tuya y una de un rival. No verás ninguna de las dos.",
+  cambioConVista:
+    "Elegí una carta tuya y una de un rival. Verás ambas antes del cambio.",
 };
 
 /**
@@ -1367,14 +1479,19 @@ dom.modal.addEventListener("click", async (evento) => {
   }
 
   // 💨 Tirar carta: se descarta como cualquier otra y el poder se pierde.
-  const tirarSinPoder = evento.target.closest('[data-accion="tirar-sin-poder"]');
+  const tirarSinPoder = evento.target.closest(
+    '[data-accion="tirar-sin-poder"]',
+  );
   if (tirarSinPoder) {
     sonidos.clic();
     estado = tirarCarta(estado);
     if (estado.fase === "poder") estado = saltarPoder(estado);
     cerrarModal();
-    pista("Tiraste la carta sin usar el poder. Podés <b>cortar</b> o <b>pasar</b> el turno.");
     dibujar();
+    await reflejosTrasTirar();
+    pista(
+      "Tiraste la carta sin usar el poder. Podés <b>cortar</b> o <b>pasar</b> el turno.",
+    );
     return;
   }
 
@@ -1394,7 +1511,12 @@ dom.modal.addEventListener("click", async (evento) => {
     estado = saltarPoder(estado);
     cerrarModal();
     seleccionPropia = null;
-    pista("Descartaste sin usar el poder. Podés <b>cortar</b> o <b>pasar</b> el turno.");
+    dibujar();
+    // La carta ya es la muestra: la mesa reacciona antes de que decida cortar.
+    await reflejosTrasTirar();
+    pista(
+      "Descartaste sin usar el poder. Podés <b>cortar</b> o <b>pasar</b> el turno.",
+    );
     dibujar();
     return;
   }
@@ -1437,7 +1559,9 @@ dom.modal.addEventListener("click", async (evento) => {
     seleccionPropia = pos;
     dom.modal
       .querySelectorAll('[data-objetivo="' + YO + '"]')
-      .forEach((el) => el.classList.toggle("seleccionada", Number(el.dataset.pos) === pos));
+      .forEach((el) =>
+        el.classList.toggle("seleccionada", Number(el.dataset.pos) === pos),
+      );
     return;
   }
 
@@ -1519,7 +1643,9 @@ async function mostrarFinRonda() {
       ${tabla}
       <button class="accion" onclick="location.reload()" type="button">Jugar otra</button>
     `);
-    pista(`Partida terminada. Ganó <b>${estado.ganador?.nombre ?? "nadie"}</b>.`);
+    pista(
+      `Partida terminada. Ganó <b>${estado.ganador?.nombre ?? "nadie"}</b>.`,
+    );
     if (ganaste) {
       sonidos.victoria();
       lanzarConfeti(dom.confeti);
@@ -1529,7 +1655,9 @@ async function mostrarFinRonda() {
     return;
   }
 
-  pista(`Cortó <b>${cortador?.nombre ?? "alguien"}</b>. Ronda ${estado.ronda} terminada.`);
+  pista(
+    `Cortó <b>${cortador?.nombre ?? "alguien"}</b>. Ronda ${estado.ronda} terminada.`,
+  );
   abrirModal(`
     <h2>✂️ Cortó ${cortador?.nombre ?? "alguien"}</h2>
     <p>Ronda ${estado.ronda} terminada.</p>
@@ -1551,6 +1679,12 @@ let dejarDeEscuchar = null;
 let dejarDeLatir = null;
 let dejarDeAvanzar = null;
 let dejarDeRescatar = null;
+
+// ------------------- NUEVAS VARIABLES PARA EL PARCHE -------------------
+let temporizadorDescarte = null; // <-- DECLARADA AQUÍ
+let descartando = false;
+let eligiendoPoder = null;
+// --------------------------------------------------------------------
 
 /**
  * Las tres fases que no tienen reloj.
@@ -1636,7 +1770,10 @@ function comoEstado(vista) {
     registro: vista.registro ?? [],
     jugadores: vista.jugadores,
     descarte: vista.muestra
-      ? [vista.muestra, ...Array.from({ length: restoDelDescarte }, () => tapada)]
+      ? [
+          vista.muestra,
+          ...Array.from({ length: restoDelDescarte }, () => tapada),
+        ]
       : [],
     mazo: Array.from({ length: vista.cartasEnMazo ?? 0 }, () => tapada),
     levantada: vista.levantada ?? null,
@@ -1658,13 +1795,21 @@ function pistaDeRed(vista) {
     case "descarte":
       return "<b>¡Reflejos!</b> Tocá una carta que creas igual a la muestra.";
     case "turno":
-      return miTurno ? "Es tu turno. <b>Levantá</b> del mazo." : `Juega <b>${quien}</b>.`;
+      return miTurno
+        ? "Es tu turno. <b>Levantá</b> del mazo."
+        : `Juega <b>${quien}</b>.`;
     case "levantada":
-      return miTurno ? "Cambiala por una tuya, o tirala." : `<b>${quien}</b> está decidiendo.`;
+      return miTurno
+        ? "Cambiala por una tuya, o tirala."
+        : `<b>${quien}</b> está decidiendo.`;
     case "poder":
-      return miTurno ? "Levantaste un poder." : `<b>${quien}</b> tiene un poder.`;
+      return miTurno
+        ? "Levantaste un poder."
+        : `<b>${quien}</b> tiene un poder.`;
     case "postLevantada":
-      return miTurno ? "Podés <b>cortar</b> o <b>pasar</b>." : `<b>${quien}</b> decide si corta.`;
+      return miTurno
+        ? "Podés <b>cortar</b> o <b>pasar</b>."
+        : `<b>${quien}</b> decide si corta.`;
     case "finRonda":
       return `Ronda ${vista.ronda} terminada.`;
     case "finPartida":
@@ -1721,9 +1866,33 @@ function mostrarRevelaciones(vista) {
   }
 }
 
+// ---------- FUNCIÓN PINTAR VISTA CON EL TEMPORIZADOR DE CIERRE ----------
 function pintarVista(vista) {
   miVista = vista;
   YO = vista.yo;
+
+  // ------------------------------------------------- PARCHE TEMPORAL
+  // Cierra la ventana de descarte automáticamente después de 7 segundos
+  if (vista.fase === "descarte") {
+    if (temporizadorDescarte) return;
+    temporizadorDescarte = setTimeout(async () => {
+      try {
+        await Red.cerrarVentanaDescarte(salaPedida);
+        await Red.avanzarPartida(salaPedida);
+        console.log("✅ Ventana de descarte cerrada automáticamente");
+      } catch (e) {
+        console.warn("No se pudo cerrar la ventana:", e);
+      } finally {
+        temporizadorDescarte = null;
+      }
+    }, 7000);
+  } else {
+    if (temporizadorDescarte) {
+      clearTimeout(temporizadorDescarte);
+      temporizadorDescarte = null;
+    }
+  }
+
   // Si la fase dejó de ser la del poder —porque se resolvió, o porque a un
   // ausente se lo saltearon— la elección en curso ya no tiene sentido.
   if (vista.fase !== "poder" && eligiendoPoder) eligiendoPoder = null;
@@ -1735,6 +1904,7 @@ function pintarVista(vista) {
   modalesDeRed(vista);
   rescatarSiHayAusente();
 }
+// ----------------------------------------------------------------------
 
 /**
  * Los modales que dependen de la fase.
@@ -1768,12 +1938,13 @@ function modalesDeRed(vista) {
  */
 function abrirModalPoderDeRed(vista) {
   const numero = vista.poderPendiente?.numero;
-  const explicacion = {
-    7: "Mirá una carta <b>tuya</b>.",
-    8: "Mirá una carta de <b>otro jugador</b>.",
-    9: "Cambiá una carta tuya por una de otro, <b>a ciegas</b>.",
-    10: "Cambiá una carta tuya por una de otro, <b>viendo las dos</b>.",
-  }[numero] ?? "";
+  const explicacion =
+    {
+      7: "Mirá una carta <b>tuya</b>.",
+      8: "Mirá una carta de <b>otro jugador</b>.",
+      9: "Cambiá una carta tuya por una de otro, <b>a ciegas</b>.",
+      10: "Cambiá una carta tuya por una de otro, <b>viendo las dos</b>.",
+    }[numero] ?? "";
 
   abrirModal(`
     <h2>🔮 Levantaste un ${numero}</h2>
@@ -1808,7 +1979,10 @@ function abrirModalFinDeRed(vista) {
     const gane = vista.jugadores[YO] && !vista.jugadores[YO].eliminado;
     abrirModal(`<h2>${gane ? "🏆 ¡Ganaste!" : "Partida terminada"}</h2>${tabla}
       <p class="aviso-suave">Volvé al lobby para jugar otra.</p>`);
-    if (gane) { sonidos.victoria(); lanzarConfeti(dom.confeti); } else sonidos.derrota();
+    if (gane) {
+      sonidos.victoria();
+      lanzarConfeti(dom.confeti);
+    } else sonidos.derrota();
     return;
   }
 
@@ -1879,13 +2053,69 @@ async function pedir(accion, ejecutar) {
 }
 let pidiendo = false;
 
+/** Freno propio del descarte: no comparte el de `pedir`, porque durante la
+ *  mirada conviven con la petición de `mirar` y el descarte no puede esperarla. */
+// descartando ya está declarado arriba
+
 /** Clic sobre una carta, en modo red. */
 /** Poder en curso: qué se está eligiendo. */
-let eligiendoPoder = null;
+// eligiendoPoder ya está declarado arriba
 
-async function clicEnCartaDeRed(indiceJugador, posicion) {
+// ---------- FUNCIÓN clicEnCartaDeRed CON LA VISUALIZACIÓN EN DESCARTE ----------
+async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
   if (!miVista) return;
 
+  // ---- NUEVO: Permitir mirar (clic simple) en fase descarte ----
+  if (miVista.fase === "descarte" && indiceJugador === YO) {
+    // Clic simple: mostrar la carta (mirar)
+    if (!dobleClic) {
+      const jugador = estado.jugadores[YO];
+      if (jugador && jugador.mano && jugador.mano[posicion]) {
+        const carta = jugador.mano[posicion];
+        const llave = clave(YO, posicion);
+        // Si ya está revelada, no hacer nada
+        if (revelaciones.has(llave)) return;
+        revelaciones.set(llave, carta);
+        dibujar();
+        setTimeout(() => {
+          revelaciones.delete(llave);
+          dibujar();
+        }, MS_REVELACION || 2000);
+        pista("Mirando tu carta...");
+      } else {
+        pista("No hay carta en esa posición.");
+      }
+      return;
+    }
+
+    // Doble clic: descarte (lógica original)
+    const ventana = miVista.ventana;
+    if (!ventana || ventana.cerrada || descartando) return;
+    descartando = true;
+    const tocadoEn = Date.now();
+    try {
+      const r = await Red.intentarDescarte(
+        salaPedida,
+        ventana,
+        posicion,
+        tocadoEn,
+      );
+      if (r?.anotado) {
+        sonidos.aviso();
+        marcarEnviada(posicion);
+        pista("Carta registrada. Se resolverá al cerrar la ventana.");
+      }
+    } catch (error) {
+      console.error("Falló el descarte:", error);
+      pista(`⚠️ ${error?.message ?? "No pudimos registrar la jugada."}`);
+      sonidos.error();
+    } finally {
+      descartando = false;
+    }
+    return;
+  }
+
+  // ---- Resto del código original (poderes, mirar, etc.) ----
   if (eligiendoPoder && miVista.fase === "poder") {
     const numero = eligiendoPoder.numero;
 
@@ -1893,11 +2123,16 @@ async function clicEnCartaDeRed(indiceJugador, posicion) {
     // dos reglas distintas, tarde o temprano una carta se vería elegible y
     // al tocarla no pasaría nada.
     const puede = elegibleParaPoder({
-      numero, yo: YO, jugadores: estado.jugadores, propiaElegida: eligiendoPoder.propia,
+      numero,
+      yo: YO,
+      jugadores: estado.jugadores,
+      propiaElegida: eligiendoPoder.propia,
     });
     if (!puede(indiceJugador, posicion)) {
       sonidos.error();
-      pista(`⚠️ Esa carta no. ${pasoDelPoder({ numero, propiaElegida: eligiendoPoder.propia })}`);
+      pista(
+        `⚠️ Esa carta no. ${pasoDelPoder({ numero, propiaElegida: eligiendoPoder.propia })}`,
+      );
       return;
     }
 
@@ -1906,7 +2141,9 @@ async function clicEnCartaDeRed(indiceJugador, posicion) {
       const objetivo = { indice: indiceJugador };
       eligiendoPoder = null;
       dibujar();
-      const r = await pedir("poder", () => Red.accion(salaPedida, "poderMirar", { posicion, objetivo }));
+      const r = await pedir("poder", () =>
+        Red.accion(salaPedida, "poderMirar", { posicion, objetivo }),
+      );
       if (r?.carta) mostrarUnMomento(indiceJugador, posicion, r.carta);
       return;
     }
@@ -1922,16 +2159,54 @@ async function clicEnCartaDeRed(indiceJugador, posicion) {
     const propia = eligiendoPoder.propia;
     eligiendoPoder = null;
     dibujar();
-    const r = await pedir("poder", () => Red.accion(salaPedida, "poderCambio", {
-      posicion: propia, objetivo: { indice: indiceJugador, posicion },
-    }));
+    const r = await pedir("poder", () =>
+      Red.accion(salaPedida, "poderCambio", {
+        posicion: propia,
+        objetivo: { indice: indiceJugador, posicion },
+      }),
+    );
     // El 10 muestra las dos cartas; el 9 no muestra ninguna.
     if (r?.revelada?.propia) mostrarUnMomento(YO, propia, r.revelada.propia);
-    if (r?.revelada?.rival) mostrarUnMomento(indiceJugador, posicion, r.revelada.rival);
+    if (r?.revelada?.rival)
+      mostrarUnMomento(indiceJugador, posicion, r.revelada.rival);
     return;
   }
 
   if (miVista.fase === "mirar" && indiceJugador === YO) {
+    // D2: la muestra puede ser justo la carta que acabás de memorizar, y la
+    // ventana de descarte ya está abierta. El segundo toque la descarta.
+    //
+    // No pasa por `pedir` a propósito: el PRIMER toque acaba de disparar
+    // `mirar`, que puede seguir en vuelo, y el guardia de reentrada se tragaría
+    // el descarte justo cuando el tiempo es lo que se está midiendo. Tiene su
+    // propio freno, y el servidor lo valida igual.
+    if (dobleClic) {
+      const ventana = miVista.ventana;
+      if (!ventana || ventana.cerrada || descartando) return;
+      descartando = true;
+      const tocadoEn = Date.now();
+      try {
+        const r = await Red.intentarDescarte(
+          salaPedida,
+          ventana,
+          posicion,
+          tocadoEn,
+        );
+        if (r?.anotado) {
+          sonidos.aviso();
+          marcarEnviada(posicion);
+          pista("Carta registrada. Se resolverá al cerrar la ventana.");
+        }
+      } catch (error) {
+        console.error("Falló el descarte durante la mirada:", error);
+        pista(`⚠️ ${error?.message ?? "No pudimos registrar la jugada."}`);
+        sonidos.error();
+      } finally {
+        descartando = false;
+      }
+      return;
+    }
+
     const r = await pedir("mirar", () => Red.mirar(salaPedida, posicion));
     // El servidor devuelve la carta SÓLO a quien la miró. No queda en la
     // partida: se muestra dos segundos y se olvida, como en la mesa local.
@@ -1939,7 +2214,10 @@ async function clicEnCartaDeRed(indiceJugador, posicion) {
       const llave = clave(YO, posicion);
       revelaciones.set(llave, r.carta);
       dibujar();
-      setTimeout(() => { revelaciones.delete(llave); dibujar(); }, MS_MIRAR);
+      setTimeout(() => {
+        revelaciones.delete(llave);
+        dibujar();
+      }, MS_MIRAR);
     }
     return;
   }
@@ -1954,7 +2232,9 @@ async function clicEnCartaDeRed(indiceJugador, posicion) {
     if (!ventana || ventana.cerrada) return;
 
     if (!dobleClic) {
-      pista("Tocá <b>dos veces</b> la carta del rival que creas que es la tuya conocida.");
+      pista(
+        "Tocá <b>dos veces</b> la carta del rival que creas que es la tuya conocida.",
+      );
       return;
     }
 
@@ -1964,7 +2244,9 @@ async function clicEnCartaDeRed(indiceJugador, posicion) {
     if (entregaElegida == null) {
       atacando = { indiceJugador, posicion };
       dibujar();
-      pista("Ahora tocá <b>una carta tuya</b>: es la que le darías si acertás.");
+      pista(
+        "Ahora tocá <b>una carta tuya</b>: es la que le darías si acertás.",
+      );
       return;
     }
     return;
@@ -1979,10 +2261,12 @@ async function clicEnCartaDeRed(indiceJugador, posicion) {
     if (!ventana || ventana.cerrada) return;
 
     const tocadoEn = Date.now();
-    const r = await pedir("descartar", () => Red.intentarDescarte(
-      salaPedida, ventana, objetivo.posicion, tocadoEn,
-      { objetivo: miVista.jugadores[objetivo.indiceJugador]?.id, posicionEntrega: posicion },
-    ));
+    const r = await pedir("descartar", () =>
+      Red.intentarDescarte(salaPedida, ventana, objetivo.posicion, tocadoEn, {
+        objetivo: miVista.jugadores[objetivo.indiceJugador]?.id,
+        posicionEntrega: posicion,
+      }),
+    );
     if (r?.anotado) {
       sonidos.aviso();
       pista("Jugada registrada. Se resuelve al cerrar la ventana.");
@@ -2002,7 +2286,8 @@ async function clicEnCartaDeRed(indiceJugador, posicion) {
     // Se manda el instante del CLIC, no el del envío.
     const tocadoEn = Date.now();
     const r = await pedir("descartar", () =>
-      Red.intentarDescarte(salaPedida, ventana, posicion, tocadoEn));
+      Red.intentarDescarte(salaPedida, ventana, posicion, tocadoEn),
+    );
 
     if (r?.anotado) {
       // Anotada, no descartada. En red los intentos se resuelven todos juntos
@@ -2016,10 +2301,15 @@ async function clicEnCartaDeRed(indiceJugador, posicion) {
     return;
   }
 
-  if (miVista.fase === "levantada" && miVista.indiceTurno === YO && indiceJugador === YO) {
+  if (
+    miVista.fase === "levantada" &&
+    miVista.indiceTurno === YO &&
+    indiceJugador === YO
+  ) {
     await pedir("cambiar", () => Red.cambiarCarta(salaPedida, posicion));
   }
 }
+// ----------------------------------------------------------------------
 
 /**
  * Muestra una carta unos segundos y la vuelve a tapar.
@@ -2031,7 +2321,10 @@ function mostrarUnMomento(indiceJugador, posicion, carta, ms = MS_MIRAR) {
   const llave = clave(indiceJugador, posicion);
   revelaciones.set(llave, carta);
   dibujar();
-  setTimeout(() => { revelaciones.delete(llave); dibujar(); }, ms);
+  setTimeout(() => {
+    revelaciones.delete(llave);
+    dibujar();
+  }, ms);
 }
 
 /**
@@ -2095,7 +2388,8 @@ function volverAlLobby(motivo) {
 async function entrarDesdeSala() {
   const { db, doc, getDoc } = await import("./firebase.js");
   const { exigirSesion } = await import("./sesion.js");
-  const { ESTADOS_SALA, MIN_JUGADORES, esCodigoValido } = await import("./reglas/salas.js");
+  const { ESTADOS_SALA, MIN_JUGADORES, esCodigoValido } =
+    await import("./reglas/salas.js");
 
   if (!esCodigoValido(salaPedida)) {
     volverAlLobby("Ese código de sala no es válido.");
@@ -2119,7 +2413,9 @@ async function entrarDesdeSala() {
   }
 
   if (sala.estado === ESTADOS_SALA.CANCELADA) {
-    volverAlLobby("Esa sala fue cancelada. Si pagaste la entrada, ya te la devolvimos.");
+    volverAlLobby(
+      "Esa sala fue cancelada. Si pagaste la entrada, ya te la devolvimos.",
+    );
     return;
   }
 

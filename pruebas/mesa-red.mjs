@@ -44,7 +44,10 @@ function comoEstado(vista) {
     registro: vista.registro ?? [],
     jugadores: vista.jugadores,
     descarte: vista.muestra
-      ? [vista.muestra, ...Array.from({ length: restoDelDescarte }, () => tapada)]
+      ? [
+          vista.muestra,
+          ...Array.from({ length: restoDelDescarte }, () => tapada),
+        ]
       : [],
     mazo: Array.from({ length: vista.cartasEnMazo ?? 0 }, () => tapada),
     levantada: vista.levantada ?? null,
@@ -134,6 +137,14 @@ function mesa(db, codigo, uid) {
 // ================================================================ montaje
 
 let reloj = 100000;
+
+/** El momento en que la ventana de esta partida ya se puede cerrar.
+ *  No se escribe a mano: la ventana abre con la mirada y su duración
+ *  vive en ella, así que hay que preguntársela. */
+function trasLaGracia(db) {
+  const v = db.leer(`partidas/${CODIGO}`).ventana;
+  return v.abiertaEn + v.duracionMs + v.graciaMs + 1;
+}
 const CUATRO = ["ana", "beto", "caro", "dani"];
 const CODIGO = "MESA01";
 
@@ -266,7 +277,7 @@ console.log("\n=== 3. Cuatro jugadores, una ronda completa ===");
      "cada uno conserva su tiempo de reacción",
      Object.values(anotados).map((x) => x.efectivo));
 
-  reloj = 109000;
+  reloj = trasLaGracia(db);
   const cierre = await red.cerrarVentana({ codigo: CODIGO });
   ok(cierre.orden.length === 4, "se resuelven los cuatro", cierre.orden.length);
   ok(cierre.orden[0].uid === "ana", "en orden de reacción", cierre.orden.map((o) => o.uid));
@@ -316,7 +327,7 @@ console.log("\n=== 4. Desconexión y reconexión ===");
   await red.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
   await red.cerrarMirada({ codigo: CODIGO });
   const { ventana } = await red.abrirVentana({ codigo: CODIGO });
-  reloj = 109000;
+  reloj = trasLaGracia(db);
   await red.cerrarVentana({ codigo: CODIGO });
   reloj += MS_REVELACION;
   await red.avanzarPartida({ codigo: CODIGO });
