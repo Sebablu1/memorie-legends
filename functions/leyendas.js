@@ -45,7 +45,9 @@ export function crearMoverLeyendas({
    */
   const refJugador = (uid) => db.collection(usuarios).doc(uid);
   const refAsiento = (clave) =>
-    clave ? db.collection(movimientos).doc(clave) : db.collection(movimientos).doc();
+    clave
+      ? db.collection(movimientos).doc(clave)
+      : db.collection(movimientos).doc();
 
   /**
    * Varios movimientos en una sola transacción.
@@ -70,12 +72,16 @@ export function crearMoverLeyendas({
     const yaAsentado = new Map();
 
     for (const m of lista) {
-      if (!m.uid) throw error("internal", "Falta el jugador al mover Leyendas.");
+      if (!m.uid)
+        throw error("internal", "Falta el jugador al mover Leyendas.");
       if (!Number.isInteger(m.delta)) {
         throw error("internal", "Las Leyendas se mueven en números enteros.");
       }
       if (m.idempotencia && !yaAsentado.has(m.idempotencia)) {
-        yaAsentado.set(m.idempotencia, (await tx.get(refAsiento(m.idempotencia))).exists);
+        yaAsentado.set(
+          m.idempotencia,
+          (await tx.get(refAsiento(m.idempotencia))).exists,
+        );
       }
       if (!saldos.has(m.uid)) {
         const snap = await tx.get(refJugador(m.uid));
