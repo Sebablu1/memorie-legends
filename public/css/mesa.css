@@ -1764,3 +1764,50 @@ button.accion.con-poder {
 @media (prefers-reduced-motion: reduce) {
   .carta.elegible-poder { animation: none; box-shadow: 0 0 12px 3px rgba(212, 168, 67, 0.4); }
 }
+
+/* ---------------------------------------------- miradas de los poderes 7 y 8
+
+   Un segundo exacto: lo que dura MS_MARCA_PODER en mesa.js. Dice QUE alguien
+   miró una carta y de quién, nunca cuál. El resplandor va sobre la mano
+   entera y no sobre una carta suelta, porque señalar la carta exacta
+   convertiría el poder en un anuncio público de dónde está lo que se vio. */
+
+.anuncio-mirada {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgba(10, 10, 10, 0.86);
+  border: 1px solid rgba(70, 200, 255, 0.5);
+  color: #d8f2ff;
+  font-size: 0.82rem;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+  animation: mirada-entra 160ms ease-out;
+}
+
+/* La animación sólo hace la entrada. La posición de reposo no depende de que
+   termine: si el navegador congela animaciones, el cartel igual queda donde va. */
+@keyframes mirada-entra {
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.mano-mirada {
+  animation: mano-mirada 1000ms ease-out;
+}
+
+@keyframes mano-mirada {
+  0%, 100% { filter: none; }
+  35%      { filter: drop-shadow(0 0 10px rgba(70, 200, 255, 0.9)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anuncio-mirada { animation: none; }
+  .mano-mirada { animation: none; outline: 2px solid rgba(70, 200, 255, 0.7); }
+}

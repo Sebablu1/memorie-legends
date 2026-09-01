@@ -146,6 +146,7 @@ console.log("\n=== 6. Empate técnico ===");
 console.log("\n=== 3-4. Qué se acepta y qué no ===");
 {
   const base = () => R.crearVentana({ id: "vX", abiertaEn: 10000 });
+  // ABRE, más abajo, tiene que valer lo mismo que ese abiertaEn.
   const intento = (extra = {}) => ({
     windowId: "vX", clientActionId: "c1", uid: "ana", posicion: 0,
     declarado: 500, latencia: 50, incertidumbre: 25, ...extra,
@@ -169,20 +170,42 @@ console.log("\n=== 3-4. Qué se acepta y qué no ===");
   ok(R.registrarIntento(base(), intento({ clientActionId: "" }), ctx(10600)).motivo === R.RECHAZO_INTENTO.FALTA_IDENTIFICADOR,
      "sin identificador se rechaza");
 
-  // Tocó en el ms 4900 y su paquete tardó 400: llega en el 5300, ya pasada la
-  // ventana. Se acepta, porque lo tardío es la llegada y no la reacción.
-  const enGracia = R.registrarIntento(base(), intento({ declarado: 4900, latencia: 400, incertidumbre: 200 }), ctx(15300));
+  // Estos tres casos se escriben contra las constantes y no contra números
+  // fijos. Estaban puestos a mano para una ventana de 5 s, y al acortarla a 2
+  // el primero empezó a fallar aunque la regla que prueba no había cambiado.
+  // Lo que importa es la relación entre reacción, latencia y llegada, no los
+  // milisegundos concretos.
+  const ABRE = 10000;
+  const CASI_AL_CIERRE = R.MS_VENTANA - 100;
+
+  // Tocó justo antes de cerrar y su paquete tardó 400: llega pasada la
+  // ventana pero dentro de la gracia. Se acepta, porque lo tardío es la
+  // llegada y no la reacción.
+  const enGracia = R.registrarIntento(
+    base(),
+    intento({ declarado: CASI_AL_CIERRE, latencia: 400, incertidumbre: 200 }),
+    ctx(ABRE + CASI_AL_CIERRE + 400),
+  );
   ok(enGracia.ok, "una llegada tardía por latencia se acepta si reaccionó a tiempo", enGracia.motivo);
-  ok(enGracia.ventana.intentos.c1.efectivo === 4900, "y conserva su tiempo de reacción", enGracia.ventana?.intentos?.c1?.efectivo);
+  ok(enGracia.ventana.intentos.c1.efectivo === CASI_AL_CIERRE,
+     "y conserva su tiempo de reacción", enGracia.ventana?.intentos?.c1?.efectivo);
 
   // En cambio, si su paquete tardó mucho más de lo que declara, el reloj se
-  // corrige hacia adelante: no se le puede creer un 4900 con 1400 de viaje.
-  const inconsistente = R.registrarIntento(base(), intento({ declarado: 4900, latencia: 400, incertidumbre: 200 }), ctx(16300));
+  // corrige hacia adelante: no se le puede creer esa reacción con ese viaje.
+  const inconsistente = R.registrarIntento(
+    base(),
+    intento({ declarado: CASI_AL_CIERRE, latencia: 400, incertidumbre: 200 }),
+    ctx(ABRE + R.MS_VENTANA + R.MS_GRACIA - 100),
+  );
   ok(inconsistente.motivo === R.RECHAZO_INTENTO.FUERA_DE_TIEMPO,
      "declarar poca latencia y llegar tardísimo perjudica al que lo declara", inconsistente.motivo);
 
   // Reacción posterior al fin de la ventana: no descarta, por rápido que sea.
-  const tarde = R.registrarIntento(base(), intento({ declarado: 6000, latencia: 10, incertidumbre: 5 }), ctx(16100));
+  const tarde = R.registrarIntento(
+    base(),
+    intento({ declarado: R.MS_VENTANA + 1000, latencia: 10, incertidumbre: 5 }),
+    ctx(ABRE + R.MS_VENTANA + 1010),
+  );
   ok(tarde.motivo === R.RECHAZO_INTENTO.FUERA_DE_TIEMPO,
      "reaccionar después de que la ventana terminó no vale", tarde.motivo);
 }

@@ -3,17 +3,18 @@ import { resolverCorte, aplicarEliminacion, comprobarFinPartida, cartasVivas } f
 import { azarDesde, semillaAleatoria } from "./azar.js";
 
 export const MS_MIRAR = 2000;
-export const MS_DESCARTE = 5000;
 
 /**
- * Lo que dura la ventana que reabre tirar una carta.
+ * Lo que dura cualquier ventana de reflejos.
  *
- * Más corta que la del principio de la ronda, y a propósito: en aquélla se
- * viene de memorizar y hay que buscar en cuatro manos; en ésta la mesa ya está
- * mirando la muestra y sólo tiene que reaccionar al número nuevo. Además ocurre
- * una vez por turno, así que cada segundo se paga cuatro veces por ronda.
+ * Una sola, para todas. Antes había dos —una para la ventana del principio de
+ * la ronda y otra, más corta, para la que reabre tirar— con el argumento de
+ * que en la primera se viene de memorizar y hay que buscar en cuatro manos.
+ * Ahora la muestra cambia en cada tiro y en cada cambio, así que hay muchas
+ * más ventanas por ronda y todas piden lo mismo: reconocer un número y tocar.
+ * Dos duraciones distintas para el mismo gesto sólo confundían.
  */
-export const MS_DESCARTE_TRAS_TIRAR = 3000;
+export const MS_DESCARTE = 2000;
 
 export const PODERES = {
   7: "mirarPropia",
@@ -98,9 +99,19 @@ export const crearPartida = (configuracion, { semilla = semillaAleatoria() } = {
   semilla: semilla >>> 0,
 });
 
-const anotar = (estado, texto) => ({
+/**
+ * Suma una línea al registro.
+ *
+ * `extra` deja marcar la línea con datos que la interfaz pueda leer sin
+ * adivinar. Se usa para la mirada de los poderes 7 y 8: la mesa tiene que
+ * pintar una marca sobre la carta mirada, y reconocer el evento por el texto
+ * —buscando "miró una carta"— se rompería con sólo cambiarle una palabra al
+ * mensaje. El registro viaja entero en la vista, así que lo que se ponga acá
+ * lo ve toda la mesa: nunca el número de la carta ni su posición.
+ */
+const anotar = (estado, texto, extra = null) => ({
   ...estado,
-  registro: [...estado.registro, { ronda: estado.ronda, texto }],
+  registro: [...estado.registro, { ronda: estado.ronda, texto, ...(extra ?? {}) }],
 });
 
 // --------------------------------------------------------------- reparto
@@ -380,7 +391,54 @@ export function levantar(estado) {
   };
 }
 
-/** Opción A: cambiarla por una carta propia. No activa poder. */
+/**
+ * Lo que sigue después de poner una carta nueva como muestra.
+ *
+ * Tirar y cambiar terminan igual: la carta que se va queda arriba del
+ * descarte, la mesa tiene un número nuevo al que reaccionar, y se abre la
+ * ventana de reflejos. Recién cuando esa ventana cierra sigue el turno.
+ *
+ * `volverA` es lo que decide adónde. Si la carta que quedó de muestra es un
+ * poder, la ventana desemboca en `poder` y el que la tiró elige si lo usa; si
+ * no, desemboca en `postLevantada`, donde corta o pasa. En los dos casos es
+ * SU turno lo que sigue: por eso no se vuelve a `turno`, que es adonde vuelve
+ * la ventana del principio de la ronda.
+ *
+ * El poder se deja anotado acá, al abrir la ventana, y no al cerrarla. Durante
+ * esos dos segundos la muestra puede cambiar —alguien acierta y su carta pasa
+ * a ser la cima—, así que preguntarle después al descarte qué poder tocaba
+ * daría el de otra carta. Se fija en el momento del tiro y no se mueve.
+ */
+function abrirReflejos(estado, cartaDeMuestra, indiceQuienTiro) {
+  const hayPoder = esPoder(cartaDeMuestra);
+  return {
+    ...estado,
+    fase: "descarte",
+    ventanaDescarte: {
+      huboPrimero: false,
+      intentos: [],
+      volverA: hayPoder ? "poder" : "postLevantada",
+    },
+    poderPendiente: hayPoder
+      ? {
+          tipo: PODERES[cartaDeMuestra.numero],
+          numero: cartaDeMuestra.numero,
+          indiceJugador: indiceQuienTiro,
+        }
+      : null,
+  };
+}
+
+/**
+ * Opción A: cambiar la levantada por una carta propia.
+ *
+ * La que sale de la mano queda como muestra, así que ahora esto también abre
+ * reflejos. Y si esa carta era un poder, el poder se activa —para el que la
+ * entregó, que es quien la tiró—. Vale la pena notar lo que eso significa en
+ * un juego de memoria: la carta salía boca abajo de la propia mano, así que
+ * uno puede activar un poder sin haber sabido que lo tenía. Es la regla
+ * pedida, y premia acordarse de lo que uno tiene.
+ */
 export function cambiarCarta(estado, posicion) {
   if (estado.fase !== "levantada" || !estado.levantada) return estado;
   const i = estado.indiceTurno;
@@ -388,60 +446,51 @@ export function cambiarCarta(estado, posicion) {
   const descartada = mano[posicion];
   mano[posicion] = { ...estado.levantada, visible: false };
 
+  const conLaMuestraNueva = {
+    ...estado,
+    jugadores: estado.jugadores.map((j, idx) => (idx === i ? { ...j, mano } : j)),
+    descarte: descartada
+      ? [{ ...descartada, visible: true }, ...estado.descarte]
+      : estado.descarte,
+    levantada: null,
+  };
+
+  // Si la posición estaba vacía no hay carta nueva arriba del descarte, así
+  // que no hay a qué reaccionar: no se abre ninguna ventana.
+  if (!descartada) {
+    return anotar(
+      { ...conLaMuestraNueva, fase: "postLevantada" },
+      `${estado.jugadores[i].nombre} cambió la posición ${posicion}`,
+    );
+  }
+
   return anotar(
-    {
-      ...estado,
-      jugadores: estado.jugadores.map((j, idx) => (idx === i ? { ...j, mano } : j)),
-      descarte: descartada
-        ? [{ ...descartada, visible: true }, ...estado.descarte]
-        : estado.descarte,
-      levantada: null,
-      fase: "postLevantada",
-    },
-    `${estado.jugadores[i].nombre} cambió la posición ${posicion}`,
+    abrirReflejos(conLaMuestraNueva, descartada, i),
+    `${estado.jugadores[i].nombre} cambió la posición ${posicion} y tiró un ${descartada.numero}`,
   );
 }
 
-/** Opción B: tirarla directamente. Si es 7/8/9/10 el poder se activa ahora. */
+/**
+ * Opción B: tirar la levantada.
+ *
+ * Sea poder o no, primero se abren los reflejos. Antes las cartas de poder
+ * salteaban la ventana e iban directo a `poder`, y eso le daba al que tiraba
+ * una ventaja que no se justificaba: tirar un 7 cambiaba la muestra igual que
+ * tirar un 3, pero sólo en un caso los demás podían aprovecharlo. Ahora la
+ * mesa siempre tiene sus dos segundos, y recién después el poder se decide.
+ */
 export function tirarCarta(estado) {
   if (estado.fase !== "levantada" || !estado.levantada) return estado;
   const carta = estado.levantada;
-  const siguiente = {
+  const conLaMuestraNueva = {
     ...estado,
     descarte: [{ ...carta, visible: true }, ...estado.descarte],
     levantada: null,
   };
 
-  // La carta tirada es la muestra nueva, así que la mesa vuelve a tener algo
-  // a lo que reaccionar: se abre otra ventana de reflejos antes de que el que
-  // tiró decida si corta. Sin esto, cambiar la muestra no le servía a nadie
-  // más que a él.
-  //
-  // `volverA` es lo que hace que esto no le robe el turno: al cerrarse, esta
-  // ventana devuelve a `postLevantada` —donde él corta o pasa— y no a `turno`,
-  // que es adonde vuelve la ventana del principio de la ronda.
-  if (!esPoder(carta)) {
-    return anotar(
-      {
-        ...siguiente,
-        fase: "descarte",
-        ventanaDescarte: { huboPrimero: false, intentos: [], volverA: "postLevantada" },
-      },
-      `${estado.jugadores[estado.indiceTurno].nombre} tiró un ${carta.numero}`,
-    );
-  }
-
   return anotar(
-    {
-      ...siguiente,
-      fase: "poder",
-      poderPendiente: {
-        tipo: PODERES[carta.numero],
-        numero: carta.numero,
-        indiceJugador: estado.indiceTurno,
-      },
-    },
-    `Poder ${carta.numero}: ${PODERES[carta.numero]}`,
+    abrirReflejos(conLaMuestraNueva, carta, estado.indiceTurno),
+    `${estado.jugadores[estado.indiceTurno].nombre} tiró un ${carta.numero}`,
   );
 }
 
@@ -484,8 +533,26 @@ export function usarPoderMirar(estado, indiceObjetivo, posicion) {
     origen: "poder8",
   });
 
+  // Queda escrito en el registro QUÉ se hizo y SOBRE QUIÉN, nunca qué carta
+  // era ni en qué posición estaba. El registro lo lee toda la mesa: decir "la
+  // segunda de Bruno" convertiría un poder en un anuncio público, y decir el
+  // número lo regalaría directamente. Que se sepa que Ana miró algo de Bruno
+  // es justamente lo que se quiere: los demás pueden contar con que ella
+  // ahora sabe algo, sin enterarse de qué.
+  const nombre = (i) => estado.jugadores[i].nombre;
+  const texto =
+    poder.tipo === "mirarPropia"
+      ? `${nombre(poder.indiceJugador)} usó el poder ${poder.numero} y miró una carta suya`
+      : `${nombre(poder.indiceJugador)} usó el poder ${poder.numero} y miró una carta de ${nombre(indiceObjetivo)}`;
+
   return {
-    estado: { ...estado, fase: "postLevantada", poderPendiente: null, conocimientos },
+    estado: anotar(
+      { ...estado, fase: "postLevantada", poderPendiente: null, conocimientos },
+      texto,
+      // Sin la posición ni el número: sólo quién miró a quién. Alcanza para
+      // que la interfaz pinte la marca y para que la mesa sepa que pasó.
+      { tipo: "miroCarta", actor: poder.indiceJugador, objetivo: indiceObjetivo },
+    ),
     revelada: { indiceJugador: indiceObjetivo, posicion, carta },
   };
 }
@@ -543,22 +610,21 @@ export function usarPoderCambio(estado, posicionPropia, indiceRival, posicionRiv
   };
 }
 
-/** El jugador decidió no usar el poder: la carta queda descartada sin efecto. */
 /**
  * Renunciar al poder: la carta queda como una carta más.
  *
- * Y como cualquier otra carta tirada, ya cambió la muestra. Así que la mesa
- * recupera sus reflejos igual que si el jugador hubiera tirado un número
- * cualquiera: renunciar al poder no puede quitarle a los demás una
- * oportunidad que el mismo tiro les habría dado.
+ * Ya no reabre nada. Antes sí, y con razón: el poder salteaba la ventana, así
+ * que al renunciar había que devolverle a la mesa los reflejos que el tiro le
+ * habría dado. Ahora la ventana ocurre ANTES de decidir el poder, siempre, así
+ * que la mesa ya tuvo su turno de reaccionar. Reabrirla acá sería una segunda
+ * ventana por la misma carta.
  */
 export function saltarPoder(estado) {
   const poder = estado.poderPendiente;
   const siguiente = {
     ...estado,
-    fase: "descarte",
+    fase: "postLevantada",
     poderPendiente: null,
-    ventanaDescarte: { huboPrimero: false, intentos: [], volverA: "postLevantada" },
   };
   if (!poder) return siguiente;
   return anotar(

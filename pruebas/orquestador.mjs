@@ -426,17 +426,24 @@ console.log("\n=== 6. Poderes 7, 8, 9 y 10 ===");
 
   // --- saltar el poder ---
   await guardar(conPoder(7, "mirarPropia"));
+  // El fixture ya trae una ventana de red abierta, así que no alcanza con
+  // mirar si hay una: hay que comprobar que sea LA MISMA de antes.
+  const ventanaAntes = db.leer(`partidas/${CODIGO}`).ventana?.id ?? null;
   const salta = await capturar(() => red.accionDeTurno({
     uid: "ana", codigo: CODIGO, accion: "saltarPoder", clientActionId: "ps",
   }));
-  // Renunciar al poder deja la carta como una carta más, y esa carta ya es la
-  // muestra: la mesa recupera sus reflejos, igual que con cualquier tiro.
-  ok(salta.valor?.fase === "descarte", "el poder se puede no usar", salta.error?.message);
+  // Renunciar ya no reabre nada, y es un cambio deliberado. Antes sí reabría,
+  // porque las cartas de poder salteaban la ventana y al renunciar había que
+  // devolverle a la mesa los reflejos que el tiro le habría dado. Ahora la
+  // ventana ocurre ANTES de que se decida el poder, siempre: la mesa ya
+  // reaccionó, y abrir otra sería una segunda ventana por la misma carta.
+  ok(salta.valor?.fase === "postLevantada", "el poder se puede no usar", salta.error?.message);
   ok(db.leer(`partidas/${CODIGO}`).estado.poderPendiente === null, "y queda descartado");
-  ok(db.leer(`partidas/${CODIGO}`).estado.ventanaDescarte?.volverA === "postLevantada",
-     "con reflejos abiertos que devuelven a su decisión de cortar");
-  const tras = db.leer(`partidas/${CODIGO}`).ventana;
-  ok(Boolean(tras) && !tras.cerrada, "y su ventana de red", tras?.cerrada);
+  ok(db.leer(`partidas/${CODIGO}`).estado.ventanaDescarte == null,
+     "sin reabrir reflejos: la mesa ya tuvo los suyos antes de la decisión");
+  const tras = db.leer(`partidas/${CODIGO}`).ventana?.id ?? null;
+  ok(tras === ventanaAntes, "ni ventana de red nueva: quedó la que ya estaba",
+     { antes: ventanaAntes, despues: tras });
 }
 
 // ============================================ 7. corte y fin de ronda

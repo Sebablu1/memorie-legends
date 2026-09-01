@@ -1,28 +1,34 @@
 /**
- * Tirar una carta reabre los reflejos.
- *
- * EL HUECO
- *
- * Al levantar del mazo y tirar, la carta tirada pasa a ser la muestra. Pero la
- * partida iba directo a `postLevantada`, así que esa muestra nueva no le
- * servía a nadie: los demás no tenían ningún momento para reaccionar a ella.
+ * Poner una carta de muestra abre los reflejos. Siempre.
  *
  * LA REGLA
  *
- * Tirar abre otra ventana de reflejos, sobre la muestra nueva. Cuando esa
- * ventana cierra, la mesa vuelve a `postLevantada` —no a `turno`—, porque el
- * que tiró todavía tiene que decidir si corta. Eso lo lleva `volverA` dentro
- * de la ventana, y es lo que distingue esta ventana de la del principio de la
- * ronda, que sí desemboca en el turno siguiente.
+ * Cada vez que una carta queda arriba del descarte, la mesa tiene una ventana
+ * para reaccionar a ella. Da igual cómo llegó ahí: tirando la levantada,
+ * entregando una de la mano al cambiar, o tirando un poder.
  *
- * LOS LÍMITES
+ * Cuando esa ventana cierra, el turno sigue siendo del que la puso: vuelve a
+ * `postLevantada` —donde corta o pasa— o a `poder`, si lo que quedó de muestra
+ * era un 7, 8, 9 o 10. Eso lo lleva `volverA` dentro de la ventana, y es lo
+ * que la distingue de la del principio de la ronda, que sí desemboca en el
+ * turno siguiente.
  *
- *   - CAMBIAR no reabre: la muestra no cambió, la carta se fue a la mano.
- *   - Tirar un PODER no reabre AL INSTANTE: primero se resuelve el poder, o
- *     se perdería. Pero si su dueño renuncia a usarlo, la carta queda como
- *     una carta más y ahí sí se reabre.
- *   - La ventana nueva es OTRA: su windowId es distinto, para que un intento
- *     de la ventana anterior no se cuele en ésta.
+ * LO QUE CAMBIÓ (y por qué esta suite se reescribió)
+ *
+ * Había dos excepciones y las dos se cayeron:
+ *
+ *   - CAMBIAR no reabría, con el argumento de que la muestra no cambiaba. Era
+ *     falso: la carta que sale de la mano SÍ queda arriba del descarte. Ahora
+ *     abre ventana como cualquier tiro.
+ *   - Tirar un PODER salteaba la ventana e iba derecho a resolverlo. Eso le
+ *     daba a las cartas de poder un atajo sin justificación: tirar un 7
+ *     cambiaba la muestra igual que tirar un 3, pero sólo en un caso los demás
+ *     podían aprovecharlo. Ahora el orden es siempre el mismo —reflejos de la
+ *     mesa primero, poder del que tiró después— y por eso RENUNCIAR ya no
+ *     reabre nada: la ventana ya ocurrió.
+ *
+ * Lo que no cambió: la ventana nueva es OTRA, con windowId distinto, para que
+ * un intento de la anterior no se cuele en ésta.
  */
 
 import * as M from "../public/js/reglas/motor.js";
@@ -38,20 +44,35 @@ const ok = (c, m, x) => {
 
 const carta = (palo, numero) => ({ id: `${palo}-${numero}`, palo, numero, puntos: numero });
 
-/** Mesa en `levantada`, con la carta levantada que se le indique. */
+/**
+ * Mesa en `levantada`, con la carta levantada que se le indique.
+ *
+ * La carta se saca del mazo Y de las manos. Sacarla sólo del mazo dejaba
+ * mesas imposibles: con semilla 4242 la mano de A empieza con el Copa-6, que
+ * es justo la levantada de varias pruebas de acá, así que la misma carta
+ * estaba en dos lugares. Una prueba llegó a fallar por eso y el motor no
+ * tenía nada que ver.
+ */
 function mesaConLevantada(levantada) {
   const base = M.empezarRonda(M.crearPartida([
     { id: "A", nombre: "A" }, { id: "B", nombre: "B" },
   ], { semilla: 4242 }));
-  const usadas = new Set([levantada.id]);
+
+  const libres = base.mazo.filter((c) => c.id !== levantada.id);
+  const jugadores = base.jugadores.map((j) => ({
+    ...j,
+    mano: j.mano.map((c) => (c?.id === levantada.id ? libres.shift() : c)),
+  }));
+
   return {
     ...base,
+    jugadores,
     fase: "levantada",
     indiceTurno: 0,
     levantada: { ...levantada, visible: true },
     ventanaDescarte: null,
     descarte: [{ ...carta("Oro", 4), visible: true }],
-    mazo: base.mazo.filter((c) => !usadas.has(c.id)),
+    mazo: libres,
   };
 }
 
@@ -102,25 +123,57 @@ console.log("\n=== 2. El que tiró conserva su decisión de cortar ===");
   ok(trasPasar.indiceTurno !== deQuien, "o pasar, y ahí sí cambia el turno", trasPasar.indiceTurno);
 }
 
-// ===================================== 3. los dos casos que NO deben reabrir
+// ================================= 3. los dos casos que ANTES no reabrian
 
-console.log("\n=== 3. Cambiar no reabre, y un poder tampoco ===");
+console.log("\n=== 3. Cambiar también reabre, y un poder también ===");
 {
-  // CAMBIAR: la carta va a la mano, la muestra no cambia.
+  // CAMBIAR: la levantada va a la mano, pero la carta que sale de la mano
+  // queda de muestra. Que la muestra cambie es lo único que importa.
   const s = mesaConLevantada(carta("Copa", 6));
   const muestraAntes = s.descarte[0].id;
+  const entregada = s.jugadores[0].mano[0];
   const cambiado = M.cambiarCarta(s, 0);
-  ok(cambiado.fase === "postLevantada", "cambiar va directo a postLevantada", cambiado.fase);
-  ok(!cambiado.ventanaDescarte, "sin abrir ninguna ventana");
-  ok(cambiado.descarte[0].id !== muestraAntes,
-     "la muestra la cambia la carta que salió de la mano, no la levantada",
-     cambiado.descarte[0].id);
 
-  // PODER: primero se resuelve, o se perdería.
+  ok(cambiado.descarte[0].id === entregada.id,
+     "la muestra la pone la carta que salió de la mano, no la levantada",
+     cambiado.descarte[0].id);
+  ok(cambiado.descarte[0].id !== muestraAntes, "y de verdad cambió");
+  ok(cambiado.jugadores[0].mano[0].id !== entregada.id,
+     "la levantada ocupó su lugar en la mano");
+
+  const esperada = M.esPoder(entregada) ? "poder" : "postLevantada";
+  ok(cambiado.fase === "descarte", "cambiar abre reflejos", cambiado.fase);
+  ok(cambiado.ventanaDescarte?.volverA === esperada,
+     `y desemboca en ${esperada}, según si lo entregado era poder`,
+     cambiado.ventanaDescarte?.volverA);
+
+  // Una posición vacía no pone muestra nueva: no hay a qué reaccionar.
+  const manoConHueco = { ...s, jugadores: s.jugadores.map((j, i) =>
+    i === 0 ? { ...j, mano: [null, ...j.mano.slice(1)] } : j) };
+  const sinCarta = M.cambiarCarta(manoConHueco, 0);
+  ok(sinCarta.fase === "postLevantada",
+     "cambiar contra un hueco no abre ventana: no hay muestra nueva", sinCarta.fase);
+  ok(!sinCarta.ventanaDescarte, "y no deja ninguna colgada");
+
+  // PODER: ahora la mesa reacciona ANTES de que el poder se resuelva.
   for (const numero of [7, 8, 9, 10]) {
     const conPoder = M.tirarCarta(mesaConLevantada(carta("Espada", numero)));
-    ok(conPoder.fase === "poder", `tirar un ${numero} va al poder, no a los reflejos`, conPoder.fase);
-    ok(!conPoder.ventanaDescarte, `y el ${numero} no abre ventana`);
+    ok(conPoder.fase === "descarte", `tirar un ${numero} abre reflejos primero`, conPoder.fase);
+    ok(conPoder.ventanaDescarte?.volverA === "poder",
+       `y el ${numero} desemboca en su poder`, conPoder.ventanaDescarte?.volverA);
+    ok(conPoder.poderPendiente?.numero === numero,
+       `el ${numero} queda anotado desde el tiro`, conPoder.poderPendiente);
+
+    // Se anota en el tiro y no al cerrar: durante la ventana alguien puede
+    // acertar y su carta pasa a ser la cima. Preguntarle después al descarte
+    // qué poder tocaba daría el de OTRA carta.
+    const otroAcierta = { ...conPoder, descarte: [
+      { ...carta("Oro", 3), visible: true }, ...conPoder.descarte] };
+    const cerrada = M.cerrarVentanaDescarte(otroAcierta);
+    ok(cerrada.fase === "poder", `el ${numero} llega a su poder`, cerrada.fase);
+    ok(cerrada.poderPendiente?.numero === numero,
+       `y sigue siendo el ${numero} aunque la muestra haya cambiado`,
+       cerrada.poderPendiente?.numero);
   }
 }
 
@@ -203,11 +256,11 @@ console.log("\n=== 5. En red: tirar abre una ventana NUEVA ===");
     ok(Boolean(p.ventana) && !p.ventana.cerrada, "con una ventana de red abierta");
     ok(p.ventana.id !== primera.id, "que NO es la de la ronda", [p.ventana.id, primera.id]);
     ok(p.ventana.abiertaEn === reloj, "abierta en el instante del tiro", p.ventana.abiertaEn - reloj);
-    // Más corta que la de la ronda: la mesa ya está mirando la muestra y sólo
-    // tiene que reaccionar al número nuevo. Y ocurre una vez por turno, así
-    // que cada segundo se paga cuatro veces por ronda.
-    ok(p.ventana.duracionMs === M.MS_DESCARTE_TRAS_TIRAR,
-       "y dura menos que la de la ronda", [p.ventana.duracionMs, MS_VENTANA]);
+    // Dura MS_VENTANA a secas. La de la ronda dura MS_MIRAR + MS_VENTANA
+    // porque tiene que cubrir además la mirada; ésta no tiene nada que cubrir.
+    ok(p.ventana.duracionMs === MS_VENTANA,
+       "y dura una ventana sola, sin la mirada encima",
+       [p.ventana.duracionMs, MS_VENTANA]);
     ok(p.plazo.que === "cerrarVentana", "con su plazo de cierre", p.plazo.que);
 
     // Un intento con el windowId viejo no se cuela.
@@ -226,41 +279,118 @@ console.log("\n=== 5. En red: tirar abre una ventana NUEVA ===");
        "cerrada, vuelve a su decisión de cortar", partida().estado.fase);
     ok(DOS[partida().estado.indiceTurno] === enTurno, "y sigue siendo su turno");
   } else {
-    ok(true, "(la levantada trajo poder: el caso en red se cubre en la sección 3)");
+    ok(true, "(esta vez la levantada trajo poder; el caso va abajo igual)");
+  }
+
+  // --- el poder, en red, de punta a punta ---
+  //
+  // Este caso quedaba sin cubrir: la sección 3 prueba el motor puro y ésta
+  // salteaba el poder cuando el azar lo traía. Es justo el camino nuevo —la
+  // ventana ocurre ANTES de resolver el poder— así que hay que verlo en red,
+  // que es donde el plazo lo lleva el servidor y no el navegador.
+  {
+    const antes = partida();
+    const enTurnoAhora = DOS[antes.estado.indiceTurno];
+
+    // Se fuerza una levantada con poder en vez de esperar a que salga sola.
+    // La carta se SACA del mazo: inventarla dejaba la misma carta en dos
+    // lugares, y el detector de filtraciones lo cazó al publicar la vista
+    // —"la carta Espada-8 del mazo aparece en la vista"—. Hizo exactamente su
+    // trabajo, sobre un error del fixture y no del motor.
+    const conPoder = antes.estado.mazo.find((c) => M.esPoder(c));
+    ok(Boolean(conPoder), "hay una carta de poder en el mazo para la prueba");
+
+    await db.runTransaction(async (tx) => {
+      tx.set({ ruta: `partidas/${C}` }, {
+        ...antes,
+        estado: {
+          ...antes.estado,
+          fase: "levantada",
+          levantada: { ...conPoder, visible: true },
+          mazo: antes.estado.mazo.filter((c) => c.id !== conPoder.id),
+          ventanaDescarte: null,
+        },
+        ventana: { ...antes.ventana, cerrada: true },
+        version: (antes.version ?? 1) + 1,
+      });
+    });
+
+    await red.accionDeTurno({ uid: enTurnoAhora, codigo: C, accion: "tirar", clientActionId: "T8" });
+    const tras = partida();
+    ok(tras.estado.fase === "descarte",
+       "en red, tirar un poder abre reflejos primero", tras.estado.fase);
+    ok(tras.estado.ventanaDescarte?.volverA === "poder",
+       "con la ventana apuntando al poder", tras.estado.ventanaDescarte?.volverA);
+    ok(tras.estado.poderPendiente?.numero === conPoder.numero,
+       "y el poder ya anotado desde el tiro", tras.estado.poderPendiente);
+    ok(Boolean(tras.ventana) && !tras.ventana.cerrada && tras.ventana.id !== primera.id,
+       "y una ventana de red nueva para ella", tras.ventana?.id);
+
+    // El servidor la cierra por plazo, no el navegador.
+    reloj = vence(tras.ventana) + 1;
+    await red.avanzarPartida({ codigo: C });
+    reloj += MS_REVELACION;
+    await red.avanzarPartida({ codigo: C });
+    ok(partida().estado.fase === "poder",
+       "cerrada por el servidor, recién ahí aparece el poder", partida().estado.fase);
+    ok(DOS[partida().estado.indiceTurno] === enTurnoAhora,
+       "y el poder es del que lo tiró", DOS[partida().estado.indiceTurno]);
+
+    // Renunciar en red tampoco abre una segunda ventana.
+    const ventanaAntesDeSaltar = partida().ventana?.id ?? null;
+    await red.accionDeTurno({ uid: enTurnoAhora, codigo: C, accion: "saltarPoder", clientActionId: "S8" });
+    ok(partida().estado.fase === "postLevantada",
+       "renunciar va derecho a la decisión de cortar", partida().estado.fase);
+    ok((partida().ventana?.id ?? null) === ventanaAntesDeSaltar,
+       "sin abrir una segunda ventana de red");
   }
 }
 
-// ============================== 6. renunciar al poder también reabre
+// =========================== 6. renunciar al poder ya NO reabre
 
 /**
- * Un 7, 8, 9 o 10 tirado ya cambió la muestra antes de que su dueño decida si
- * usa el poder. Si renuncia, la carta queda como una carta más — y la mesa
- * merece los mismos reflejos que le habría dado cualquier otro tiro. Si no,
- * tirar un poder y renunciar sería la manera de cambiar la muestra sin que
- * nadie pudiera aprovecharla.
+ * Renunciar no abre una segunda ventana, y ése es el cambio.
+ *
+ * Antes sí lo hacía, y tenía sentido mientras los poderes salteaban la
+ * ventana: si el poder no la abría, había que devolvérsela a la mesa cuando su
+ * dueño renunciaba, o tirar un poder y renunciar habría sido la forma de
+ * cambiar la muestra sin que nadie la aprovechara.
+ *
+ * Ese agujero ya no existe, porque la ventana ocurre ANTES de la decisión.
+ * La mesa reaccionó al 7 apenas se tiró. Reabrirla al renunciar sería darle
+ * dos oportunidades por la misma carta.
  */
-console.log("\n=== 6. Renunciar al poder deja la muestra viva ===");
+console.log("\n=== 6. Renunciar al poder no da una segunda ventana ===");
 {
   for (const numero of [7, 8, 9, 10]) {
     const tirada = carta("Espada", numero);
     let s = M.tirarCarta(mesaConLevantada(tirada));
-    ok(s.fase === "poder", `el ${numero} activa su poder`, s.fase);
+    ok(s.fase === "descarte", `el ${numero} abre reflejos antes de nada`, s.fase);
     ok(s.descarte[0].id === tirada.id, `y ya es la muestra`, s.descarte[0].id);
 
-    s = M.saltarPoder(s);
-    ok(s.fase === "descarte", `renunciar al ${numero} reabre los reflejos`, s.fase);
-    ok(s.poderPendiente === null, `sin poder pendiente tras el ${numero}`);
-    ok(s.ventanaDescarte?.volverA === "postLevantada",
-       `y el ${numero} devuelve a su decisión de cortar`);
-
+    // La mesa tuvo su ventana. Ahora se cierra y recién ahí aparece el poder.
     s = M.cerrarVentanaDescarte(s);
-    ok(s.fase === "postLevantada", `cerrada, el ${numero} vuelve a postLevantada`, s.fase);
+    ok(s.fase === "poder", `cerrada la ventana, el ${numero} ofrece su poder`, s.fase);
+
+    s = M.saltarPoder(s);
+    ok(s.fase === "postLevantada",
+       `renunciar al ${numero} va derecho a la decisión de cortar`, s.fase);
+    ok(s.poderPendiente === null, `sin poder pendiente tras el ${numero}`);
+    ok(s.ventanaDescarte == null,
+       `y el ${numero} no abre una segunda ventana`, s.ventanaDescarte);
   }
 
-  // Usar el poder, en cambio, sigue yendo derecho a la decisión.
-  const usado = M.usarPoderMirar(M.tirarCarta(mesaConLevantada(carta("Espada", 7))), 0, 0);
+  // Usar el poder también termina en la decisión de cortar.
+  const conVentana = M.tirarCarta(mesaConLevantada(carta("Espada", 7)));
+  const usado = M.usarPoderMirar(M.cerrarVentanaDescarte(conVentana), 0, 0);
   ok(usado.estado.fase === "postLevantada",
-     "usar el poder sigue yendo derecho a la decisión", usado.estado.fase);
+     "usar el poder también termina en la decisión", usado.estado.fase);
+  ok(usado.estado.registro.at(-1)?.tipo === "miroCarta",
+     "y deja anotado en el registro que se miró una carta",
+     usado.estado.registro.at(-1));
+  ok(!/\d/.test(usado.estado.registro.at(-1)?.texto?.replace(/poder \d/, "") ?? ""),
+     "sin filtrar el número de la carta mirada",
+     usado.estado.registro.at(-1)?.texto);
 }
 
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);

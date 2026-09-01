@@ -328,9 +328,9 @@ console.log("\n=== 5. Los imports de index.js resuelven ===");
  * las partidas por Leyendas. Las 22 suites siguieron en verde, porque cada
  * modo miraba su propia constante.
  *
- * `MS_MIRAR` ya no está duplicado. `MS_VENTANA` y `MS_DESCARTE` todavía sí
- * —una es del protocolo de red y la otra de las reglas—, así que al menos se
- * comprueba que digan lo mismo.
+ * Ya no queda ninguna duplicada: `MS_MIRAR` lo re-exporta el motor en red y
+ * `MS_VENTANA` lo re-exporta `red.js`. Igual se comprueba, porque nada impide
+ * que mañana alguien vuelva a escribir el número a mano.
  */
 console.log("\n=== Los tiempos coinciden entre modos ===");
 {
@@ -346,9 +346,21 @@ console.log("\n=== Los tiempos coinciden entre modos ===");
      "y la ventana de reflejos también",
      { motor: motor.MS_DESCARTE, red: red.MS_VENTANA });
 
-  ok(motor.MS_DESCARTE_TRAS_TIRAR < motor.MS_DESCARTE,
-     "la ventana que reabre tirar es más corta que la de la ronda",
-     { tirar: motor.MS_DESCARTE_TRAS_TIRAR, ronda: motor.MS_DESCARTE });
+  // Hubo dos duraciones distintas —una para la ventana de la ronda y otra,
+  // más corta, para la que reabría tirar—. Ahora hay una sola, porque la
+  // muestra cambia en cada tiro y en cada cambio y todas las ventanas piden
+  // el mismo gesto. Que no vuelva a aparecer una segunda por la puerta de
+  // atrás.
+  ok(motor.MS_DESCARTE_TRAS_TIRAR === undefined,
+     "no hay una segunda duración de ventana dando vueltas",
+     { sobrante: motor.MS_DESCARTE_TRAS_TIRAR });
+
+  // Y un piso: por debajo de esto no alcanza para reaccionar y que el pedido
+  // llegue. El tiempo de reacción humano ronda los 250 ms y la latencia
+  // doméstica agrega tranquilamente otros 200.
+  ok(motor.MS_DESCARTE >= 1500,
+     "la ventana deja tiempo para reaccionar y para que el pedido viaje",
+     { ventana: motor.MS_DESCARTE });
 }
 
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);

@@ -29,10 +29,20 @@
  * desfase y armar el intento) y el servidor (que es el que decide).
  */
 
+import { MS_DESCARTE } from "./motor.js";
+
 // ------------------------------------------------------------ constantes
 
-/** Lo que dura la ventana de reflejos, igual que en la mesa local. */
-export const MS_VENTANA = 5000;
+/**
+ * Lo que dura la ventana de reflejos.
+ *
+ * Se re-exporta la del motor en vez de escribir el número otra vez. Tenerlo
+ * duplicado ya nos costó una divergencia silenciosa —el entrenamiento midiendo
+ * el doble que las partidas por Leyendas, con las pruebas en verde porque cada
+ * modo leía su propia copia— y no hay razón para volver a arriesgarlo: las dos
+ * ventanas SON la misma regla.
+ */
+export const MS_VENTANA = MS_DESCARTE;
 
 /**
  * Margen extra en el que todavía se aceptan intentos ya enviados.

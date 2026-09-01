@@ -18,7 +18,6 @@ import {
   PODERES,
   MS_MIRAR,
   MS_DESCARTE,
-  MS_DESCARTE_TRAS_TIRAR,
 } from "./reglas/motor.js";
 
 import { dorsoDeAsiento } from "./reglas/baraja.js";
@@ -708,6 +707,25 @@ function marcarEfecto(i, pos, clase, ms = 900) {
   setTimeout(() => el.classList.remove(clase), ms);
 }
 
+/** El último texto que escribió el motor. Lo redacta él, no la interfaz. */
+const ultimaLineaDelRegistro = () =>
+  estado.registro[estado.registro.length - 1]?.texto ?? "";
+
+/**
+ * Cartel de un segundo: "Ana miró una carta de Bruno".
+ *
+ * Dice QUE se miró y a quién, nunca qué. Que la mesa se entere es parte de la
+ * regla: los demás tienen derecho a saber que ese jugador ahora sabe algo, y
+ * a poder contar con eso. Lo que no puede filtrarse es el número.
+ */
+function anunciarMirada(texto) {
+  const cartel = document.createElement("div");
+  cartel.className = "anuncio-mirada";
+  cartel.textContent = texto;
+  dom.mesa.appendChild(cartel);
+  setTimeout(() => cartel.remove(), MS_MARCA_PODER);
+}
+
 /** Cartel sobre la mesa anunciando qué poder se activó y quién lo usa. */
 async function anunciarPoder(poder, nombre) {
   if (!poder) return;
@@ -922,14 +940,41 @@ function resolverUltimoDescarte() {
 }
 
 /**
- * Si tirar acaba de reabrir los reflejos, los corre y espera a que cierren.
+ * Cuánto dura la marca sobre una carta que alguien acaba de mirar.
  *
- * Es el mismo hueco que en red: la carta tirada es la muestra nueva y la mesa
- * tiene que poder reaccionar a ella antes de que el que tiró decida si corta.
+ * Un segundo: lo justo para que la mesa registre QUE pasó algo. No revela el
+ * número —eso sería regalar el poder— sino que esa carta fue vista, que es
+ * información legítima y pública: los demás pueden contar con que ese jugador
+ * ahora sabe algo.
+ */
+const MS_MARCA_PODER = 1000;
+
+/**
+ * Corre la ventana de reflejos si la jugada acaba de abrir una.
+ *
+ * La abren tirar y cambiar por igual: las dos dejan una carta nueva arriba del
+ * descarte, y la mesa tiene que poder reaccionar antes de que el turno siga.
  */
 async function reflejosTrasTirar() {
   if (estado.fase !== "descarte") return;
-  await faseDescarte(null, MS_DESCARTE_TRAS_TIRAR);
+  await faseDescarte(null);
+}
+
+/**
+ * Lo que va después de poner una carta nueva de muestra.
+ *
+ * Primero los reflejos de todos, después el poder del que tiró. Ese orden es
+ * la regla nueva: antes las cartas de poder salteaban la ventana, y tirar un 7
+ * no le servía a nadie más que a quien lo tiraba.
+ *
+ * @returns true si quedó un poder para decidir.
+ */
+async function trasPonerMuestra() {
+  await reflejosTrasTirar();
+  if (estado.fase !== "poder") return false;
+  const poder = estado.poderPendiente;
+  await anunciarPoder(poder, estado.jugadores[poder.indiceJugador].nombre);
+  return true;
 }
 
 /**
@@ -1046,15 +1091,13 @@ async function turnoDeIA(i) {
     sonidos.whoosh();
   }
   dibujar();
-  await reflejosTrasTirar();
+  // Los reflejos de la mesa van primero; recién después la IA decide su poder.
+  // Renunciar ya no reabre nada: la ventana ocurrió antes de la decisión.
+  const hayPoder = await trasPonerMuestra();
   await esperar(RITMO.trasDecidir);
 
-  if (estado.fase === "poder") {
-    await anunciarPoder(estado.poderPendiente, jugador.nombre);
+  if (hayPoder) {
     await poderDeIA(i);
-    // Si la IA renunció al poder, su carta quedó como una carta más y la
-    // muestra cambió: la mesa recupera sus reflejos antes de que decida cortar.
-    await reflejosTrasTirar();
     await esperar(RITMO.trasPoder);
   }
 
@@ -1105,9 +1148,10 @@ async function poderDeIA(i) {
       objetivo.indiceJugador,
       objetivo.posicion,
       "efecto-mirar",
-      1100,
+      MS_MARCA_PODER,
     );
-    await esperar(1100);
+    anunciarMirada(ultimaLineaDelRegistro());
+    await esperar(MS_MARCA_PODER);
     return;
   }
 
@@ -1177,15 +1221,17 @@ dom.btnTirar.addEventListener("click", async () => {
     return;
   }
   if (estado.fase !== "levantada" || estado.indiceTurno !== YO) return;
-  if (PODERES[estado.levantada?.numero]) {
-    sonidos.poder();
-    abrirModalDecisionPoder();
-    return;
-  }
+  // Ya no se pregunta acá si querés usar el poder. La carta se tira igual que
+  // cualquier otra, la mesa tiene sus reflejos, y recién entonces se abre la
+  // elección del poder. Preguntar antes le habría dado a las cartas de poder
+  // un atajo que salteaba la ventana de todos.
   sonidos.whoosh();
   estado = tirarCarta(estado);
   dibujar();
-  await reflejosTrasTirar();
+  if (await trasPonerMuestra()) {
+    abrirModalPoder();
+    return;
+  }
   if (estado.fase === "postLevantada") {
     pista("Podés <b>cortar</b> o <b>pasar</b> el turno.");
   }
@@ -1326,8 +1372,16 @@ document.addEventListener("click", async (evento) => {
   ) {
     sonidos.voltear();
     estado = cambiarCarta(estado, posicion);
-    pista("Podés <b>cortar</b> o <b>pasar</b> el turno.");
     dibujar();
+    // La carta que sale de la mano queda de muestra, así que esto también
+    // abre reflejos. Y si esa carta era un poder, el poder es de quien la
+    // entregó: en un juego de memoria, eso significa que uno puede activar
+    // un poder sin haber sabido que lo tenía.
+    if (await trasPonerMuestra()) {
+      abrirModalPoder();
+      return;
+    }
+    pista("Podés <b>cortar</b> o <b>pasar</b> el turno.");
   }
 });
 
@@ -1465,32 +1519,30 @@ dom.modal.addEventListener("click", async (evento) => {
     return;
   }
 
-  // 🔮 Usar poder: recién acá se tira la carta y se activa el efecto.
+  // 🔮 Usar poder / 💨 Tirar carta: los dos tiran la carta y esperan a que la
+  // mesa tenga sus reflejos. La diferencia aparece DESPUÉS: uno abre la
+  // elección del poder y el otro renuncia. Antes esta rama salteaba la
+  // ventana, que es justamente lo que se vino a corregir.
   const usar = evento.target.closest('[data-accion="usar-poder"]');
-  if (usar) {
-    sonidos.whoosh();
-    estado = tirarCarta(estado);
-    cerrarModal();
-    dibujar();
-    if (estado.fase !== "poder") return;
-    await anunciarPoder(estado.poderPendiente, estado.jugadores[YO].nombre);
-    abrirModalPoder();
-    return;
-  }
-
-  // 💨 Tirar carta: se descarta como cualquier otra y el poder se pierde.
   const tirarSinPoder = evento.target.closest(
     '[data-accion="tirar-sin-poder"]',
   );
-  if (tirarSinPoder) {
-    sonidos.clic();
+  if (usar || tirarSinPoder) {
+    sonidos[usar ? "whoosh" : "clic"]();
     estado = tirarCarta(estado);
-    if (estado.fase === "poder") estado = saltarPoder(estado);
     cerrarModal();
     dibujar();
-    await reflejosTrasTirar();
+    const hayPoder = await trasPonerMuestra();
+    if (hayPoder && usar) {
+      abrirModalPoder();
+      return;
+    }
+    if (hayPoder) estado = saltarPoder(estado);
+    dibujar();
     pista(
-      "Tiraste la carta sin usar el poder. Podés <b>cortar</b> o <b>pasar</b> el turno.",
+      usar
+        ? "Podés <b>cortar</b> o <b>pasar</b> el turno."
+        : "Tiraste la carta sin usar el poder. Podés <b>cortar</b> o <b>pasar</b> el turno.",
     );
     return;
   }
@@ -1511,9 +1563,9 @@ dom.modal.addEventListener("click", async (evento) => {
     estado = saltarPoder(estado);
     cerrarModal();
     seleccionPropia = null;
-    dibujar();
-    // La carta ya es la muestra: la mesa reacciona antes de que decida cortar.
-    await reflejosTrasTirar();
+    // Sin reflejos acá: la mesa ya los tuvo cuando la carta se tiró, antes de
+    // que apareciera esta elección. Abrir otra ventana al renunciar le daría
+    // dos oportunidades por la misma carta.
     pista(
       "Descartaste sin usar el poder. Podés <b>cortar</b> o <b>pasar</b> el turno.",
     );
@@ -1547,6 +1599,9 @@ dom.modal.addEventListener("click", async (evento) => {
     cerrarModal();
     pista("Memorizá…");
     correrTemporizador(MS_MIRAR, "Mirando");
+    // El que mira ve la carta; el resto de la mesa, sólo el aviso de que la
+    // miró. Son dos cosas distintas y por eso van por caminos distintos.
+    anunciarMirada(ultimaLineaDelRegistro());
     await revelarUnMomento(i, pos);
     cancelarTemporizador();
     pista("Podés <b>cortar</b> o <b>pasar</b> el turno.");
@@ -1868,6 +1923,43 @@ function mostrarRevelaciones(vista) {
 }
 
 /**
+ * Cuántas líneas del registro ya se anunciaron.
+ *
+ * En red el registro llega entero en cada vista, así que sin recordar hasta
+ * dónde se llegó, cada repintado volvería a anunciar todas las miradas de la
+ * partida. Se guarda el largo y no el contenido: el registro sólo crece.
+ */
+let registroAnunciado = 0;
+
+/**
+ * Muestra en red las miradas de los poderes 7 y 8.
+ *
+ * El motor marca esas líneas con `tipo: "miroCarta"` y la interfaz las
+ * reconoce por ese campo, no por el texto: buscar "miró una carta" se rompería
+ * con sólo reescribir el mensaje.
+ *
+ * Se pinta la marca sobre la mano del mirado, no sobre una carta suya: el
+ * servidor no manda la posición —y hace bien, porque decirla convertiría el
+ * poder en un anuncio público de dónde está lo que se vio.
+ */
+function mostrarMiradas(vista) {
+  const registro = vista.registro ?? [];
+  if (registro.length < registroAnunciado) registroAnunciado = 0; // ronda nueva
+  const nuevas = registro.slice(registroAnunciado);
+  registroAnunciado = registro.length;
+
+  for (const linea of nuevas) {
+    if (linea?.tipo !== "miroCarta") continue;
+    anunciarMirada(linea.texto);
+    sonidos.voltear();
+    const mano = document.querySelector(`.jugador[data-jugador="${linea.objetivo}"]`);
+    if (!mano) continue;
+    mano.classList.add("mano-mirada");
+    setTimeout(() => mano.classList.remove("mano-mirada"), MS_MARCA_PODER);
+  }
+}
+
+/**
  * Pinta lo que publicó el servidor. Nada más.
  *
  * Acá NO se cierra ninguna ventana por reloj propio. El servidor guarda el
@@ -1888,6 +1980,8 @@ function pintarVista(vista) {
   // Antes de dibujar: si algo se expuso, tiene que verse en este mismo pintado.
   mostrarRevelaciones(vista);
   dibujar();
+  // Después de dibujar: la marca busca la mano en el DOM ya pintado.
+  mostrarMiradas(vista);
   pista(pistaDeRed(vista));
   modalesDeRed(vista);
   rescatarSiHayAusente();

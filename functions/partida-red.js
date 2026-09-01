@@ -692,12 +692,13 @@ export function crearMotorEnRed({
         // Tirar una carta cambia la muestra y el motor vuelve a abrir una
         // ventana de reflejos. Necesita la SUYA en la red: la de la ronda ya
         // está cerrada, y su plazo de revelación —vencido hace rato— cerraría
-        // esta al primer golpe. Dura 5 s porque acá no hay mirada que cubrir.
+        // esta al primer golpe. Dura MS_VENTANA a secas: acá no hay mirada que
+        // cubrir, así que no lleva el agregado de MS_MIRAR.
         ventana: reabreDescarte(partida, estado)
           ? crearVentana({
               id: `v_${idAleatorio()}`,
               abiertaEn: ahora(),
-              duracionMs: motor.MS_DESCARTE_TRAS_TIRAR,
+              duracionMs: MS_VENTANA,
             })
           : partida.ventana,
         latidos: { ...partida.latidos, [uid]: ahora() },
@@ -1041,7 +1042,7 @@ export function crearMotorEnRed({
           ? crearVentana({
               id: `v_${idAleatorio()}`,
               abiertaEn: ahora(),
-              duracionMs: motor.MS_DESCARTE_TRAS_TIRAR,
+              duracionMs: MS_VENTANA,
             })
           : partida.ventana,
         version: partida.version + 1,
