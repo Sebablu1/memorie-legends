@@ -282,7 +282,17 @@ console.log("\n=== 4. Quién llama a moverLeyendas ===");
   llamadas.forEach((c) =>
     console.log(`    ${c.archivo}:${String(c.linea).padStart(4)}  ${c.forma}`));
 
-  const CONOCIDOS = new Set(["index.js", "abandono.js", "cierre.js", "salida.js"]);
+  // El auditor no valida que la operación esté BIEN, sino que el archivo sea
+  // uno de los que tienen permiso de tocar saldos. Agregar un nombre acá es
+  // una decisión consciente, y por eso la lista es explícita: si mañana
+  // aparece otro archivo moviendo Leyendas, esta prueba lo canta.
+  const CONOCIDOS = new Set([
+    "index.js",
+    "abandono.js",   // penalización del 50 % al abandonar
+    "cierre.js",     // reparto del pozo 75/25
+    "salida.js",     // devolución al salir de una sala que no empezó
+    "admin.js",      // devolución al cancelar una sala desde el panel
+  ]);
   const raros = llamadas.filter((c) => !CONOCIDOS.has(c.archivo));
   ok(raros.length === 0, "todas están en operaciones económicas conocidas", raros);
   ok(llamadas.some((c) => c.forma === "varias"),

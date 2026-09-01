@@ -9,7 +9,7 @@
     "build": "echo 'No build needed'",
     "_comentario_pretest": "Las reglas viven en public/js/reglas y functions/reglas es una copia generada. npm ejecuta pretest antes de test, asi que las suites nunca corren contra una copia vieja: eso ya nos dio un diagnostico falso una vez.",
     "pretest": "node functions/copiar-reglas.js",
-    "test": "node pruebas/puntaje.mjs && node pruebas/salas.mjs && node pruebas/vista.mjs && node pruebas/descarte.mjs && node pruebas/estado.mjs && node pruebas/transacciones.mjs && node pruebas/abandono.mjs && node pruebas/abandono-red.mjs && node pruebas/salida.mjs && node pruebas/cierre.mjs && node pruebas/cierre-automatico.mjs && node pruebas/red.mjs && node pruebas/orquestador.mjs && node pruebas/red-e2e.mjs && node pruebas/mesa-red.mjs && node pruebas/desempate-red.mjs && node pruebas/filtraciones.mjs && node pruebas/rival.mjs && node pruebas/ausente.mjs && node pruebas/mirar-descarte.mjs && node pruebas/tirar-reabre.mjs"
+    "test": "node pruebas/puntaje.mjs && node pruebas/salas.mjs && node pruebas/vista.mjs && node pruebas/descarte.mjs && node pruebas/estado.mjs && node pruebas/transacciones.mjs && node pruebas/abandono.mjs && node pruebas/abandono-red.mjs && node pruebas/salida.mjs && node pruebas/cierre.mjs && node pruebas/cierre-automatico.mjs && node pruebas/red.mjs && node pruebas/orquestador.mjs && node pruebas/red-e2e.mjs && node pruebas/mesa-red.mjs && node pruebas/desempate-red.mjs && node pruebas/filtraciones.mjs && node pruebas/rival.mjs && node pruebas/ausente.mjs && node pruebas/mirar-descarte.mjs && node pruebas/tirar-reabre.mjs && node pruebas/admin.mjs"
   },
   "keywords": [
     "game",

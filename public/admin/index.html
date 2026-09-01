@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <title>Memorie Legends — Administración</title>
+    <link rel="icon" href="../img/claude-inspiration/logo.png" />
+    <link rel="stylesheet" href="admin.css" />
+  </head>
+  <body>
+    <header class="barra">
+      <img class="marca" src="../img/claude-inspiration/logo.png" alt="" />
+      <div>
+        <h1>Administración</h1>
+        <p class="lema" id="quien">Sin sesión</p>
+      </div>
+      <button id="btnSalir" class="btn sobrio" type="button" hidden>Salir</button>
+    </header>
+
+    <!-- Entrar. El correo se comprueba de verdad en el servidor; esto sólo
+         evita mostrar una pantalla que no va a funcionar. -->
+    <main id="entrar" class="tarjeta angosta">
+      <h2>Entrar</h2>
+      <form id="formEntrar" autocomplete="on">
+        <label>
+          Correo
+          <input id="correo" type="email" required autocomplete="username" />
+        </label>
+        <label>
+          Contraseña
+          <input id="clave" type="password" required autocomplete="current-password" />
+        </label>
+        <button class="btn" type="submit">Entrar</button>
+      </form>
+      <p class="aviso" id="avisoEntrar" role="status"></p>
+    </main>
+
+    <main id="panel" hidden>
+      <section class="totales">
+        <div class="dato"><b id="totalSalas">—</b><span>salas vivas</span></div>
+        <div class="dato"><b id="totalPartidas">—</b><span>partidas en curso</span></div>
+        <div class="dato acento"><b id="totalRetenido">—</b><span>Leyendas retenidas</span></div>
+      </section>
+
+      <div class="acciones">
+        <button id="btnRefrescar" class="btn sobrio" type="button">Refrescar</button>
+        <button id="btnCancelarTodas" class="btn peligro" type="button">
+          Cancelar todas las que esperan
+        </button>
+      </div>
+
+      <p class="aviso" id="aviso" role="status"></p>
+
+      <section>
+        <h2>Salas</h2>
+        <div id="salas" class="lista"></div>
+      </section>
+
+      <section>
+        <h2>Partidas en curso</h2>
+        <!-- De las partidas no llega ni una carta: el servidor manda sólo
+             código, fase, ronda y cuántos juegan. -->
+        <div id="partidas" class="lista"></div>
+      </section>
+    </main>
+
+    <script type="module" src="admin.js"></script>
+  </body>
+</html>

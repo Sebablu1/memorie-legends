@@ -32,6 +32,7 @@ import { crearAbandonarPartida } from "./abandono.js";
 import { crearMotorEnRed } from "./partida-red.js";
 import { crearCierre } from "./cierre.js";
 import { crearSalirDeSalaEnEspera } from "./salida.js";
+import { crearAdmin } from "./admin.js";
 
 import {
   ENTRADAS,
@@ -421,6 +422,45 @@ export const salirDeSalaEnEspera = functions.https.onCall(async (data, context) 
   const uid = exigirSesion(context);
   return salida({ uid, codigo: data?.codigo });
 });
+
+// ------------------------------------------------------- administración
+
+/**
+ * Panel de administración.
+ *
+ * La cuenta autorizada se comprueba ACÁ, contra `context.auth.token`, que lo
+ * pone Firebase al verificar el token. El navegador puede decir lo que quiera:
+ * lo único que cuenta es ese correo, y verificado.
+ *
+ * Las reglas de Firestore no cambian. `partidas` sigue siendo ilegible para
+ * todo el mundo —administrador incluido—: lo que el panel recibe es un resumen
+ * que se arma acá y no lleva ni una carta.
+ */
+const CORREO_ADMIN = "soporte.memorie.legends@gmail.com";
+
+const panel = crearAdmin({
+  db,
+  salas: SALAS,
+  partidas: "partidas",
+  moverLeyendas,
+  // Una cancelación devuelve la entrada: mismo motivo que cualquier otra
+  // devolución, y la misma clave de idempotencia que usa `salida.js`, para que
+  // a nadie se le pague dos veces por la misma sala.
+  motivo: MOTIVOS.APUESTA,
+  marcaDeTiempo,
+  error: errorHttp,
+  estados: ESTADOS_SALA,
+  emailAdmin: CORREO_ADMIN,
+});
+
+export const listarSalasAdmin = functions.https.onCall((_data, context) =>
+  panel.listarSalas(context));
+
+export const cancelarSalaAdmin = functions.https.onCall((data, context) =>
+  panel.cancelarSala(context, { codigo: data?.codigo }));
+
+export const cancelarSalasEnEsperaAdmin = functions.https.onCall((_data, context) =>
+  panel.cancelarTodasEnEspera(context));
 
 // ------------------------------------------------------ partida en red
 
