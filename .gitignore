@@ -42,3 +42,5 @@ build/
 # Firebase Admin
 serviceAccountKey.json
 *.key.json
+# Volcado del código para pegar en el chat. No es parte del sitio.
+proyecto_completo.txt

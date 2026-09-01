@@ -37,6 +37,7 @@ import { crearMoverLeyendas } from "./leyendas.js";
 import { crearAbandonarPartida } from "./abandono.js";
 import { crearMotorEnRed } from "./partida-red.js";
 import { crearCierre } from "./cierre.js";
+import { crearLimiteDeRitmo } from "./limite-de-ritmo.js";
 import { crearSalirDeSalaEnEspera } from "./salida.js";
 import { crearAdmin } from "./admin.js";
 
@@ -89,10 +90,27 @@ const moverLeyendas = crearMoverLeyendas({
   error: errorHttp,
 });
 
-const exigirSesion = (context) => {
+/**
+ * Techo de llamadas por jugador. Ver limite-de-ritmo.js: las acciones del
+ * juego se cuentan en memoria y las de plata en Firestore, y ese reparto no
+ * es una optimización sino una condición para no torcer los reflejos.
+ */
+const limite = crearLimiteDeRitmo({ db, error: errorHttp });
+
+/**
+ * Puerta única: sesión y ritmo.
+ *
+ * El techo viaja pegado al control de sesión a propósito. Si fuera una
+ * llamada aparte, una función nueva podría olvidárselo sin que se note;
+ * así, olvidarlo obliga a olvidarse también de exigir sesión, que es un
+ * error que salta a la primera. Igual hay una prueba que audita el archivo
+ * y exige que toda callable pase su nombre (pruebas/ritmo.mjs).
+ */
+const exigirSesion = (context, accion) => {
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "Iniciá sesión para continuar.");
   }
+  if (accion) limite.exigirRitmo(context.auth.uid, accion);
   return context.auth.uid;
 };
 
@@ -105,7 +123,8 @@ const exigirSesion = (context) => {
 // ------------------------------------------------------------ bono diario
 
 export const reclamarBonoDiario = functions.https.onCall(async (_data, context) => {
-  const uid = exigirSesion(context);
+  const uid = exigirSesion(context, "reclamarBonoDiario");
+  await limite.exigirRitmoDePlata(uid, "reclamarBonoDiario");
 
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(db.collection(USUARIOS).doc(uid));
@@ -135,7 +154,8 @@ export const reclamarBonoDiario = functions.https.onCall(async (_data, context) 
 const azarSeguro = () => crypto.randomInt(0, 2 ** 48) / 2 ** 48;
 
 export const girarLaRuleta = functions.https.onCall(async (_data, context) => {
-  const uid = exigirSesion(context);
+  const uid = exigirSesion(context, "girarLaRuleta");
+  await limite.exigirRitmoDePlata(uid, "girarLaRuleta");
 
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(db.collection(USUARIOS).doc(uid));
@@ -181,7 +201,7 @@ const azarCodigo = () => crypto.randomInt(0, 2 ** 32) / 2 ** 32;
  * pueden hacer.
  */
 export const crearSala = functions.https.onCall(async (data, context) => {
-  const uid = exigirSesion(context);
+  const uid = exigirSesion(context, "crearSala");
   const entrada = Number(data?.entrada);
   const nombre = String(data?.nombre ?? "Sala").slice(0, 40);
 
@@ -252,7 +272,7 @@ export const crearSala = functions.https.onCall(async (data, context) => {
  * sala en cinco ni cobrarse dos veces.
  */
 export const unirseASala = functions.https.onCall(async (data, context) => {
-  const uid = exigirSesion(context);
+  const uid = exigirSesion(context, "unirseASala");
   const codigo = String(data?.codigo ?? "").trim().toUpperCase();
 
   if (!esCodigoValido(codigo)) {
@@ -305,7 +325,7 @@ export const unirseASala = functions.https.onCall(async (data, context) => {
  * a sí mismo — el uid sale de la sesión, no de lo que manda el cliente.
  */
 export const marcarListo = functions.https.onCall(async (data, context) => {
-  const uid = exigirSesion(context);
+  const uid = exigirSesion(context, "marcarListo");
   const codigo = String(data?.codigo ?? "").trim().toUpperCase();
   const listo = data?.listo !== false;
 
@@ -340,7 +360,7 @@ export const marcarListo = functions.https.onCall(async (data, context) => {
  * nadie más puede sumarse.
  */
 export const iniciarPartida = functions.https.onCall(async (data, context) => {
-  const uid = exigirSesion(context);
+  const uid = exigirSesion(context, "iniciarPartida");
   const codigo = String(data?.codigo ?? "").trim().toUpperCase();
 
   return db.runTransaction(async (tx) => {
@@ -425,7 +445,7 @@ const salida = crearSalirDeSalaEnEspera({
 });
 
 export const salirDeSalaEnEspera = functions.https.onCall(async (data, context) => {
-  const uid = exigirSesion(context);
+  const uid = exigirSesion(context, "salirDeSalaEnEspera");
   return salida({ uid, codigo: data?.codigo });
 });
 
@@ -506,7 +526,7 @@ const cierre = crearCierre({
  * caminos usan las mismas primitivas, así que no pueden divergir.
  */
 export const cerrarPartida = functions.https.onCall(async (data, context) => {
-  const uid = exigirSesion(context);
+  const uid = exigirSesion(context, "cerrarPartida");
   return cierre.cerrarPartida({ uid, codigo: data?.codigo });
 });
 
@@ -533,13 +553,13 @@ const enRed = crearMotorEnRed({
  * pasadas y se queda con la de viaje más corto; ver reglas/red.js.
  */
 export const horaDelServidor = functions.https.onCall(async (_data, context) => {
-  exigirSesion(context);
+  exigirSesion(context, "horaDelServidor");
   return { ahora: Date.now() };
 });
 
 /** Abre la ventana de reflejos. La hora y el identificador los pone el servidor. */
 export const abrirVentanaDescarte = functions.https.onCall(async (data, context) => {
-  exigirSesion(context);
+  exigirSesion(context, "abrirVentanaDescarte");
   return enRed.abrirVentana({ codigo: String(data?.codigo ?? "").trim().toUpperCase() });
 });
 
@@ -550,7 +570,7 @@ export const abrirVentanaDescarte = functions.https.onCall(async (data, context)
  * siempre la mejor conexión. Ver PROTOCOLO-REFLEJOS.md.
  */
 export const intentarDescarte = functions.https.onCall(async (data, context) => {
-  const uid = exigirSesion(context);
+  const uid = exigirSesion(context, "intentarDescarte");
   return enRed.intentarDescarte({
     uid,
     codigo: String(data?.codigo ?? "").trim().toUpperCase(),
@@ -569,7 +589,7 @@ export const intentarDescarte = functions.https.onCall(async (data, context) => 
 
 /** Cierra la ventana y aplica los intentos en orden de reacción. */
 export const cerrarVentanaDescarte = functions.https.onCall(async (data, context) => {
-  exigirSesion(context);
+  exigirSesion(context, "cerrarVentanaDescarte");
   return enRed.cerrarVentana({ codigo: String(data?.codigo ?? "").trim().toUpperCase() });
 });
 
@@ -581,19 +601,19 @@ export const cerrarVentanaDescarte = functions.https.onCall(async (data, context
  * no adelanta nada; llamarla mil veces es lo mismo que llamarla una.
  */
 export const avanzarPartida = functions.https.onCall(async (data, context) => {
-  exigirSesion(context);
+  exigirSesion(context, "avanzarPartida");
   return enRed.avanzarPartida({ codigo: String(data?.codigo ?? "").trim().toUpperCase() });
 });
 
 /** Cierra la fase de mirar. La decide el servidor con su reloj. */
 export const cerrarMirada = functions.https.onCall(async (data, context) => {
-  exigirSesion(context);
+  exigirSesion(context, "cerrarMirada");
   return enRed.cerrarMirada({ codigo: String(data?.codigo ?? "").trim().toUpperCase() });
 });
 
 /** Cualquier acción de turno. La lista de acciones válidas es blanca. */
 export const accionDePartida = functions.https.onCall(async (data, context) => {
-  const uid = exigirSesion(context);
+  const uid = exigirSesion(context, "accionDePartida");
   return enRed.accionDeTurno({
     uid,
     codigo: String(data?.codigo ?? "").trim().toUpperCase(),
@@ -606,13 +626,13 @@ export const accionDePartida = functions.https.onCall(async (data, context) => {
 
 /** Señal de vida. Caerse no cuesta Leyendas; sólo hace que te salten el turno. */
 export const latir = functions.https.onCall(async (data, context) => {
-  const uid = exigirSesion(context);
+  const uid = exigirSesion(context, "latir");
   return enRed.latir({ uid, codigo: String(data?.codigo ?? "").trim().toUpperCase() });
 });
 
 /** Saltea el turno de quien lleva rato sin dar señales. */
 export const saltarAusente = functions.https.onCall(async (data, context) => {
-  exigirSesion(context);
+  exigirSesion(context, "saltarAusente");
   return enRed.saltarAusente({ codigo: String(data?.codigo ?? "").trim().toUpperCase() });
 });
 
@@ -646,14 +666,15 @@ const abandono = crearAbandonarPartida({
 });
 
 export const abandonarPartida = functions.https.onCall(async (data, context) => {
-  const uid = exigirSesion(context);
+  const uid = exigirSesion(context, "abandonarPartida");
   return abandono({ uid, codigo: data?.codigo });
 });
 
 // -------------------------------------------------------------- referidos
 
 export const acreditarReferido = functions.https.onCall(async (data, context) => {
-  const uid = exigirSesion(context);
+  const uid = exigirSesion(context, "acreditarReferido");
+  await limite.exigirRitmoDePlata(uid, "acreditarReferido");
   const { referidoUid } = data ?? {};
   if (!referidoUid || referidoUid === uid) {
     throw new functions.https.HttpsError("invalid-argument", "Referido inválido.");
@@ -770,7 +791,8 @@ export const cerrarRankingAnual = functions.pubsub
  * si viniera del navegador, cualquiera compraría el Pack Élite por $U 1.
  */
 export const crearOrdenDeCompra = functions.https.onCall(async (data, context) => {
-  const uid = exigirSesion(context);
+  const uid = exigirSesion(context, "crearOrdenDeCompra");
+  await limite.exigirRitmoDePlata(uid, "crearOrdenDeCompra");
   const paquete = paquetePorId(data?.paqueteId);
   if (!paquete) {
     throw new functions.https.HttpsError("invalid-argument", "Paquete inexistente.");
