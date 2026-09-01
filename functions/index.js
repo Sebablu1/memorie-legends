@@ -9,7 +9,13 @@
  * colecciones de dinero y ranking son de sólo lectura para el cliente.
  */
 
-import functions from "firebase-functions/v1";
+/**
+ * En firebase-functions v7 el subpaquete v1 dejó de tener export por defecto:
+ * sigue exportando `https`, `pubsub` y compañía, pero uno por uno. Con
+ * `import functions from` la variable queda en undefined y las 27 funciones
+ * revientan al arrancar, no al desplegar. De ahí el namespace.
+ */
+import * as functions from "firebase-functions/v1";
 import admin from "firebase-admin";
 import crypto from "node:crypto";
 
