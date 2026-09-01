@@ -3,7 +3,7 @@
   "description": "Cloud Functions de Memorie Legends: Leyendas, ranking, ruleta y pagos",
   "type": "module",
   "main": "index.js",
-  "engines": { "node": "20" },
+  "engines": { "node": "22" },
   "scripts": {
     "copiar-reglas": "node copiar-reglas.js",
     "serve": "npm run copiar-reglas && firebase emulators:start --only functions",
