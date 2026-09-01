@@ -1680,11 +1680,12 @@ let dejarDeLatir = null;
 let dejarDeAvanzar = null;
 let dejarDeRescatar = null;
 
-// ------------------- NUEVAS VARIABLES PARA EL PARCHE -------------------
-let temporizadorDescarte = null; // <-- DECLARADA AQUÍ
+/** Freno propio del descarte: no comparte el de `pedir`, porque durante la
+ *  mirada convive con la petición de `mirar` y no puede esperarla. */
 let descartando = false;
+
+/** Poder en curso: qué se está eligiendo. */
 let eligiendoPoder = null;
-// --------------------------------------------------------------------
 
 /**
  * Las tres fases que no tienen reloj.
@@ -1866,32 +1867,19 @@ function mostrarRevelaciones(vista) {
   }
 }
 
-// ---------- FUNCIÓN PINTAR VISTA CON EL TEMPORIZADOR DE CIERRE ----------
+/**
+ * Pinta lo que publicó el servidor. Nada más.
+ *
+ * Acá NO se cierra ninguna ventana por reloj propio. El servidor guarda el
+ * plazo de cada una y la cierra cuando vence; `mantenerEnMarcha` sólo le
+ * golpea la puerta cada 900 ms para preguntarle. Un temporizador del navegador
+ * con un número fijo no puede saber cuánto dura la ventana que está mirando:
+ * la de la ronda vence a los 9 s y la que reabre tirar a los 5, y cerrar antes
+ * de tiempo se come la gracia y pierde jugadas legítimas que venían en camino.
+ */
 function pintarVista(vista) {
   miVista = vista;
   YO = vista.yo;
-
-  // ------------------------------------------------- PARCHE TEMPORAL
-  // Cierra la ventana de descarte automáticamente después de 7 segundos
-  if (vista.fase === "descarte") {
-    if (temporizadorDescarte) return;
-    temporizadorDescarte = setTimeout(async () => {
-      try {
-        await Red.cerrarVentanaDescarte(salaPedida);
-        await Red.avanzarPartida(salaPedida);
-        console.log("✅ Ventana de descarte cerrada automáticamente");
-      } catch (e) {
-        console.warn("No se pudo cerrar la ventana:", e);
-      } finally {
-        temporizadorDescarte = null;
-      }
-    }, 7000);
-  } else {
-    if (temporizadorDescarte) {
-      clearTimeout(temporizadorDescarte);
-      temporizadorDescarte = null;
-    }
-  }
 
   // Si la fase dejó de ser la del poder —porque se resolvió, o porque a un
   // ausente se lo saltearon— la elección en curso ya no tiene sentido.
@@ -2041,6 +2029,13 @@ async function pedir(accion, ejecutar) {
           "La jugada PUEDE haberse aplicado igual: no se reintenta.",
       );
       pista("⌛ No pudimos confirmar la acción. Esperá un momento.");
+    } else if (esDesincronizacion(error)) {
+      // La mesa siguió mientras el dedo iba en camino: el reloj de turno saltó
+      // al jugador, o la ventana venció. No es un error del jugador ni algo
+      // que deba arreglar, y la vista nueva ya viene en camino a corregir la
+      // pantalla. Se dice en voz baja y sin el sonido de error.
+      console.info(`"${accion}" llegó tarde: ${error?.message}`);
+      pista(esoYaPaso(error));
     } else {
       console.error(`Falló "${accion}":`, error);
       pista(`⚠️ ${error?.message ?? "No pudimos enviar la jugada."}`);
@@ -2051,6 +2046,24 @@ async function pedir(accion, ejecutar) {
     pidiendo = false;
   }
 }
+
+/**
+ * ¿El rechazo es porque la mesa avanzó, y no porque la jugada esté mal?
+ *
+ * Se mira el código del servidor y no sólo el texto: `failed-precondition` es
+ * lo que devuelve cuando la acción era válida pero ya no corresponde. Se
+ * acota con los mensajes concretos para no tragarse otros rechazos de la
+ * misma familia que sí conviene que el jugador vea.
+ */
+const esDesincronizacion = (error) =>
+  error?.codigo === "failed-precondition" &&
+  /No es tu turno|ventana .*(cerr|termin)|no está en fase|no se puede hacer ahora/i
+    .test(error?.message ?? "");
+
+const esoYaPaso = (error) =>
+  /No es tu turno/i.test(error?.message ?? "")
+    ? "Se te pasó el turno."
+    : "Esa jugada llegó tarde.";
 let pidiendo = false;
 
 /** Freno propio del descarte: no comparte el de `pedir`, porque durante la
