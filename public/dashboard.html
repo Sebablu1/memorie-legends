@@ -63,7 +63,27 @@
            aunque el JavaScript no cargue. -->
       <section class="tarjeta-modo caja-jugar">
         <span class="marco-esquinas" aria-hidden="true"></span>
-        <span class="icono" aria-hidden="true">🃏</span>
+
+        <!-- El logo, no un emoji.
+
+             Lleva `alt` de verdad y no `alt=""`: si la imagen no carga —un 404,
+             una red mala— el navegador dibuja el texto en su lugar, que se lee
+             como el nombre del juego. Con `alt` vacío quedaría el hueco roto y
+             nadie sabría qué faltaba.
+
+             `width`/`height` son la proporción real del archivo. Van puestos
+             aunque el CSS mande, porque son los que le dicen al navegador
+             cuánto espacio reservar: sin ellos la página salta cuando la imagen
+             termina de bajar. -->
+        <img
+          class="logo-caja"
+          src="img/memorie-legends.png"
+          alt="Memorie Legends"
+          width="612"
+          height="408"
+          decoding="async"
+        />
+
         <h3>Jugar</h3>
         <p class="modo-lema">Elegí el modo</p>
 

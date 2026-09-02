@@ -125,6 +125,53 @@ test("una sola caja de jugar, con el modo adentro", async ({ page }) => {
   await expect(page.locator("#panelLeyendas")).toBeHidden();
 });
 
+test("el logo carga y entra en la caja en cualquier pantalla", async ({ page }) => {
+  // Esta prueba existe por dos cosas distintas que se rompen distinto.
+  //
+  // Que el archivo ESTÉ: un `src` mal escrito no rompe nada, no ensucia la
+  // consola con un error de JavaScript y no lo ve nadie hasta que un jugador
+  // abre el tablero y encuentra un hueco donde va la marca.
+  //
+  // Y que el tamaño CREZCA Y SE ACHIQUE: el logo es horizontal, y un ancho
+  // fijo que se ve bien en el escritorio desborda la caja en un teléfono.
+  for (const [donde, ancho] of [["escritorio", 1440], ["tablet", 768], ["móvil", 390], ["móvil chico", 320]]) {
+    await page.setViewportSize({ width: ancho, height: 800 });
+    await abrirTablero(page);
+
+    const logo = page.locator(".caja-jugar .logo-caja");
+    await expect(logo, `no hay logo en ${donde}`).toHaveCount(1);
+
+    const m = await logo.evaluate((img) => {
+      const r = img.getBoundingClientRect();
+      const caja = img.closest(".caja-jugar").getBoundingClientRect();
+      return {
+        // `complete` sola dice "el navegador dejó de intentar", que también es
+        // cierto cuando el archivo devolvió 404. El que separa las dos cosas
+        // es `naturalWidth`: en una imagen rota vale 0.
+        cargo: img.complete && img.naturalWidth > 0,
+        ancho: r.width,
+        // Cuánto se sale de la caja, por cualquiera de los dos lados.
+        desborde: Math.max(0, r.right - caja.right, caja.left - r.left),
+        texto: img.alt,
+      };
+    });
+
+    expect(m.cargo, `la imagen del logo no cargó (¿falta public/img/memorie-legends.png?)`).toBe(true);
+    expect(m.texto, "el logo necesita alt: es lo que se lee si no carga").toBeTruthy();
+    expect(m.desborde, `el logo se sale ${m.desborde}px de la caja en ${donde}`).toBe(0);
+
+    // Entre los dos extremos del clamp, con un pelín de margen por el redondeo.
+    expect(m.ancho, `ancho raro en ${donde}: ${m.ancho}`).toBeGreaterThanOrEqual(89);
+    expect(m.ancho, `ancho raro en ${donde}: ${m.ancho}`).toBeLessThanOrEqual(161);
+  }
+
+  // La página no queda con barra horizontal en el teléfono más chico.
+  const seSale = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(seSale, "el tablero desborda a lo ancho en 320px").toBe(false);
+});
+
 test("las salas abiertas sólo se muestran en el modo por Leyendas", async ({ page }) => {
   // Un listado de salas por Leyendas no tiene sentido mientras se está
   // mirando el entrenamiento.

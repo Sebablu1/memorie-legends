@@ -176,20 +176,31 @@
   opacity: 0.75;
 }
 
-/* El icono, en un medallón. Un emoji suelto sobre el paño se ve como un emoji
-   suelto; dentro de un disco con relieve se ve como una ficha. */
-.caja-jugar .icono {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 62px;
-  height: 62px;
-  margin: 0 auto 4px;
-  border-radius: 50%;
-  font-size: 1.7rem;
-  background: radial-gradient(circle at 35% 30%, rgba(212, 168, 67, 0.28), rgba(0, 0, 0, 0.6));
-  border: 1px solid var(--borde);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 6px 20px rgba(0, 0, 0, 0.5);
+/* El logo.
+
+   No lleva medallón. El disco era para un emoji —un emoji suelto sobre el paño
+   se ve como un emoji suelto— pero un logo horizontal metido en un círculo
+   queda apretado y con aire muerto a los costados. Un logo ya trae su propia
+   forma: lo que necesita es espacio y una luz detrás, no un marco.
+
+   El brillo va con `drop-shadow` y no con `box-shadow`: drop-shadow sigue la
+   silueta del PNG transparente, box-shadow dibujaría el halo de un rectángulo
+   y se vería la caja invisible de la imagen. */
+.caja-jugar .logo-caja {
+  display: block;
+  /* Grande en una pantalla ancha, sin desbordar en un teléfono: el `25vw` del
+     medio manda mientras esté entre los dos extremos. */
+  width: clamp(90px, 25vw, 160px);
+  height: auto;
+  margin: 0 auto 10px;
+  filter: drop-shadow(0 0 15px rgba(212, 168, 67, 0.5));
+}
+
+/* Un resplandor detrás, del tamaño del logo, para despegarlo del paño. Va en
+   un pseudoelemento del contenedor y no en la imagen: un filtro más sobre el
+   PNG lo apagaría. */
+.caja-jugar .logo-caja + h3 {
+  margin-top: 0;
 }
 
 .caja-jugar h3 {
