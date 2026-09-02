@@ -3,13 +3,31 @@ import { esDescarteValido, esPoder } from "./motor.js";
 
 // errorDescarte y reaccion salen directos de la tabla del reglamento.
 // memoria = probabilidad de recordar una carta vista.
-// cortaEn = puntos estimados de mano por debajo de los cuales corta.
+//
+// `cortaEn` y `ESTIMACION_DESCONOCIDA` ya NO los usa `decidirCorte`: quedaron
+// de la regla anterior, que estimaba las cartas no recordadas. Se dejan
+// exportados porque describen bien el perfil de cada dificultad y `cambiaEn`
+// vive en la misma tabla, pero nadie los lee para decidir el corte.
+/**
+ * `sumaMaximaConocida` es el techo para cortar con la mano casi entera.
+ *
+ * Sólo suma las cartas que la IA RECUERDA, así que no es comparable con
+ * `cortaEn`, que estimaba las desconocidas en 5,6 puntos cada una. Cuanto
+ * mejor la IA, más exigente: la experta no corta con más de 8 puntos vistos,
+ * la fácil se conforma con 16.
+ */
 export const DIFICULTADES = {
-  facil: { etiqueta: "Fácil", errorDescarte: 0.3, reaccion: [2000, 4000], memoria: 0.45, cortaEn: 16, cambiaEn: 8 },
-  medio: { etiqueta: "Medio", errorDescarte: 0.15, reaccion: [1000, 3000], memoria: 0.7, cortaEn: 14, cambiaEn: 7 },
-  dificil: { etiqueta: "Difícil", errorDescarte: 0.05, reaccion: [500, 1500], memoria: 0.9, cortaEn: 12, cambiaEn: 6 },
-  experto: { etiqueta: "Experto", errorDescarte: 0, reaccion: [300, 800], memoria: 1, cortaEn: 10, cambiaEn: 5 },
+  facil: { etiqueta: "Fácil", errorDescarte: 0.3, reaccion: [2000, 4000], memoria: 0.45, cortaEn: 16, cambiaEn: 8, sumaMaximaConocida: 16 },
+  medio: { etiqueta: "Medio", errorDescarte: 0.15, reaccion: [1000, 3000], memoria: 0.7, cortaEn: 14, cambiaEn: 7, sumaMaximaConocida: 13 },
+  dificil: { etiqueta: "Difícil", errorDescarte: 0.05, reaccion: [500, 1500], memoria: 0.9, cortaEn: 12, cambiaEn: 6, sumaMaximaConocida: 10 },
+  experto: { etiqueta: "Experto", errorDescarte: 0, reaccion: [300, 800], memoria: 1, cortaEn: 10, cambiaEn: 5, sumaMaximaConocida: 8 },
 };
+
+/** Con esta cantidad de cartas o menos, se corta sin pensarlo. */
+export const MANO_CHICA = 2;
+
+/** Cuántas cartas hay que recordar para que la estimación valga algo. */
+export const MINIMO_CONOCIDAS = 3;
 
 /** Valor medio de una carta de la baraja (268 puntos / 48 cartas). */
 export const ESTIMACION_DESCONOCIDA = 5.6;
@@ -185,22 +203,48 @@ export function decidirObjetivoCambio(estado, indiceIA, memoria, aCiegas, rng = 
  * El umbral se afloja según se alarga la ronda, para que nadie se quede
  * esperando indefinidamente una mano perfecta.
  */
+/**
+ * ¿Corta?
+ *
+ * Antes esto era una sola cuenta: estimar la mano —contando las desconocidas
+ * como 5,6 puntos— y cortar si daba por debajo del umbral. El problema es que
+ * esa estimación trata igual dos situaciones que no se parecen en nada. Cuatro
+ * cartas sin recordar ninguna estima 22,4, y una mano de dos cartas que sí
+ * conoce estima lo mismo si suman 22: la primera es una apuesta a ciegas y la
+ * segunda un dato. Cortar mal cuesta +10, así que la diferencia importa.
+ *
+ * Ahora se decide en dos escalones distintos según cuántas cartas queden:
+ *
+ *   0 cartas   → corta. No hay nada que pueda salir mal.
+ *   1 o 2      → corta. Con tan poco en la mano es muy difícil no tener el
+ *                puntaje más bajo, y seguir jugando expone a recibir cartas de
+ *                castigo, que es peor que el riesgo del +10.
+ *   3 o 4      → sólo si sabe de qué habla: tiene que recordar al menos
+ *                MINIMO_CONOCIDAS cartas, y la suma de ÉSAS tiene que caber
+ *                bajo el techo de su dificultad. Si recuerda menos, no corta:
+ *                una estimación mala vale menos que no arriesgar.
+ *
+ * Ojo con la suma: son sólo las cartas RECORDADAS, sin estimar las otras. Por
+ * eso `sumaMaximaConocida` no es comparable con el viejo `cortaEn`, que sí las
+ * estimaba.
+ */
 export function decidirCorte(estado, indiceIA, memoria) {
   const { dificultad, mano } = estado.jugadores[indiceIA];
-  const { cortaEn } = perfil(dificultad);
+  const { sumaMaximaConocida } = perfil(dificultad);
 
   const vivas = mano.filter(Boolean).length;
   if (vivas === 0) return true;
+  if (vivas <= MANO_CHICA) return true;
 
-  const estimado = mano.reduce((suma, carta, posicion) => {
-    if (!carta) return suma;
-    const conocida = consultar(memoria, indiceIA, posicion);
-    return suma + (conocida ? puntosCarta(conocida.numero) : ESTIMACION_DESCONOCIDA);
-  }, 0);
+  // Sólo lo que recuerda. Las que no recuerda no suman ni estiman: si son
+  // demasiadas, directamente no corta.
+  const conocidas = mano.reduce((puntos, carta, posicion) => {
+    if (!carta) return puntos;
+    const recordada = consultar(memoria, indiceIA, posicion);
+    return recordada ? [...puntos, puntosCarta(recordada.numero)] : puntos;
+  }, []);
 
-  const activos = estado.jugadores.filter((j) => !j.eliminado).length || 1;
-  const vueltas = Math.floor((estado.turnosRonda ?? 0) / activos);
-  const presion = Math.max(0, vueltas - 2) * 2;
+  if (conocidas.length < MINIMO_CONOCIDAS) return false;
 
-  return estimado <= cortaEn + presion;
+  return conocidas.reduce((a, b) => a + b, 0) <= sumaMaximaConocida;
 }
