@@ -49,6 +49,10 @@ const dom = {
   avisoUsuarios: $("avisoUsuarios"),
   listaUsuarios: $("listaUsuarios"),
   partidas: $("partidas"),
+  btnVerReportes: $("btnVerReportes"),
+  filtroReportes: $("filtroReportes"),
+  avisoReportes: $("avisoReportes"),
+  listaReportes: $("listaReportes"),
 };
 
 const listar = httpsCallable(funciones, "listarSalasAdmin");
@@ -57,6 +61,8 @@ const cancelarTodas = httpsCallable(funciones, "cancelarSalasEnEsperaAdmin");
 const revisarNombres = httpsCallable(funciones, "revisarNombresAdmin");
 const listarUsuarios = httpsCallable(funciones, "listarUsuariosAdmin");
 const eliminarUsuario = httpsCallable(funciones, "eliminarUsuarioAdmin");
+const listarReportes = httpsCallable(funciones, "listarReportesAdmin");
+const resolverReporte = httpsCallable(funciones, "resolverReporteAdmin");
 
 const decir = (donde, texto, clase = "") => {
   donde.textContent = texto;
@@ -409,3 +415,121 @@ No tiene saldo ni partidas, así que se borra del todo. No se puede deshacer.`
 }
 
 dom.btnListarUsuarios.addEventListener("click", verCuentas);
+
+// ------------------------------------------------------------ reportes
+
+/**
+ * Lo que denuncian los jugadores.
+ *
+ * Todo se dibuja con `createElement` y `textContent`, nunca con `innerHTML`.
+ * Acá entra texto escrito por dos desconocidos —el nombre de quien reporta y
+ * el comentario que escribió— y el comentario es texto libre de hasta 500
+ * caracteres. Es el sitio del panel donde más fácil sería colar HTML.
+ */
+
+const MOTIVOS_VISIBLES = {
+  trampa: "Hizo trampa",
+  insultos: "Insultos o malos tratos",
+  abandono: "Abandonó o demoró",
+  nombre: "Nombre ofensivo",
+  otro: "Otra cosa",
+};
+
+function filaDeReporte(reporte) {
+  const fila = document.createElement("div");
+  fila.className = "fila";
+
+  const campo = (texto, clase = "campo") => {
+    const el = document.createElement("span");
+    el.className = clase;
+    el.textContent = texto;
+    return el;
+  };
+
+  const etiqueta = document.createElement("span");
+  const clases = { pendiente: "alerta", resuelto: "jugando", ignorado: "esperando" };
+  etiqueta.className = `etiqueta ${clases[reporte.estado] ?? "esperando"}`;
+  etiqueta.textContent = reporte.estado;
+
+  // "(cuenta dada de baja)" y "(sin nombre)" son cosas distintas: la primera
+  // significa que el uid ya no existe en `users`, y eso cambia qué se puede
+  // hacer con el reporte.
+  const quien = (persona) =>
+    persona.nombre === null
+      ? "(cuenta dada de baja)"
+      : persona.nombre || "(sin nombre)";
+
+  fila.append(
+    etiqueta,
+    campo(`${quien(reporte.denunciado)} ← ${quien(reporte.denunciante)}`, "campo"),
+    campo(MOTIVOS_VISIBLES[reporte.motivo] ?? reporte.motivo),
+    campo(fecha(reporte.creado)),
+  );
+
+  if (reporte.sala) fila.append(campo(`sala ${reporte.sala}`));
+  if (reporte.comentario) fila.append(campo(`"${reporte.comentario}"`, "campo comentario"));
+
+  // El uid del denunciado, para poder buscarlo en la sección de cuentas. El
+  // del denunciante NO se muestra: quien reporta tiene que poder hacerlo sin
+  // quedar expuesto, incluso acá adentro, salvo que haga falta.
+  fila.append(campo(reporte.denunciado.uid, "campo tenue"));
+
+  if (reporte.estado === "pendiente") {
+    for (const [estado, texto, clase] of [
+      ["resuelto", "Resuelto", "btn chico"],
+      ["ignorado", "Ignorar", "btn sobrio chico"],
+    ]) {
+      const boton = document.createElement("button");
+      boton.type = "button";
+      boton.className = clase;
+      boton.textContent = texto;
+      boton.addEventListener("click", () => marcar(reporte, estado, fila));
+      fila.append(boton);
+    }
+  }
+
+  return fila;
+}
+
+async function verReportes() {
+  dom.btnVerReportes.disabled = true;
+  decir(dom.avisoReportes, "Cargando…");
+  try {
+    const { data } = await listarReportes({ estado: dom.filtroReportes.value || undefined });
+    dom.listaReportes.replaceChildren(...data.reportes.map(filaDeReporte));
+    decir(
+      dom.avisoReportes,
+      data.total === 0
+        ? "No hay reportes con ese filtro."
+        : `${data.total} reporte(s) · ${data.pendientes} sin revisar`,
+      data.pendientes > 0 ? "alerta" : "bien",
+    );
+  } catch (error) {
+    decir(dom.avisoReportes, error?.message ?? "No pudimos leer los reportes.", "mal");
+    console.error(error);
+  } finally {
+    dom.btnVerReportes.disabled = false;
+  }
+}
+
+/**
+ * Marca un reporte como visto.
+ *
+ * No pide confirmación a propósito, al revés que dar de baja una cuenta: esto
+ * no le hace nada a nadie y es reversible desde el filtro "Todos". Pedir
+ * confirmación para lo inocuo entrena a confirmar sin leer, y entonces la
+ * confirmación que sí importa tampoco se lee.
+ */
+async function marcar(reporte, estado, fila) {
+  fila.querySelectorAll("button").forEach((b) => (b.disabled = true));
+  try {
+    await resolverReporte({ id: reporte.id, estado });
+    await verReportes();
+  } catch (error) {
+    fila.querySelectorAll("button").forEach((b) => (b.disabled = false));
+    decir(dom.avisoReportes, error?.message ?? "No pudimos guardarlo.", "mal");
+  }
+}
+
+dom.btnVerReportes.addEventListener("click", verReportes);
+dom.filtroReportes.addEventListener("change", verReportes);

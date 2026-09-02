@@ -61,9 +61,11 @@ import {
   EsquemaAccion,
   EsquemaCompra,
   EsquemaReferido,
+  EsquemaReporte,
 } from "./esquemas.js";
 import { crearSalirDeSalaEnEspera } from "./salida.js";
 import { crearAdmin } from "./admin.js";
+import { crearReportes } from "./reportes.js";
 import { crearMercadoPago, pagoCoincideConOrden } from "./mercadopago.js";
 
 import {
@@ -131,10 +133,45 @@ const limite = crearLimiteDeRitmo({ db, error: errorHttp });
  * error que salta a la primera. Igual hay una prueba que audita el archivo
  * y exige que toda callable pase su nombre (pruebas/ritmo.mjs).
  */
+
+/**
+ * Si se exige que el pedido venga de la aplicación de verdad (App Check).
+ *
+ * ARRANCA EN FALSE, Y ES LA DECISIÓN MÁS IMPORTANTE DE ESTE ARCHIVO.
+ *
+ * Ponerlo en `true` antes de que los navegadores estén mandando el token deja
+ * a TODO el mundo afuera del juego, con el saldo adentro. No es una hipótesis:
+ * es lo que pasa el primer minuto, porque hoy ningún cliente manda token —la
+ * clave de reCAPTCHA está vacía en `public/js/app-check.js`—.
+ *
+ * El orden correcto es:
+ *
+ *   1. Registrar el sitio en la consola y pegar la clave en `app-check.js`.
+ *   2. Desplegar el hosting y esperar. La consola muestra cuántos pedidos
+ *      llegan con token y cuántos sin él.
+ *   3. Cuando los "sin token" sean cerca de cero —hay que darle tiempo a la
+ *      gente con la pestaña vieja abierta—, poner esto en `true` y desplegar.
+ *
+ * Los pasos están escritos en `HACER-EN-LA-CONSOLA.md`.
+ */
+const EXIGIR_APP_CHECK = false;
+
 const exigirSesion = (context, accion) => {
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "Iniciá sesión para continuar.");
   }
+
+  // `context.app` lo pone Firebase cuando el token de App Check vino y era
+  // válido. Que falte significa "no puedo probar que esto sale de la
+  // aplicación", que no es lo mismo que "sos un atacante": también le pasa a
+  // quien tenga la pestaña abierta desde antes del despliegue.
+  if (EXIGIR_APP_CHECK && !context.app) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "Recargá la página para seguir jugando.",
+    );
+  }
+
   if (accion) limite.exigirRitmo(context.auth.uid, accion);
   return context.auth.uid;
 };
@@ -532,6 +569,21 @@ const panel = crearAdmin({
   emailAdmin: CORREO_ADMIN,
 });
 
+/**
+ * Moderación.
+ *
+ * Bandeja de entrada, no policía automática: junta lo que denuncian los
+ * jugadores y se lo muestra a una persona. No bloquea cuentas, no descuenta
+ * Leyendas y no decide nada solo. Ver la nota larga en `reportes.js`.
+ */
+const moderacion = crearReportes({
+  db,
+  error: errorHttp,
+  ahora: () => Date.now(),
+  marcaDeTiempo,
+  emailAdmin: CORREO_ADMIN,
+});
+
 export const listarSalasAdmin = functions.https.onCall((_data, context) =>
   panel.listarSalas(context));
 
@@ -564,6 +616,32 @@ export const listarUsuariosAdmin = functions.https.onCall((_data, context) =>
  */
 export const eliminarUsuarioAdmin = functions.https.onCall((data, context) =>
   panel.eliminarUsuario(context, { uid: data?.uid }));
+
+// ---------------------------------------------------------- moderación
+
+/**
+ * Un jugador reporta a otro.
+ *
+ * Quién denuncia NO viene del pedido: sale de `exigirSesion`, que lo lee del
+ * token verificado. Aceptarlo del cuerpo dejaría firmar denuncias a nombre de
+ * cualquiera.
+ */
+export const reportarJugador = functions.https.onCall((data, context) => {
+  const uid = exigirSesion(context, "reportarJugador");
+  return moderacion.reportar(uid, validar(EsquemaReporte, data, errorHttp));
+});
+
+/** La bandeja del administrador. */
+export const listarReportesAdmin = functions.https.onCall((data, context) =>
+  moderacion.listar(context, { estado: data?.estado, limite: data?.limite }));
+
+/** Marcar uno como resuelto o ignorado. No toca la cuenta denunciada. */
+export const resolverReporteAdmin = functions.https.onCall((data, context) =>
+  moderacion.resolver(context, {
+    id: data?.id,
+    estado: data?.estado,
+    nota: data?.nota,
+  }));
 
 // ------------------------------------------------------ partida en red
 

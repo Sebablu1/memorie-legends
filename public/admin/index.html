@@ -95,6 +95,31 @@
         <div class="lista" id="listaUsuarios"></div>
       </section>
 
+      <!-- Reportes. Bandeja de entrada, no policía: acá no se suspende a
+           nadie, se lee lo que denunciaron y se marca qué se hizo. -->
+      <section>
+        <h2>Reportes</h2>
+        <p class="nota">
+          Lo que denuncian los jugadores. Marcarlo como resuelto o ignorado
+          <b>no le hace nada a la cuenta reportada</b>: sólo anota que ya lo
+          miraste. Para actuar sobre una cuenta está la sección de arriba.
+        </p>
+        <div class="acciones">
+          <button class="btn sobrio" id="btnVerReportes" type="button">Ver reportes</button>
+          <label class="filtro-reportes" for="filtroReportes">
+            <span class="oculto-visual">Filtrar por estado</span>
+            <select id="filtroReportes">
+              <option value="pendiente">Sólo pendientes</option>
+              <option value="">Todos</option>
+              <option value="resuelto">Resueltos</option>
+              <option value="ignorado">Ignorados</option>
+            </select>
+          </label>
+        </div>
+        <div class="aviso" id="avisoReportes"></div>
+        <div class="lista" id="listaReportes"></div>
+      </section>
+
       <section>
         <h2>Salas</h2>
         <div id="salas" class="lista"></div>

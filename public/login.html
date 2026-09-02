@@ -107,10 +107,118 @@
       .support-footer a:hover {
         text-decoration: underline;
       }
+
+      /* ─────────────────────────────────────────────────────────────────
+         El velo de carga.
+
+         EL PROBLEMA QUE RESUELVE
+
+         Firebase tarda en decir si hay sesión: lee IndexedDB y a veces hace un
+         viaje a la red. Hasta entonces la página ya se dibujó, así que quien
+         YA estaba adentro veía el formulario de login un instante antes de que
+         lo mandaran al panel. Parecía que se había cerrado la sesión.
+
+         POR QUÉ ESTÁ VISIBLE POR DEFECTO
+
+         Al revés de como uno lo escribiría. Si arrancara oculto y lo mostrara
+         el JavaScript, el formulario ya se habría visto: el flash ocurre ANTES
+         de que corra una sola línea. Así que se pinta tapado y se destapa
+         cuando se sabe que NO hay sesión, que es el único caso en que el
+         formulario sirve de algo.
+
+         Va en esta etiqueta y no en un archivo aparte a propósito: un `<link>`
+         más es un viaje más antes de poder pintar, y este estilo tiene que
+         estar aplicado en el primer cuadro o no sirve para nada.
+         ───────────────────────────────────────────────────────────────── */
+      .velo-carga {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 22px;
+        padding: 24px;
+        text-align: center;
+        background:
+          radial-gradient(ellipse 80% 50% at 50% -5%, rgba(212, 168, 67, 0.16), transparent 68%),
+          #05070b;
+      }
+
+      /* Cuando ya sabemos que no hay sesión. Se va con una transición corta
+         para que no dé un tirón, y `visibility` lo saca del alcance del
+         teclado: un velo transparente que sigue ahí atrapa el foco. */
+      .velo-carga[hidden] {
+        display: flex;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity 220ms ease, visibility 0s linear 220ms;
+      }
+
+      .velo-carga img {
+        width: clamp(140px, 46vw, 230px);
+        height: auto;
+        filter: drop-shadow(0 0 18px rgba(212, 168, 67, 0.45));
+      }
+
+      .velo-carga p {
+        margin: 0;
+        color: #d9c48b;
+        font-size: 0.95rem;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+      }
+
+      /* El disco que gira. Un borde con un solo lado dorado: es un elemento,
+         sin imágenes ni bibliotecas. */
+      .girador {
+        width: 34px;
+        height: 34px;
+        border: 3px solid rgba(212, 168, 67, 0.22);
+        border-top-color: #d4a843;
+        border-radius: 50%;
+        animation: girar 750ms linear infinite;
+      }
+
+      @keyframes girar {
+        to { transform: rotate(360deg); }
+      }
+
+      /* Quien pidió que no se muevan las cosas ve un punto que late en vez de
+         girar. Que no gire no puede significar que no haya señal de que algo
+         está pasando. */
+      @media (prefers-reduced-motion: reduce) {
+        .girador {
+          animation: latir 1.6s ease-in-out infinite;
+          border-color: rgba(212, 168, 67, 0.55);
+        }
+        @keyframes latir {
+          50% { opacity: 0.35; }
+        }
+      }
     </style>
+
+    <!-- Sin JavaScript nadie va a destapar esto, y el velo dejaría la página
+         en blanco para siempre. El formulario tampoco funcionaría, pero al
+         menos se ve y se entiende qué pasó. -->
+    <noscript>
+      <style>
+        .velo-carga { display: none !important; }
+      </style>
+    </noscript>
       <link rel="stylesheet" href="css/pie.css" />
 </head>
   <body class="acceso">
+    <!-- Tapado de entrada. Ver la nota en el <style>: destaparlo es la
+         excepción, no la regla. -->
+    <div class="velo-carga" id="veloCarga" role="status" aria-live="polite">
+      <img src="img/memorie-legends.png" alt="Memorie Legends" width="612" height="408" />
+      <div class="girador" aria-hidden="true"></div>
+      <p id="veloTexto">Cargando…</p>
+    </div>
+
     <div class="container">
       <div style="text-align: center">
         <div class="memorie-icon"><img src="img/claude-inspiration/logo.png" alt="Memorie Legends" class="logo-img grande"></div>
@@ -119,6 +227,46 @@
       </div>
 
       <div id="mensaje" class="mensaje"></div>
+
+      <!-- Segundo paso. Oculto salvo que la cuenta lo tenga puesto.
+
+           Reemplaza al formulario en vez de ponerse debajo: quien llegó acá ya
+           puso bien la contraseña, y dejarle el formulario a la vista invita a
+           volver a intentar desde cero, que es lo único que NO hay que hacer
+           —se pierde la resolución pendiente y hay que empezar de nuevo—. -->
+      <div id="segundoPaso" hidden>
+        <h2 class="titulo-segundo-paso">Verificación en dos pasos</h2>
+        <p class="ayuda-segundo-paso" id="pistaSegundoPaso">
+          Escribí el código que muestra tu aplicación.
+        </p>
+        <form id="formSegundoPaso">
+          <div class="form-group">
+            <input
+              id="codigoMfa"
+              type="text"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              maxlength="6"
+              pattern="[0-9]{6}"
+              placeholder="000000"
+              aria-label="Código de seis dígitos"
+              required
+            />
+          </div>
+          <button type="submit" class="btn-primary">Entrar</button>
+        </form>
+        <div style="text-align: center; margin-top: 12px">
+          <button id="btnVolverAlLogin" type="button"
+                  style="background:transparent;color:#6c757d;border:none;cursor:pointer;
+                         font-size:0.9rem;text-decoration:underline">
+            Volver
+          </button>
+        </div>
+      </div>
+
+      <!-- Se agrupa lo del primer paso para poder esconderlo entero cuando la
+           cuenta pide un segundo. -->
+      <div id="primerPaso">
 
       <!-- 🔑 LOGIN CON GOOGLE CON LOGO -->
       <button id="googleBtn" class="google-btn">
@@ -170,6 +318,8 @@
         </div>
         <button type="submit" class="btn-primary">Entrar</button>
       </form>
+
+      </div><!-- /primerPaso -->
 
       <!-- Botón olvidé contraseña -->
       <div style="text-align: center; margin: 15px 0">

@@ -34,6 +34,7 @@ import { z } from "zod";
 import { esCodigoValido, LARGO_CODIGO } from "./reglas/salas.js";
 import { TAM_MANO } from "./reglas/baraja.js";
 import { ACCIONES } from "./partida-red.js";
+import { MOTIVOS, LARGO_COMENTARIO } from "./reportes.js";
 
 /**
  * El código de sala.
@@ -121,6 +122,30 @@ export const EsquemaAccion = z.object({
 });
 
 export const EsquemaCompra = z.object({ paqueteId: z.string().min(1).max(64) });
+
+/**
+ * Un reporte de un jugador sobre otro.
+ *
+ * `denunciante` NO está acá, y es lo importante: sale del token verificado en
+ * `exigirSesion`. Si el esquema lo aceptara, alguien podría firmar denuncias
+ * con el nombre de otro y el resto del sistema no tendría cómo notarlo.
+ *
+ * El comentario se recorta en vez de rechazarse. Es texto que alguien escribió
+ * enojado en el medio de una partida: perdérselo entero por pasarse de largo
+ * es peor que quedarse con los primeros 500 caracteres.
+ */
+export const EsquemaReporte = z.object({
+  denunciado: z.string().min(1).max(128),
+  motivo: z.enum(MOTIVOS),
+  comentario: z
+    .string()
+    .max(LARGO_COMENTARIO * 4)
+    .transform((t) => t.trim().slice(0, LARGO_COMENTARIO))
+    .optional()
+    .default(""),
+  // La sala donde pasó. Opcional: también se puede reportar desde fuera de una.
+  codigo: Codigo.optional(),
+});
 
 export const EsquemaReferido = z.object({ referidoUid: z.string().min(1).max(128) });
 

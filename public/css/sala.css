@@ -109,6 +109,49 @@
 
 .jugador-fila:last-child { border-bottom: none; }
 
+/* La banderita de reportar.
+
+   Apagada hasta que se la toca o se la enfoca. Es una acción que casi nadie
+   usa y que no conviene ofrecer con insistencia: un botón llamativo al lado
+   del nombre de cada persona invita a apretarlo por curiosidad.
+
+   No se esconde con `opacity: 0` a secas ni aparece sólo con `:hover`: en un
+   teléfono no hay hover, y con el botón invisible la función no existiría
+   para la mitad de los jugadores. */
+.jugador-fila .reportar {
+  flex-shrink: 0;
+  /* 44px es el mínimo que se puede tocar con el pulgar sin errarle. Más chico
+     obliga a apuntar, y apuntar en una lista de nombres termina en un reporte
+     contra quien no era. */
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.32);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+
+.jugador-fila .reportar:hover,
+.jugador-fila .reportar:focus-visible {
+  color: #e6a5a5;
+  border-color: rgba(230, 120, 120, 0.45);
+  background: rgba(230, 120, 120, 0.09);
+}
+
+/* Aire entre la marca de "listo" y la banderita: sin esto se toca una
+   queriendo tocar la otra.
+
+   Lo que NO se hace es mover el `margin-left: auto` de `.marca-listo` a este
+   botón. Parece equivalente y no lo es: mi propia fila no lleva botón, así que
+   ahí la marca se quedaría sin nada que la empuje y saltaría a la izquierda,
+   desalineada respecto a las demás. */
+.jugador-fila .reportar { margin-left: 6px; }
+
 .avatar-inicial {
   width: 38px;
   height: 38px;

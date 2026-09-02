@@ -9,7 +9,7 @@
 
 import { db, doc, onSnapshot } from "./firebase.js";
 import { exigirSesion, mostrarSaldo } from "./sesion.js";
-import { iniciarPartida, salirDeSalaEnEspera, marcarListo, ErrorDeServidor } from "./servidor.js";
+import { iniciarPartida, salirDeSalaEnEspera, marcarListo, reportarJugador, ErrorDeServidor } from "./servidor.js";
 import { ESTADOS_SALA, MIN_JUGADORES, MAX_JUGADORES } from "./reglas/salas.js";
 import { escapar } from "./modulos/texto.js";
 
@@ -133,6 +133,19 @@ function pintar(sala, uid) {
       jugadorUid === sala.creador ? '<span class="insignia">Creador</span>' : "",
       jugadorUid === uid ? '<span class="insignia propio">Vos</span>' : "",
     ].join("");
+    // El botón de reportar, sólo en las filas ajenas. Va acá y no en la mesa
+    // a propósito: durante una partida hay ventanas de reflejos de tres
+    // segundos, y un diálogo encima de eso le hace perder la jugada a quien
+    // lo abre. Acá nadie está apurado.
+    const reportar =
+      jugadorUid === uid
+        ? ""
+        : `<button class="reportar" type="button"
+             data-reportar="${escapar(jugadorUid)}"
+             data-nombre="${escapar(nombre)}"
+             title="Reportar a ${escapar(nombre)}"
+             aria-label="Reportar a ${escapar(nombre)}">⚑</button>`;
+
     return `
       <li class="jugador-fila ${jugadorUid === uid ? "es-mio" : ""}">
         <span class="avatar-inicial" aria-hidden="true">${escapar(inicial)}</span>
@@ -141,6 +154,7 @@ function pintar(sala, uid) {
         <span class="marca-listo ${estaListo ? "si" : "no"}">
           ${estaListo ? "✅ Listo" : "esperando"}
         </span>
+        ${reportar}
       </li>`;
   });
 
@@ -253,7 +267,9 @@ $("velo").addEventListener("click", (evento) => {
 });
 
 document.addEventListener("keydown", (evento) => {
-  if (evento.key === "Escape" && !$("velo").hidden) $("velo").hidden = true;
+  if (evento.key !== "Escape") return;
+  if (!$("velo").hidden) $("velo").hidden = true;
+  if (!$("veloReporte").hidden) cerrarReporte();
 });
 
 $("btnConfirmarSalida").addEventListener("click", async () => {
@@ -270,6 +286,70 @@ $("btnConfirmarSalida").addEventListener("click", async () => {
     boton.textContent = "Salir de la sala";
     $("textoModal").textContent =
       error instanceof ErrorDeServidor ? error.message : "No pudimos procesar la salida.";
+  }
+});
+
+// --- reportar a alguien ---
+
+/**
+ * A quién se está por reportar. Se guarda al abrir el diálogo y no se lee del
+ * DOM al enviar: la lista se repinta sola cada vez que llega la sala, así que
+ * el botón que se tocó puede haber dejado de existir para cuando se confirma.
+ */
+let aQuienReporto = null;
+
+const cerrarReporte = () => {
+  $("veloReporte").hidden = true;
+  aQuienReporto = null;
+};
+
+// Delegado en la lista, no en cada botón: las filas se vuelven a dibujar en
+// cada actualización de la sala, y los oyentes puestos uno por uno se
+// perderían con ellas.
+$("listaJugadores").addEventListener("click", (evento) => {
+  const boton = evento.target.closest("[data-reportar]");
+  if (!boton) return;
+
+  aQuienReporto = { uid: boton.dataset.reportar, nombre: boton.dataset.nombre };
+  // textContent: el nombre lo elige quien juega.
+  $("textoReporte").textContent = `Vas a reportar a ${aQuienReporto.nombre}.`;
+  $("avisoReporte").textContent = "";
+  $("comentarioReporte").value = "";
+  $("btnEnviarReporte").disabled = false;
+  $("btnEnviarReporte").textContent = "Enviar reporte";
+  $("veloReporte").hidden = false;
+  $("motivoReporte").focus();
+});
+
+$("btnCancelarReporte").addEventListener("click", cerrarReporte);
+
+$("veloReporte").addEventListener("click", (evento) => {
+  if (evento.target === $("veloReporte")) cerrarReporte();
+});
+
+$("btnEnviarReporte").addEventListener("click", async () => {
+  if (!aQuienReporto) return;
+  const boton = $("btnEnviarReporte");
+  boton.disabled = true;
+  boton.textContent = "Enviando…";
+
+  try {
+    await reportarJugador({
+      denunciado: aQuienReporto.uid,
+      motivo: $("motivoReporte").value,
+      comentario: $("comentarioReporte").value,
+      codigo,
+    });
+    $("avisoReporte").textContent = "Gracias. Lo vamos a revisar.";
+    boton.textContent = "Enviado";
+    setTimeout(cerrarReporte, 1600);
+  } catch (error) {
+    boton.disabled = false;
+    boton.textContent = "Enviar reporte";
+    // El servidor tiene mensajes escritos para esto —"ya reportaste a esta
+    // persona hace poco"— y son mejores que cualquier cosa genérica.
+    $("avisoReporte").textContent =
+      error instanceof ErrorDeServidor ? error.message : "No pudimos enviar el reporte.";
   }
 });
 

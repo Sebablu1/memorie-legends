@@ -122,6 +122,48 @@
       </div>
     </div>
 
+    <!-- Reportar a alguien.
+
+         Es un velo aparte del de salir y no el mismo reutilizado: los dos
+         pueden estar en juego a la vez —se puede reportar y después irse— y
+         compartir uno solo obligaba a acordarse de qué botón estaba conectado
+         en cada momento. Dos diálogos separados no se pisan. -->
+    <div class="velo" id="veloReporte" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloReporte">
+        <h2 id="tituloReporte">Reportar jugador</h2>
+        <p id="textoReporte"></p>
+
+        <label class="campo" for="motivoReporte">
+          <span>¿Qué pasó?</span>
+          <select id="motivoReporte">
+            <option value="trampa">Hizo trampa</option>
+            <option value="insultos">Insultos o malos tratos</option>
+            <option value="abandono">Abandonó o demoró a propósito</option>
+            <option value="nombre">El nombre es ofensivo</option>
+            <option value="otro">Otra cosa</option>
+          </select>
+        </label>
+
+        <label class="campo" for="comentarioReporte">
+          <span>Contanos un poco más <small>(opcional)</small></span>
+          <textarea id="comentarioReporte" rows="3" maxlength="500"
+                    placeholder="Lo que quieras agregar."></textarea>
+        </label>
+
+        <p class="aviso-suave">
+          Lo revisa una persona del equipo. No se le avisa a la otra parte
+          quién la reportó.
+        </p>
+
+        <p class="estado-sala" id="avisoReporte" role="status"></p>
+
+        <div class="botonera-modal">
+          <button class="btn-plata" id="btnCancelarReporte" type="button">Cancelar</button>
+          <button class="btn-oro" id="btnEnviarReporte" type="button">Enviar reporte</button>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="js/room.js"></script>
   </body>
 </html>

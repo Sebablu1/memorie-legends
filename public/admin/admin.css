@@ -414,3 +414,51 @@ select {
     transform: none;
   }
 }
+
+/* ------------------------------------------------------------- reportes
+
+   La fila de un reporte lleva más cosas que las demás —dos personas, motivo,
+   fecha, sala y un comentario libre— así que se deja envolver en vez de
+   forzarla en una línea. En una pantalla angosta, una fila que no envuelve
+   es una fila que se sale. */
+
+#listaReportes .fila {
+  flex-wrap: wrap;
+}
+
+/* El comentario lo escribió alguien enojado en medio de una partida. Puede
+   ser largo y puede venir en una sola palabra kilométrica, así que se le
+   permite partirse por donde sea antes que romper la caja. */
+.campo.comentario {
+  flex-basis: 100%;
+  color: var(--texto-tenue);
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+/* El uid: hace falta para buscar la cuenta, pero no es lo que se lee. */
+.campo.tenue {
+  color: var(--texto-tenue);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+
+.filtro-reportes select {
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+/* Visible para un lector de pantalla, invisible para el resto. No usa
+   `display: none` porque eso también lo esconde del lector. */
+.oculto-visual {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

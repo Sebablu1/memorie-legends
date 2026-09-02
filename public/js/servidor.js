@@ -94,3 +94,13 @@ export const iniciarPartida = (codigo) => llamar("iniciarPartida", { codigo });
  * @returns {Promise<{cancelada: boolean, devuelto: number}>}
  */
 export const salirDeSalaEnEspera = (codigo) => llamar("salirDeSalaEnEspera", { codigo });
+
+/**
+ * Reporta a otro jugador.
+ *
+ * No se manda quién denuncia: lo pone el servidor con el token verificado.
+ * Mandarlo desde acá sería dejar que cualquiera firme denuncias con el nombre
+ * de otro, y el servidor lo ignora igual.
+ */
+export const reportarJugador = ({ denunciado, motivo, comentario, codigo }) =>
+  llamar("reportarJugador", { denunciado, motivo, comentario, codigo });

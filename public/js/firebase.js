@@ -58,11 +58,27 @@ const funciones = getFunctions(app);
 // 🔑 Crear el proveedor de Google
 const googleProvider = new GoogleAuthProvider();
 
+/**
+ * App Check, si está configurado.
+ *
+ * Se enciende acá y no en cada pantalla porque hay nueve páginas que llaman a
+ * funciones y acordarse en todas es acordarse en ocho. Va sin `await`: no
+ * tiene que retrasar la carga de nada, y el SDK sabe esperar el token cuando
+ * le hace falta.
+ *
+ * Mientras no haya clave, esto es una función que devuelve `false` y ya. Ver
+ * `app-check.js`.
+ */
+import("./app-check.js")
+  .then((m) => m.encenderAppCheck())
+  .catch((e) => console.error("No se pudo cargar app-check.js:", e));
+
 // ✅ Correo de soporte
 const SUPPORT_EMAIL = "soporte.memorie.legends@gmail.com";
 
 // ✅ EXPORTAR TODO (sin duplicar SUPPORT_EMAIL)
 export {
+  app,
   auth,
   db,
   funciones,
