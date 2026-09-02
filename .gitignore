@@ -9,11 +9,14 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# El lockfile de functions/ SÍ se versiona: lo que hay ahí se despliega a
-# producción, y con `^7.3.2` sin lockfile cada deploy resuelve la versión de
-# nuevo. Un 7.x publicado entre dos deploys entraría solo, sin que nadie lo
-# hubiera pedido ni probado.
-/package-lock.json
+# Los dos lockfiles SÍ se versionan.
+#
+# El de functions/ porque lo que hay ahí se despliega a producción: con
+# `^7.3.2` y sin lockfile, cada deploy resuelve la versión de nuevo, y un 7.x
+# publicado entre dos deploys entraría solo, sin que nadie lo pidiera ni lo
+# probara. El de la raíz porque fija la versión de Playwright, y una suite de
+# navegador que corre contra una versión distinta en cada máquina no sirve
+# para lo único que se le pide, que es ser confiable.
 
 # IDE
 .vscode/

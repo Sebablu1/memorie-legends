@@ -36,7 +36,9 @@ jobs:
         with:
           node-version: "22"
       - run: npm ci --prefix functions
-      - run: npm install --no-save @playwright/test
+      # `npm ci` y no `npm install`: respeta el lockfile, así que la suite
+      # corre contra la MISMA versión de Playwright acá y en cada máquina.
+      - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run e2e
         env:
