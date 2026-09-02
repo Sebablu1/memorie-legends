@@ -1,26 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    {
-      "name": "mesa",
-      "runtimeExecutable": "python",
-      "runtimeArgs": [
-        "-m",
-        "http.server",
-        "8123",
-        "--directory",
-        "public"
-      ],
-      "port": 8123
-    },
-    {
-      "name": "mesa-sin-cache",
-      "runtimeExecutable": "python",
-      "runtimeArgs": [
-        "servidor-dev.py",
-        "8124"
-      ],
-      "port": 8124
-    }
+    { "name": "memorie", "runtimeExecutable": "node", "runtimeArgs": ["herramientas/servir.mjs"], "port": 5000 }
   ]
 }

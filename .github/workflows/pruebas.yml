@@ -1,0 +1,52 @@
+# Las pruebas, en cada empujón y en cada pull request.
+#
+# Dos trabajos separados a propósito. Las suites de Node tardan segundos y
+# tienen que dar el rojo enseguida; las de navegador necesitan descargar
+# Chromium y tardan minutos. Mezcladas, el aviso rápido se perdería detrás del
+# lento.
+
+name: Pruebas
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  motor:
+    name: Motor y reglas (23 suites)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # `npm ci` necesita el lockfile de functions/, que ahora sí se versiona.
+      - run: npm ci --prefix functions
+      # El hook `pretest` copia public/js/reglas a functions/reglas, así que
+      # las suites nunca corren contra una copia vieja.
+      - run: npm test
+
+  navegador:
+    name: Mesa en el navegador (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci --prefix functions
+      - run: npm install --no-save @playwright/test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+        env:
+          CI: "true"
+      # Sólo cuando algo falla: el rastro y el video de la prueba que se rompió.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: rastro-playwright
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

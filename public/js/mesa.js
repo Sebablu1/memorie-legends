@@ -188,7 +188,27 @@ const partidaEconomica = {
   codigo: salaPedida || null,
 };
 
-let estado = crearPartida(jugadoresConfig);
+/**
+ * Semilla fija para el reparto, si la piden por la URL.
+ *
+ * Existe para que las pruebas de navegador puedan afirmar algo concreto: sin
+ * esto, cada carga reparte otra mesa y lo único que se puede comprobar es que
+ * "algo pasó". Con `?semilla=7` la partida es siempre la misma y una prueba
+ * puede decir "la tercera carta de Nara es un 6".
+ *
+ * Sólo vale en entrenamiento. En partidas por Leyendas el reparto lo hace el
+ * servidor y el navegador ni siquiera lo ve: `crearPartida` no se usa en ese
+ * modo, así que esto no puede tocar una mesa donde haya dinero. Aunque
+ * alguien lo escriba a mano en la barra de direcciones, lo único que consigue
+ * es elegirse su propio mazo contra la máquina.
+ */
+const semillaPedida = Number(new URLSearchParams(location.search).get("semilla"));
+const opcionesDeReparto =
+  !enRed() && Number.isFinite(semillaPedida) && semillaPedida !== 0
+    ? { semilla: semillaPedida }
+    : undefined;
+
+let estado = crearPartida(jugadoresConfig, opcionesDeReparto);
 let memorias = estado.jugadores.map(() => IA.crearMemoria());
 
 /**

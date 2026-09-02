@@ -7,6 +7,10 @@
     "start": "firebase serve",
     "deploy": "firebase deploy",
     "build": "echo 'No build needed'",
+    "_comentario_e2e": "Las de navegador van aparte de `npm test` a proposito: necesitan Chromium descargado y tardan minutos. `npm test` tiene que seguir siendo lo que se corre sin pensarlo.",
+    "e2e": "playwright test",
+    "e2e:ver": "playwright test --headed",
+    "e2e:informe": "playwright show-report",
     "_comentario_pretest": "Las reglas viven en public/js/reglas y functions/reglas es una copia generada. npm ejecuta pretest antes de test, asi que las suites nunca corren contra una copia vieja: eso ya nos dio un diagnostico falso una vez.",
     "pretest": "node functions/copiar-reglas.js",
     "test": "node pruebas/puntaje.mjs && node pruebas/salas.mjs && node pruebas/vista.mjs && node pruebas/descarte.mjs && node pruebas/estado.mjs && node pruebas/transacciones.mjs && node pruebas/abandono.mjs && node pruebas/abandono-red.mjs && node pruebas/salida.mjs && node pruebas/cierre.mjs && node pruebas/cierre-automatico.mjs && node pruebas/red.mjs && node pruebas/orquestador.mjs && node pruebas/red-e2e.mjs && node pruebas/mesa-red.mjs && node pruebas/desempate-red.mjs && node pruebas/filtraciones.mjs && node pruebas/rival.mjs && node pruebas/ausente.mjs && node pruebas/mirar-descarte.mjs && node pruebas/tirar-reabre.mjs && node pruebas/admin.mjs && node pruebas/ritmo.mjs"
@@ -20,6 +24,7 @@
   "author": "Tu Nombre",
   "license": "MIT",
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "firebase-tools": "^13.0.0"
   }
 }
