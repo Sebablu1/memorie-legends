@@ -22,6 +22,17 @@ import {
 } from "./reglas/motor.js";
 
 import { dorsoDeAsiento } from "./reglas/baraja.js";
+import { crearTemporizadores, esperar } from "./modulos/temporizadores.js";
+import { crearInterfaz, escapar } from "./modulos/ui.js";
+import {
+  claseAsiento,
+  clave,
+  dibujarCarta,
+  geometriaAbanico,
+  estiloAbanico,
+  asientoVacio,
+  asientosParaMesa,
+} from "./modulos/cartas.js";
 import { LIMITE_ELIMINACION, puntosMano } from "./reglas/puntaje.js";
 import * as IA from "./reglas/ia.js";
 import { MODOS, costoDeAbandonar } from "./reglas/salas.js";
@@ -222,6 +233,23 @@ let memorias = estado.jugadores.map(() => IA.crearMemoria());
  */
 const MS_TURNO = 8000;
 
+/**
+ * Los dos relojes de la mesa. Ver modulos/temporizadores.js.
+ *
+ * Se les dan nombres sueltos a sus métodos porque el archivo los llama por su
+ * nombre en una docena de sitios, y renombrarlos todos habría mezclado en un
+ * mismo cambio dos cosas: mover código y reescribir a quien lo usa. Lo segundo
+ * se ve fácil en el diff; lo primero no.
+ */
+const relojes = crearTemporizadores({ dom, msTurno: MS_TURNO });
+const correrTemporizador = relojes.correr;
+const cancelarTemporizador = relojes.cancelar;
+const cancelarRelojTurno = relojes.cancelarRelojTurno;
+const pintarReloj = relojes.pintarReloj;
+// El remate se queda acá: qué hacer al llegar a cero depende de la partida.
+const iniciarRelojTurno = (fase, indice) =>
+  relojes.iniciarRelojTurno(fase, indice, resolverPorTiempo);
+
 const RITMO = {
   entreTurnos: 1100,
   trasLevantar: 1400,
@@ -232,29 +260,52 @@ const RITMO = {
   trasCorte: 1600,
 };
 
+/**
+ * Cuánto dura la marca sobre una carta que alguien acaba de mirar.
+ *
+ * Un segundo: lo justo para que la mesa registre QUE pasó algo. No revela el
+ * número —eso sería regalar el poder— sino que esa carta fue vista, que es
+ * información legítima y pública: los demás pueden contar con que ese jugador
+ * ahora sabe algo.
+ */
+const MS_MARCA_PODER = 1000;
+
+const TITULOS_PODER = {
+  mirarPropia: "Mirar una carta propia",
+  mirarRival: "Mirar una carta de un rival",
+  cambioCiego: "Cambio a ciegas",
+  cambioConVista: "Cambio viendo ambas cartas",
+};
+
+/**
+ * Carteles, marcas y modales. Ver modulos/ui.js.
+ *
+ * Va acá arriba, y no donde estaba cada función, porque necesita RITMO,
+ * TITULOS_PODER y MS_MARCA_PODER ya declarados: un `const` al que se accede
+ * antes de su línea no es undefined, es un error de arranque.
+ */
+const interfaz = crearInterfaz({
+  dom,
+  sonidos,
+  titulos: TITULOS_PODER,
+  esperar,
+  msAnuncio: RITMO.anunciarPoder,
+  msMarcaPoder: MS_MARCA_PODER,
+});
+const { pista, abrirModal, cerrarModal, marcarEfecto,
+        anunciarMirada, marcarManoMirada, anunciarPoder, efectoCambio } = interfaz;
+
 /** Cartas reveladas de forma temporal: claves "indiceJugador:posicion". */
 /** Posición propia elegida para un poder de cambio, mientras se elige la rival. */
 let seleccionPropia = null;
-let temporizadorActual = null;
 
 /**
  * Reloj del turno. Un turno tiene hasta tres decisiones (levantar, cambiar o
  * tirar, y cortar o pasar) y cada una tiene su propia cuenta de 8 segundos.
  * `fase` guarda en cuál arrancó, para reiniciarlo cuando el turno avanza.
  */
-let relojTurno = null;
-
-// --------------------------------------------------------------- asientos
-
-/**
- * Con sólo dos dorsos, el 3º y el 4º jugador repiten imagen. Lo que los
- * distingue es el color del aro que rodea sus cartas y su ficha.
- */
-const claseAsiento = (indice) => `asiento-color-${indice % 4}`;
 
 // --------------------------------------------------------------- dibujo
-
-const clave = (i, pos) => `${i}:${pos}`;
 
 /**
  * Cartas destapadas en este instante: `posición → carta`, o `null` cuando la
@@ -265,95 +316,8 @@ const clave = (i, pos) => `${i}:${pos}`;
  */
 const revelaciones = new Map();
 
-function dibujarCarta(
-  carta,
-  { visible, asiento = 0, posicion = null, clases = "", estilo = "" },
-) {
-  if (!carta) {
-    return `<div class="hueco vacio" style="${estilo}"></div>`;
-  }
-  const dorso = dorsoDeAsiento(asiento);
 
-  // El servidor manda las cartas ajenas como un marcador sin palo, número ni
-  // imagen. No es que no se dibuje la cara: es que la cara NO VIAJÓ. Dibujar
-  // un `<img>` con src vacío dejaría un hueco roto, y peor, sugeriría que el
-  // dato está y sólo falta mostrarlo.
-  if (carta.oculta) {
-    return `
-      <button class="carta ${claseAsiento(asiento)} ${clases}"
-              ${posicion != null ? `data-posicion="${posicion}"` : ""}
-              style="${estilo}"
-              type="button">
-        ${posicion != null ? `<span class="posicion">${posicion}</span>` : ""}
-        <span class="lados">
-          <span class="dorso"><img src="${dorso}" alt="Carta boca abajo" /></span>
-        </span>
-      </button>`;
-  }
-  return `
-    <button class="carta ${visible ? "visible" : ""} ${claseAsiento(asiento)} ${clases}"
-            ${posicion != null ? `data-posicion="${posicion}"` : ""}
-            style="${estilo}"
-            type="button">
-      ${posicion != null ? `<span class="posicion">${posicion}</span>` : ""}
-      <span class="lados">
-        <span class="dorso"><img src="${dorso}" alt="Carta boca abajo" /></span>
-        <span class="cara"><img src="${carta.imagen}" alt="${carta.numero} de ${carta.palo}" /></span>
-      </span>
-    </button>`;
-}
 
-/**
- * Reparte las cartas en abanico. Cuanto más cartas hay (los castigos
- * las suman) más se cierra el ángulo y más se solapan, para que la mano
- * siga entrando en el asiento sin achicar las cartas.
- */
-function geometriaAbanico(cantidad, propio) {
-  if (cantidad <= 1) return { anguloTotal: 0, arco: 0, solape: 0 };
-
-  const anguloTotal = Math.min(propio ? 26 : 18, cantidad * (propio ? 5.5 : 4));
-  const arco = propio ? 3.2 : 2.2;
-  // A partir de 5 cartas se montan unas sobre otras, cada vez más, para que
-  // el asiento no siga ensanchándose cuando los castigos suman cartas.
-  // Los asientos laterales tienen menos lugar antes de tocar el centro de la
-  // mesa, así que sus cartas se montan más rápido que las propias.
-  const solape =
-    cantidad <= 4
-      ? 0
-      : Math.min(propio ? 46 : 40, (cantidad - 4) * (propio ? 11 : 14));
-
-  return { anguloTotal, arco, solape };
-}
-
-function estiloAbanico(indice, cantidad, { anguloTotal, arco, solape }) {
-  if (cantidad <= 1) return "";
-  const t = indice / (cantidad - 1) - 0.5;
-  const giro = anguloTotal * t;
-  // Las de los extremos caen un poco, como una mano sostenida.
-  const desvio = arco * Math.pow(t * 2, 2) * (cantidad - 1);
-  return `--giro:${giro.toFixed(2)}deg;--desvio:${desvio.toFixed(1)}px;--solape:${solape.toFixed(0)}px;`;
-}
-
-/** Lugar libre en la mesa: se ve, pero no juega nadie. */
-function asientoVacio() {
-  return `
-    <div class="jugador vacante" aria-hidden="true">
-      <div class="cabecera-jugador">
-        <span class="ficha-vacante"></span>
-        <div class="datos">
-          <div class="nombre">Lugar libre</div>
-          <div class="puntos">sin jugador</div>
-        </div>
-      </div>
-      <div class="mano">${Array(4).fill('<div class="hueco vacio"></div>').join("")}</div>
-    </div>`;
-}
-
-function asientosParaMesa(total) {
-  if (total <= 2) return ["abajo", "arriba"];
-  if (total === 3) return ["abajo", "izq", "der"];
-  return ["abajo", "izq", "arriba", "der"];
-}
 
 function dibujarJugador(jugador, i) {
   const enTurno = i === estado.indiceTurno && !jugador.eliminado;
@@ -387,9 +351,9 @@ function dibujarJugador(jugador, i) {
          data-jugador="${i}">
       <div class="cabecera-jugador">
         <img class="ficha ${claseAsiento(i)}" src="${dorsoDeAsiento(i)}"
-             alt="Dorso de ${jugador.nombre}" />
+             alt="Dorso de ${escapar(jugador.nombre)}" />
         <div class="datos">
-          <div class="nombre">${jugador.nombre} ${insignia}</div>
+          <div class="nombre">${escapar(jugador.nombre)} ${insignia}</div>
           <div class="puntos"><b>${jugador.puntos}</b> pts · ${jugador.mano.filter(Boolean).length} cartas</div>
         </div>
       </div>
@@ -403,7 +367,7 @@ function dibujarMarcador() {
     .map(
       (j) => `
         <div class="marcador-fila ${j.eliminado ? "fuera" : ""}">
-          <span>${j.nombre}</span><b>${j.puntos}</b>
+          <span>${escapar(j.nombre)}</span><b>${j.puntos}</b>
         </div>`,
     )
     .join("");
@@ -414,7 +378,7 @@ function dibujarRegistro() {
   dom.registro.innerHTML = ultimas
     .map(
       (l, idx) =>
-        `<div class="${idx === 0 ? "destacado" : ""}">R${l.ronda} · ${l.texto}</div>`,
+        `<div class="${idx === 0 ? "destacado" : ""}">R${l.ronda} · ${escapar(l.texto)}</div>`,
     )
     .join("");
 }
@@ -576,41 +540,11 @@ function actualizarBotones() {
   dom.btnPasar.disabled = !(estado.fase === "postLevantada" && miTurno);
 }
 
-const pista = (texto) => {
-  dom.pista.innerHTML = texto;
-};
 
 // -------------------------------------------------------- temporizadores
 
-function correrTemporizador(ms, etiqueta, { reflejos = false } = {}) {
-  cancelarTemporizador();
-  dom.temporizador.classList.add("activo");
-  dom.temporizador.classList.toggle("reflejos", reflejos);
 
-  const relleno = dom.temporizadorRelleno;
-  relleno.style.transition = "none";
-  relleno.style.transform = "scaleX(1)";
-  // Fuerza un reflow para que la transición arranque desde el estado inicial.
-  void relleno.offsetWidth;
-  relleno.style.transition = `transform ${ms}ms linear`;
-  relleno.style.transform = "scaleX(0)";
 
-  const fin = Date.now() + ms;
-  const pintar = () => {
-    const restante = Math.max(0, fin - Date.now());
-    dom.temporizadorTexto.textContent = `${etiqueta} ${(restante / 1000).toFixed(1)}s`;
-  };
-  pintar();
-  temporizadorActual = setInterval(pintar, 80);
-}
-
-function cancelarTemporizador() {
-  if (temporizadorActual) clearInterval(temporizadorActual);
-  temporizadorActual = null;
-  dom.temporizador.classList.remove("activo", "reflejos");
-}
-
-const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function revelarUnMomento(i, pos, ms = MS_MIRAR) {
   sonidos.voltear();
@@ -624,48 +558,8 @@ async function revelarUnMomento(i, pos, ms = MS_MIRAR) {
 
 // ----------------------------------------------------- reloj del turno
 
-function pintarReloj() {
-  const caja = dom.reloj;
-  if (!caja) return;
 
-  if (!relojTurno) {
-    caja.hidden = true;
-    return;
-  }
 
-  const restante = Math.max(0, relojTurno.fin - Date.now());
-  const segundos = Math.ceil(restante / 1000);
-
-  caja.hidden = false;
-  dom.relojNumero.textContent = segundos;
-  dom.relojRelleno.style.width = `${(restante / MS_TURNO) * 100}%`;
-  // Dorado hasta los 2 segundos; de ahí en más, rojo.
-  caja.classList.toggle("apurado", segundos <= 2);
-}
-
-function cancelarRelojTurno() {
-  if (relojTurno?.intervalo) clearInterval(relojTurno.intervalo);
-  relojTurno = null;
-  if (dom.reloj) dom.reloj.hidden = true;
-}
-
-function iniciarRelojTurno(fase, indice) {
-  cancelarRelojTurno();
-  relojTurno = {
-    fase,
-    indice,
-    fin: Date.now() + MS_TURNO,
-    intervalo: setInterval(() => {
-      pintarReloj();
-      if (relojTurno && Date.now() >= relojTurno.fin) {
-        const quien = relojTurno.indice;
-        cancelarRelojTurno();
-        resolverPorTiempo(quien);
-      }
-    }, 120),
-  };
-  pintarReloj();
-}
 
 /**
  * Se acabó el tiempo: se resuelve la decisión pendiente con la salida más
@@ -695,15 +589,17 @@ function sincronizarReloj() {
   const activo =
     estado.fase === "turno" && !estado.jugadores[estado.indiceTurno]?.eliminado;
 
+  const enCurso = relojes.turnoEnCurso();
+
   if (!activo) {
-    if (relojTurno) cancelarRelojTurno();
+    if (enCurso) cancelarRelojTurno();
     return;
   }
 
   const mismaDecision =
-    relojTurno &&
-    relojTurno.fase === estado.fase &&
-    relojTurno.indice === estado.indiceTurno;
+    enCurso &&
+    enCurso.fase === estado.fase &&
+    enCurso.indice === estado.indiceTurno;
 
   if (!mismaDecision) iniciarRelojTurno(estado.fase, estado.indiceTurno);
   else pintarReloj();
@@ -711,85 +607,18 @@ function sincronizarReloj() {
 
 // ------------------------------------------------- efectos de los poderes
 
-const ESTILO_PODER = {
-  mirarPropia: { icono: "👁", clase: "poder-7" },
-  mirarRival: { icono: "🔍", clase: "poder-8" },
-  cambioCiego: { icono: "🌀", clase: "poder-9" },
-  cambioConVista: { icono: "🔄", clase: "poder-10" },
-};
 
-/** Pinta un efecto sobre una carta concreta y lo limpia solo. */
-function marcarEfecto(i, pos, clase, ms = 900) {
-  const el = document.querySelector(
-    `.jugador[data-jugador="${i}"] .carta[data-posicion="${pos}"]`,
-  );
-  if (!el) return;
-  el.classList.add(clase);
-  setTimeout(() => el.classList.remove(clase), ms);
-}
 
 /** El último texto que escribió el motor. Lo redacta él, no la interfaz. */
 const ultimaLineaDelRegistro = () =>
   estado.registro[estado.registro.length - 1]?.texto ?? "";
 
-/**
- * Cartel de un segundo: "Ana miró una carta de Bruno".
- *
- * Dice QUE se miró y a quién, nunca qué. Que la mesa se entere es parte de la
- * regla: los demás tienen derecho a saber que ese jugador ahora sabe algo, y
- * a poder contar con eso. Lo que no puede filtrarse es el número.
- */
-function anunciarMirada(texto) {
-  const cartel = document.createElement("div");
-  cartel.className = "anuncio-mirada";
-  cartel.textContent = texto;
-  dom.mesa.appendChild(cartel);
-  setTimeout(() => cartel.remove(), MS_MARCA_PODER);
-}
 
-/** Cartel sobre la mesa anunciando qué poder se activó y quién lo usa. */
-async function anunciarPoder(poder, nombre) {
-  if (!poder) return;
-  sonidos.poder();
-  const { icono, clase } = ESTILO_PODER[poder.tipo] ?? {
-    icono: "✨",
-    clase: "",
-  };
 
-  const cartel = document.createElement("div");
-  cartel.className = `anuncio-poder ${clase}`;
-  cartel.innerHTML = `
-    <span class="icono">${icono}</span>
-    <span class="detalle">
-      <b>Poder ${poder.numero}</b>
-      <i>${TITULOS_PODER[poder.tipo]}</i>
-      <em>${nombre}</em>
-    </span>`;
-  dom.mesa.appendChild(cartel);
-
-  await esperar(RITMO.anunciarPoder);
-  cartel.classList.add("saliendo");
-  setTimeout(() => cartel.remove(), 320);
-}
-
-/** Resalta las dos posiciones que participan de un intercambio. */
-function efectoCambio(tipo, yo, posPropia, indiceRival, posRival) {
-  const clase = tipo === "cambioCiego" ? "efecto-ciego" : "efecto-vista";
-  marcarEfecto(yo, posPropia, clase, 1100);
-  marcarEfecto(indiceRival, posRival, clase, 1100);
-}
 
 // ------------------------------------------------------------ modal
 
-function abrirModal(html) {
-  dom.modal.innerHTML = html;
-  dom.velo.classList.add("abierto");
-}
 
-function cerrarModal() {
-  dom.velo.classList.remove("abierto");
-  dom.modal.innerHTML = "";
-}
 
 // ---------------------------------------------------------- abandono
 
@@ -959,16 +788,6 @@ function resolverUltimoDescarte() {
     dibujar();
   }, MS_CARTA_EXPUESTA);
 }
-
-/**
- * Cuánto dura la marca sobre una carta que alguien acaba de mirar.
- *
- * Un segundo: lo justo para que la mesa registre QUE pasó algo. No revela el
- * número —eso sería regalar el poder— sino que esa carta fue vista, que es
- * información legítima y pública: los demás pueden contar con que ese jugador
- * ahora sabe algo.
- */
-const MS_MARCA_PODER = 1000;
 
 /**
  * Corre la ventana de reflejos si la jugada acaba de abrir una.
@@ -1427,13 +1246,6 @@ function manoParaElegir(i, { soloVacias = false } = {}) {
     .join("");
 }
 
-const TITULOS_PODER = {
-  mirarPropia: "Mirar una carta propia",
-  mirarRival: "Mirar una carta de un rival",
-  cambioCiego: "Cambio a ciegas",
-  cambioConVista: "Cambio viendo ambas cartas",
-};
-
 /** Qué hace el poder: se muestra antes de decidir si conviene usarlo. */
 const EFECTOS_PODER = {
   mirarPropia: "Mirás una carta tuya, la hayas visto antes o no.",
@@ -1694,7 +1506,7 @@ async function mostrarFinRonda() {
       const cambio = enRonda - mano;
       return `
         <tr class="${i === estado.indiceCortador ? "cortador" : ""} ${j.eliminado ? "fuera" : ""}">
-          <td>${j.nombre}${i === estado.indiceCortador ? " ✂️" : ""}</td>
+          <td>${escapar(j.nombre)}${i === estado.indiceCortador ? " ✂️" : ""}</td>
           <td class="num">${mano}</td>
           <td class="num ${cambio < 0 ? "bueno" : cambio > 0 ? "malo" : ""}">${cambio > 0 ? "+" : ""}${cambio || 0}</td>
           <td class="num">${enRonda > 0 ? "+" : ""}${enRonda}</td>
@@ -1975,10 +1787,7 @@ function mostrarMiradas(vista) {
     if (linea?.tipo !== "miroCarta") continue;
     anunciarMirada(linea.texto);
     sonidos.voltear();
-    const mano = document.querySelector(`.jugador[data-jugador="${linea.objetivo}"]`);
-    if (!mano) continue;
-    mano.classList.add("mano-mirada");
-    setTimeout(() => mano.classList.remove("mano-mirada"), MS_MARCA_PODER);
+    marcarManoMirada(linea.objetivo);
   }
 }
 
@@ -2068,7 +1877,7 @@ function abrirModalFinDeRed(vista) {
     .map((j, i) => {
       const enMano = vista.puntosDeMano?.[i];
       return `<tr${i === YO ? ' class="propio"' : ""}>
-        <td>${j.nombre}</td>
+        <td>${escapar(j.nombre)}</td>
         <td>${enMano ?? "—"}</td>
         <td>${j.puntos}</td>
         <td>${j.eliminado ? "eliminado" : ""}</td>
