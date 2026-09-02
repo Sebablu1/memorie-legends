@@ -98,14 +98,17 @@ test("la mesa se entera de si el cambio se hizo o no", async ({ page }) => {
   await llegarALaDecision(page);
   await page.locator('[data-accion="diez-dejar"]').click();
 
-  const aviso = page.locator(".anuncio-mirada");
+  // El aviso es ahora un cartel corto —un ícono y una palabra— en vez de la
+  // frase que escribía el motor. Lo que se comprueba no cambió: que la mesa se
+  // entere de CUÁL de las dos decisiones fue.
+  const aviso = page.locator(".cartel-corto");
   await expect(aviso.first()).toBeVisible({ timeout: 15_000 });
-  const texto = await aviso.first().innerText();
-  expect(texto).toMatch(/no cambió/i);
+  const texto = await aviso.first().locator("b").innerText();
+  expect(texto, "el cartel no dice que NO cambió").toMatch(/sin cambio/i);
 
   // Y sin decir QUÉ cartas eran ni en qué posiciones estaban: el aviso cuenta
   // la decisión, no el contenido.
-  expect(texto.replace(/poder \d+/i, "")).not.toMatch(/\d/);
+  expect(texto).not.toMatch(/\d/);
 });
 
 test("dejar como está también devuelve el turno", async ({ page }) => {

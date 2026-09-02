@@ -68,15 +68,43 @@ export function crearInterfaz({ dom, sonidos, titulos, esperar, msAnuncio, msMar
     setTimeout(() => el.classList.remove(clase), ms);
   }
 
-  /** Cartel de un segundo: "Ana miró una carta de Bruno". */
-  function anunciarMirada(texto) {
+  /**
+   * El cartel corto: un ícono grande y una o dos palabras.
+   *
+   * Reemplaza a los carteles que contaban la jugada en una frase — "Ana miró
+   * una carta de Bruno", "Vos miró las dos cartas y NO cambió". En el medio de
+   * una mano nadie lee una frase: se mira, se reconoce la forma y se sigue
+   * jugando. Un ícono se reconoce sin leer.
+   *
+   * La frase larga NO se pierde: sigue entera en el registro, que es donde uno
+   * va justamente a leer con calma qué pasó.
+   *
+   * `texto` viaja por `textContent` aunque hoy sean palabras fijas escritas
+   * acá. Cuesta nada y cierra la puerta a que mañana alguien le pase un nombre
+   * de jugador, que es texto que elige un desconocido.
+   */
+  function mostrarCartel(icono, texto, { clase = "" } = {}) {
     const cartel = document.createElement("div");
-    cartel.className = "anuncio-mirada";
-    // textContent y no innerHTML: el texto lleva nombres que eligen los
-    // jugadores, y un nombre puede ser `<img onerror=...>`.
-    cartel.textContent = texto;
+    cartel.className = `cartel-corto ${clase}`.trim();
+
+    const marca = document.createElement("span");
+    marca.className = "icono";
+    // El ícono no se lee en voz alta: lo dice la palabra de al lado, y un
+    // lector de pantalla que anuncie "emoji de ojo Miró" dice la cosa dos
+    // veces.
+    marca.setAttribute("aria-hidden", "true");
+    marca.textContent = icono;
+
+    const palabra = document.createElement("b");
+    palabra.textContent = texto;
+
+    cartel.append(marca, palabra);
     dom.mesa.appendChild(cartel);
-    setTimeout(() => cartel.remove(), msMarcaPoder);
+
+    setTimeout(() => {
+      cartel.classList.add("saliendo");
+      setTimeout(() => cartel.remove(), 260);
+    }, msMarcaPoder);
   }
 
   /** Marca la mano entera de quien fue mirado, sin señalar qué carta. */
@@ -120,6 +148,6 @@ export function crearInterfaz({ dom, sonidos, titulos, esperar, msAnuncio, msMar
 
   return {
     pista, abrirModal, cerrarModal,
-    marcarEfecto, anunciarMirada, marcarManoMirada, anunciarPoder, efectoCambio,
+    marcarEfecto, mostrarCartel, marcarManoMirada, anunciarPoder, efectoCambio,
   };
 }

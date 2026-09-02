@@ -14,6 +14,7 @@ import {
   saltarPoder,
   cortar,
   pasarTurno,
+  MS_PASO_AUTOMATICO,
   saltarTurno,
   siguienteRonda,
   PODERES,
@@ -295,7 +296,34 @@ const interfaz = crearInterfaz({
   msMarcaPoder: MS_MARCA_PODER,
 });
 const { pista, abrirModal, cerrarModal, marcarEfecto,
-        anunciarMirada, marcarManoMirada, anunciarPoder, efectoCambio } = interfaz;
+        mostrarCartel, marcarManoMirada, anunciarPoder, efectoCambio } = interfaz;
+
+/**
+ * Los carteles cortos, en un solo sitio.
+ *
+ * Antes cada aviso repetía la frase que había escrito el motor —"Ana miró una
+ * carta de Bruno"— y eso ataba la interfaz a la redacción del registro: cambiar
+ * el texto de una línea cambiaba lo que se veía flotando sobre la mesa. Acá el
+ * cartel se elige por lo que PASÓ, no por cómo se contó.
+ *
+ * Los iconos son los mismos que usa el cartel de poder para los mismos poderes,
+ * a propósito: el 7 se anuncia con 👁 y se confirma con 👁.
+ */
+const CARTELES = {
+  mirarPropia:  ["👁", "Miró"],
+  mirarRival:   ["🔍", "Miró"],
+  cambio:       ["🔄", "Cambio"],
+  sinCambio:    ["🤝", "Sin cambio"],
+  tuTurno:      ["🃏", "Tu turno"],
+  decidir:      ["✂️", "Decidí"],
+};
+
+/** Muestra uno de CARTELES por su nombre. `tuyo` lo pinta en dorado. */
+const cartel = (nombre, { tuyo = false } = {}) => {
+  const par = CARTELES[nombre];
+  if (!par) return;
+  mostrarCartel(par[0], par[1], { clase: tuyo ? "tuyo" : "" });
+};
 
 /** Cartas reveladas de forma temporal: claves "indiceJugador:posicion". */
 /** Posición propia elegida para un poder de cambio, mientras se elige la rival. */
@@ -441,6 +469,54 @@ function dibujar() {
   marcarCartasJugables();
   actualizarBotones();
   sincronizarReloj();
+  sincronizarPasoAutomatico();
+  avisarSiMeToca();
+}
+
+/**
+ * Lo último que se dibujó cuando me tocaba a mí.
+ *
+ * `dibujar()` se llama muchas veces por turno —cada carta que se mueve, y en
+ * red cada vista que llega, que son varias por segundo—, así que sin recordar
+ * qué se avisó, el cartel de "Tu turno" reaparecería sin parar sobre la mesa.
+ * Se guarda una clave y no un booleano porque hay DOS avisos por turno, el de
+ * levantar y el de decidir, y el segundo tiene que poder salir después del
+ * primero dentro del mismo turno.
+ */
+let ultimoAviso = "";
+
+/**
+ * El cartel dorado de "te toca".
+ *
+ * Sólo en las dos fases en las que la mesa espera una decisión mía: levantar
+ * del mazo, y cortar o pasar. En las del medio —elegir qué hacer con la carta
+ * levantada, usar el poder— ya hay un modal o una carta iluminada diciendo qué
+ * hacer, y un cartel más sería ruido encima de algo que ya se ve.
+ *
+ * La instrucción larga sigue en la barra de pista, que es donde se lee. Esto
+ * sólo hace que uno levante la vista.
+ */
+function avisarSiMeToca() {
+  const mio = estado.indiceTurno === YO;
+  const cual =
+    !mio ? null
+    : estado.fase === "turno" ? "tuTurno"
+    : estado.fase === "postLevantada" ? "decidir"
+    : null;
+
+  if (!cual) {
+    // Fuera de mis fases se olvida lo avisado, para que el turno siguiente
+    // vuelva a avisar aunque caiga en la misma fase.
+    if (!mio) ultimoAviso = "";
+    return;
+  }
+
+  // `turnosRonda` entra en la clave porque en una ronda larga me toca varias
+  // veces, y sin él el segundo turno se creería el mismo que el primero.
+  const clave = `${estado.ronda}:${estado.turnosRonda}:${cual}`;
+  if (clave === ultimoAviso) return;
+  ultimoAviso = clave;
+  cartel(cual, { tuyo: true });
 }
 
 /** Marca como pulsables sólo las cartas que la fase actual permite tocar. */
@@ -583,6 +659,56 @@ function resolverPorTiempo(indice) {
 }
 
 /**
+ * El paso automático de `postLevantada`, en entrenamiento.
+ *
+ * En red esto NO corre: el plazo lo lleva el servidor con su propio reloj, y
+ * dos relojes contando lo mismo son dos resultados distintos en cuanto uno de
+ * los dos se atrasa. Acá no hay servidor, así que el reloj es éste.
+ *
+ * Se guarda a QUÉ turno pertenece la cuenta. Si sólo se guardara el timeout,
+ * una ventana de descarte que interrumpe y devuelve la mesa a `postLevantada`
+ * dejaría el turno sin cuenta, porque al salir de la fase se canceló.
+ */
+let pasoAutomatico = null;
+
+function cancelarPasoAutomatico() {
+  if (pasoAutomatico) clearTimeout(pasoAutomatico.timeout);
+  pasoAutomatico = null;
+}
+
+function sincronizarPasoAutomatico() {
+  const activo =
+    !enRed() &&
+    estado.fase === "postLevantada" &&
+    estado.indiceTurno === YO;
+
+  if (!activo) {
+    cancelarPasoAutomatico();
+    return;
+  }
+
+  const clave = `${estado.ronda}:${estado.turnosRonda}`;
+  if (pasoAutomatico?.clave === clave) return; // ya está contando este turno
+
+  cancelarPasoAutomatico();
+  pasoAutomatico = {
+    clave,
+    timeout: setTimeout(() => {
+      pasoAutomatico = null;
+      // Se vuelve a comprobar: entre que arrancó la cuenta y ahora pudo pasar
+      // cualquier cosa, y `pasarTurno` fuera de `postLevantada` no hace nada
+      // pero tampoco avisa.
+      if (estado.fase !== "postLevantada" || estado.indiceTurno !== YO) return;
+      sonidos.clic();
+      estado = pasarTurno(estado);
+      pista("Se acabó el tiempo para decidir: <b>pasaste</b> el turno.");
+      dibujar();
+      cicloTurnos();
+    }, MS_PASO_AUTOMATICO),
+  };
+}
+
+/**
  * Arranca, reinicia o apaga el reloj según la fase. Se llama en cada dibujado,
  * así que basta con cambiar de fase para que el reloj se reinicie solo.
  */
@@ -611,9 +737,6 @@ function sincronizarReloj() {
 
 
 
-/** El último texto que escribió el motor. Lo redacta él, no la interfaz. */
-const ultimaLineaDelRegistro = () =>
-  estado.registro[estado.registro.length - 1]?.texto ?? "";
 
 
 
@@ -994,7 +1117,7 @@ async function poderDeIA(i) {
       "efecto-mirar",
       MS_MARCA_PODER,
     );
-    anunciarMirada(ultimaLineaDelRegistro());
+    cartel(tipo);
     await esperar(MS_MARCA_PODER);
     return;
   }
@@ -1026,7 +1149,7 @@ async function poderDeIA(i) {
     estado = resolverCambioConVista(estado, conviene);
     // La mesa se entera de lo que decidió la IA, igual que de lo que decide
     // un humano. Si no, el 10 de las IA sería invisible.
-    anunciarMirada(ultimaLineaDelRegistro());
+    cartel(conviene ? "cambio" : "sinCambio");
     if (!conviene) {
       // No cambió: sigue sabiendo qué tiene el rival ahí.
       memorias[i] = IA.recordar(
@@ -1470,7 +1593,7 @@ dom.modal.addEventListener("click", async (evento) => {
     correrTemporizador(MS_MIRAR, "Mirando");
     // El que mira ve la carta; el resto de la mesa, sólo el aviso de que la
     // miró. Son dos cosas distintas y por eso van por caminos distintos.
-    anunciarMirada(ultimaLineaDelRegistro());
+    cartel(tipo);
     await revelarUnMomento(i, pos);
     cancelarTemporizador();
     pista("Podés <b>cortar</b> o <b>pasar</b> el turno.");
@@ -1570,7 +1693,7 @@ async function resolverElDiez(cambiar) {
   sonidos[cambiar ? "whoosh" : "clic"]();
   // En entrenamiento no hay vistas del servidor, así que el aviso se dispara
   // acá. En red lo hace `mostrarMiradas` al recibir el registro.
-  anunciarMirada(ultimaLineaDelRegistro());
+  cartel(cambiar ? "cambio" : "sinCambio");
   pista(
     cambiar
       ? "Cambiaste la carta. Podés <b>cortar</b> o <b>pasar</b> el turno."
@@ -1878,7 +2001,9 @@ function mostrarMiradas(vista) {
   for (const linea of nuevas) {
     // Las miradas de los poderes 7 y 8.
     if (linea?.tipo === "miroCarta") {
-      anunciarMirada(linea.texto);
+      // Quién miró a quién ya viene en la línea, así que el 7 (mirarse una
+      // propia) y el 8 (mirar la de otro) se distinguen sin leer el texto.
+      cartel(linea.actor === linea.objetivo ? "mirarPropia" : "mirarRival");
       sonidos.voltear();
       marcarManoMirada(linea.objetivo);
       continue;
@@ -1887,7 +2012,7 @@ function mostrarMiradas(vista) {
     // es parte de la regla: si el rival cambió, alguien tiene una carta suya y
     // conviene saberlo; si NO cambió, eso también dice algo.
     if (linea?.tipo === "resolvioElDiez") {
-      anunciarMirada(linea.texto);
+      cartel(linea.cambio ? "cambio" : "sinCambio");
       sonidos[linea.cambio ? "whoosh" : "clic"]();
       if (linea.cambio) marcarManoMirada(linea.objetivo);
       continue;

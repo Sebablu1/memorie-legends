@@ -1772,23 +1772,56 @@ button.accion.con-poder {
    entera y no sobre una carta suelta, porque señalar la carta exacta
    convertiría el poder en un anuncio público de dónde está lo que se vio. */
 
-.anuncio-mirada {
+/* El cartel corto: un ícono grande y una palabra.
+
+   Va arriba y chico, no en el medio y grande como el de los poderes. Es una
+   diferencia deliberada: el de poder ANUNCIA algo que está por pasar y merece
+   frenar la mesa; éste CONFIRMA algo que ya pasó y tiene que poder ignorarse.
+   Si los dos gritaran igual, el que importa dejaría de destacar. */
+
+.cartel-corto {
   position: absolute;
   top: 18%;
   left: 50%;
   transform: translateX(-50%);
   z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 9px;
   padding: 8px 18px;
   border-radius: 999px;
-  background: rgba(10, 10, 10, 0.86);
+  background: rgba(10, 10, 10, 0.88);
   border: 1px solid rgba(70, 200, 255, 0.5);
   color: #d8f2ff;
-  font-size: 0.82rem;
-  letter-spacing: 0.4px;
   white-space: nowrap;
   pointer-events: none;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
   animation: mirada-entra 160ms ease-out;
+}
+
+.cartel-corto .icono {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.cartel-corto b {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+/* Es tu turno: dorado, no celeste. El celeste es "alguien hizo algo"; el
+   dorado, "te toca a vos". Que se distingan de un vistazo es el punto de que
+   exista este cartel. */
+.cartel-corto.tuyo {
+  border-color: rgba(212, 168, 67, 0.75);
+  color: #f6e6c0;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5), 0 0 26px rgba(212, 168, 67, 0.35);
+}
+
+.cartel-corto.saliendo {
+  opacity: 0;
+  transition: opacity 240ms ease-in;
 }
 
 /* La animación sólo hace la entrada. La posición de reposo no depende de que
@@ -1808,7 +1841,7 @@ button.accion.con-poder {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .anuncio-mirada { animation: none; }
+  .cartel-corto { animation: none; }
   .mano-mirada { animation: none; outline: 2px solid rgba(70, 200, 255, 0.7); }
 }
 

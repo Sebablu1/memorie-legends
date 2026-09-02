@@ -55,6 +55,15 @@ export const MS_TURNO = 8000;
  */
 export const MS_MIRAR = motor.MS_MIRAR;
 
+/**
+ * Lo que espera el servidor a que el del turno corte o pase.
+ *
+ * Sale del motor y no se escribe acá otra vez: la mesa de entrenamiento usa la
+ * misma cuenta, y tenerla duplicada es como se separan dos números que tenían
+ * que ser el mismo.
+ */
+export const MS_PASO_AUTOMATICO = motor.MS_PASO_AUTOMATICO;
+
 /** Lo que se muestran los resultados antes de repartir la ronda siguiente. */
 export const MS_ENTRE_RONDAS = 6000;
 
@@ -298,9 +307,24 @@ export function crearMotorEnRed({
         if (cerrada) return null;
         return nuevo("finPartida", `r${estado.ronda}`, ahoraMs + MS_ANTES_DE_CERRAR, "cerrarPartida");
 
-      // Levantada, poder y postLevantada no tienen reloj, igual que en la mesa
-      // local: esas decisiones se toman sin apuro. Si el jugador desaparece,
-      // lo resuelve `saltarAusente`, que exige 15 segundos de silencio.
+      case "postLevantada":
+        // `saltarAusente` no cubre este caso y por eso hace falta el plazo.
+        // Aquél mide SILENCIO: pide 15 segundos sin latidos. Alguien que dejó
+        // la pestaña abierta y se fue a hacer otra cosa sigue latiendo, así
+        // que nunca cuenta como ausente, y la mesa se queda esperándolo sin
+        // que nada la destrabe. Los otros tres no pueden hacer nada.
+        //
+        // La marca lleva el turno, no la ronda: en una ronda me toca decidir
+        // varias veces, y con `r${estado.ronda}` la segunda heredaría el
+        // vencimiento de la primera y pasaría de inmediato.
+        return nuevo("postLevantada", `t${estado.turnosRonda}-${estado.indiceTurno}`,
+                     ahoraMs + MS_PASO_AUTOMATICO, "pasarPorTiempo");
+
+      // Levantada y poder siguen sin reloj, igual que en la mesa local: esas
+      // decisiones se toman sin apuro y no dejan a la mesa esperando —el que
+      // levantó tiene la carta en la mano y va a hacer algo con ella. Si el
+      // jugador desaparece del todo, lo resuelve `saltarAusente`, que exige
+      // 15 segundos de silencio.
       default:
         return null;
     }
@@ -973,6 +997,11 @@ export function crearMotorEnRed({
 
       case "saltarTurno":
         return { ...partida, estado: motor.saltarTurno(partida.estado) };
+
+      // Se acabó el tiempo de decidir: pasa, nunca corta. Cortar por alguien
+      // que no contestó podría eliminarlo; pasar no le cuesta nada.
+      case "pasarPorTiempo":
+        return { ...partida, estado: motor.pasarTurno(partida.estado) };
 
       case "siguienteRonda": {
         // Si la partida terminó, no hay ronda siguiente que repartir.

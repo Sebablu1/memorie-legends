@@ -110,12 +110,14 @@ test("mirar una carta deja constancia sin decir cuál", async ({ page }) => {
   // Se elige una carta cualquiera de las ofrecidas.
   await page.locator("#modal .objetivos .carta").first().click();
 
-  const anuncio = page.locator(".anuncio-mirada");
+  // Un cartel corto, no la frase del motor. La regla que cubre esta prueba es
+  // la misma: la mesa se entera de que alguien miró, y de nada más.
+  const anuncio = page.locator(".cartel-corto");
   await expect(anuncio.first()).toBeVisible({ timeout: 15_000 });
 
-  const texto = await anuncio.first().innerText();
-  expect(texto).toMatch(/miró una carta/i);
-  // Ni el número de la carta ni su posición. El único dígito permitido es el
-  // del poder, en "usó el poder 7".
-  expect(texto.replace(/poder \d+/i, "")).not.toMatch(/\d/);
+  const texto = await anuncio.first().locator("b").innerText();
+  expect(texto, "el cartel no dice que se miró").toMatch(/mir/i);
+  // Ni el número de la carta ni su posición. Ahora no hay ningún dígito que
+  // valga: el cartel corto ya no nombra el poder.
+  expect(texto).not.toMatch(/\d/);
 });

@@ -31,6 +31,25 @@ export const MS_DESCARTE = 5000;
  */
 export const MS_REAPERTURA = 3000;
 
+/**
+ * Cuánto se espera a que el del turno decida si corta o pasa.
+ *
+ * Treinta segundos. Es la única fase sin reloj en la que la mesa entera queda
+ * esperando a una sola persona: levantar tiene sus 8 segundos, y la mirada y
+ * los reflejos se cierran solos. `postLevantada` no tenía nada, y eso alcanza
+ * para que alguien que se levantó de la silla —con la pestaña abierta, así que
+ * sigue latiendo y `saltarAusente` no lo toca— congele la partida para los
+ * otros tres sin querer.
+ *
+ * No es un reloj de reflejos y por eso es largo: cortar o pasar es la decisión
+ * con más peso de la ronda y hay que poder pensarla. Treinta segundos es
+ * tiempo de sobra para decidir y poco para quedarse mirando la pared.
+ *
+ * Al vencerse se PASA, nunca se corta. Pasar es lo que no arriesga nada de
+ * quien no contestó: cortar por él podría eliminarlo.
+ */
+export const MS_PASO_AUTOMATICO = 30000;
+
 export const PODERES = {
   7: "mirarPropia",
   8: "mirarRival",
