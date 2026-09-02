@@ -19,9 +19,16 @@
         </div>
         <div class="derecha">
           <div class="chip-ronda">Ronda <strong id="numeroRonda">-</strong></div>
-          <button id="btnRegistro" class="btn-icono" type="button" title="Ver el registro de jugadas">📜</button>
-          <button id="btnSonido" class="btn-icono" type="button" title="Silenciar sonidos">🔊</button>
-          <button id="btnAbandonar" class="btn-icono" type="button" title="Abandonar la partida">🚪</button>
+          <button id="btnRegistro" class="btn-icono" type="button"
+                  aria-label="Ver el registro de jugadas" aria-expanded="false"
+                  aria-controls="panelRegistro"
+                  title="Ver el registro de jugadas"><span aria-hidden="true">📜</span></button>
+          <button id="btnSonido" class="btn-icono" type="button"
+                  aria-label="Silenciar sonidos" aria-pressed="false"
+                  title="Silenciar sonidos"><span aria-hidden="true">🔊</span></button>
+          <button id="btnAbandonar" class="btn-icono" type="button"
+                  aria-label="Abandonar la partida"
+                  title="Abandonar la partida"><span aria-hidden="true">🚪</span></button>
         </div>
       </header>
 
@@ -58,17 +65,24 @@
       </div>
 
       <div class="acciones">
-        <div class="pista" id="pista">Preparando la partida…</div>
+        <!-- La pista dice qué se puede hacer en cada momento. Es el canal
+             principal del juego para quien no ve la mesa, así que se anuncia
+             sola. `polite` y no `assertive`: no debe cortar lo que el lector
+             esté leyendo. -->
+        <div class="pista" id="pista" role="status" aria-live="polite">Preparando la partida…</div>
 
         <!-- La cuenta atrás de la mirada y de los reflejos vive acá, junto a la
              instrucción que la explica. Sobre el paño tapaba la ficha del
              jugador de enfrente justo cuando hay que mirar la mesa. -->
-        <div class="temporizador" id="temporizador">
+        <!-- El texto del temporizador se repinta cada 80 ms. Anunciarlo sería
+             un lector hablando sin parar, así que queda oculto para la
+             accesibilidad: el cambio de fase ya lo cuenta la pista. -->
+        <div class="temporizador" id="temporizador" aria-hidden="true">
           <span class="texto" id="temporizadorTexto"></span>
           <span class="barra"><i class="relleno" id="temporizadorRelleno"></i></span>
         </div>
 
-        <div class="reloj-turno" id="relojTurno" hidden>
+        <div class="reloj-turno" id="relojTurno" aria-hidden="true" hidden>
           <span class="reloj-numero" id="relojNumero">8</span>
           <span class="reloj-barra"><i class="reloj-relleno" id="relojRelleno"></i></span>
         </div>
@@ -88,18 +102,22 @@
 
     <!-- El registro sigue completo, pero fuera del paño: cerrado no ocupa
          nada, y abierto se desliza por encima con su propio scroll. -->
-    <div class="panel-registro" id="panelRegistro" hidden>
+    <div class="panel-registro" id="panelRegistro" role="region"
+         aria-label="Registro de jugadas" hidden>
       <div class="panel-cabecera">
         <h2>Registro de jugadas</h2>
-        <button id="btnCerrarRegistro" class="btn-icono" type="button" title="Cerrar el registro">✕</button>
+        <button id="btnCerrarRegistro" class="btn-icono" type="button"
+                aria-label="Cerrar el registro"
+                title="Cerrar el registro"><span aria-hidden="true">✕</span></button>
       </div>
-      <div class="registro" id="registro"></div>
+      <div class="registro" id="registro" role="log" aria-label="Jugadas de la partida"></div>
     </div>
 
-    <canvas id="confeti"></canvas>
+    <canvas id="confeti" aria-hidden="true"></canvas>
 
     <div class="velo" id="velo">
-      <div class="modal" id="modal"></div>
+      <div class="modal" id="modal" role="dialog" aria-modal="true"
+           aria-label="Decisión de la partida"></div>
     </div>
 
     <script type="module" src="js/mesa.js"></script>

@@ -54,24 +54,35 @@ test("la partida arranca igual con la misma semilla", async ({ page }) => {
   // La semilla es lo que hace que estas pruebas puedan afirmar algo concreto
   // en vez de "algo pasó". Si dejara de fijar el reparto, las demás seguirían
   // en verde por casualidad hasta el día que no.
-  const leerMano = async () => {
-    const alts = await page.locator(`${SEL.miMano} .carta .cara img`).evaluateAll(
-      (imgs) => imgs.map((i) => i.getAttribute("alt")),
+  /**
+   * La huella de un reparto.
+   *
+   * Incluye la MUESTRA y no sólo la mano, y hace falta: de la mano propia sólo
+   * está destapada la carta que se miró, así que las otras tres se leen "boca
+   * abajo" en cualquier partida. La primera versión comparaba sólo eso y falló
+   * por una coincidencia real —las semillas 4242 y 99 reparten las dos un
+   * Copa-6 en la posición 0—, con lo que dos repartos distintos daban la misma
+   * cadena. La muestra está siempre a la vista y desempata.
+   */
+  const huellaDelReparto = async () => {
+    const mano = await page.locator(`${SEL.miMano} .carta`).evaluateAll(
+      (cartas) => cartas.map((c) => c.getAttribute("aria-label")),
     );
-    return alts.join(",");
+    const muestra = await page.locator("#muestraCarta .carta").getAttribute("aria-label");
+    return `${muestra} || ${mano.join(",")}`;
   };
 
   await abrirMesa(page, { semilla: 4242 });
   await elegirCartaParaMirar(page);
-  const primera = await leerMano();
+  const primera = await huellaDelReparto();
 
   await abrirMesa(page, { semilla: 4242 });
   await elegirCartaParaMirar(page);
-  expect(await leerMano()).toBe(primera);
+  expect(await huellaDelReparto()).toBe(primera);
 
   // Y con otra semilla, otra mesa. Si esto fallara, la semilla no se estaría
   // usando y la comprobación de arriba no valdría nada.
   await abrirMesa(page, { semilla: 99 });
   await elegirCartaParaMirar(page);
-  expect(await leerMano()).not.toBe(primera);
+  expect(await huellaDelReparto()).not.toBe(primera);
 });

@@ -1811,3 +1811,63 @@ button.accion.con-poder {
   .anuncio-mirada { animation: none; }
   .mano-mirada { animation: none; outline: 2px solid rgba(70, 200, 255, 0.7); }
 }
+
+/* ------------------------------------------------ indicador de espera
+
+   Aparece con retraso (ver spinner.js) y NO tapa la mesa: quien decide si una
+   acción se puede pedir es `pedir()`, y dos cosas decidiendo lo mismo es como
+   se cuelga una interfaz. Esto sólo informa. */
+
+.cargando-global {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  /* Contraste comprobado: #f2e6cd sobre #12100a da 13.4:1, muy por encima del
+     4.5:1 que pide WCAG AA para texto normal. */
+  background: rgba(18, 16, 10, 0.94);
+  border: 1px solid rgba(212, 168, 67, 0.45);
+  color: #f2e6cd;
+  font-size: 0.84rem;
+  pointer-events: none;
+}
+
+.cargando-global[hidden] { display: none; }
+
+.cargando-global .aro {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid rgba(212, 168, 67, 0.3);
+  border-top-color: #d4a843;
+  animation: cargando-gira 700ms linear infinite;
+}
+
+@keyframes cargando-gira {
+  to { transform: rotate(360deg); }
+}
+
+/* Sin animación, el aro se queda quieto pero visible: el texto ya dice lo que
+   está pasando, así que no se pierde información. */
+@media (prefers-reduced-motion: reduce) {
+  .cargando-global .aro { animation: none; }
+}
+
+/* El foco del teclado, marcado a propósito y no dejado al contorno de fábrica.
+
+   El del navegador es un hilo fino que sobre el paño verde oscuro casi no se
+   distingue, y las cartas se pintan unas sobre otras: quien navega con
+   tabulador necesita saber en cuál está. Va con `:focus-visible` y no con
+   `:focus`, para que no aparezca al hacer clic con el ratón. */
+.carta:focus-visible,
+.accion:focus-visible,
+.btn-icono:focus-visible {
+  outline: 3px solid #d4a843;
+  outline-offset: 2px;
+}

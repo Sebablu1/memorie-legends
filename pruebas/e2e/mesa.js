@@ -184,8 +184,13 @@ export async function llegarADecidirCorte(page, { timeout = 40_000 } = {}) {
  * se niega a adivinar cuál.
  */
 export async function numeroDeLaMuestra(page) {
-  const alt = await page.locator(`${SEL.muestra} .cara img`).getAttribute("alt");
-  const m = alt?.match(/^(\d+)/);
+  // Del aria-label de la carta y no del alt de la imagen. Las imágenes van con
+  // `alt=""` a propósito: cada carta pinta el dorso Y la cara, y un lector de
+  // pantalla las leía las dos —"carta boca abajo, tres de espada"—, diciendo
+  // el valor de una carta tapada. Ahora el nombre accesible es uno solo, y es
+  // el que vale como contrato.
+  const etiqueta = await page.locator(SEL.muestra + " .carta").getAttribute("aria-label");
+  const m = etiqueta?.match(/(\d+)\s+de\s+/i);
   return m ? Number(m[1]) : null;
 }
 

@@ -16,6 +16,22 @@
  * revientan al arrancar, no al desplegar. De ahí el namespace.
  */
 import * as functions from "firebase-functions/v1";
+
+/**
+ * Los logs, estructurados.
+ *
+ * Es el logger que trae firebase-functions, no uno escrito a mano. Se propuso
+ * armar uno propio con `JSON.stringify({level, message, ...})`, y sería peor:
+ * éste ya emite el formato que Cloud Logging entiende, le pega la traza del
+ * pedido —así los mensajes de una misma invocación quedan agrupados— y respeta
+ * los niveles de severidad de la consola. Un JSON.stringify a pelo pierde las
+ * tres cosas.
+ *
+ * El segundo argumento es un objeto y no texto pegado con `+`: así los campos
+ * quedan consultables en Cloud Logging. Buscar por `codigo="ABC234"` sólo
+ * funciona si el código viajó como campo.
+ */
+const { logger } = functions;
 import admin from "firebase-admin";
 import crypto from "node:crypto";
 
@@ -264,7 +280,7 @@ export const crearSala = functions.https.onCall(async (data, context) => {
     } catch (e) {
       if (e instanceof functions.https.HttpsError) throw e;
       if (e.message === "codigo-ocupado") continue; // otro código y de nuevo
-      console.error("Error creando sala:", e);
+      logger.error("No se pudo crear la sala", { uid, entrada, error: e.message });
       throw new functions.https.HttpsError("internal", "No pudimos crear la sala.");
     }
   }
@@ -723,7 +739,7 @@ async function cerrarPeriodo(periodo, fechaDelPeriodoQueCierra) {
 
   const yaCerrado = await refPeriodo.get();
   if (yaCerrado.exists && yaCerrado.data().cerrado) {
-    console.log(`El período ${clave} ya estaba cerrado.`);
+    logger.info("El período ya estaba cerrado", { clave, periodo });
     return { clave, premiados: 0 };
   }
 
@@ -773,7 +789,7 @@ async function cerrarPeriodo(periodo, fechaDelPeriodoQueCierra) {
     { merge: true },
   );
 
-  console.log(`Período ${clave} cerrado: ${premiados} premiados.`);
+  logger.info("Período de ranking cerrado", { clave, periodo, premiados });
   return { clave, premiados };
 }
 
@@ -854,7 +870,7 @@ export const webhookPago = functions.https.onRequest(async (req, res) => {
   // entorno. Se define con:  firebase functions:secrets:set PAGOS_SECRETO
   const secreto = process.env.PAGOS_SECRETO;
   if (!secreto) {
-    console.error("Falta la variable PAGOS_SECRETO.");
+    logger.error("Falta la variable PAGOS_SECRETO: el webhook de pagos no puede verificar nada");
     return res.status(500).send("Sin configurar");
   }
 
@@ -869,7 +885,9 @@ export const webhookPago = functions.https.onRequest(async (req, res) => {
     crypto.timingSafeEqual(Buffer.from(firmaRecibida), Buffer.from(esperada));
 
   if (!iguales) {
-    console.warn("Webhook con firma inválida.");
+    // Sin volcar la firma recibida: es lo que un atacante querría ver para
+    // saber qué tan cerca estuvo.
+    logger.warn("Webhook de pago con firma inválida", { origen: req.ip });
     return res.status(401).send("Firma inválida");
   }
 
@@ -921,7 +939,7 @@ export const webhookPago = functions.https.onRequest(async (req, res) => {
 
     return res.status(200).send("ok");
   } catch (e) {
-    console.error("Error acreditando la compra:", e);
+    logger.error("No se pudo acreditar la compra", { error: e.message });
     return res.status(500).send("Error");
   }
 });

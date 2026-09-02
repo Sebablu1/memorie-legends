@@ -23,6 +23,24 @@ export const claseAsiento = (indice) => `asiento-color-${indice % 4}`;
 /** Clave de una posición concreta en una mano concreta. */
 export const clave = (i, pos) => `${i}:${pos}`;
 
+/**
+ * Nombre accesible de una carta.
+ *
+ * Se arma acá y no se deja al `alt` de las imágenes porque cada carta pinta
+ * DOS —el dorso y la cara, para que el volteo sea una animación—, y un lector
+ * de pantalla leía las dos: "carta boca abajo, tres de espada". El valor de una
+ * carta tapada no puede decirse, y decirlo justo al lado de "boca abajo" es
+ * peor que no tener etiqueta.
+ *
+ * Ahora las dos imágenes van con `alt=""` dentro de un contenedor
+ * `aria-hidden`, y lo único que se anuncia es esto.
+ */
+function etiqueta(posicion, cartaVisible) {
+  const donde = posicion != null ? `Posición ${posicion}` : "Carta";
+  if (!cartaVisible) return `${donde}, boca abajo`;
+  return `${donde}, ${cartaVisible.numero} de ${cartaVisible.palo}`;
+}
+
 export function dibujarCarta(
   carta,
   { visible, asiento = 0, posicion = null, clases = "", estilo = "" },
@@ -41,10 +59,11 @@ export function dibujarCarta(
       <button class="carta ${claseAsiento(asiento)} ${clases}"
               ${posicion != null ? `data-posicion="${posicion}"` : ""}
               style="${estilo}"
+              aria-label="${etiqueta(posicion, null)}"
               type="button">
         ${posicion != null ? `<span class="posicion">${posicion}</span>` : ""}
-        <span class="lados">
-          <span class="dorso"><img src="${dorso}" alt="Carta boca abajo" /></span>
+        <span class="lados" aria-hidden="true">
+          <span class="dorso"><img src="${dorso}" alt="" /></span>
         </span>
       </button>`;
   }
@@ -52,11 +71,12 @@ export function dibujarCarta(
     <button class="carta ${visible ? "visible" : ""} ${claseAsiento(asiento)} ${clases}"
             ${posicion != null ? `data-posicion="${posicion}"` : ""}
             style="${estilo}"
+            aria-label="${etiqueta(posicion, visible ? carta : null)}"
             type="button">
       ${posicion != null ? `<span class="posicion">${posicion}</span>` : ""}
-      <span class="lados">
-        <span class="dorso"><img src="${dorso}" alt="Carta boca abajo" /></span>
-        <span class="cara"><img src="${carta.imagen}" alt="${carta.numero} de ${carta.palo}" /></span>
+      <span class="lados" aria-hidden="true">
+        <span class="dorso"><img src="${dorso}" alt="" /></span>
+        <span class="cara"><img src="${carta.imagen}" alt="" /></span>
       </span>
     </button>`;
 }

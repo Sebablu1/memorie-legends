@@ -24,6 +24,7 @@ import {
 import { dorsoDeAsiento } from "./reglas/baraja.js";
 import { crearTemporizadores, esperar } from "./modulos/temporizadores.js";
 import { crearInterfaz, escapar } from "./modulos/ui.js";
+import { mostrarCargando, ocultarCargando } from "./spinner.js";
 import {
   claseAsiento,
   clave,
@@ -1939,6 +1940,9 @@ async function pedir(accion, ejecutar) {
   }
   pidiendo = true;
   pista("Procesando…");
+  // Con retraso: la mayoría de las jugadas vuelven en menos de lo que tarda
+  // en aparecer, y para ésas es mejor no mostrar nada. Ver spinner.js.
+  mostrarCargando("Enviando la jugada…");
 
   let reloj = null;
   try {
@@ -1975,6 +1979,9 @@ async function pedir(accion, ejecutar) {
   } finally {
     clearTimeout(reloj);
     pidiendo = false;
+    // En el finally, no en el camino feliz: una jugada que falla no puede
+    // dejar girando un aro que ya no espera nada.
+    ocultarCargando();
   }
 }
 
