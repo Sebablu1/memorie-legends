@@ -45,6 +45,9 @@ const dom = {
   btnRevisarNombres: $("btnRevisarNombres"),
   avisoNombres: $("avisoNombres"),
   listaNombres: $("listaNombres"),
+  btnListarUsuarios: $("btnListarUsuarios"),
+  avisoUsuarios: $("avisoUsuarios"),
+  listaUsuarios: $("listaUsuarios"),
   partidas: $("partidas"),
 };
 
@@ -52,6 +55,8 @@ const listar = httpsCallable(funciones, "listarSalasAdmin");
 const cancelar = httpsCallable(funciones, "cancelarSalaAdmin");
 const cancelarTodas = httpsCallable(funciones, "cancelarSalasEnEsperaAdmin");
 const revisarNombres = httpsCallable(funciones, "revisarNombresAdmin");
+const listarUsuarios = httpsCallable(funciones, "listarUsuariosAdmin");
+const eliminarUsuario = httpsCallable(funciones, "eliminarUsuarioAdmin");
 
 const decir = (donde, texto, clase = "") => {
   donde.textContent = texto;
@@ -295,3 +300,112 @@ dom.btnRevisarNombres.addEventListener("click", async () => {
     dom.btnRevisarNombres.disabled = false;
   }
 });
+
+// ------------------------------------------------------ cuentas
+
+/**
+ * Una fila de cuenta, con lo que hace falta para decidir sobre ella.
+ *
+ * Construida con DOM y no con innerHTML: el nombre lo eligió el jugador. Es la
+ * misma vía por la que un nombre podía ejecutar código en la mesa de los demás.
+ */
+function filaDeUsuario(cuenta) {
+  const fila = document.createElement("div");
+  fila.className = "fila";
+
+  const etiqueta = document.createElement("span");
+  etiqueta.className = `etiqueta ${cuenta.desactivado ? "alerta" : cuenta.vacia ? "esperando" : "jugando"}`;
+  etiqueta.textContent = cuenta.desactivado ? "desactivada" : cuenta.vacia ? "vacía" : "con datos";
+
+  const campo = (texto, clase = "campo") => {
+    const el = document.createElement("span");
+    el.className = clase;
+    el.textContent = texto;
+    return el;
+  };
+
+  fila.append(
+    etiqueta,
+    campo(cuenta.nombre || "(sin nombre)", "campo"),
+    campo(`${cuenta.saldo} Leyendas`),
+    campo(`${cuenta.partidas} partidas · ${cuenta.victorias} victorias`),
+    campo(cuenta.uid),
+  );
+
+  const boton = document.createElement("button");
+  boton.type = "button";
+  boton.className = "btn peligro chico";
+
+  if (cuenta.desactivado) {
+    boton.textContent = "Ya desactivada";
+    boton.disabled = true;
+  } else {
+    // El texto dice lo que VA A PASAR, no "eliminar" para las dos cosas: con
+    // saldo o partidas no se borra nada, se desactiva.
+    boton.textContent = cuenta.vacia ? "🗑️ Borrar" : "Desactivar";
+    boton.addEventListener("click", () => darDeBaja(cuenta, boton));
+  }
+
+  fila.appendChild(boton);
+  return fila;
+}
+
+async function verCuentas() {
+  dom.btnListarUsuarios.disabled = true;
+  decir(dom.avisoUsuarios, "Cargando…");
+  try {
+    const { data } = await listarUsuarios();
+    dom.listaUsuarios.replaceChildren(...data.cuentas.map(filaDeUsuario));
+    decir(
+      dom.avisoUsuarios,
+      `${data.total} cuenta(s) · ${data.vacias} sin saldo ni partidas.`,
+      "bien",
+    );
+  } catch (error) {
+    decir(dom.avisoUsuarios, error?.message ?? "No pudimos cargar las cuentas.", "mal");
+    console.error(error);
+  } finally {
+    dom.btnListarUsuarios.disabled = false;
+  }
+}
+
+/**
+ * Da de baja una cuenta, avisando ANTES qué va a pasar exactamente.
+ *
+ * El texto de la confirmación cambia según el caso. Un "¿seguro?" genérico
+ * enseña a apretar Aceptar sin leer, y esto borra la cuenta de una persona.
+ */
+async function darDeBaja(cuenta, boton) {
+  const nombre = cuenta.nombre || cuenta.uid;
+  const aviso = cuenta.vacia
+    ? `Borrar la cuenta de "${nombre}"?
+
+No tiene saldo ni partidas, así que se borra del todo. No se puede deshacer.`
+    : `"${nombre}" tiene ${cuenta.saldo} Leyendas y ${cuenta.partidas} partidas.
+
+` +
+      `NO se va a borrar: se desactiva y queda fuera del juego, conservando el historial. ¿Seguir?`;
+
+  if (!confirm(aviso)) return;
+
+  boton.disabled = true;
+  decir(dom.avisoUsuarios, "Aplicando…");
+  try {
+    const { data } = await eliminarUsuario({ uid: cuenta.uid });
+    const que = {
+      eliminado: "borrada",
+      desactivado: "desactivada",
+      no_existia: "ya no estaba",
+    }[data.hizo] ?? data.hizo;
+    decir(dom.avisoUsuarios, `Cuenta ${que}.`, "bien");
+    // La lista se rehace sola: recargar la página a mano es la clase de paso
+    // que se olvida y deja mirando datos viejos.
+    await verCuentas();
+  } catch (error) {
+    decir(dom.avisoUsuarios, error?.message ?? "No se pudo dar de baja.", "mal");
+    console.error(error);
+    boton.disabled = false;
+  }
+}
+
+dom.btnListarUsuarios.addEventListener("click", verCuentas);

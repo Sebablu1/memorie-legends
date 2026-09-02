@@ -550,6 +550,21 @@ export const cancelarSalasEnEsperaAdmin = functions.https.onCall((_data, context
 export const revisarNombresAdmin = functions.https.onCall((_data, context) =>
   panel.revisarNombres(context));
 
+/** Todas las cuentas, con saldo y partidas, para poder decidir sobre cada una. */
+export const listarUsuariosAdmin = functions.https.onCall((_data, context) =>
+  panel.listarUsuarios(context));
+
+/**
+ * Da de baja una cuenta.
+ *
+ * Borra sólo si NO tiene saldo ni partidas. Con cualquiera de las dos cosas la
+ * desactiva en vez de borrarla: ese saldo es dinero de alguien y sus partidas
+ * están en el ranking de los demás. Ver la nota en admin.js sobre por qué no
+ * toca Firebase Auth.
+ */
+export const eliminarUsuarioAdmin = functions.https.onCall((data, context) =>
+  panel.eliminarUsuario(context, { uid: data?.uid }));
+
 // ------------------------------------------------------ partida en red
 
 /**

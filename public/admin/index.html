@@ -7,6 +7,14 @@
     <meta name="theme-color" content="#0a0a0a" />
     <title>Memorie Legends — Administración</title>
     <link rel="icon" href="../img/claude-inspiration/logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Las mismas fuentes que el resto del sitio. Sin esto, el panel caía a
+         Georgia y parecía otra aplicación. -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Playfair+Display:wght@700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="admin.css" />
   </head>
   <body>
@@ -67,6 +75,24 @@
         </div>
         <div class="aviso" id="avisoNombres"></div>
         <div class="lista" id="listaNombres"></div>
+      </section>
+
+      <!-- Cuentas. Separado de "Revisar nombres" a propósito: aquélla lista
+           sólo los nombres con caracteres peligrosos, y para decidir a quién
+           dar de baja hay que ver el saldo y las partidas. -->
+      <section>
+        <h2>Cuentas</h2>
+        <p class="nota">
+          Una cuenta <b>sin saldo y sin partidas</b> se borra: no hay historial
+          que perder. Con saldo o partidas se <b>desactiva</b> en vez de
+          borrarse — ese saldo es dinero de alguien y sus partidas están en el
+          ranking de los demás.
+        </p>
+        <div class="acciones">
+          <button class="btn sobrio" id="btnListarUsuarios" type="button">Ver cuentas</button>
+        </div>
+        <div class="aviso" id="avisoUsuarios"></div>
+        <div class="lista" id="listaUsuarios"></div>
       </section>
 
       <section>

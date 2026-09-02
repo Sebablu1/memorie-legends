@@ -1,0 +1,415 @@
+/* ============================================================
+   TABLERO — las dos formas de jugar y las salas en vivo
+
+   El vocabulario visual sale de tema.css: --filo-oro, --relieve-oro,
+   --fieltro, --halo-oro. Acá se compone, no se inventa. Si el dorado hay que
+   cambiarlo, se cambia en un lugar; tres definiciones distintas de "dorado"
+   es como se pierde una estética.
+
+   Todo con CSS y ni una imagen de textura: el sitio se abre desde teléfonos
+   con datos móviles, y un fondo de 200 KB por pantalla se nota más que el
+   brillo que agrega.
+   ============================================================ */
+
+.titulo-elegir {
+  margin: 34px 0 18px;
+  text-align: center;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(1.4rem, 3.6vw, 2.1rem);
+  letter-spacing: 1px;
+  color: var(--oro);
+  text-shadow: 0 2px 20px rgba(212, 168, 67, 0.28);
+}
+
+/* --------------------------------------------- las dos tarjetas */
+
+.modos-de-juego {
+  align-items: stretch;
+}
+
+.tarjeta-modo {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 26px 24px;
+  border-radius: 18px;
+  background:
+    radial-gradient(ellipse 90% 70% at 50% 0%, rgba(212, 168, 67, 0.07), transparent 70%),
+    var(--panel);
+  border: 1px solid var(--borde-suave);
+  box-shadow: var(--sombra-negra);
+  overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* El filo dorado, como el canto de una carta cara.
+
+   Va en un pseudoelemento con `mask` y no con `border-image` porque
+   border-image no respeta el `border-radius`: con esquinas redondeadas deja
+   los cantos cuadrados. Esto pinta el degradado y recorta el centro, así que
+   queda un anillo de un píxel que sí sigue la curva. */
+.tarjeta-modo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--filo-oro);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+/* La de Leyendas lleva el filo más encendido: es la que cuesta entrada, y esa
+   diferencia tiene que verse antes de hacer clic, no después. */
+.tarjeta-modo.amigos::before {
+  opacity: 0.85;
+}
+
+.tarjeta-modo:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--sombra-negra), var(--halo-oro);
+}
+
+.tarjeta-modo:hover::before {
+  opacity: 1;
+}
+
+/* El barrido de luz al pasar el mouse. */
+.tarjeta-modo::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.07), transparent);
+  transform: skewX(-18deg);
+  transition: left 0.65s ease;
+  pointer-events: none;
+}
+
+.tarjeta-modo:hover::after {
+  left: 120%;
+}
+
+.tarjeta-modo > * {
+  position: relative;
+  z-index: 1;
+}
+
+.tarjeta-modo .icono {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.tarjeta-modo h3 {
+  margin: 0;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.4rem;
+  color: var(--texto);
+}
+
+.tarjeta-modo .modo-lema {
+  margin: 0;
+  font-size: 0.74rem;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: var(--oro);
+}
+
+.tarjeta-modo p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--texto-tenue);
+}
+
+/* El botón principal se ancla abajo: si no, dos tarjetas con distinto
+   contenido dejan los botones a alturas distintas y parece un error. */
+.tarjeta-modo .accion.grande {
+  margin-top: auto;
+}
+
+/* ------------------------------------------ botones "de juego" */
+
+.accion.grande {
+  display: block;
+  width: 100%;
+  padding: 15px 18px;
+  border: none;
+  border-radius: 12px;
+  text-align: center;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  color: #1a1206;
+  background: linear-gradient(180deg, var(--oro-claro), var(--oro) 55%, var(--oro-hondo));
+  /* El relieve es lo que lo hace parecer una gema y no un rectángulo pintado. */
+  box-shadow: var(--relieve-oro), 0 6px 18px rgba(0, 0, 0, 0.45);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.accion.grande:hover:not(:disabled) {
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+  box-shadow: var(--relieve-oro), 0 8px 24px rgba(212, 168, 67, 0.35);
+}
+
+/* Al presionar se hunde: el relieve se invierte. */
+.accion.grande:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: var(--relieve-hueco);
+}
+
+.accion.grande:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.accion.chica {
+  padding: 8px 15px;
+  font-size: 0.74rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-weight: 700;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  color: #16110a;
+  background: linear-gradient(180deg, var(--plata-clara), var(--plata) 60%, var(--plata-honda));
+  box-shadow: var(--relieve-oro), 0 3px 10px rgba(0, 0, 0, 0.4);
+  transition: filter 0.18s ease, transform 0.18s ease;
+}
+
+.accion.chica:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.accion.chica:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+}
+
+/* ------------------------------------------ entrada y código */
+
+.tarjeta-modo .campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tarjeta-modo .campo > span {
+  font-size: 0.72rem;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--texto-tenue);
+}
+
+/* El estilo base de select e input vive en tema.css, con selector de elemento,
+   para que cualquier formulario nuevo nazca bien. Acá va sólo lo propio. */
+.tarjeta-modo select,
+.tarjeta-modo input {
+  width: 100%;
+}
+
+.ayuda-entrada {
+  font-size: 0.76rem !important;
+  color: var(--texto-tenue);
+  min-height: 2.2em;
+}
+
+.separador-o {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+  color: var(--texto-tenue);
+  font-size: 0.7rem;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+
+.separador-o::before,
+.separador-o::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--borde), transparent);
+}
+
+.unirse-fila {
+  display: flex;
+  gap: 8px;
+}
+
+.unirse-fila input {
+  flex: 1;
+  /* `min-width: 0` es lo que de verdad permite encoger: un hijo de flex no
+     baja de su contenido si no se le dice. Sin esto, en un teléfono el input
+     empuja al botón fuera de la fila. */
+  min-width: 0;
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  text-align: center;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  color: var(--oro-claro);
+}
+
+.unirse-fila .accion.sobria {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------- tabla de salas */
+
+.panel-salas {
+  margin-top: 26px;
+  border-radius: 18px;
+  background:
+    radial-gradient(ellipse 70% 60% at 0% 0%, rgba(212, 168, 67, 0.06), transparent 70%),
+    var(--panel);
+  border: 1px solid var(--borde);
+}
+
+.nota-salas {
+  margin: 0 0 14px;
+  font-size: 0.82rem;
+  color: var(--texto-tenue);
+}
+
+/* La tabla scrollea DENTRO de su caja: sin esto, en un teléfono estrecho
+   empuja la página entera de costado. */
+.tabla-salas-caja {
+  overflow-x: auto;
+}
+
+.tabla-salas {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.tabla-salas th {
+  text-align: left;
+  padding: 9px 10px;
+  font-size: 0.66rem;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--oro);
+  border-bottom: 1px solid var(--borde);
+  white-space: nowrap;
+}
+
+.tabla-salas td {
+  padding: 12px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--texto);
+  white-space: nowrap;
+}
+
+.tabla-salas tbody tr {
+  transition: background 0.18s ease;
+}
+
+.tabla-salas tbody tr:hover {
+  background: rgba(212, 168, 67, 0.06);
+}
+
+.tabla-salas tr:last-child td {
+  border-bottom: none;
+}
+
+.tabla-salas .celda-codigo {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--oro-claro);
+}
+
+.tabla-salas td:last-child {
+  text-align: right;
+}
+
+/* La sala en la que ya estoy: si se cortó la conexión, volver es lo primero
+   que quiero hacer, así que se marca y va primero. */
+.tabla-salas .sala-mia {
+  background: rgba(212, 168, 67, 0.08);
+}
+
+.tabla-salas .sala-mia .celda-codigo::before {
+  content: "\2605  ";
+}
+
+.aviso-salas {
+  min-height: 1.4em;
+  margin: 14px 0 0;
+  font-size: 0.88rem;
+  color: var(--texto-tenue);
+}
+
+.aviso-salas.error {
+  color: #fca5a5;
+}
+
+/* Para lectores de pantalla: la columna de acciones necesita nombre, pero
+   dibujarlo dejaría un encabezado suelto arriba de los botones. */
+.oculto-visual {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 620px) {
+  .unirse-fila {
+    flex-direction: column;
+  }
+
+  .unirse-fila .accion.sobria {
+    width: 100%;
+  }
+
+  .tarjeta-modo {
+    padding: 22px 18px;
+  }
+
+  .tabla-salas th,
+  .tabla-salas td {
+    padding: 10px 7px;
+  }
+}
+
+/* Quien pidió menos movimiento no tiene por qué ver barridos de luz. */
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta-modo,
+  .tarjeta-modo::after,
+  .accion.grande,
+  .accion.chica {
+    transition: none;
+  }
+
+  .tarjeta-modo:hover {
+    transform: none;
+  }
+
+  .tarjeta-modo:hover::after {
+    left: -60%;
+  }
+}

@@ -1,150 +1,268 @@
 /* ============================================================
-   Panel de administración. Mismo idioma visual que la mesa:
-   noche, oro y vidrio, pero sin fieltro — acá no se juega.
+   Panel de administración.
+
+   Mismo idioma visual que el resto del sitio —noche, oro y relieve— pero sin
+   fieltro: acá no se juega.
+
+   IMPORTA css/tema.css en vez de repetir la paleta. Antes definía su propio
+   `--oro: #fbbf24`, que NO es el `#d4a843` del sitio: eran dos dorados
+   distintos conviviendo, y esa clase de diferencia se nota aunque nadie sepa
+   señalar por qué. Ahora hay uno solo, y las piezas (--filo-oro, --relieve-oro,
+   --halo-oro) salen de ahí.
    ============================================================ */
 
-:root {
-  --noche: #0a0a0a;
-  --noche-2: #121218;
-  --oro: #fbbf24;
-  --oro-hondo: #8a6d2a;
-  --rojo: #dc2626;
-  --verde: #3d8b6b;
-  --texto: #f4f4f5;
-  --tenue: #a1a1aa;
-  --borde: rgba(251, 191, 36, 0.18);
-}
+@import url("../css/tema.css");
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
 body {
   min-height: 100dvh;
   padding: 16px;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   color: var(--texto);
   background:
-    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(251, 191, 36, 0.07), transparent 70%),
-    var(--noche);
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(212, 168, 67, 0.08), transparent 70%),
+    var(--negro);
 }
 
-/* ------------------------------------------------------- cabecera */
+/* --------------------------------------------------------- cabecera */
 
 .barra {
   display: flex;
   align-items: center;
   gap: 14px;
   max-width: 1100px;
-  margin: 0 auto 20px;
-  padding: 12px 18px;
-  border-radius: 14px;
-  background: var(--noche-2);
+  margin: 0 auto 22px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: var(--panel);
   border: 1px solid var(--borde);
+  box-shadow: var(--sombra-negra);
 }
 
-.barra .marca { width: 38px; height: 38px; border-radius: 10px; object-fit: cover; }
-.barra h1 { font-size: 1.05rem; letter-spacing: 2px; text-transform: uppercase; color: var(--oro); }
-.barra .lema { font-size: 0.76rem; color: var(--tenue); }
-.barra > button { margin-left: auto; }
-
-/* ---------------------------------------------------------- cajas */
-
-main { max-width: 1100px; margin: 0 auto; }
-
-.tarjeta {
-  padding: 22px;
-  border-radius: 14px;
-  background: var(--noche-2);
-  border: 1px solid var(--borde);
+.barra .marca {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex: 0 0 auto;
 }
 
-.angosta { max-width: 380px; margin: 8vh auto 0; }
-
-h2 {
-  font-size: 0.72rem;
+.barra h1 {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.15rem;
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--oro);
-  margin: 26px 0 12px;
 }
 
-.angosta h2 { margin-top: 0; }
+.barra .lema {
+  font-size: 0.76rem;
+  color: var(--texto-tenue);
+}
 
-/* -------------------------------------------------------- entrar */
+.barra > button {
+  margin-left: auto;
+}
 
-form { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+/* ------------------------------------------------------------ cajas */
+
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.tarjeta,
+.dato {
+  position: relative;
+}
+
+/* El filo dorado, como el canto de una carta cara.
+
+   Va en un pseudoelemento con `mask` y no con `border-image` porque
+   border-image no respeta el `border-radius`: con esquinas redondeadas deja
+   los cantos cuadrados. Esto pinta el degradado y recorta el centro, así que
+   queda un anillo de un píxel que sí sigue la curva. */
+.tarjeta::before,
+.dato::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--filo-oro);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.tarjeta {
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--panel);
+  border: 1px solid var(--borde-suave);
+  box-shadow: var(--sombra-negra);
+}
+
+.angosta {
+  max-width: 400px;
+  margin: 8vh auto 0;
+}
+
+h2 {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 0.82rem;
+  letter-spacing: 2.4px;
+  text-transform: uppercase;
+  color: var(--oro);
+  margin: 28px 0 12px;
+}
+
+.angosta h2 {
+  margin-top: 0;
+}
+
+.nota {
+  margin: 0 0 14px;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--texto-tenue);
+}
+
+/* ----------------------------------------------------------- entrar */
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 16px;
+}
 
 label {
   display: flex;
   flex-direction: column;
   gap: 6px;
   font-size: 0.78rem;
-  color: var(--tenue);
+  color: var(--texto-tenue);
 }
 
-input {
-  padding: 11px 13px;
-  border-radius: 9px;
-  border: 1px solid var(--borde);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--texto);
-  font-size: 0.95rem;
-  font-family: inherit;
-  /* El navegador dibuja el autocompletado con el tema del sistema; sin esto,
-     en Windows sale texto claro sobre fondo claro. */
-  color-scheme: dark;
+/* El estilo base de input y select vive en tema.css, con selector de elemento:
+   cualquier campo que aparezca mañana nace oscuro. Sin `color-scheme: dark`,
+   el navegador dibuja el desplegable con el tema del SISTEMA, y en Windows eso
+   es un panel blanco con texto claro encima. */
+input,
+select {
+  width: 100%;
 }
 
-input:focus { outline: 2px solid var(--oro); outline-offset: 1px; }
-
-/* ------------------------------------------------------- botones */
+/* ---------------------------------------------------------- botones */
 
 .btn {
-  padding: 11px 18px;
+  padding: 12px 20px;
   border: none;
-  border-radius: 9px;
-  font-size: 0.78rem;
+  border-radius: 11px;
+  font-size: 0.76rem;
   font-weight: 700;
-  letter-spacing: 1.2px;
+  letter-spacing: 1.4px;
   text-transform: uppercase;
   font-family: inherit;
   cursor: pointer;
   color: #1a1206;
-  background: var(--oro);
-  transition: filter 0.18s, transform 0.18s;
+  background: linear-gradient(180deg, var(--oro-claro), var(--oro) 55%, var(--oro-hondo));
+  /* El relieve es lo que lo hace parecer una gema y no un rectángulo pintado. */
+  box-shadow: var(--relieve-oro), 0 5px 16px rgba(0, 0, 0, 0.45);
+  transition: filter 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
-.btn:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
-.btn:disabled { opacity: 0.45; cursor: progress; transform: none; }
+.btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
 
-.btn.sobrio { background: rgba(255, 255, 255, 0.09); color: var(--texto); }
-.btn.peligro { background: var(--rojo); color: #fff; }
+/* Al presionar se hunde: el relieve se invierte. */
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: var(--relieve-hueco);
+}
 
-.btn.chico { padding: 7px 12px; font-size: 0.68rem; }
+.btn:disabled {
+  opacity: 0.45;
+  cursor: progress;
+  transform: none;
+  filter: grayscale(0.5);
+}
 
-/* ------------------------------------------------------- totales */
+.btn.sobrio {
+  color: #16110a;
+  background: linear-gradient(180deg, var(--plata-clara), var(--plata) 60%, var(--plata-honda));
+}
+
+.btn.peligro {
+  color: #fff;
+  background: linear-gradient(180deg, #e05a4a, var(--rojo) 55%, #8e2a1e);
+}
+
+.btn.chico {
+  padding: 8px 13px;
+  font-size: 0.68rem;
+}
+
+/* ---------------------------------------------------------- totales */
 
 .totales {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
 }
 
 .dato {
-  padding: 16px 18px;
-  border-radius: 12px;
-  background: var(--noche-2);
-  border: 1px solid var(--borde);
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 1px solid var(--borde-suave);
+  box-shadow: var(--sombra-negra);
 }
 
-.dato b { display: block; font-size: 1.7rem; font-variant-numeric: tabular-nums; }
-.dato span { font-size: 0.7rem; letter-spacing: 1.4px; text-transform: uppercase; color: var(--tenue); }
-.dato.acento b { color: var(--oro); }
+.dato b {
+  display: block;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.9rem;
+  font-variant-numeric: tabular-nums;
+}
 
-.acciones { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.dato span {
+  font-size: 0.68rem;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--texto-tenue);
+}
 
-/* --------------------------------------------------------- lista */
+.dato.acento b {
+  color: var(--oro);
+  text-shadow: 0 2px 16px rgba(212, 168, 67, 0.35);
+}
 
-.lista { display: flex; flex-direction: column; gap: 10px; }
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* ------------------------------------------------------------ lista */
+
+.lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 
 .fila {
   display: flex;
@@ -152,63 +270,96 @@ input:focus { outline: 2px solid var(--oro); outline-offset: 1px; }
   align-items: center;
   gap: 10px 16px;
   padding: 14px 16px;
-  border-radius: 12px;
-  background: var(--noche-2);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 13px;
+  background: var(--panel);
+  border: 1px solid var(--borde-suave);
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.fila:hover {
+  background: var(--panel-alto);
+  border-color: var(--borde);
 }
 
 .fila .codigo {
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
   font-size: 1rem;
   font-weight: 700;
-  color: var(--oro);
+  letter-spacing: 1.5px;
+  color: var(--oro-claro);
   min-width: 84px;
 }
 
-.fila .campo { font-size: 0.82rem; color: var(--tenue); }
-.fila .campo b { color: var(--texto); font-weight: 600; }
-.fila > :last-child { margin-left: auto; }
+.fila .campo {
+  font-size: 0.82rem;
+  color: var(--texto-tenue);
+  /* Sin esto, un nombre largo empuja al botón fuera de la fila: un hijo de
+     flex no baja de su contenido salvo que se le diga. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fila .campo b {
+  color: var(--texto);
+  font-weight: 600;
+}
+
+/* Un nombre sospechoso se muestra como texto dentro de un `code`: se lee que
+   es un dato y no parte de la interfaz. El escapado lo hace el JS. */
+.fila .campo code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.8rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--plata-clara);
+  word-break: break-all;
+}
+
+.fila > :last-child {
+  margin-left: auto;
+}
 
 .etiqueta {
-  padding: 3px 10px;
+  padding: 3px 11px;
   border-radius: 999px;
-  font-size: 0.66rem;
-  letter-spacing: 1.2px;
+  font-size: 0.64rem;
+  letter-spacing: 1.4px;
   text-transform: uppercase;
   border: 1px solid currentColor;
+  white-space: nowrap;
 }
 
 .etiqueta.esperando { color: var(--oro); }
 .etiqueta.jugando { color: var(--verde); }
+.etiqueta.alerta { color: #ff8a7a; }
 
-.vacio { padding: 22px; text-align: center; color: var(--tenue); font-size: 0.88rem; }
+.vacio {
+  padding: 22px;
+  text-align: center;
+  color: var(--texto-tenue);
+  font-size: 0.88rem;
+}
 
-/* --------------------------------------------------------- aviso */
+/* ------------------------------------------------------------ aviso */
 
 .aviso {
   min-height: 1.4em;
   margin-top: 14px;
   font-size: 0.86rem;
-  color: var(--tenue);
+  color: var(--texto-tenue);
 }
 
 .aviso.mal { color: #fca5a5; }
 .aviso.bien { color: #86efac; }
 
-/* --------------------------------------------------------- móvil */
+/* ------------------------------------------------------------ móvil
 
-@media (max-width: 560px) {
-  .fila > :last-child { margin-left: 0; width: 100%; }
-  .fila .codigo { min-width: 0; }
-  .acciones .btn { flex: 1 1 auto; }
-}
-
-/* --------------------------------------------------- teléfonos angostos
-
-   El botón "Salir" se salía de la cabecera. Medido: a 360 px se pasaba 8 px,
-   y a 344 px eran 24 px con scroll horizontal en toda la página. A 375 px
-   todavía entraba, así que el corte va holgado en 560 y no justo en el borde
-   donde se rompe. */
+   Medido antes de escribir esto: el botón "Salir" se salía 8 px a 360 px y
+   24 px a 344, con scroll horizontal en toda la página. A 375 px todavía
+   entraba, que es el ancho con el que uno prueba por reflejo. Por eso el corte
+   va holgado en 560 y no justo en el borde donde se rompe. */
 
 @media (max-width: 560px) {
   .barra {
@@ -218,8 +369,8 @@ input:focus { outline: 2px solid var(--oro); outline-offset: 1px; }
     padding: 12px 14px;
   }
 
-  /* Sin `margin-left: auto` el botón deja de empujarse contra el borde
-     derecho, y con `width: 100%` se lleva su propia línea entera. */
+  /* Sin `margin-left: auto` deja de empujarse contra el borde derecho, y con
+     `width: 100%` se lleva su propia línea entera. */
   .barra > button {
     margin-left: 0;
     width: 100%;
@@ -237,5 +388,29 @@ input:focus { outline: 2px solid var(--oro); outline-offset: 1px; }
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .fila > :last-child {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .fila .codigo {
+    min-width: 0;
+  }
+
+  .acciones .btn {
+    flex: 1 1 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .fila {
+    transition: none;
+  }
+
+  .btn:hover:not(:disabled) {
+    transform: none;
   }
 }

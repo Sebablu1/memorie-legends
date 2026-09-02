@@ -410,5 +410,97 @@ console.log("\n=== Revisar nombres guardados ===");
      "el nombre viaja tal cual está guardado");
 }
 
+console.log("\n=== Cuentas: listar y dar de baja ===");
+{
+  // Lo que decide el camino no es una opción de la interfaz: es si la cuenta
+  // tiene algo que perder. Sin saldo ni partidas se borra; con cualquiera de
+  // las dos cosas se desactiva, porque ese saldo es dinero de alguien y sus
+  // partidas están en el ranking de los demás.
+  const cuentas = {
+    vacia: { username: "Prueba", credits: 0, gamesPlayed: 0, wins: 0 },
+    conSaldo: { username: "Ana", credits: 250, gamesPlayed: 0, wins: 0 },
+    conPartidas: { username: "Bruno", credits: 0, gamesPlayed: 12, wins: 3 },
+    yaBaja: { username: "Vieja", credits: 0, gamesPlayed: 0, wins: 0, desactivado: true },
+  };
+
+  const borrados = [];
+  const escrituras = [];
+  const hacerDb = () => ({
+    collection: () => ({
+      doc: (id) => ({
+        get: async () => ({ exists: id in cuentas, data: () => cuentas[id] }),
+        set: async (datos) => escrituras.push({ id, datos }),
+        delete: async () => borrados.push(id),
+      }),
+      get: async () => ({
+        size: Object.keys(cuentas).length,
+        forEach: (fn) => Object.entries(cuentas).forEach(([id, d]) => fn({ id, data: () => d })),
+      }),
+    }),
+  });
+
+  const nuevoPanel = () => crearAdmin({
+    db: hacerDb(), salas: "rooms", partidas: "partidas", moverLeyendas: null,
+    motivo: "x", marcaDeTiempo: () => "T", error, emailAdmin: ADMIN,
+  });
+  const comoAdmin = { auth: { uid: "admin-uid", token: { email: ADMIN, email_verified: true } } };
+
+  // --- permisos ---
+  for (const [quien, ctx] of [
+    ["otro correo", { auth: { token: { email: "otro@x.com", email_verified: true } } }],
+    ["sin verificar", { auth: { token: { email: ADMIN, email_verified: false } } }],
+    ["sin sesión", {}],
+  ]) {
+    for (const fn of ["listarUsuarios", "eliminarUsuario"]) {
+      let rechazado = false;
+      try { await nuevoPanel()[fn](ctx, { uid: "vacia" }); } catch { rechazado = true; }
+      ok(rechazado, `${quien} no puede ${fn}`);
+    }
+  }
+
+  // --- listado ---
+  const lista = await nuevoPanel().listarUsuarios(comoAdmin);
+  ok(lista.total === 4, "lista todas las cuentas", lista.total);
+  ok(lista.vacias === 2, "y cuenta las que no tienen nada que perder", lista.vacias);
+  const porUid = Object.fromEntries(lista.cuentas.map((c) => [c.uid, c]));
+  ok(porUid.vacia.vacia === true, "sin saldo ni partidas: vacía");
+  ok(porUid.conSaldo.vacia === false, "con saldo: NO vacía");
+  ok(porUid.conPartidas.vacia === false, "con partidas: NO vacía");
+  ok(lista.cuentas[0].vacia === true, "las vacías van primero");
+  ok(porUid.yaBaja.desactivado === true, "y se ve cuál ya estaba desactivada");
+
+  // --- la baja ---
+  const r1 = await nuevoPanel().eliminarUsuario(comoAdmin, { uid: "vacia" });
+  ok(r1.hizo === "eliminado", "una cuenta vacía se borra", r1.hizo);
+  ok(borrados.includes("vacia"), "y de verdad se borró el documento");
+
+  escrituras.length = 0;
+  const r2 = await nuevoPanel().eliminarUsuario(comoAdmin, { uid: "conSaldo" });
+  ok(r2.hizo === "desactivado", "una con SALDO se desactiva, no se borra", r2.hizo);
+  ok(!borrados.includes("conSaldo"), "su documento sigue ahí");
+  ok(escrituras.some((e) => e.id === "conSaldo" && e.datos.desactivado === true),
+     "marcada como desactivada");
+
+  const r3 = await nuevoPanel().eliminarUsuario(comoAdmin, { uid: "conPartidas" });
+  ok(r3.hizo === "desactivado", "una con PARTIDAS tampoco se borra", r3.hizo);
+  ok(!borrados.includes("conPartidas"), "su historial sigue en el ranking de los demás");
+
+  // --- los bordes ---
+  const r4 = await nuevoPanel().eliminarUsuario(comoAdmin, { uid: "no-existe" });
+  ok(r4.hizo === "no_existia", "una cuenta que no está no rompe nada", r4.hizo);
+
+  for (const malo of ["", "   ", null, undefined]) {
+    let salto = false;
+    try { await nuevoPanel().eliminarUsuario(comoAdmin, { uid: malo }); } catch { salto = true; }
+    ok(salto, `un uid ${JSON.stringify(malo)} se rechaza`);
+  }
+
+  // El administrador no puede borrarse a sí mismo por accidente: quedaría sin
+  // perfil y sin poder entrar a arreglarlo.
+  let propio = false;
+  try { await nuevoPanel().eliminarUsuario(comoAdmin, { uid: "admin-uid" }); } catch { propio = true; }
+  ok(propio, "el administrador no puede darse de baja a sí mismo");
+}
+
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);
 process.exit(fallos ? 1 : 0);

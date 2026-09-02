@@ -38,6 +38,8 @@ export function crearAdmin({
   // La colección de perfiles. Se inyecta como todo lo demás para no repetir
   // el nombre de la colección en dos archivos.
   usuarios = "users",
+  // El campo del saldo. Se inyecta por lo mismo que la colección.
+  campoSaldo = "credits",
 }) {
   /**
    * Comprueba que quien llama es el administrador.
@@ -298,5 +300,107 @@ export function crearAdmin({
     };
   }
 
-  return { listarSalas, cancelarSala, cancelarTodasEnEspera, revisarNombres, exigirAdmin };
+  /**
+   * Todas las cuentas, con lo que hace falta para decidir sobre cada una.
+   *
+   * Existe porque "Revisar nombres" NO sirve para esto: aquélla lista sólo los
+   * nombres con caracteres peligrosos, y colgar de ahí un botón de borrar
+   * llevaría a borrar cuentas por tener un apóstrofo en el nombre. Para decidir
+   * hay que ver el saldo y las partidas.
+   */
+  async function listarUsuarios(context) {
+    exigirAdmin(context);
+
+    const snap = await db.collection(usuarios).get();
+    const cuentas = [];
+
+    snap.forEach((doc) => {
+      const d = doc.data() ?? {};
+      const saldo = Number(d[campoSaldo] ?? 0);
+      const partidas = Number(d.gamesPlayed ?? 0);
+      cuentas.push({
+        uid: doc.id,
+        nombre: typeof d.username === "string" ? d.username : "",
+        saldo,
+        partidas,
+        victorias: Number(d.wins ?? 0),
+        desactivado: d.desactivado === true,
+        /**
+         * Si borrarla es reversible o no.
+         *
+         * Una cuenta sin saldo y sin partidas no tiene historial que perder:
+         * se puede borrar. Con cualquiera de las dos cosas NO se borra, se
+         * desactiva, porque el saldo es dinero de alguien y las partidas son
+         * el ranking de los demás.
+         */
+        vacia: saldo === 0 && partidas === 0,
+      });
+    });
+
+    // Las vacías primero: son las que uno viene a limpiar.
+    cuentas.sort((a, b) => Number(b.vacia) - Number(a.vacia) || a.nombre.localeCompare(b.nombre));
+
+    return {
+      total: cuentas.length,
+      vacias: cuentas.filter((c) => c.vacia).length,
+      cuentas,
+    };
+  }
+
+  /**
+   * Da de baja una cuenta.
+   *
+   * DOS CAMINOS, Y LA DIFERENCIA NO ES UN DETALLE:
+   *
+   *   Sin saldo ni partidas  → se borra el documento. No hay historial que
+   *                            perder y es lo que se quiere de una cuenta de
+   *                            prueba.
+   *   Con saldo o partidas   → se DESACTIVA (`desactivado: true`) y no se
+   *                            borra. Ese saldo es dinero de alguien, y sus
+   *                            partidas están en el ranking de los demás:
+   *                            borrarlas cambiaría tablas ajenas.
+   *
+   * Lo que NO hace esta función es tocar Firebase Auth. Se pidió agregar
+   * `admin.auth().deleteUser(uid)`, y no está por una razón: borrar la
+   * credencial es irreversible y deja el estado partido si la transacción de
+   * Firestore falla después. Además, quien quede sin documento en `users` ya
+   * no puede jugar —el perfil no existe— así que el efecto buscado se consigue
+   * sin destruir la cuenta. Si aun así hace falta, es una decisión aparte y con
+   * su propia confirmación.
+   */
+  async function eliminarUsuario(context, { uid }) {
+    const quien = exigirAdmin(context);
+
+    const objetivo = String(uid ?? "").trim();
+    if (!objetivo) throw error("invalid-argument", "Falta el uid.");
+
+    // Que el administrador no se borre a sí mismo por accidente.
+    if (objetivo === context.auth?.uid) {
+      throw error("failed-precondition", "No podés darte de baja a vos mismo desde acá.");
+    }
+
+    const ref = db.collection(usuarios).doc(objetivo);
+    const snap = await ref.get();
+    if (!snap.exists) return { uid: objetivo, hizo: "no_existia" };
+
+    const d = snap.data() ?? {};
+    const saldo = Number(d[campoSaldo] ?? 0);
+    const partidas = Number(d.gamesPlayed ?? 0);
+
+    if (saldo > 0 || partidas > 0) {
+      await ref.set(
+        { desactivado: true, desactivadaEn: marcaDeTiempo(), desactivadaPor: quien },
+        { merge: true },
+      );
+      return { uid: objetivo, hizo: "desactivado", saldo, partidas };
+    }
+
+    await ref.delete();
+    return { uid: objetivo, hizo: "eliminado", saldo: 0, partidas: 0 };
+  }
+
+  return {
+    listarSalas, cancelarSala, cancelarTodasEnEspera,
+    revisarNombres, listarUsuarios, eliminarUsuario, exigirAdmin,
+  };
 }

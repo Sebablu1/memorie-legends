@@ -41,6 +41,85 @@
   --bronce: #b87333;
   --azul: #4a7fb5; /* azul apagado, para el dorso azul */
   --ambar: var(--oro-claro);
+
+  /* ------------------------------------------------------------------
+     CAPA "LEGENDARIA"
+
+     Piezas reutilizables para que una tarjeta parezca una carta cara y no
+     un rectángulo con borde. Viven acá y no en cada hoja porque el punto
+     es que el tablero, el panel y la sala se vean de la MISMA familia:
+     tres definiciones distintas de "dorado" es como se pierde una estética.
+
+     Todo con CSS. Nada de imágenes: el sitio carga en teléfonos con datos
+     móviles y una textura de 200 KB por pantalla se nota más que el brillo.
+     ------------------------------------------------------------------ */
+
+  /* El paño: un degradado radial cálido sobre negro, como fieltro con una
+     luz encima. Se usa de fondo en las superficies grandes. */
+  --fieltro:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(212, 168, 67, 0.10), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(184, 115, 51, 0.07), transparent 70%),
+    var(--negro);
+
+  /* El borde de una carta legendaria: oro que gira de apagado a claro y
+     vuelve. Se pinta con `border-image` o como fondo de un pseudoelemento. */
+  --filo-oro: linear-gradient(135deg, var(--oro-hondo), var(--oro-claro) 45%, var(--oro-hondo) 70%, var(--oro) 100%);
+  --filo-plata: linear-gradient(135deg, #6d6d6d, var(--plata-clara) 45%, #6d6d6d 100%);
+
+  /* Relieve: una luz arriba y una sombra abajo, DENTRO del elemento. Es lo
+     que hace que un botón parezca una gema y no un rectángulo pintado. */
+  --relieve-oro:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.35);
+  --relieve-hueco:
+    inset 0 2px 6px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+
+  /* Halo para el foco y el hover. Suave: un resplandor que ciega cansa. */
+  --halo-oro: 0 0 0 1px rgba(212, 168, 67, 0.5), 0 8px 34px rgba(212, 168, 67, 0.22);
+}
+
+/* ------------------------------------------------------ campos de formulario
+
+   El problema que esto resuelve: sin `color-scheme: dark`, el navegador dibuja
+   el desplegable con el tema del SISTEMA. En Windows eso es un panel blanco con
+   texto claro encima —ilegible— y no se arregla pintando el `select`, porque la
+   lista desplegada la dibuja el sistema operativo y no la página.
+
+   Va en el tema y con selector de elemento a propósito: cualquier `select` que
+   aparezca mañana en cualquier pantalla nace bien. Un problema que reaparece en
+   cada formulario nuevo no se arregla formulario por formulario. */
+
+select,
+input,
+textarea {
+  color-scheme: dark;
+  background-color: var(--negro-2);
+  color: var(--texto);
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 11px 13px;
+  box-shadow: var(--relieve-hueco);
+}
+
+/* Las opciones también: en algunos navegadores heredan del sistema aunque el
+   select esté pintado. */
+select option {
+  background-color: var(--negro-2);
+  color: var(--texto);
+}
+
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--oro);
+  outline-offset: 1px;
+}
+
+input::placeholder {
+  color: rgba(192, 192, 192, 0.45);
 }
 
 /* ------------------------------------------------- botones de la paleta */
