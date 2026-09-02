@@ -38,6 +38,14 @@ import { crearAbandonarPartida } from "./abandono.js";
 import { crearMotorEnRed } from "./partida-red.js";
 import { crearCierre } from "./cierre.js";
 import { crearLimiteDeRitmo } from "./limite-de-ritmo.js";
+import {
+  validar,
+  EsquemaDeSala,
+  EsquemaDescarte,
+  EsquemaAccion,
+  EsquemaCompra,
+  EsquemaReferido,
+} from "./esquemas.js";
 import { crearSalirDeSalaEnEspera } from "./salida.js";
 import { crearAdmin } from "./admin.js";
 
@@ -273,7 +281,7 @@ export const crearSala = functions.https.onCall(async (data, context) => {
  */
 export const unirseASala = functions.https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "unirseASala");
-  const codigo = String(data?.codigo ?? "").trim().toUpperCase();
+  const codigo = validar(EsquemaDeSala, data, errorHttp).codigo;
 
   if (!esCodigoValido(codigo)) {
     throw new functions.https.HttpsError("invalid-argument", "Código inválido.");
@@ -326,7 +334,7 @@ export const unirseASala = functions.https.onCall(async (data, context) => {
  */
 export const marcarListo = functions.https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "marcarListo");
-  const codigo = String(data?.codigo ?? "").trim().toUpperCase();
+  const codigo = validar(EsquemaDeSala, data, errorHttp).codigo;
   const listo = data?.listo !== false;
 
   return db.runTransaction(async (tx) => {
@@ -361,7 +369,7 @@ export const marcarListo = functions.https.onCall(async (data, context) => {
  */
 export const iniciarPartida = functions.https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "iniciarPartida");
-  const codigo = String(data?.codigo ?? "").trim().toUpperCase();
+  const codigo = validar(EsquemaDeSala, data, errorHttp).codigo;
 
   return db.runTransaction(async (tx) => {
     const refSala = db.collection(SALAS).doc(codigo);
@@ -560,7 +568,7 @@ export const horaDelServidor = functions.https.onCall(async (_data, context) => 
 /** Abre la ventana de reflejos. La hora y el identificador los pone el servidor. */
 export const abrirVentanaDescarte = functions.https.onCall(async (data, context) => {
   exigirSesion(context, "abrirVentanaDescarte");
-  return enRed.abrirVentana({ codigo: String(data?.codigo ?? "").trim().toUpperCase() });
+  return enRed.abrirVentana({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
 });
 
 /**
@@ -571,26 +579,32 @@ export const abrirVentanaDescarte = functions.https.onCall(async (data, context)
  */
 export const intentarDescarte = functions.https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "intentarDescarte");
+  // El esquema normaliza y acota; lo que sigue siendo del servidor es el
+  // TIEMPO: `declarado`, `latencia` e `incertidumbre` llegan validados como
+  // números razonables, pero el que decide cuánto valen es `tiempoEfectivo`,
+  // que los acota al intervalo que la llegada del pedido hace posible. Un
+  // esquema no puede saber si un jugador miente sobre cuándo reaccionó.
+  const d = validar(EsquemaDescarte, data, errorHttp);
   return enRed.intentarDescarte({
     uid,
-    codigo: String(data?.codigo ?? "").trim().toUpperCase(),
-    windowId: String(data?.windowId ?? ""),
-    posicion: Number(data?.posicion),
-    clientActionId: String(data?.clientActionId ?? ""),
-    declarado: Number(data?.declarado),
-    latencia: Number(data?.latencia),
-    incertidumbre: Number(data?.incertidumbre),
+    codigo: d.codigo,
+    windowId: d.windowId,
+    posicion: d.posicion,
+    clientActionId: d.clientActionId,
+    declarado: d.declarado,
+    latencia: d.latencia,
+    incertidumbre: d.incertidumbre,
     // Contra la mano de un rival: a quién y qué carta propia se entrega si
     // acierta. Sólo posiciones y un uid; el servidor deriva todo lo demás.
-    objetivo: data?.objetivo ? String(data.objetivo) : null,
-    posicionEntrega: data?.posicionEntrega == null ? null : Number(data.posicionEntrega),
+    objetivo: d.objetivo ?? null,
+    posicionEntrega: d.posicionEntrega ?? null,
   });
 });
 
 /** Cierra la ventana y aplica los intentos en orden de reacción. */
 export const cerrarVentanaDescarte = functions.https.onCall(async (data, context) => {
   exigirSesion(context, "cerrarVentanaDescarte");
-  return enRed.cerrarVentana({ codigo: String(data?.codigo ?? "").trim().toUpperCase() });
+  return enRed.cerrarVentana({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
 });
 
 /**
@@ -602,38 +616,39 @@ export const cerrarVentanaDescarte = functions.https.onCall(async (data, context
  */
 export const avanzarPartida = functions.https.onCall(async (data, context) => {
   exigirSesion(context, "avanzarPartida");
-  return enRed.avanzarPartida({ codigo: String(data?.codigo ?? "").trim().toUpperCase() });
+  return enRed.avanzarPartida({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
 });
 
 /** Cierra la fase de mirar. La decide el servidor con su reloj. */
 export const cerrarMirada = functions.https.onCall(async (data, context) => {
   exigirSesion(context, "cerrarMirada");
-  return enRed.cerrarMirada({ codigo: String(data?.codigo ?? "").trim().toUpperCase() });
+  return enRed.cerrarMirada({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
 });
 
 /** Cualquier acción de turno. La lista de acciones válidas es blanca. */
 export const accionDePartida = functions.https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "accionDePartida");
+  const a = validar(EsquemaAccion, data, errorHttp);
   return enRed.accionDeTurno({
     uid,
-    codigo: String(data?.codigo ?? "").trim().toUpperCase(),
-    accion: String(data?.accion ?? ""),
-    clientActionId: String(data?.clientActionId ?? ""),
-    posicion: data?.posicion == null ? undefined : Number(data.posicion),
-    objetivo: data?.objetivo ?? undefined,
+    codigo: a.codigo,
+    accion: a.accion,
+    clientActionId: a.clientActionId,
+    posicion: a.posicion,
+    objetivo: a.objetivo,
   });
 });
 
 /** Señal de vida. Caerse no cuesta Leyendas; sólo hace que te salten el turno. */
 export const latir = functions.https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "latir");
-  return enRed.latir({ uid, codigo: String(data?.codigo ?? "").trim().toUpperCase() });
+  return enRed.latir({ uid, codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
 });
 
 /** Saltea el turno de quien lleva rato sin dar señales. */
 export const saltarAusente = functions.https.onCall(async (data, context) => {
   exigirSesion(context, "saltarAusente");
-  return enRed.saltarAusente({ codigo: String(data?.codigo ?? "").trim().toUpperCase() });
+  return enRed.saltarAusente({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
 });
 
 // ------------------------------------------------- abandono en curso
@@ -675,7 +690,7 @@ export const abandonarPartida = functions.https.onCall(async (data, context) => 
 export const acreditarReferido = functions.https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "acreditarReferido");
   await limite.exigirRitmoDePlata(uid, "acreditarReferido");
-  const { referidoUid } = data ?? {};
+  const { referidoUid } = validar(EsquemaReferido, data, errorHttp);
   if (!referidoUid || referidoUid === uid) {
     throw new functions.https.HttpsError("invalid-argument", "Referido inválido.");
   }
@@ -793,7 +808,7 @@ export const cerrarRankingAnual = functions.pubsub
 export const crearOrdenDeCompra = functions.https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "crearOrdenDeCompra");
   await limite.exigirRitmoDePlata(uid, "crearOrdenDeCompra");
-  const paquete = paquetePorId(data?.paqueteId);
+  const paquete = paquetePorId(validar(EsquemaCompra, data, errorHttp).paqueteId);
   if (!paquete) {
     throw new functions.https.HttpsError("invalid-argument", "Paquete inexistente.");
   }
