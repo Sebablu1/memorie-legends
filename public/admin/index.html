@@ -53,6 +53,22 @@
 
       <p class="aviso" id="aviso" role="status"></p>
 
+      <!-- Revisión de nombres. Existe porque el escapado tapa la SALIDA, pero
+           lo que se guardó antes del arreglo sigue guardado tal cual. -->
+      <section>
+        <h2>Nombres guardados</h2>
+        <p class="nota">
+          Busca nombres con caracteres que podrían hacer daño si se dibujaran
+          sin escapar. Sólo lee: cambiar el nombre de alguien es una decisión
+          tuya, no de un listado.
+        </p>
+        <div class="acciones">
+          <button class="btn sobrio" id="btnRevisarNombres" type="button">Revisar nombres</button>
+        </div>
+        <div class="aviso" id="avisoNombres"></div>
+        <div class="lista" id="listaNombres"></div>
+      </section>
+
       <section>
         <h2>Salas</h2>
         <div id="salas" class="lista"></div>

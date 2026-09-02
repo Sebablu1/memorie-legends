@@ -1,4 +1,20 @@
 /**
+ * ⚠️ ESTA HERRAMIENTA YA NO FUNCIONA, Y ES A PROPÓSITO.
+ *
+ * Se apoyaba en que `users` fuera legible por cualquier jugador autenticado.
+ * Eso ERA el problema: en ese documento vive `credits`, o sea el saldo. Las
+ * reglas se cerraron —`allow read: if esDuenio(uid)`— y con ellas se cerró
+ * también este atajo.
+ *
+ * La revisión de nombres vive ahora en el PANEL de administración, botón
+ * "Revisar nombres". Corre en el servidor, con credenciales de administrador
+ * y comprobando el correo de quien la pide.
+ *
+ * Se deja el archivo por lo que documenta: durante unas horas cualquiera pudo
+ * leer el saldo de todos, y ésta es la prueba de cómo se hacía.
+ */
+
+/**
  * ¿Alguien se puso un nombre peligroso antes del arreglo?
  *
  * CÓMO SE USA

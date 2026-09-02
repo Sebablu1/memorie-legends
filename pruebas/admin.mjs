@@ -338,5 +338,77 @@ console.log("\n=== 7. Firestore: leer antes de escribir ===");
   ok(r.valor?.devueltas === 40, "y devuelve las cuatro entradas", r.valor?.devueltas);
 }
 
+console.log("\n=== Revisar nombres guardados ===");
+{
+  // El escapado tapa la SALIDA, pero lo que se guardó antes sigue guardado.
+  // Esto lista lo que habría que mirar. Vive en el servidor porque `users`
+  // pasó a leerse sólo por su dueño —el saldo está en ese documento— y ya no
+  // se puede listar desde el navegador.
+  const perfiles = [
+    ["u1", "Sebastián"],
+    ["u2", "O'Brien"],
+    ["u3", "Tom & Jerry"],
+    ["u4", '<img src=x onerror=alert(1)>'],
+    ["u5", "<script>fetch(1)</script>"],
+    ["u6", "Vex_99"],
+    ["u7", "javascript:alert(1)"],
+    ["u8", null],
+    ["u9", 12345],
+  ];
+  const db = {
+    collection: () => ({
+      get: async () => ({
+        size: perfiles.length,
+        forEach: (fn) => perfiles.forEach(([id, username]) => fn({ id, data: () => ({ username }) })),
+      }),
+    }),
+  };
+  const panel = crearAdmin({
+    db, salas: "rooms", partidas: "partidas", moverLeyendas: null,
+    motivo: "x", marcaDeTiempo: () => "T", error, emailAdmin: ADMIN,
+  });
+
+  // Sólo el administrador, con el correo verificado.
+  for (const [quien, ctx] of [
+    ["otro correo", { auth: { token: { email: "otro@x.com", email_verified: true } } }],
+    ["correo sin verificar", { auth: { token: { email: ADMIN, email_verified: false } } }],
+    ["sin sesión", {}],
+  ]) {
+    let rechazado = false;
+    try { await panel.revisarNombres(ctx); } catch { rechazado = true; }
+    ok(rechazado, `${quien} no puede revisar nombres`);
+  }
+
+  const r = await panel.revisarNombres({ auth: { token: { email: ADMIN, email_verified: true } } });
+
+  ok(r.revisados === perfiles.length, "cuenta todos los perfiles", r.revisados);
+  ok(r.sospechosos.length === 5, "marca los cinco raros y deja pasar los normales",
+     r.sospechosos.map((s) => s.nombre));
+  ok(r.ataques === 3, "y distingue los tres que parecen un intento", r.ataques);
+
+  const nombres = r.sospechosos.map((s) => s.nombre);
+  ok(!nombres.includes("Sebastián") && !nombres.includes("Vex_99"),
+     "un nombre común no se marca");
+  ok(nombres.includes("O'Brien") && nombres.includes("Tom & Jerry"),
+     "pero una comilla o un & sí, aunque no sean un ataque");
+  ok(r.sospechosos.find((s) => s.nombre === "O'Brien")?.pareceAtaque === false,
+     "y esos NO se marcan como ataque: son nombres de gente");
+
+  // `javascript:alert(1)` no tiene ninguno de <>"'& y como nombre no es
+  // explotable, pero la intención se ve. Se marca igual.
+  ok(nombres.includes("javascript:alert(1)"), "se marca la intención, no sólo los caracteres");
+
+  ok(r.sospechosos[0].pareceAtaque === true, "los ataques van primero en la lista");
+
+  // Un perfil sin nombre o con un número no rompe la revisión.
+  ok(!r.sospechosos.some((s) => s.uid === "u8" || s.uid === "u9"),
+     "los perfiles sin nombre usable se saltean sin romper nada");
+
+  // Lo que devuelve es el nombre CRUDO: quien revisa necesita ver qué se
+  // guardó, no una versión limpia. El panel lo escapa al pintarlo.
+  ok(r.sospechosos.some((s) => s.nombre.includes("<img")),
+     "el nombre viaja tal cual está guardado");
+}
+
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);
 process.exit(fallos ? 1 : 0);

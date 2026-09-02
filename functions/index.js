@@ -512,6 +512,15 @@ export const cancelarSalaAdmin = functions.https.onCall((data, context) =>
 export const cancelarSalasEnEsperaAdmin = functions.https.onCall((_data, context) =>
   panel.cancelarTodasEnEspera(context));
 
+/**
+ * Busca nombres guardados que podrían hacer daño si se dibujaran sin escapar.
+ *
+ * Vive en el servidor porque `users` pasó a leerse sólo por su dueño —el saldo
+ * está en ese documento— y ya no hay forma de listarla desde el navegador.
+ */
+export const revisarNombresAdmin = functions.https.onCall((_data, context) =>
+  panel.revisarNombres(context));
+
 // ------------------------------------------------------ partida en red
 
 /**

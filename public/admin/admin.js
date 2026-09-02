@@ -42,12 +42,16 @@ const dom = {
   btnCancelarTodas: $("btnCancelarTodas"),
   aviso: $("aviso"),
   salas: $("salas"),
+  btnRevisarNombres: $("btnRevisarNombres"),
+  avisoNombres: $("avisoNombres"),
+  listaNombres: $("listaNombres"),
   partidas: $("partidas"),
 };
 
 const listar = httpsCallable(funciones, "listarSalasAdmin");
 const cancelar = httpsCallable(funciones, "cancelarSalaAdmin");
 const cancelarTodas = httpsCallable(funciones, "cancelarSalasEnEsperaAdmin");
+const revisarNombres = httpsCallable(funciones, "revisarNombresAdmin");
 
 const decir = (donde, texto, clase = "") => {
   donde.textContent = texto;
@@ -242,5 +246,52 @@ dom.btnCancelarTodas.addEventListener("click", async () => {
     decir(dom.aviso, error?.message ?? "No se pudo cancelar.", "mal");
     console.error(error);
     dom.btnCancelarTodas.disabled = false;
+  }
+});
+
+// ------------------------------------------------ nombres guardados
+
+/**
+ * Lista los nombres que podrían hacer daño si se dibujaran sin escapar.
+ *
+ * El servidor devuelve el nombre TAL CUAL está guardado, a propósito: quien
+ * revisa esto necesita ver exactamente qué se guardó, no una versión limpia.
+ * Acá se escapa al pintarlo, que es donde corresponde —y es justamente el
+ * arreglo que hizo falta en el juego—.
+ */
+dom.btnRevisarNombres.addEventListener("click", async () => {
+  dom.btnRevisarNombres.disabled = true;
+  decir(dom.avisoNombres, "Revisando…");
+  dom.listaNombres.replaceChildren();
+
+  try {
+    const { data } = await revisarNombres();
+
+    if (!data.sospechosos.length) {
+      decir(dom.avisoNombres, `${data.revisados} perfiles revisados: ninguno con caracteres peligrosos.`, "bien");
+      return;
+    }
+
+    decir(
+      dom.avisoNombres,
+      `${data.revisados} revisados · ${data.sospechosos.length} con caracteres raros, ` +
+        `de los cuales ${data.ataques} parecen un intento deliberado.`,
+      data.ataques ? "mal" : "",
+    );
+
+    for (const s of data.sospechosos) {
+      const fila = document.createElement("div");
+      fila.className = "fila";
+      fila.innerHTML = `
+        <span class="etiqueta ${s.pareceAtaque ? "jugando" : "esperando"}">${s.pareceAtaque ? "ataque" : "raro"}</span>
+        <span class="campo"><code>${limpio(s.nombre)}</code></span>
+        <span class="campo">uid <b>${limpio(s.uid)}</b></span>`;
+      dom.listaNombres.appendChild(fila);
+    }
+  } catch (error) {
+    decir(dom.avisoNombres, error?.message ?? "No pudimos revisar los nombres.", "mal");
+    console.error(error);
+  } finally {
+    dom.btnRevisarNombres.disabled = false;
   }
 });

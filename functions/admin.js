@@ -35,6 +35,9 @@ export function crearAdmin({
   error,
   estados = ESTADOS_SALA,
   emailAdmin,
+  // La colección de perfiles. Se inyecta como todo lo demás para no repetir
+  // el nombre de la colección en dos archivos.
+  usuarios = "users",
 }) {
   /**
    * Comprueba que quien llama es el administrador.
@@ -240,5 +243,60 @@ export function crearAdmin({
     };
   }
 
-  return { listarSalas, cancelarSala, cancelarTodasEnEspera, exigirAdmin };
+  /**
+   * Nombres guardados que podrían hacer daño si se dibujaran sin escapar.
+   *
+   * Por qué acá y no en el navegador: `users` pasó a leerse SÓLO por su dueño
+   * —el saldo vive en ese documento— así que ya no hay forma de listarla desde
+   * una pestaña. Las Cloud Functions no pasan por las reglas, y ésta comprueba
+   * el correo del administrador antes de mirar nada.
+   *
+   * Sólo LEE. Cambiarle el nombre a alguien es una acción sobre la cuenta de
+   * una persona, y no la toma una función de listado.
+   *
+   * Devuelve el nombre TAL CUAL está guardado. El panel lo escapa al pintarlo
+   * —para eso está `escapar`—, y eso es correcto: quien revisa esto necesita
+   * ver exactamente qué se guardó, no una versión limpia.
+   */
+  async function revisarNombres(context) {
+    exigirAdmin(context);
+
+    // Los caracteres que un nombre normal no tiene y que son los que hacen
+    // falta para salirse del texto. No se busca "código malicioso": eso no se
+    // puede definir.
+    const PELIGROSOS = /[<>"'&]/;
+    // Y lo que ya no es un despiste con una comilla, sino un intento.
+    const ATAQUE = /<\s*(script|img|svg|iframe)|on\w+\s*=|javascript:/i;
+
+    const snap = await db.collection(usuarios).get();
+
+    const sospechosos = [];
+    snap.forEach((doc) => {
+      const nombre = doc.data()?.username;
+      if (typeof nombre !== "string") return;
+      // Se marca por CUALQUIERA de las dos, no sólo por los caracteres.
+      // `javascript:alert(1)` no tiene ninguno de `<>"'&` y como nombre no es
+      // explotable —nunca va a parar a un href— pero la intención se ve igual,
+      // y quien revisa esto quiere enterarse.
+      const raro = PELIGROSOS.test(nombre);
+      const ataque = ATAQUE.test(nombre);
+      if (!raro && !ataque) return;
+      sospechosos.push({
+        uid: doc.id,
+        nombre,
+        pareceAtaque: ataque,
+      });
+    });
+
+    // Los intentos claros primero: es lo que se quiere ver de un vistazo.
+    sospechosos.sort((a, b) => Number(b.pareceAtaque) - Number(a.pareceAtaque));
+
+    return {
+      revisados: snap.size,
+      sospechosos,
+      ataques: sospechosos.filter((s) => s.pareceAtaque).length,
+    };
+  }
+
+  return { listarSalas, cancelarSala, cancelarTodasEnEspera, revisarNombres, exigirAdmin };
 }
