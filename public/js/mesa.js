@@ -1626,7 +1626,7 @@ async function mostrarFinRonda() {
       <button class="accion" onclick="location.reload()" type="button">Jugar otra</button>
     `);
     pista(
-      `Partida terminada. Ganó <b>${estado.ganador?.nombre ?? "nadie"}</b>.`,
+      `Partida terminada. Ganó <b>${escapar(estado.ganador?.nombre ?? "nadie")}</b>.`,
     );
     if (ganaste) {
       sonidos.victoria();
@@ -1638,10 +1638,10 @@ async function mostrarFinRonda() {
   }
 
   pista(
-    `Cortó <b>${cortador?.nombre ?? "alguien"}</b>. Ronda ${estado.ronda} terminada.`,
+    `Cortó <b>${escapar(cortador?.nombre ?? "alguien")}</b>. Ronda ${estado.ronda} terminada.`,
   );
   abrirModal(`
-    <h2>✂️ Cortó ${cortador?.nombre ?? "alguien"}</h2>
+    <h2>✂️ Cortó ${escapar(cortador?.nombre ?? "alguien")}</h2>
     <p>Ronda ${estado.ronda} terminada.</p>
     ${tabla}
     <button class="accion" data-accion="siguiente" type="button">Siguiente ronda</button>

@@ -11,6 +11,7 @@ import { db, doc, onSnapshot } from "./firebase.js";
 import { exigirSesion, mostrarSaldo } from "./sesion.js";
 import { iniciarPartida, salirDeSalaEnEspera, marcarListo, ErrorDeServidor } from "./servidor.js";
 import { ESTADOS_SALA, MIN_JUGADORES, MAX_JUGADORES } from "./reglas/salas.js";
+import { escapar } from "./modulos/texto.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -120,6 +121,10 @@ function pintar(sala, uid) {
   $("contadorJugadores").textContent = `${jugadores.length} / ${capacidad}`;
 
   // Lista: los que están, más los lugares libres.
+  //
+  // Los nombres se escapan. Los elige cada jugador y los ve toda la sala, así
+  // que sin esto uno llamado `<img src=x onerror="...">` corría lo que
+  // quisiera en la pantalla de los demás, con la sesión de ellos abierta.
   const filas = jugadores.map((jugadorUid, i) => {
     const nombre = nombres[i] ?? "Jugador";
     const inicial = nombre.trim().charAt(0).toUpperCase() || "?";
@@ -130,8 +135,8 @@ function pintar(sala, uid) {
     ].join("");
     return `
       <li class="jugador-fila ${jugadorUid === uid ? "es-mio" : ""}">
-        <span class="avatar-inicial" aria-hidden="true">${inicial}</span>
-        <span class="nombre-jugador">${nombre}</span>
+        <span class="avatar-inicial" aria-hidden="true">${escapar(inicial)}</span>
+        <span class="nombre-jugador">${escapar(nombre)}</span>
         ${etiquetas}
         <span class="marca-listo ${estaListo ? "si" : "no"}">
           ${estaListo ? "✅ Listo" : "esperando"}

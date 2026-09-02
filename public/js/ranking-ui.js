@@ -1,4 +1,7 @@
 import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
+// Los nombres del ranking los eligen los jugadores y esta tabla la ve todo el
+// mundo: es la pantalla de mayor alcance del sitio.
+import { escapar } from "./modulos/texto.js";
 import { db, collection, getDocs, query, orderBy, limit } from "./firebase.js";
 import { clavesDePeriodos } from "./reglas/ranking.js";
 
@@ -49,7 +52,7 @@ if (sesion) {
               (f) => `
             <tr class="${f.uid === miUid ? "yo" : ""} podio-${f.puesto <= 3 ? f.puesto : ""}">
               <td class="puesto">${f.puesto <= 3 ? ["🥇", "🥈", "🥉"][f.puesto - 1] : f.puesto}</td>
-              <td>${f.nombre ?? f.uid ?? "Jugador"}</td>
+              <td>${escapar(f.nombre ?? f.uid ?? "Jugador")}</td>
               <td class="num puntos">${(f.puntos ?? 0).toLocaleString("es-UY")}</td>
               <td class="num">${f.partidasGanadas ?? 0}</td>
               <td class="num">${f.partidasJugadas ?? 0}</td>

@@ -13,25 +13,14 @@
  */
 
 /**
- * Escapa texto que va a parar a innerHTML.
+ * Se re-exporta desde `texto.js`, donde vive ahora.
  *
- * Hace falta de verdad, no por prolijidad. Las reglas de Firestore dejan que
- * cada jugador escriba su propio nombre —`allow update: if esDuenio(uid)`— y
- * ese nombre lo leen todos los demás para dibujar la mesa. Estaba entrando sin
- * escapar en tres sitios, así que un jugador llamado
- * `<img src=x onerror="...">` ejecutaba lo que quisiera en el navegador de sus
- * rivales, con la sesión de ellos abierta.
- *
- * Se escapa al SALIR y no al entrar: el nombre puede llegar de Firestore, de
- * una vista publicada o de la configuración local, y tapar cada una de esas
- * puertas es una pelea que se pierde. El único punto por el que pasa todo es
- * éste, el de dibujarlo.
+ * Se mudó cuando hizo falta en la sala de espera y en el listado de salas: que
+ * esas pantallas importaran la interfaz de la mesa para escapar un nombre
+ * habría sido una dependencia falsa. Se sigue exportando desde acá para no
+ * tocar a `mesa.js`, que ya la importaba.
  */
-export const escapar = (texto) =>
-  String(texto ?? "").replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
-  );
+export { escapar } from "./texto.js";
 
 const ESTILO_PODER = {
   mirarPropia: { icono: "👁", clase: "poder-7" },

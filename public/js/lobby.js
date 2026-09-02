@@ -14,6 +14,7 @@ import { exigirSesion, mostrarSaldo } from "./sesion.js";
 import { crearSala, unirseASala, ErrorDeServidor } from "./servidor.js";
 import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/salas.js";
 import { DIFICULTADES } from "./reglas/ia.js";
+import { escapar } from "./modulos/texto.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -187,10 +188,10 @@ function escucharSalas() {
           return `
             <div class="sala-fila">
               <div>
-                <b>${s.nombre ?? "Sala"}</b>
+                <b>${escapar(s.nombre ?? "Sala")}</b>
                 <span class="sala-meta">${s.entrada} Leyendas · ${ocupados}/${MAX_JUGADORES} jugadores</span>
               </div>
-              <button class="btn-plata" data-codigo="${s.codigo}" type="button">Entrar</button>
+              <button class="btn-plata" data-codigo="${escapar(s.codigo)}" type="button">Entrar</button>
             </div>`;
         })
         .join("");
