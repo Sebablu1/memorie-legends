@@ -255,3 +255,44 @@
   .acciones-sala .btn-oro,
   .acciones-sala .btn-plata { width: 100%; }
 }
+
+/* --------------------------------------------------- teléfonos angostos
+
+   La fila de cada jugador se cortaba por la derecha y se perdían el estado y
+   las insignias. Medido: a 375 px el "✅ Listo" se salía 11 px de su fila, a
+   360 px eran 26, y desde 344 px la página entera scrolleaba de costado. */
+
+@media (max-width: 600px) {
+  .jugador-fila {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* `min-width: 0` es lo que de verdad permite encoger: un hijo de flex no
+     baja de su contenido si no se le dice, y por eso el nombre empujaba todo
+     lo demás fuera de la fila. */
+  .jugador-fila .nombre-jugador {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1 1 auto;
+  }
+
+  .jugador-fila .insignia {
+    font-size: 0.55rem;
+    padding: 2px 6px;
+  }
+
+  /* El estado baja a su propia línea en vez de pelear por el ancho. */
+  .jugador-fila .marca-listo {
+    flex-basis: 100%;
+    margin-left: 0;
+    text-align: right;
+    margin-top: 4px;
+  }
+
+  .avatar-inicial {
+    width: 32px;
+    height: 32px;
+  }
+}

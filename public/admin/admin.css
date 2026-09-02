@@ -202,3 +202,40 @@ input:focus { outline: 2px solid var(--oro); outline-offset: 1px; }
   .fila .codigo { min-width: 0; }
   .acciones .btn { flex: 1 1 auto; }
 }
+
+/* --------------------------------------------------- teléfonos angostos
+
+   El botón "Salir" se salía de la cabecera. Medido: a 360 px se pasaba 8 px,
+   y a 344 px eran 24 px con scroll horizontal en toda la página. A 375 px
+   todavía entraba, así que el corte va holgado en 560 y no justo en el borde
+   donde se rompe. */
+
+@media (max-width: 560px) {
+  .barra {
+    flex-wrap: wrap;
+    height: auto;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  /* Sin `margin-left: auto` el botón deja de empujarse contra el borde
+     derecho, y con `width: 100%` se lleva su propia línea entera. */
+  .barra > button {
+    margin-left: 0;
+    width: 100%;
+    text-align: center;
+  }
+
+  /* El correo puede ser largo y es lo que empujaba al botón. Que se corte con
+     puntos suspensivos en vez de estirar la cabecera. */
+  .barra > div {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .barra .lema {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
