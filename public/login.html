@@ -19,6 +19,24 @@
         border-radius: 10px;
         font-size: 0.98rem;
         font-weight: 600;
+        /* Contra la regla global `button { text-transform: uppercase;
+           letter-spacing: 1px }` de style.css.
+
+           No es un capricho de estilo: era una de las causas de que el texto no
+           entrara. Un espaciado de 1px por letra son 24px regalados en "Iniciar
+           sesión con Google", y las mayúsculas ocupan más que las minúsculas.
+
+           Medido sobre la página: en mayúsculas el texto se partía en dos
+           líneas ya a 393px. Pasarlo a minúsculas lo lleva a una sola línea
+           hasta 360px, y con el margen que recupera `style.css` en pantallas
+           chicas llega hasta 320 con 13px de sobra — sin tocar el tamaño de
+           letra, que era la otra salida y dejaba el botón más chico.
+
+           De paso es lo que pide la guía de marca de Google, que fija el texto
+           del botón en minúsculas. La regla global se deja como está: la usan
+           todos los demás botones del sitio. */
+        text-transform: none;
+        letter-spacing: normal;
         cursor: pointer;
         margin-bottom: 15px;
         display: flex;
@@ -26,6 +44,21 @@
         justify-content: center;
         gap: 12px;
         transition: background 0.25s, border-color 0.25s, box-shadow 0.25s;
+      }
+
+      /* El logo NO se encoge.
+
+         Un SVG dentro de un flex es un elemento flexible como cualquier otro, y
+         cuando el texto no entra, el navegador le recorta el ancho a él. La
+         altura la fija el atributo `height`, así que sólo se achica a lo ancho:
+         medido, el logo pasaba de 20px a 12.8px en una pantalla de 320 y el
+         círculo de Google quedaba convertido en un óvalo. Eso era la mitad de
+         lo que se veía torcido.
+
+         `flex-shrink: 0` dice "de acá no se saca espacio". Lo que sobre o falte
+         se lo arregla el texto, que sí puede. */
+      .google-btn svg {
+        flex-shrink: 0;
       }
       .google-btn:hover {
         background: #1e1f20;

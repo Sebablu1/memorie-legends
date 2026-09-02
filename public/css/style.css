@@ -40,6 +40,25 @@ body.acceso .container {
   padding: 34px 30px;
 }
 
+/* En un teléfono esos 30px del contenedor, más los 20px del body, son 100px de
+   una pantalla de 320: casi un tercio del ancho gastado en margen antes de que
+   el formulario reciba nada.
+
+   Hay un `@media (max-width: 768px)` más abajo que baja `.container` a 15px,
+   pero acá NO llega a aplicarse: `body.acceso .container` le gana por
+   especificidad, sin importar el orden. Por eso la regla se repite con el mismo
+   selector en vez de confiar en aquélla. */
+@media (max-width: 480px) {
+  body.acceso {
+    padding: 16px 8px;
+  }
+
+  body.acceso .container {
+    margin: 3vh auto;
+    padding: 26px 14px;
+  }
+}
+
 /* En una tarjeta angosta la marca va apilada, no en fila: si no, el nombre
    se parte en dos líneas al lado de un logo diminuto. */
 body.acceso .marca-titulo a {
