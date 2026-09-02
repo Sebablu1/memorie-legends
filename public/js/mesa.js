@@ -1024,6 +1024,9 @@ async function poderDeIA(i) {
     const conviene =
       (r.revelada.rival?.numero ?? 99) < (r.revelada.propia?.numero ?? 99);
     estado = resolverCambioConVista(estado, conviene);
+    // La mesa se entera de lo que decidió la IA, igual que de lo que decide
+    // un humano. Si no, el 10 de las IA sería invisible.
+    anunciarMirada(ultimaLineaDelRegistro());
     if (!conviene) {
       // No cambió: sigue sabiendo qué tiene el rival ahí.
       memorias[i] = IA.recordar(
@@ -1565,6 +1568,9 @@ async function resolverElDiez(cambiar) {
 
   estado = resolverCambioConVista(estado, cambiar);
   sonidos[cambiar ? "whoosh" : "clic"]();
+  // En entrenamiento no hay vistas del servidor, así que el aviso se dispara
+  // acá. En red lo hace `mostrarMiradas` al recibir el registro.
+  anunciarMirada(ultimaLineaDelRegistro());
   pista(
     cambiar
       ? "Cambiaste la carta. Podés <b>cortar</b> o <b>pasar</b> el turno."
@@ -1870,10 +1876,22 @@ function mostrarMiradas(vista) {
   registroAnunciado = registro.length;
 
   for (const linea of nuevas) {
-    if (linea?.tipo !== "miroCarta") continue;
-    anunciarMirada(linea.texto);
-    sonidos.voltear();
-    marcarManoMirada(linea.objetivo);
+    // Las miradas de los poderes 7 y 8.
+    if (linea?.tipo === "miroCarta") {
+      anunciarMirada(linea.texto);
+      sonidos.voltear();
+      marcarManoMirada(linea.objetivo);
+      continue;
+    }
+    // Y cómo terminó el 10. Que la mesa se entere de si el cambio se hizo o no
+    // es parte de la regla: si el rival cambió, alguien tiene una carta suya y
+    // conviene saberlo; si NO cambió, eso también dice algo.
+    if (linea?.tipo === "resolvioElDiez") {
+      anunciarMirada(linea.texto);
+      sonidos[linea.cambio ? "whoosh" : "clic"]();
+      if (linea.cambio) marcarManoMirada(linea.objetivo);
+      continue;
+    }
   }
 }
 

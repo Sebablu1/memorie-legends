@@ -421,8 +421,11 @@ export function levantar(estado) {
  * a ser la cima—, así que preguntarle después al descarte qué poder tocaba
  * daría el de otra carta. Se fija en el momento del tiro y no se mueve.
  */
-function abrirReflejos(estado, cartaDeMuestra, indiceQuienTiro) {
-  const hayPoder = esPoder(cartaDeMuestra);
+function abrirReflejos(estado, cartaDeMuestra, indiceQuienTiro, { conPoder }) {
+  // `conPoder` lo decide QUIEN LLAMA, no esta función mirando la carta. Un 7
+  // tirado desde el mazo activa; el mismo 7 entregado desde la mano, no. Es la
+  // misma carta y el mismo lugar del descarte: lo que cambia es de dónde vino.
+  const hayPoder = conPoder && esPoder(cartaDeMuestra);
   return {
     ...estado,
     fase: "descarte",
@@ -444,12 +447,19 @@ function abrirReflejos(estado, cartaDeMuestra, indiceQuienTiro) {
 /**
  * Opción A: cambiar la levantada por una carta propia.
  *
- * La que sale de la mano queda como muestra, así que ahora esto también abre
- * reflejos. Y si esa carta era un poder, el poder se activa —para el que la
- * entregó, que es quien la tiró—. Vale la pena notar lo que eso significa en
- * un juego de memoria: la carta salía boca abajo de la propia mano, así que
- * uno puede activar un poder sin haber sabido que lo tenía. Es la regla
- * pedida, y premia acordarse de lo que uno tiene.
+ * La que sale de la mano queda como muestra, así que esto abre reflejos igual
+ * que tirar. Lo que NO hace es activar ningún poder, y ésa es la regla:
+ *
+ *   El poder sale de la carta que se LEVANTA DEL MAZO, y de ninguna otra.
+ *
+ * Las cartas repartidas boca abajo no son poderes. Un 7 en la mano es siete
+ * puntos y nada más. Por eso, entregarlo al cambiar lo manda al descarte como
+ * cualquier número, y por eso también, levantar un 7 y meterlo en la mano en
+ * vez de tirarlo es renunciar a su poder: adentro de la mano deja de serlo.
+ *
+ * Esto estuvo implementado al revés y se notó jugando: entregar una carta que
+ * uno ni sabía que tenía activaba un poder. Además de no ser la regla, hacía
+ * al cambio impredecible justo en el juego donde todo depende de acordarse.
  */
 export function cambiarCarta(estado, posicion) {
   if (estado.fase !== "levantada" || !estado.levantada) return estado;
@@ -477,7 +487,8 @@ export function cambiarCarta(estado, posicion) {
   }
 
   return anotar(
-    abrirReflejos(conLaMuestraNueva, descartada, i),
+    // Sin poder: la carta salió de la mano, no del mazo.
+    abrirReflejos(conLaMuestraNueva, descartada, i, { conPoder: false }),
     `${estado.jugadores[i].nombre} cambió la posición ${posicion} y tiró un ${descartada.numero}`,
   );
 }
@@ -501,7 +512,8 @@ export function tirarCarta(estado) {
   };
 
   return anotar(
-    abrirReflejos(conLaMuestraNueva, carta, estado.indiceTurno),
+    // Con poder: es la carta que se acaba de levantar del mazo.
+    abrirReflejos(conLaMuestraNueva, carta, estado.indiceTurno, { conPoder: true }),
     `${estado.jugadores[estado.indiceTurno].nombre} tiró un ${carta.numero}`,
   );
 }
@@ -683,7 +695,10 @@ export function resolverCambioConVista(estado, cambiar) {
           origen: "poder10",
         }),
       },
-      `${estado.jugadores[yo].nombre} miró las dos cartas y no cambió`,
+      `${estado.jugadores[yo].nombre} miró las dos cartas y NO cambió`,
+      // Sin posiciones: no se movió nada, así que no hay nada que la mesa
+      // pueda haber visto moverse.
+      { tipo: "resolvioElDiez", actor: yo, objetivo: indiceRival, cambio: false },
     );
   }
 
@@ -703,7 +718,11 @@ export function resolverCambioConVista(estado, cambiar) {
         i === yo ? { ...j, mano: miMano } : i === indiceRival ? { ...j, mano: manoRival } : j,
       ),
     },
-    `${estado.jugadores[yo].nombre} cambió su ${posicionPropia} por la ${posicionRival} de ${estado.jugadores[indiceRival].nombre}`,
+    `${estado.jugadores[yo].nombre} cambió una carta con ${estado.jugadores[indiceRival].nombre}`,
+    // Las posiciones SÍ podrían decirse —dos cartas cambiaron de mano y eso se
+    // ve en la mesa— pero no hacen falta para nada y el resto de los avisos no
+    // las dice. Se deja fuera por la misma razón que en los poderes 7 y 8.
+    { tipo: "resolvioElDiez", actor: yo, objetivo: indiceRival, cambio: true },
   );
 }
 

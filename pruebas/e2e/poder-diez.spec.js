@@ -87,6 +87,27 @@ test("decir que sí cambia las cartas; decir que no, las deja", async ({ page })
   await expect(page.locator(SEL.pasar)).toBeEnabled();
 });
 
+test("la mesa se entera de si el cambio se hizo o no", async ({ page }) => {
+  // Reportado jugando: el 10 funcionaba, pero los rivales no se enteraban de
+  // qué había decidido. Y les importa: si cambió, alguien tiene una carta suya;
+  // si no cambió, eso también dice algo.
+  test.setTimeout(180_000);
+  const semilla = await mesaConDiez(page);
+  test.skip(semilla === null, "ninguna semilla repartió un 10 en el primer turno");
+
+  await llegarALaDecision(page);
+  await page.locator('[data-accion="diez-dejar"]').click();
+
+  const aviso = page.locator(".anuncio-mirada");
+  await expect(aviso.first()).toBeVisible({ timeout: 15_000 });
+  const texto = await aviso.first().innerText();
+  expect(texto).toMatch(/no cambió/i);
+
+  // Y sin decir QUÉ cartas eran ni en qué posiciones estaban: el aviso cuenta
+  // la decisión, no el contenido.
+  expect(texto.replace(/poder \d+/i, "")).not.toMatch(/\d/);
+});
+
 test("dejar como está también devuelve el turno", async ({ page }) => {
   test.setTimeout(180_000);
   const semilla = await mesaConDiez(page);

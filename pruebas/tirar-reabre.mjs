@@ -141,11 +141,41 @@ console.log("\n=== 3. Cambiar también reabre, y un poder también ===");
   ok(cambiado.jugadores[0].mano[0].id !== entregada.id,
      "la levantada ocupó su lugar en la mano");
 
-  const esperada = M.esPoder(entregada) ? "poder" : "postLevantada";
   ok(cambiado.fase === "descarte", "cambiar abre reflejos", cambiado.fase);
-  ok(cambiado.ventanaDescarte?.volverA === esperada,
-     `y desemboca en ${esperada}, según si lo entregado era poder`,
+  ok(cambiado.ventanaDescarte?.volverA === "postLevantada",
+     "y desemboca en la decisión de cortar",
      cambiado.ventanaDescarte?.volverA);
+
+  // LA REGLA: el poder sale de la carta que se LEVANTA DEL MAZO y de ninguna
+  // otra. Las cartas repartidas boca abajo no son poderes; un 7 en la mano son
+  // siete puntos.
+  //
+  // Esto estuvo al revés y la prueba anterior no lo veía: derivaba lo esperado
+  // de `esPoder(entregada)`, así que daba verde con la regla vieja Y con la
+  // nueva. Pasaba por la carta que traía el fixture, no por la regla. Ahora se
+  // afirma el caso que importa, con un poder puesto a mano.
+  for (const numero of [7, 8, 9, 10]) {
+    const conPoderEnMano = {
+      ...s,
+      jugadores: s.jugadores.map((j, i) =>
+        i === 0 ? { ...j, mano: [carta("Oro", numero), ...j.mano.slice(1)] } : j,
+      ),
+    };
+    const entregandoPoder = M.cambiarCarta(conPoderEnMano, 0);
+    ok(entregandoPoder.ventanaDescarte?.volverA === "postLevantada",
+       `entregar un ${numero} de la mano NO activa su poder`,
+       entregandoPoder.ventanaDescarte?.volverA);
+    ok(entregandoPoder.poderPendiente == null,
+       `y el ${numero} entregado no deja poder pendiente`, entregandoPoder.poderPendiente);
+    ok(entregandoPoder.descarte[0].numero === numero,
+       `pero sí queda de muestra, como cualquier carta`);
+  }
+
+  // La misma carta, levantada del mazo, SÍ activa. La diferencia no está en la
+  // carta ni en dónde termina: está en de dónde vino.
+  const mismoSieteDelMazo = M.tirarCarta(mesaConLevantada(carta("Oro", 7)));
+  ok(mismoSieteDelMazo.ventanaDescarte?.volverA === "poder",
+     "el mismo 7, levantado del mazo, sí activa");
 
   // Una posición vacía no pone muestra nueva: no hay a qué reaccionar.
   const manoConHueco = { ...s, jugadores: s.jugadores.map((j, i) =>
