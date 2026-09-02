@@ -241,7 +241,12 @@ console.log("\n=== Toda callable pasa su nombre al guardián ===");
   const mal = [];
   let actual = null;
   for (const linea of fuente.split("\n")) {
-    const m = linea.match(/^export const ([a-zA-Z]+) = functions\.https\.on/);
+    // `= functions` a secas, sin exigir `.https.on` en la MISMA línea: cuando
+    // una función declara sus secretos, `runWith` parte la expresión en varias
+    // líneas y esta auditoría dejaba de ver dónde empezaba. Daba un rojo que
+    // decía "acreditarReferido declara crearOrdenDeCompra", que es exactamente
+    // el error que busca, pero era suyo.
+    const m = linea.match(/^export const ([a-zA-Z]+) = functions/);
     if (m) actual = m[1];
     const s = linea.match(/exigirSesion\(context,\s*"([^"]+)"\)/);
     if (s && actual && s[1] !== actual) mal.push(`${actual} declara "${s[1]}"`);

@@ -64,6 +64,7 @@ import {
 } from "./esquemas.js";
 import { crearSalirDeSalaEnEspera } from "./salida.js";
 import { crearAdmin } from "./admin.js";
+import { crearMercadoPago, pagoCoincideConOrden } from "./mercadopago.js";
 
 import {
   ENTRADAS,
@@ -488,6 +489,34 @@ export const salirDeSalaEnEspera = functions.https.onCall(async (data, context) 
  */
 const CORREO_ADMIN = "soporte.memorie.legends@gmail.com";
 
+/**
+ * Mercado Pago. Las credenciales entran por variable de entorno y se leen en
+ * cada llamada, no al arrancar: un secreto rotado tiene efecto sin redesplegar.
+ *
+ *   firebase functions:secrets:set MP_ACCESS_TOKEN
+ *   firebase functions:secrets:set MP_WEBHOOK_SECRET
+ */
+const mercadoPago = () =>
+  crearMercadoPago({
+    accessToken: process.env.MP_ACCESS_TOKEN,
+    webhookSecret: process.env.MP_WEBHOOK_SECRET,
+  });
+
+/** Dónde avisa Mercado Pago y adónde vuelve el comprador. */
+/**
+ * Los secretos hay que DECLARARLOS, no sólo configurarlos.
+ *
+ * En Cloud Functions v1, `functions:secrets:set` guarda el valor pero
+ * `process.env` sigue vacío hasta que la función lo pide con `runWith`. El
+ * código anterior leía `process.env.PAGOS_SECRETO` sin declararlo: habría
+ * respondido "Sin configurar" para siempre, con el secreto correctamente
+ * guardado y nadie entendiendo por qué.
+ */
+const SECRETOS_MP = ["MP_ACCESS_TOKEN", "MP_WEBHOOK_SECRET"];
+
+const URL_WEBHOOK = "https://us-central1-memorie-legends.cloudfunctions.net/webhookPago";
+const URL_VUELTA = "https://memorie-legends.web.app/tienda.html";
+
 const panel = crearAdmin({
   db,
   salas: SALAS,
@@ -830,7 +859,9 @@ export const cerrarRankingAnual = functions.pubsub
  * El importe SIEMPRE se toma del catálogo del servidor, nunca del cliente:
  * si viniera del navegador, cualquiera compraría el Pack Élite por $U 1.
  */
-export const crearOrdenDeCompra = functions.https.onCall(async (data, context) => {
+export const crearOrdenDeCompra = functions
+  .runWith({ secrets: SECRETOS_MP })
+  .https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "crearOrdenDeCompra");
   await limite.exigirRitmoDePlata(uid, "crearOrdenDeCompra");
   const paquete = paquetePorId(validar(EsquemaCompra, data, errorHttp).paqueteId);
@@ -850,10 +881,39 @@ export const crearOrdenDeCompra = functions.https.onCall(async (data, context) =
     creada: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  // TODO(pagos): crear acá la sesión de checkout con el proveedor y devolver
-  // su URL. Debe enviarse `refOrden.id` como referencia externa para poder
-  // reconciliar el webhook, y el importe tomado de `paquete.precio`.
-  const urlCheckout = null;
+  if (!process.env.MP_ACCESS_TOKEN) {
+    logger.error("Falta MP_ACCESS_TOKEN: no se puede abrir el checkout");
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "Los pagos todavía no están habilitados. Probá más tarde.",
+    );
+  }
+
+  let checkout;
+  try {
+    checkout = await mercadoPago().crearPreferencia({
+      orden: { id: refOrden.id },
+      paquete,
+      moneda: MONEDA,
+      urlWebhook: URL_WEBHOOK,
+      urlVuelta: URL_VUELTA,
+    });
+  } catch (e) {
+    // La orden queda en `pendiente` y sin checkout: no se borra, porque saber
+    // que alguien intentó comprar y no pudo es justamente lo que hay que poder
+    // mirar después.
+    logger.error("No se pudo crear la preferencia de Mercado Pago", {
+      uid, ordenId: refOrden.id, error: e.message,
+    });
+    throw new functions.https.HttpsError("unavailable", "No pudimos abrir el pago. Probá de nuevo.");
+  }
+
+  await refOrden.set(
+    { preferenciaId: checkout.preferenciaId, esSandbox: checkout.esSandbox },
+    { merge: true },
+  );
+
+  const urlCheckout = checkout.url;
 
   return {
     ordenId: refOrden.id,
@@ -870,51 +930,90 @@ export const crearOrdenDeCompra = functions.https.onCall(async (data, context) =
  * ⚠️ La verificación de firma de abajo es genérica (HMAC-SHA256 sobre el
  * cuerpo crudo). Ajustala al algoritmo y encabezado que documente el
  * proveedor que uses; sin firma válida NO se acredita nada.
- * El secreto se configura con:  firebase functions:secrets:set PAGOS_SECRETO
+ * Los secretos se configuran con:
+ *   firebase functions:secrets:set MP_ACCESS_TOKEN
+ *   firebase functions:secrets:set MP_WEBHOOK_SECRET
  */
-export const webhookPago = functions.https.onRequest(async (req, res) => {
+export const webhookPago = functions
+  .runWith({ secrets: SECRETOS_MP })
+  .https.onRequest(async (req, res) => {
   if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
 
-  // functions.config() está discontinuado: el secreto viene por variable de
-  // entorno. Se define con:  firebase functions:secrets:set PAGOS_SECRETO
-  const secreto = process.env.PAGOS_SECRETO;
-  if (!secreto) {
-    logger.error("Falta la variable PAGOS_SECRETO: el webhook de pagos no puede verificar nada");
+  const mp = mercadoPago();
+
+  if (!process.env.MP_WEBHOOK_SECRET || !process.env.MP_ACCESS_TOKEN) {
+    logger.error("Faltan las credenciales de Mercado Pago: el webhook no puede verificar nada");
+    // 500 y no 200: que MP lo reintente cuando esté configurado, en vez de
+    // dar el aviso por entregado y perder el pago.
     return res.status(500).send("Sin configurar");
   }
 
-  const firmaRecibida = req.get("x-signature") ?? "";
-  const esperada = crypto
-    .createHmac("sha256", secreto)
-    .update(req.rawBody ?? Buffer.from(""))
-    .digest("hex");
+  // Mercado Pago manda el id del pago en la QUERY, y ése es el que firma.
+  const dataId = req.query?.["data.id"] ?? req.query?.id ?? req.body?.data?.id;
+  const tipo = req.query?.type ?? req.body?.type;
 
-  const iguales =
-    firmaRecibida.length === esperada.length &&
-    crypto.timingSafeEqual(Buffer.from(firmaRecibida), Buffer.from(esperada));
+  const firma = mp.verificarFirma({
+    firma: req.get("x-signature"),
+    requestId: req.get("x-request-id"),
+    dataId,
+    crypto,
+  });
 
-  if (!iguales) {
+  if (!firma.valida) {
     // Sin volcar la firma recibida: es lo que un atacante querría ver para
-    // saber qué tan cerca estuvo.
-    logger.warn("Webhook de pago con firma inválida", { origen: req.ip });
+    // saber qué tan cerca estuvo. El motivo sí, que sirve para diagnosticar.
+    logger.warn("Webhook de Mercado Pago rechazado", { motivo: firma.motivo, origen: req.ip });
     return res.status(401).send("Firma inválida");
   }
 
-  const { ordenId, estado, transaccionId } = req.body ?? {};
-  if (!ordenId || !transaccionId) return res.status(400).send("Payload incompleto");
-  if (estado !== "pagado") {
-    await db.collection("ordenes").doc(ordenId).set({ estado }, { merge: true });
+  // Sólo interesan las notificaciones de pago. Al resto se le contesta 200
+  // para que MP no reintente eternamente algo que no vamos a procesar.
+  if (tipo && tipo !== "payment") return res.status(200).send("ignorado");
+  if (!dataId) return res.status(400).send("Sin id de pago");
+
+  // ────────────────────────────────────────────────────────────────────
+  // ACÁ ESTÁ LO IMPORTANTE: el aviso no dice que te pagaron, dice que MIRES.
+  //
+  // El estado se lee de la API de Mercado Pago, NUNCA del cuerpo del pedido.
+  // La versión anterior confiaba en `req.body.estado === "pagado"`, y eso
+  // significa que cualquiera capaz de producir un cuerpo aceptado acuñaba
+  // Leyendas. La firma tampoco alcanza por sí sola: el manifiesto que MP firma
+  // cubre el id, el request-id y la marca de tiempo, no el cuerpo entero.
+  // ────────────────────────────────────────────────────────────────────
+  let pago;
+  try {
+    pago = await mp.consultarPago(dataId);
+  } catch (e) {
+    logger.error("No se pudo consultar el pago en Mercado Pago", { dataId, error: e.message });
+    // 500 para que MP reintente: puede haber sido un problema pasajero suyo.
+    return res.status(500).send("No se pudo confirmar");
+  }
+
+  if (!pago.aprobado) {
+    // Se anota el estado real y no se acredita nada. `authorized` está retenido
+    // y todavía puede caerse: tratarlo como pagado sería regalar Leyendas.
+    if (pago.ordenId) {
+      await db.collection("ordenes").doc(pago.ordenId)
+        .set({ estado: pago.estado, detalle: pago.detalle ?? null }, { merge: true });
+    }
+    logger.info("Pago no aprobado", { pagoId: pago.id, estado: pago.estado });
     return res.status(200).send("ok");
   }
 
   try {
     await db.runTransaction(async (tx) => {
-      const refOrden = db.collection("ordenes").doc(ordenId);
-      const snap = await tx.get(refOrden);
-      if (!snap.exists) throw new Error(`Orden ${ordenId} inexistente`);
+      const refOrden = db.collection("ordenes").doc(String(pago.ordenId));
+      const snap = await tx.get(refOrden);           // ← leer primero
+      const orden = snap.exists ? { id: snap.id, ...snap.data() } : null;
 
-      const orden = snap.data();
-      if (orden.estado === "pagado") return; // reintento del proveedor
+      const coincide = pagoCoincideConOrden(pago, orden, { moneda: MONEDA });
+      if (!coincide.ok) {
+        // "Ya pagada" es un reintento de MP y es normal: se contesta bien.
+        if (coincide.motivo === "ya_pagada") return;
+        // Lo demás no. Un importe o una moneda que no cuadran con la orden es
+        // la señal de que algo se manipuló, y no se acredita nada.
+        throw Object.assign(new Error(coincide.motivo), { noAcreditar: true, pago: pago.id });
+      }
 
       const paquete = paquetePorId(orden.paqueteId);
 
@@ -922,16 +1021,19 @@ export const webhookPago = functions.https.onRequest(async (req, res) => {
         uid: orden.uid,
         delta: orden.leyendas,
         motivo: MOTIVOS.COMPRA,
-        referencia: transaccionId,
-        // Idempotencia por transacción: el proveedor puede reintentar el aviso.
-        idempotencia: `compra_${transaccionId}`,
+        referencia: pago.id,
+        // Idempotencia por pago: MP reintenta el aviso hasta que le contestes
+        // 200, y a veces igual manda duplicados.
+        idempotencia: `compra_${pago.id}`,
       });
 
       tx.set(
         refOrden,
         {
           estado: "pagado",
-          transaccionId,
+          transaccionId: pago.id,
+          importePagado: pago.importe,
+          modoVivo: pago.modoVivo,
           pagada: admin.firestore.FieldValue.serverTimestamp(),
         },
         { merge: true },
@@ -948,7 +1050,14 @@ export const webhookPago = functions.https.onRequest(async (req, res) => {
 
     return res.status(200).send("ok");
   } catch (e) {
-    logger.error("No se pudo acreditar la compra", { error: e.message });
+    if (e.noAcreditar) {
+      logger.error("Pago aprobado que NO coincide con su orden: no se acreditó nada", {
+        pagoId: e.pago, motivo: e.message, ordenId: pago.ordenId,
+      });
+      // 200: reintentar no va a arreglarlo, y hay que mirarlo a mano.
+      return res.status(200).send("no coincide");
+    }
+    logger.error("No se pudo acreditar la compra", { pagoId: pago.id, error: e.message });
     return res.status(500).send("Error");
   }
 });
