@@ -553,3 +553,264 @@ footer {
   text-decoration: none;
   color: inherit;
 }
+
+/* ============================================================
+   TABLERO: las dos formas de jugar y las salas en vivo
+
+   Absorbe lo que era el lobby. Las dos tarjetas de arriba no son dos botones
+   del mismo formulario a propósito: una no toca Leyendas nunca y la otra
+   cobra entrada, y esa diferencia tiene que verse antes de hacer clic.
+   ============================================================ */
+
+.titulo-elegir {
+  margin: 30px 0 16px;
+  text-align: center;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(1.35rem, 3.4vw, 2rem);
+  letter-spacing: 1px;
+  color: var(--oro);
+}
+
+/* ------------------------------------------- las dos tarjetas */
+
+.modos-de-juego {
+  align-items: stretch;
+}
+
+.tarjeta-modo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 26px 24px;
+  border-radius: 16px;
+  background: var(--panel);
+  border: 1px solid var(--borde-suave);
+  box-shadow: var(--sombra-negra);
+}
+
+/* La de Leyendas se marca con el borde dorado: es la que cuesta. */
+.tarjeta-modo.amigos {
+  border-color: var(--borde);
+}
+
+.tarjeta-modo .icono {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.tarjeta-modo h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--texto);
+}
+
+.tarjeta-modo .modo-lema {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--oro);
+}
+
+.tarjeta-modo p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--texto-tenue);
+}
+
+/* El botón principal queda abajo del todo aunque las tarjetas tengan
+   distinto contenido: si no, quedan a alturas distintas y parece un error. */
+.tarjeta-modo .accion.grande {
+  margin-top: auto;
+}
+
+.accion.grande {
+  display: block;
+  width: 100%;
+  padding: 14px 18px;
+  text-align: center;
+  font-size: 0.95rem;
+  text-decoration: none;
+}
+
+.accion.chica {
+  padding: 7px 14px;
+  font-size: 0.78rem;
+}
+
+/* ------------------------------------------- entrada y código */
+
+.tarjeta-modo .campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tarjeta-modo .campo > span {
+  font-size: 0.78rem;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--texto-tenue);
+}
+
+.tarjeta-modo select,
+.tarjeta-modo input {
+  padding: 11px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--borde-suave);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--texto);
+  font-family: inherit;
+  font-size: 0.95rem;
+  /* Sin esto, en Windows el desplegable se dibuja con el tema del sistema y
+     queda texto claro sobre fondo claro. */
+  color-scheme: dark;
+}
+
+.tarjeta-modo select:focus-visible,
+.tarjeta-modo input:focus-visible {
+  outline: 2px solid var(--oro);
+  outline-offset: 1px;
+}
+
+.ayuda-entrada {
+  font-size: 0.78rem !important;
+  color: var(--texto-tenue);
+  min-height: 2.2em;
+}
+
+.separador-o {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+  color: var(--texto-tenue);
+  font-size: 0.74rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.separador-o::before,
+.separador-o::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--borde-suave);
+}
+
+.unirse-fila {
+  display: flex;
+  gap: 8px;
+}
+
+.unirse-fila input {
+  flex: 1;
+  min-width: 0;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+/* -------------------------------------------- tabla de salas */
+
+.panel-salas {
+  margin-top: 24px;
+}
+
+.nota-salas {
+  margin: 0 0 14px;
+  font-size: 0.84rem;
+  color: var(--texto-tenue);
+}
+
+/* La tabla scrollea DENTRO de su caja: sin esto, en un teléfono estrecho
+   empuja la página entera hacia el costado. */
+.tabla-salas-caja {
+  overflow-x: auto;
+}
+
+.tabla-salas {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.tabla-salas th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 0.7rem;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  color: var(--texto-tenue);
+  border-bottom: 1px solid var(--borde-suave);
+  white-space: nowrap;
+}
+
+.tabla-salas td {
+  padding: 11px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--texto);
+  white-space: nowrap;
+}
+
+.tabla-salas tr:last-child td {
+  border-bottom: none;
+}
+
+.tabla-salas .celda-codigo {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--oro);
+}
+
+.tabla-salas td:last-child {
+  text-align: right;
+}
+
+/* La sala en la que ya estoy, resaltada: si se cortó la conexión, volver es
+   lo primero que quiero hacer. */
+.tabla-salas .sala-mia {
+  background: rgba(212, 168, 67, 0.07);
+}
+
+.tabla-salas .sala-mia .celda-codigo::before {
+  content: "★ ";
+}
+
+.aviso-salas {
+  min-height: 1.4em;
+  margin: 14px 0 0;
+  font-size: 0.88rem;
+  color: var(--texto-tenue);
+}
+
+.aviso-salas.error {
+  color: #fca5a5;
+}
+
+/* Para lectores de pantalla: la columna de acciones necesita nombre, pero
+   dibujarlo dejaría un encabezado suelto arriba de los botones. */
+.oculto-visual {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 620px) {
+  .unirse-fila {
+    flex-direction: column;
+  }
+  .tabla-salas th,
+  .tabla-salas td {
+    padding: 9px 7px;
+  }
+}

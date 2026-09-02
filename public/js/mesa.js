@@ -668,7 +668,7 @@ async function confirmarAbandono(boton) {
   // Entrenamiento: no hay nada que cobrar ni a quién avisarle. Se sale.
   if (costo.esEntrenamiento) {
     cerrarModal();
-    window.location.href = "lobby.html";
+    window.location.href = "dashboard.html";
     return;
   }
 
@@ -2460,10 +2460,15 @@ let miUid = null;
 
 // ------------------------------------------------------------- arranque
 
-/** Manda al lobby con un motivo que el lobby muestra al cargar. */
+/**
+ * Manda al tablero con un motivo, que el tablero muestra al cargar.
+ *
+ * La clave sigue llamándose `avisoLobby` a propósito: renombrarla dejaría sin
+ * mensaje a quien tuviera la pestaña vieja abierta durante el despliegue.
+ */
 function volverAlLobby(motivo) {
   sessionStorage.setItem("avisoLobby", motivo);
-  window.location.href = "lobby.html";
+  window.location.href = "dashboard.html";
 }
 
 /**
@@ -2545,7 +2550,7 @@ function mostrarMesaEnRedPendiente(sala) {
       </p>
       <div class="botonera-pendiente">
         <a class="btn-oro" href="room.html?code=${salaPedida}">Volver a la sala</a>
-        <a class="btn-plata" href="lobby.html">Ir al lobby</a>
+        <a class="btn-plata" href="dashboard.html">Ir al inicio</a>
       </div>
     </div>`;
 }

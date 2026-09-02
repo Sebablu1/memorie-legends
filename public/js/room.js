@@ -259,7 +259,7 @@ $("btnConfirmarSalida").addEventListener("click", async () => {
     await salirDeSalaEnEspera(codigo);
     if (dejarDeEscuchar) dejarDeEscuchar();
     localStorage.removeItem("roomCode");
-    window.location.href = "lobby.html";
+    window.location.href = "dashboard.html";
   } catch (error) {
     boton.disabled = false;
     boton.textContent = "Salir de la sala";

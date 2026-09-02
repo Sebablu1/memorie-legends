@@ -47,15 +47,84 @@
 
       <div id="avisoServidor"></div>
 
-      <section class="rejilla">
-        <a class="tarjeta-accion mesa" href="mesa.html">
-          <span class="etiqueta lista">Disponible</span>
-          <span class="icono">🃏</span>
-          <h2>Mesa de juego</h2>
-          <p>Partida contra la máquina, con los cuatro niveles de dificultad. No necesita conexión con otros jugadores.</p>
-          <span class="pie-tarjeta">Jugar ahora →</span>
-        </a>
+      <h2 class="titulo-elegir">¿Cómo querés jugar?</h2>
 
+      <!-- Las dos formas de jugar, y la diferencia que más importa entre ellas:
+           una no toca Leyendas nunca y la otra cobra entrada. Por eso están
+           separadas y no son dos botones del mismo formulario. -->
+      <section class="rejilla dos-columnas modos-de-juego">
+        <article class="tarjeta-modo entrenamiento">
+          <span class="icono">🃏</span>
+          <h3>Jugar</h3>
+          <p class="modo-lema">Entrenamiento contra la máquina</p>
+          <p>
+            Tres rivales con cuatro niveles de dificultad. <b>No cuesta Leyendas</b> y no
+            suma al ranking: es para practicar la memoria y los reflejos.
+          </p>
+          <a class="accion grande" id="btnEntrenar" href="mesa.html">Jugar ahora</a>
+        </article>
+
+        <article class="tarjeta-modo amigos">
+          <span class="icono">👥</span>
+          <h3>Jugar con amigos</h3>
+          <p class="modo-lema">Sala privada por código</p>
+
+          <label class="campo" for="entradaSala">
+            <span>Entrada</span>
+            <select id="entradaSala"></select>
+          </label>
+          <p class="ayuda-entrada" id="ayudaEntrada"></p>
+
+          <button class="accion grande" id="btnCrearSala" type="button">Crear sala</button>
+
+          <div class="separador-o"><span>o entrá con un código</span></div>
+
+          <div class="unirse-fila">
+            <input
+              id="codigoSala"
+              type="text"
+              maxlength="6"
+              inputmode="latin"
+              autocomplete="off"
+              autocapitalize="characters"
+              spellcheck="false"
+              placeholder="ABC234"
+              aria-label="Código de la sala, seis caracteres"
+            />
+            <button class="accion sobria" id="btnUnirse" type="button">Unirse</button>
+          </div>
+        </article>
+      </section>
+
+      <div class="aviso-salas" id="mensaje" role="status" aria-live="polite"></div>
+
+      <section class="panel panel-salas">
+        <h2>🏠 Mis salas / Salas activas</h2>
+        <p class="nota-salas">
+          Las salas esperando jugadores, en vivo. Si ya estás en una, te la marcamos
+          para que puedas volver.
+        </p>
+
+        <!-- Oculta hasta que llegue la primera respuesta: una cabecera de tabla
+             sola, encima de un "buscando…", parece que algo se rompió. -->
+        <div class="tabla-salas-caja" hidden>
+          <table class="tabla-salas">
+            <thead>
+              <tr>
+                <th scope="col">Código</th>
+                <th scope="col">Jugadores</th>
+                <th scope="col">Entrada</th>
+                <th scope="col">Estado</th>
+                <th scope="col"><span class="oculto-visual">Acción</span></th>
+              </tr>
+            </thead>
+            <tbody id="filasSalas"></tbody>
+          </table>
+        </div>
+        <p class="vacio-simple" id="salasVacias">Buscando salas…</p>
+      </section>
+
+      <section class="rejilla" style="margin-top: 22px">
         <a class="tarjeta-accion ranking" href="ranking.html">
           <span class="icono">🏆</span>
           <h2>Ranking</h2>
@@ -77,28 +146,6 @@
           <p>Un giro cada 48 horas. Doce premios, de 1 a 2.500 Leyendas.</p>
           <span class="pie-tarjeta" id="pieRuleta">Girar →</span>
         </a>
-
-        <a class="tarjeta-accion amigos" href="lobby.html">
-          <span class="icono">👥</span>
-          <h2>Jugar con amigos</h2>
-          <p>Salas privadas por código para partidas en línea. Es el lobby de siempre.</p>
-          <span class="pie-tarjeta">Ir al lobby →</span>
-        </a>
-
-        <article class="tarjeta-accion tarjeta-rey">
-          <img src="img/claude-inspiration/Rey.png" alt="" class="figura-rey" />
-          <div class="rey-texto">
-            <h2>El Rey vale 12</h2>
-            <p>
-              Es la carta más cara de la baraja: la que más conviene sacarse de encima
-              antes de que alguien corte.
-            </p>
-            <p class="rey-dato">
-              <span>👑 Rey · 12 puntos</span>
-              <span>🐴 Caballo · 0 puntos</span>
-            </p>
-          </div>
-        </article>
       </section>
 
       <section class="rejilla dos-columnas" style="margin-top: 22px">
