@@ -37,7 +37,123 @@ body {
 body.acceso .container {
   max-width: 440px;
   margin: 6vh auto;
-  padding: 34px 30px;
+
+  /* ─────────────────────────────────────────────────────────────────────
+     La caja, con marco oscuro y fondo más claro adentro.
+     ─────────────────────────────────────────────────────────────────────
+
+     Son dos capas de fondo sobre el MISMO elemento, sin un div de más. El
+     truco es que un elemento pinta su fondo dos veces con orígenes distintos:
+
+       - `padding-box` pinta desde el borde interior hacia adentro. Ahí va el
+         gris claro, que es lo que se ve detrás del formulario.
+       - `border-box` pinta también debajo del borde. Ahí va el casi negro.
+
+     Con el borde en `transparent`, lo que se ve por él es la segunda capa. El
+     resultado son dos tonos con un escalón nítido entre ellos, que es lo que
+     da la sensación de profundidad, y ni un elemento más en el HTML.
+
+     El orden importa: la primera capa va ARRIBA. Invertirlas tapa el interior
+     con el marco y la caja queda de un solo color. */
+  border: 14px solid transparent;
+  border-radius: 22px;
+  padding: 26px 24px;
+  background:
+    linear-gradient(180deg, #262626, #202020) padding-box,
+    linear-gradient(180deg, #161616, #101010) border-box;
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(212, 168, 67, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+
+  /* El destello se recorta a la caja. Sin esto la banda de luz se sale por las
+     esquinas redondeadas y se ve un rectángulo donde no hay ninguno. */
+  position: relative;
+  overflow: hidden;
+}
+
+/* ───────────────────────────────────────────────────────── el destello
+
+   Una banda dorada que cruza la caja UNA vez al cargar y no vuelve.
+
+   `animation-fill-mode: forwards` la deja parada fuera de cuadro al terminar;
+   sin eso vuelve al principio y se queda tapando la caja con un velo dorado
+   fijo. Y `pointer-events: none` es obligatorio: es una capa por encima del
+   formulario, y sin eso se come los clics de los campos que hay debajo. */
+body.acceso .container::after {
+  content: "";
+  position: absolute;
+  inset: -40% -60%;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 42%,
+    rgba(212, 168, 67, 0.14) 48%,
+    rgba(246, 230, 192, 0.3) 50%,
+    rgba(212, 168, 67, 0.14) 52%,
+    transparent 58%
+  );
+  transform: translateX(-120%);
+  animation: destello-login 1.5s cubic-bezier(0.3, 0, 0.2, 1) 0.25s forwards;
+}
+
+@keyframes destello-login {
+  to { transform: translateX(120%); }
+}
+
+/* El contenido va POR ENCIMA del destello. Sin esto la banda pasa por delante
+   del texto y por un instante el formulario se lee mal. */
+body.acceso .container > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* ────────────────────────────────────────────────────── el logo del login */
+
+.marca-login {
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+.logo-login {
+  display: block;
+  margin: 0 auto;
+  /* Los tres números están medidos, no elegidos a ojo.
+
+     El primer intento fue `clamp(90px, 22vw, 140px)` y tenía un defecto que
+     sólo se ve midiendo: a 390 px de pantalla, 22vw da 86 px — por debajo del
+     piso— así que en TODO teléfono el logo quedaba clavado en 90 y el término
+     del medio no hacía nada. Un clamp que nunca usa su valor central es un
+     ancho fijo escrito de forma complicada.
+
+     Con 34vw sí varía: 120 px a 320, 133 a 390, y el techo de 170 desde los
+     500. En los tres casos el logo ocupa cerca de la mitad del ancho útil de
+     la caja, que es lo que hace que se vea igual de proporcionado en un
+     teléfono y en un monitor.
+
+     Y tiene que verse: al sacar el <h1>, este logo es lo único que dice de qué
+     sitio es esta pantalla. */
+  width: clamp(120px, 34vw, 170px);
+  /* `auto` y no un número: el logo es 3:2 y fijar el alto lo aplastaría. */
+  height: auto;
+  filter: drop-shadow(0 0 14px rgba(212, 168, 67, 0.45));
+  animation: latido-logo 3.4s ease-in-out 1.6s infinite;
+}
+
+/* Un brillo que respira, no que parpadea. Arranca DESPUÉS del destello para
+   que no se pisen: dos animaciones a la vez sobre lo mismo se ven como un
+   error, no como un efecto. */
+@keyframes latido-logo {
+  0%, 100% { filter: drop-shadow(0 0 14px rgba(212, 168, 67, 0.45)); }
+  50%      { filter: drop-shadow(0 0 24px rgba(212, 168, 67, 0.75)); }
+}
+
+/* Quien pidió que no se muevan las cosas no ve ninguna de las dos. El logo
+   conserva su resplandor fijo: es parte de cómo se ve, no del movimiento. */
+@media (prefers-reduced-motion: reduce) {
+  body.acceso .container::after { animation: none; opacity: 0; }
+  .logo-login { animation: none; }
 }
 
 /* En un teléfono esos 30px del contenedor, más los 20px del body, son 100px de
@@ -55,7 +171,11 @@ body.acceso .container {
 
   body.acceso .container {
     margin: 3vh auto;
-    padding: 26px 14px;
+    /* El marco de 14 px ya pone su parte del aire, así que acá sólo queda lo
+       que separa el formulario del marco. Dejar los 26 px de escritorio hacía
+       que en 320 px el campo de correo midiera menos que el botón de al lado. */
+    border-width: 10px;
+    padding: 20px 12px;
   }
 }
 
@@ -335,13 +455,28 @@ button:disabled {
 
 /* --- marca con logo propio --- */
 
+/* El logo de la cabecera.
+
+   `contain` y no `cover`: el logo nuevo es transparente y tiene la corona
+   pegada al borde de arriba. `cover` recorta lo que sobre para llenar la caja,
+   y lo que sobra en un logo así son justamente las puntas.
+
+   Sin `border-radius` por lo mismo: redondear las esquinas de una imagen
+   transparente no redondea nada —no hay fondo que recortar— pero sí se come
+   las hojas del laurel que llegan hasta el ángulo. */
 .logo-img {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  object-fit: cover;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
   flex-shrink: 0;
   vertical-align: middle;
+}
+
+@media (min-width: 768px) {
+  .logo-img {
+    width: 50px;
+    height: 50px;
+  }
 }
 
 .logo-img.grande {

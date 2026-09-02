@@ -73,11 +73,26 @@ body {
   color: inherit;
 }
 
+/* El logo de la barra.
+
+   Esta regla le gana a `.logo-img` por especificidad, así que es la que manda:
+   cambiar sólo aquélla no movía nada acá, que fue lo primero que probé.
+
+   Se le quitaron el borde dorado y las esquinas redondeadas. Eran un marco
+   para el logo cuadrado anterior; alrededor de uno transparente encierran aire
+   y le recortan las puntas del laurel. El logo nuevo ya trae su propio
+   contorno. */
 .barra .marca img {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  border: 1px solid rgba(212, 168, 67, 0.4);
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+@media (min-width: 768px) {
+  .barra .marca img {
+    width: 50px;
+    height: 50px;
+  }
 }
 
 .barra .marca span {
@@ -519,13 +534,26 @@ footer {
 
 /* --- marca con logo propio --- */
 
+/* El logo de la cabecera. La misma regla está en style.css, que cargan las
+   pantallas de acceso: si se cambia una hay que cambiar las dos, o la mitad
+   del sitio queda con el logo de otro tamaño.
+
+   `contain` y no `cover`: el logo es transparente y tiene la corona pegada al
+   borde de arriba; `cover` recorta lo que sobre para llenar la caja, y lo que
+   sobra en un logo así son las puntas. Sin `border-radius` por lo mismo. */
 .logo-img {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  object-fit: cover;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
   flex-shrink: 0;
   vertical-align: middle;
+}
+
+@media (min-width: 768px) {
+  .logo-img {
+    width: 50px;
+    height: 50px;
+  }
 }
 
 .logo-img.grande {

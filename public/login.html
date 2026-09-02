@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Memorie Legends - Login</title>
+    <link rel="icon" href="img/memorie-legends2.png" />
     <link rel="stylesheet" href="css/tema.css" />
     <link rel="stylesheet" href="css/style.css" />
     <style>
@@ -86,10 +87,6 @@
       }
       .or-divider::after {
         margin-left: 15px;
-      }
-      .memorie-icon {
-        font-size: 2.5rem;
-        margin-bottom: 10px;
       }
       .support-footer {
         text-align: center;
@@ -214,16 +211,40 @@
     <!-- Tapado de entrada. Ver la nota en el <style>: destaparlo es la
          excepción, no la regla. -->
     <div class="velo-carga" id="veloCarga" role="status" aria-live="polite">
-      <img src="img/memorie-legends.png" alt="Memorie Legends" width="612" height="408" />
+      <!-- El MISMO archivo que el logo de abajo, a propósito. Antes eran dos
+           logos distintos en la misma pantalla —el velo mostraba uno y el
+           formulario otro— y encima obligaba a bajar dos imágenes cuando con
+           una alcanza: ésta ya está en la caché cuando el velo aparece. -->
+      <img src="img/memorie-legends3.png" alt="Memorie Legends" width="420" height="280" />
       <div class="girador" aria-hidden="true"></div>
       <p id="veloTexto">Cargando…</p>
     </div>
 
     <div class="container">
-      <div style="text-align: center">
-        <div class="memorie-icon"><img src="img/claude-inspiration/logo.png" alt="Memorie Legends" class="logo-img grande"></div>
-        <h1 style="margin-bottom: 5px">Memorie Legends</h1>
-        <p class="subtitulo" style="margin-top: 0">Inicia sesión para jugar</p>
+      <!-- El logo solo, sin el nombre repetido debajo.
+
+           El título y el "Inicia sesión para jugar" se fueron a propósito: el
+           logo ya dice el nombre, con más fuerza que un <h1>, y quien está
+           mirando un formulario con "Correo" y "Contraseña" no necesita que le
+           expliquen que es para iniciar sesión. Cada renglón de más aleja el
+           campo donde hay que escribir.
+
+           El `alt` es el nombre del juego, no una descripción del dibujo: para
+           quien no ve la imagen, ESO es lo que la imagen dice. Y como ya no hay
+           <h1>, este alt es el único sitio donde el nombre existe como texto.
+
+           `width`/`height` son los del archivo. Van puestos aunque el CSS
+           mande: son los que le reservan el espacio al navegador, y sin ellos
+           el formulario salta hacia abajo cuando la imagen termina de bajar. -->
+      <div class="marca-login">
+        <img
+          class="logo-login"
+          src="img/memorie-legends3.png"
+          alt="Memorie Legends"
+          width="420"
+          height="280"
+          fetchpriority="high"
+        />
       </div>
 
       <div id="mensaje" class="mensaje"></div>

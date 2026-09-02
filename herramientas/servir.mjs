@@ -17,6 +17,10 @@ const RAIZ = normalize(
 );
 const TIPOS = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+  // `.mjs` también. Sin esto sale como `application/octet-stream`, el navegador
+  // rechaza el módulo por el tipo, y el import falla entero: la pantalla queda
+  // muerta y el único rastro es un error de MIME en la consola.
+  ".mjs": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8", ".json": "application/json",
   ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml",
   ".webp": "image/webp", ".mp3": "audio/mpeg", ".ico": "image/x-icon",

@@ -6,7 +6,7 @@
     <meta name="description" content="Cómo protegemos tu cuenta, tus Leyendas y tus pagos en Memorie Legends.">
     <meta name="theme-color" content="#0a0a0a">
     <title>Seguridad - Memorie Legends</title>
-    <link rel="icon" href="img/claude-inspiration/logo.png">
+    <link rel="icon" href="img/memorie-legends2.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
@@ -17,7 +17,7 @@
 
     <header>
         <div class="header-content">
-            <a href="/dashboard.html" class="logo"><img src="img/claude-inspiration/logo.png" alt="Memorie Legends" class="logo-img"><span class="logo-text">Memorie Legends</span></a>
+            <a href="/dashboard.html" class="logo"><img src="img/memorie-legends2.png" alt="Memorie Legends" class="logo-img"><span class="logo-text">Memorie Legends</span></a>
             <nav>
                 <a href="/">Inicio</a>
                 <a href="/lobby.html">Lobby</a>
@@ -87,12 +87,27 @@
                 <li><strong>Se puede reportar a la misma persona una vez cada 24 horas.</strong> Es para que la herramienta no se use como forma de hostigar a alguien.</li>
             </ul>
 
+            <h2>🔐 Verificación en Dos Pasos</h2>
+            <p>Ya podés activarla desde <strong>Tu cuenta</strong>. Con los dos pasos puestos, entrar necesita tu contraseña <em>y además</em> un código de seis dígitos que genera una aplicación en tu teléfono: Google Authenticator, Authy, 1Password o cualquier otra que sirva. La activás escaneando un código QR.</p>
+            <p>Es <strong>opcional</strong>, y la recomendamos si tenés Leyendas guardadas. Tres cosas que conviene saber antes:</p>
+            <ul>
+                <li><strong>El código no viaja por ningún lado.</strong> Lo calcula tu teléfono a partir de una clave que sólo tienen él y nuestro servidor. No hay mensajes que interceptar ni número de teléfono que robar con un cambio de SIM.</li>
+                <li><strong>Guardá la clave que te mostramos</strong> en un lugar seguro que no sea ese mismo teléfono. Es lo que te permite volver a configurarlo si cambiás de aparato.</li>
+                <li><strong>Si perdés el teléfono y no guardaste la clave</strong>, no vas a poder entrar por tu cuenta: escribinos y lo resolvemos a mano.</li>
+            </ul>
+
+            <h2>🚧 En Proceso de Activación</h2>
+            <div class="aviso">
+                <p>Una medida más está construida y la estamos encendiendo por etapas. Te contamos en qué punto está, porque «en proceso» no es lo mismo que «protegiéndote hoy»:</p>
+                <ul>
+                    <li><strong>Verificación de origen de las peticiones (App Check):</strong> desde ahora tu navegador acompaña cada pedido al servidor con una prueba de que sale de la aplicación real y no de un script. <em>Todavía estamos midiendo</em>: el servidor registra esa prueba pero aún no rechaza a quien no la trae. Lo hacemos así para no dejar afuera a nadie que tenga la página abierta desde antes del cambio.</li>
+                </ul>
+            </div>
+
             <h2>🧭 Lo que Todavía No Tenemos</h2>
             <div class="aviso">
-                <p>Preferimos decirlo claro antes que dar una falsa sensación de seguridad. Estas funciones <strong>aún no están activas</strong>:</p>
+                <p>Preferimos decirlo claro antes que dar una falsa sensación de seguridad. Estas funciones <strong>no existen</strong>:</p>
                 <ul>
-                    <li><strong>Verificación en dos pasos (2FA):</strong> está construida y la vas a ver en <em>Tu cuenta</em>, pero todavía no la habilitamos del lado del servidor. Hasta que lo hagamos, activarla no va a funcionar. Te vamos a avisar cuando esté.</li>
-                    <li><strong>Verificación de origen de las peticiones:</strong> estamos preparando un control que asegura que los pedidos al servidor salgan de la aplicación real y no de un script. Todavía no está encendido.</li>
                     <li><strong>Detección automática de fraude:</strong> no hay un sistema que bloquee cuentas solo. Las revisiones son manuales, y preferimos que lo sean: un sistema automático con la señal que tenemos hoy se equivocaría seguido, y equivocarse acá significa dejar a alguien sin su saldo.</li>
                     <li><strong>Equipo de moderación permanente:</strong> las denuncias las atiende el equipo de desarrollo, sin un turno dedicado.</li>
                 </ul>

@@ -24,6 +24,7 @@ import {
   confirmarInscripcion,
   quitarFactor,
 } from "./mfa.js";
+import { dibujarQr } from "./qr.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -104,8 +105,20 @@ $("btnActivarMfa").addEventListener("click", async (evento) => {
 
   try {
     enCurso = await empezarInscripcion();
+
+    // El QR y la clave a mano dicen LO MISMO: la clave es la misma URI sin el
+    // envoltorio. Se ofrecen las dos porque escanear falla seguido —cámara
+    // sucia, pantalla con brillo bajo, una aplicación que no trae lector— y
+    // quedarse sin salida ahí significa no poder activar los dos pasos.
     $("claveSecreta").textContent = enCurso.clave;
     $("enlaceOtp").href = enCurso.uri;
+
+    // Antes de `refrescar()`, que es lo que destapa el bloque: un canvas
+    // oculto mide 0x0 y el dibujo saldría vacío... pero al revés tampoco,
+    // porque `hidden` no impide dibujar en el búfer. Se dibuja acá y se
+    // destapa después, que es el orden que no depende de eso.
+    dibujarQr($("qr"), enCurso.uri, { lado: 240 });
+
     avisar("");
     await refrescar();
     $("codigoConfirmar").focus();

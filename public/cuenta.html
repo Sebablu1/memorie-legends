@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#05070b" />
     <title>Tu cuenta - Memorie Legends</title>
-    <link rel="icon" href="img/claude-inspiration/logo.png" />
+    <link rel="icon" href="img/memorie-legends2.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -65,6 +65,36 @@
       .factor-puesto small { color: var(--texto-tenue); }
       .factor-puesto .accion { margin-left: auto; }
 
+      /* El QR va sobre blanco aunque la página sea oscura. No es un descuido:
+         un lector necesita contraste alto y un margen claro para encontrar el
+         código. Es de los pocos sitios donde la marca cede. */
+      .caja-qr {
+        display: flex;
+        justify-content: center;
+        margin: 18px 0;
+      }
+
+      .caja-qr canvas {
+        border-radius: 12px;
+        box-shadow: 0 0 0 1px rgba(212, 168, 67, 0.35), 0 8px 28px rgba(0, 0, 0, 0.55);
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* La clave a mano queda plegada: la mayoría escanea, y mostrar las dos
+         cosas a la vez hace dudar sobre cuál hay que usar. */
+      .a-mano {
+        margin: 6px 0 18px;
+        color: var(--texto-tenue);
+        font-size: 0.9rem;
+      }
+
+      .a-mano summary {
+        cursor: pointer;
+        color: var(--oro);
+        padding: 6px 0;
+      }
+
       .aviso-fuerte {
         border-left: 3px solid var(--oro);
         padding: 10px 0 10px 14px;
@@ -88,7 +118,7 @@
     <header class="barra">
       <div class="barra-contenido">
         <a href="dashboard.html" class="marca">
-          <img src="img/claude-inspiration/logo.png" alt="Memorie Legends" class="logo-img" />
+          <img src="img/memorie-legends2.png" alt="Memorie Legends" class="logo-img" />
           <span class="logo-text">Memorie Legends</span>
         </a>
         <nav>
@@ -155,17 +185,32 @@
 
         <!-- Paso 2: cargar el secreto y confirmar -->
         <div id="pasoConfirmar" hidden>
-          <h3>1. Cargá esta clave en tu aplicación</h3>
+          <h3>1. Escaneá esto con tu aplicación</h3>
           <p style="color: var(--texto-tenue); font-size: 0.9rem">
-            Abrí tu aplicación de códigos, elegí "agregar cuenta" y
-            escribí esta clave a mano:
+            Abrí Google Authenticator (o la que uses), tocá "agregar" y apuntá
+            la cámara acá:
           </p>
-          <code class="clave-secreta" id="claveSecreta"></code>
-          <button class="accion sobria" id="btnCopiarClave" type="button">Copiar la clave</button>
-          <p style="color: var(--texto-tenue); font-size: 0.85rem; margin-top: 10px">
-            <a id="enlaceOtp" href="#">Abrir directamente en la aplicación</a>
-            — funciona si la tenés instalada en este mismo dispositivo.
-          </p>
+
+          <div class="caja-qr">
+            <canvas id="qr" role="img"
+                    aria-label="Código QR para tu aplicación de autenticación"></canvas>
+          </div>
+
+          <details class="a-mano">
+            <summary>No puedo escanear</summary>
+            <p style="color: var(--texto-tenue); font-size: 0.88rem">
+              Elegí "escribir clave de configuración" en tu aplicación y usá
+              esta, tal cual:
+            </p>
+            <code class="clave-secreta" id="claveSecreta"></code>
+            <button class="accion sobria" id="btnCopiarClave" type="button">
+              Copiar la clave
+            </button>
+            <p style="color: var(--texto-tenue); font-size: 0.85rem; margin-top: 10px">
+              <a id="enlaceOtp" href="#">Abrir directamente en la aplicación</a>
+              — funciona si la tenés instalada en este mismo dispositivo.
+            </p>
+          </details>
 
           <h3 style="margin-top: 26px">2. Escribí el código que aparece</h3>
           <form id="formConfirmarMfa">
