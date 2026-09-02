@@ -41,9 +41,32 @@ service cloud.firestore {
 
     // ---------------------------------------------------- perfiles
     match /users/{uid} {
-      // Los perfiles se leen entre jugadores: el lobby y el ranking
-      // muestran nombres. No hay datos sensibles acá.
-      allow read: if autenticado();
+      /**
+       * El perfil lo lee SU DUEÑO y nadie más.
+       *
+       * Antes decía `allow read: if autenticado()`, con el argumento de que
+       * "el lobby y el ranking muestran nombres" y de que acá no había datos
+       * sensibles. Las dos mitades eran falsas:
+       *
+       *   - En este documento vive `credits`, o sea el saldo. Cualquier
+       *     jugador logueado podía leer cuánto tiene cada uno de los demás,
+       *     además de sus partidas y sus victorias.
+       *   - Y ni el lobby ni el ranking lo necesitaban. La sala guarda los
+       *     nombres en `jugadoresNombres` dentro de su propio documento, y las
+       *     filas del ranking guardan su `uid` y sus estadísticas. Ninguna de
+       *     las dos pantallas lee `users` de nadie: se comprobó recorriendo
+       *     todas las lecturas del cliente antes de cerrar esto.
+       *
+       * Por eso alcanza con restringir la lectura y no hace falta mover
+       * `credits` a una subcolección: mover el campo obligaba a migrar los
+       * datos de todas las cuentas y a tocar cada lectura y cada escritura del
+       * saldo, para llegar al mismo lugar. Menos partes móviles, menos formas
+       * de equivocarse con el dinero de la gente.
+       *
+       * Las Cloud Functions no pasan por estas reglas: usan credenciales de
+       * administrador, así que el panel y el ranking siguen funcionando.
+       */
+      allow read: if esDuenio(uid);
 
       // La cuenta se crea una sola vez, y sólo con el saldo de bienvenida.
       allow create: if esDuenio(uid) && saldoDeBienvenidaValido();
