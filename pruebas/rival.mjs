@@ -91,23 +91,77 @@ console.log("\n=== 1. El poder 8 deja saber, el 7 no ===");
   ok(r7.estado.conocimientos.length === 0, "mirar una carta propia no deja conocimiento de nadie");
 }
 
-console.log("\n=== 2. El poder 10 deja saber lo que ENTREGÓ ===");
+console.log("\n=== 2. El 10 muestra, espera, y deja saber según lo que se decidió ===");
 {
-  // El 10 muestra las dos y las intercambia. La del rival pasa a ser propia,
-  // así que saberla ya no sirve de nada; la propia se queda en la mano ajena.
+  // El 10 son DOS pasos. Primero muestra las dos cartas y se detiene: hasta
+  // que su dueño no conteste no se mueve nada ni se sabe nada, porque todavía
+  // no se sabe dónde va a quedar cada carta.
   const s = { ...mesa(), fase: "poder", poderPendiente: { tipo: "cambioConVista", numero: 10, indiceJugador: 0 } };
   const miCarta = s.jugadores[0].mano[2];        // Oro-3
-  const r = M.usarPoderCambio(s, 2, 1, 0);       // mi posición 2 por la 0 de Y
+  const suCarta = s.jugadores[1].mano[0];
+  const visto = M.usarPoderCambio(s, 2, 1, 0);   // mi posición 2 por la 0 de Y
 
-  ok(r.estado.jugadores[1].mano[0].id === miCarta.id, "mi carta quedó en la mano de Y");
-  const c = r.estado.conocimientos[0];
+  ok(visto.estado.fase === "cambioConVista", "primero espera la decisión", visto.estado.fase);
+  ok(visto.revelada?.propia?.id === miCarta.id && visto.revelada?.rival?.id === suCarta.id,
+     "mostrando las dos cartas a quien lo usó");
+  ok(visto.estado.jugadores[1].mano[0].id === suCarta.id, "sin haber movido nada todavía");
+  ok((visto.estado.conocimientos ?? []).length === 0,
+     "y sin anotar conocimiento: aún no se sabe dónde va a quedar cada carta");
+
+  // Las POSICIONES quedan en el estado para poder resolver, nunca las cartas:
+  // guardarlas ahí las pondría a un `vistaDe` mal escrito de toda la mesa.
+  const p = visto.estado.cambioPendiente;
+  ok(p && p.indiceJugador === 0 && p.indiceRival === 1,
+     "el pendiente dice quién decide y sobre quién");
+  ok(!JSON.stringify(p).includes(suCarta.id) && !JSON.stringify(p).includes(miCarta.id),
+     "y NO guarda ninguna carta", p);
+
+  // SI CAMBIA: la del rival pasa a ser propia, así que saberla ya no dice nada
+  // de nadie. La que él entregó sí quedó en la mano ajena, y su número se vio.
+  const cambio = M.resolverCambioConVista(visto.estado, true);
+  ok(cambio.jugadores[1].mano[0].id === miCarta.id, "mi carta quedó en la mano de Y");
+  ok(cambio.jugadores[0].mano[2].id === suCarta.id, "y la suya en la mía");
+  const c = cambio.conocimientos[0];
   ok(c?.numero === miCarta.numero, "y sé que Y tiene ese número", c?.numero);
   ok(c?.origen === "poder10", "anotado como poder10", c?.origen);
+  ok(cambio.fase === "postLevantada", "y vuelve a la decisión de cortar", cambio.fase);
 
-  // El 9 cambia a ciegas: no se vio nada, no se sabe nada.
+  // SI NO CAMBIA: cada carta se queda donde estaba, y lo que sabe es la carta
+  // del rival, que sigue siendo del rival. Derivarlo al revés le daría un
+  // derecho sobre una carta que no está donde él cree.
+  const sinCambiar = M.resolverCambioConVista(visto.estado, false);
+  ok(sinCambiar.jugadores[1].mano[0].id === suCarta.id, "no cambiar deja todo donde estaba");
+  ok(sinCambiar.jugadores[0].mano[2].id === miCarta.id, "en las dos manos");
+  const c2 = sinCambiar.conocimientos[0];
+  ok(c2?.numero === suCarta.numero,
+     "y lo que sabe es la carta de Y, no la suya", { sabe: c2?.numero, deY: suCarta.numero });
+  ok(c2?.origen === "poder10", "también anotado como poder10", c2?.origen);
+
+  // Mientras dura la decisión, la mesa NO puede enterarse de qué posiciones
+  // se están mirando. Decir "está mirando la segunda de Bruno" convierte el
+  // poder en un anuncio público de dónde está lo que se vio, y serviría igual
+  // si después decide no cambiar.
+  {
+    const V = await import("../public/js/reglas/vista.js");
+    const paraElDuenio = V.vistaDe(visto.estado, 0).cambioPendiente;
+    ok(paraElDuenio?.posicionPropia === 2 && paraElDuenio?.posicionRival === 0,
+       "el dueño sí ve las posiciones: si recarga, no tiene otra forma de saberlas");
+
+    for (const espectador of [1, 2]) {
+      const v = V.vistaDe(visto.estado, espectador).cambioPendiente;
+      ok(v?.indiceJugador === 0 && v?.indiceRival === 1,
+         `el jugador ${espectador} ve quién decide y sobre quién`);
+      ok(!("posicionPropia" in (v ?? {})) && !("posicionRival" in (v ?? {})),
+         `pero el jugador ${espectador} NO ve las posiciones`, v);
+    }
+  }
+
+  // El 9 cambia a ciegas: no se vio nada, no se sabe nada, y no espera a nadie.
   const s9 = { ...mesa(), fase: "poder", poderPendiente: { tipo: "cambioCiego", numero: 9, indiceJugador: 0 } };
   const r9 = M.usarPoderCambio(s9, 2, 1, 0);
+  ok(r9.estado.fase === "postLevantada", "el 9 no pregunta nada", r9.estado.fase);
   ok((r9.estado.conocimientos ?? []).length === 0, "el 9 cambia a ciegas y no deja conocimiento");
+  ok(r9.estado.jugadores[1].mano[0].id === miCarta.id, "pero sí cambia");
 }
 
 // ================================================== 3. la autorización

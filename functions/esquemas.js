@@ -100,9 +100,23 @@ export const EsquemaAccion = z.object({
   accion: z.enum(Object.values(ACCIONES)),
   clientActionId: ClaveDeAccion,
   posicion: Posicion.optional(),
+  /**
+   * `objetivo` significa tres cosas distintas segun la accion, y por eso
+   * acepta tres formas:
+   *
+   *   - un jugador y su posicion, para los poderes de cambio;
+   *   - un uid, para el descarte contra la mano de un rival;
+   *   - un booleano, que es el si o el no del 10 despues de ver las cartas.
+   *
+   * Reusar el mismo campo para tres cosas no es lindo, pero cambiarle el
+   * nombre obligaria a tocar el protocolo entero. Lo que si hace falta es que
+   * el esquema las contemple: sin el booleano, la segunda mitad del 10 se
+   * rechazaba en la puerta con "los datos de la jugada no son validos".
+   */
   objetivo: z
     .object({ indice: z.coerce.number().int().min(0).max(3), posicion: Posicion.optional() })
     .or(z.string().min(1).max(128))
+    .or(z.boolean())
     .optional(),
 });
 

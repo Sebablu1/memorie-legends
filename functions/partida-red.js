@@ -80,6 +80,8 @@ export const ACCIONES = {
   PODER_MIRAR: "poderMirar",
   PODER_CAMBIO: "poderCambio",
   SALTAR_PODER: "saltarPoder",
+  // Segunda mitad del 10: ya vio las dos cartas y dice si cambia.
+  RESOLVER_CAMBIO: "resolverCambio",
   CORTAR: "cortar",
   PASAR: "pasar",
 };
@@ -115,6 +117,7 @@ const FASE_DE = {
   [ACCIONES.PODER_MIRAR]: "poder",
   [ACCIONES.PODER_CAMBIO]: "poder",
   [ACCIONES.SALTAR_PODER]: "poder",
+  [ACCIONES.RESOLVER_CAMBIO]: "cambioConVista",
   [ACCIONES.CORTAR]: "postLevantada",
   [ACCIONES.PASAR]: "postLevantada",
 };
@@ -123,6 +126,7 @@ const FASE_DE = {
 const EXIGEN_TURNO = new Set([
   ACCIONES.LEVANTAR, ACCIONES.CAMBIAR, ACCIONES.TIRAR,
   ACCIONES.PODER_MIRAR, ACCIONES.PODER_CAMBIO, ACCIONES.SALTAR_PODER,
+  ACCIONES.RESOLVER_CAMBIO,
   ACCIONES.CORTAR, ACCIONES.PASAR,
 ]);
 
@@ -338,6 +342,17 @@ export function crearMotorEnRed({
     if (accion === ACCIONES.MIRAR || accion === ACCIONES.CAMBIAR) {
       if (!enRango(indice, posicion)) {
         throw error("invalid-argument", "Esa posición no existe en tu mano.");
+      }
+    }
+
+    // La segunda mitad del 10 la decide QUIEN lo uso, no quien tenga el turno.
+    // Son la misma persona hoy, pero atar el permiso al turno seria confiar en
+    // una coincidencia: si manana el turno pudiera moverse durante la
+    // decision, el cambio lo resolveria otro.
+    if (accion === ACCIONES.RESOLVER_CAMBIO) {
+      const pendiente = partida.estado.cambioPendiente;
+      if (!pendiente || pendiente.indiceJugador !== indice) {
+        throw error("permission-denied", "Ese cambio no es tuyo.");
       }
     }
 
@@ -768,6 +783,11 @@ export function crearMotorEnRed({
       case ACCIONES.CAMBIAR: return motor.cambiarCarta(estado, posicion);
       case ACCIONES.TIRAR: return motor.tirarCarta(estado);
       case ACCIONES.SALTAR_PODER: return motor.saltarPoder(estado);
+      // `objetivo` acá no es un jugador: es el sí o el no. Se lee como
+      // booleano estricto para que un objetivo ausente NO cambie las cartas,
+      // que es la salida conservadora.
+      case ACCIONES.RESOLVER_CAMBIO:
+        return motor.resolverCambioConVista(estado, objetivo === true);
       case ACCIONES.CORTAR: return motor.cortar(estado);
       case ACCIONES.PASAR: return motor.pasarTurno(estado);
       // Los dos poderes devuelven { estado, revelada }. Lo revelado NO se

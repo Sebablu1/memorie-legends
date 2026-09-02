@@ -10,6 +10,7 @@ import {
   tirarCarta,
   usarPoderMirar,
   usarPoderCambio,
+  resolverCambioConVista,
   saltarPoder,
   cortar,
   pasarTurno,
@@ -1015,6 +1016,27 @@ async function poderDeIA(i) {
     objetivo.posicionRival,
   );
   estado = r.estado;
+
+  // Con el 10 el motor se detiene a esperar la decisión, así que la IA también
+  // decide: cambia sólo si la del rival es más baja que la suya. Es la misma
+  // información que ve un humano en el modal, sin ventaja ni desventaja.
+  if (r.revelada) {
+    const conviene =
+      (r.revelada.rival?.numero ?? 99) < (r.revelada.propia?.numero ?? 99);
+    estado = resolverCambioConVista(estado, conviene);
+    if (!conviene) {
+      // No cambió: sigue sabiendo qué tiene el rival ahí.
+      memorias[i] = IA.recordar(
+        memorias[i], estado.jugadores[i].dificultad,
+        objetivo.indiceRival, objetivo.posicionRival, r.revelada.rival, () => 0,
+      );
+      dibujar();
+      sonidos.clic();
+      await esperar(1100);
+      return;
+    }
+  }
+
   memorias = memorias.map((m) =>
     IA.olvidar(
       IA.olvidar(m, i, objetivo.posicionPropia),
@@ -1345,6 +1367,14 @@ dom.modal.addEventListener("click", async (evento) => {
     return;
   }
 
+  // La segunda mitad del 10. Sirve igual en entrenamiento y en red: lo que
+  // cambia es quién aplica la decisión, y de eso se ocupa `resolverElDiez`.
+  const diez = evento.target.closest('[data-accion="diez-cambiar"], [data-accion="diez-dejar"]');
+  if (diez) {
+    await resolverElDiez(diez.dataset.accion === "diez-cambiar");
+    return;
+  }
+
   if (evento.target.closest('[data-accion="abandonar-no"]')) {
     cerrarModal();
     return;
@@ -1470,23 +1500,78 @@ dom.modal.addEventListener("click", async (evento) => {
   sonidos.whoosh();
 
   if (revelada) {
-    // El cambio con vista muestra ambas cartas ya intercambiadas de posición.
-    revelaciones.set(clave(i, pos), null);
-    revelaciones.set(clave(YO, propiaUsada), null);
+    // El 10 muestra las dos cartas y ESPERA. Antes revelaba y cambiaba de una,
+    // que es lo mismo que no mostrar nada: ver algo que ya no podés usar para
+    // decidir no es información, es el acta de lo que te pasó.
+    revelaciones.set(clave(i, pos), revelada.rival);
+    revelaciones.set(clave(YO, propiaUsada), revelada.propia);
     dibujar();
     efectoCambio("cambioConVista", YO, propiaUsada, i, pos);
-    await esperar(MS_MIRAR);
-    revelaciones.clear();
-  } else {
-    dibujar();
-    efectoCambio("cambioCiego", YO, propiaUsada, i, pos);
-    await esperar(1100);
+    preguntarSiCambia(revelada, propiaUsada, i, pos);
+    return;
   }
+
+  dibujar();
+  efectoCambio("cambioCiego", YO, propiaUsada, i, pos);
+  await esperar(1100);
 
   seleccionPropia = null;
   pista("Podés <b>cortar</b> o <b>pasar</b> el turno.");
   dibujar();
 });
+
+/**
+ * La segunda mitad del 10: con las dos cartas a la vista, cambiar o dejar.
+ *
+ * Las cartas se quedan destapadas mientras dure la decisión y no un par de
+ * segundos: se está decidiendo CON ellas, no mirándolas de recuerdo. Se tapan
+ * al resolver.
+ */
+function preguntarSiCambia(revelada, posicionPropia, indiceRival, posicionRival) {
+  const nombreRival = estado.jugadores[indiceRival].nombre;
+  abrirModal(`
+    <h2>Cambio viendo ambas cartas</h2>
+    <div class="cartas-del-diez">
+      <figure>
+        <img src="${revelada.propia?.imagen ?? ""}"
+             alt="Tu carta: ${revelada.propia?.numero} de ${revelada.propia?.palo}" />
+        <figcaption>La tuya · <b>${revelada.propia?.numero ?? "?"}</b></figcaption>
+      </figure>
+      <span class="flecha" aria-hidden="true">⇄</span>
+      <figure>
+        <img src="${revelada.rival?.imagen ?? ""}"
+             alt="Carta de ${escapar(nombreRival)}: ${revelada.rival?.numero} de ${revelada.rival?.palo}" />
+        <figcaption>${escapar(nombreRival)} · <b>${revelada.rival?.numero ?? "?"}</b></figcaption>
+      </figure>
+    </div>
+    <p>Cambiás sólo si te conviene. Gana quien menos suma.</p>
+    <div class="botonera-poder">
+      <button class="accion" data-accion="diez-cambiar" type="button">⇄ Cambiar</button>
+      <button class="accion sobria" data-accion="diez-dejar" type="button">✋ Dejar como está</button>
+    </div>
+  `);
+}
+
+/** Cierra el 10 con la decisión tomada, en cualquiera de los dos modos. */
+async function resolverElDiez(cambiar) {
+  cerrarModal();
+  revelaciones.clear();
+  seleccionPropia = null;
+
+  if (enRed()) {
+    await pedir("resolverCambio", () => Red.resolverCambio(salaPedida, cambiar));
+    return;
+  }
+
+  estado = resolverCambioConVista(estado, cambiar);
+  sonidos[cambiar ? "whoosh" : "clic"]();
+  pista(
+    cambiar
+      ? "Cambiaste la carta. Podés <b>cortar</b> o <b>pasar</b> el turno."
+      : "Dejaste las cartas donde estaban. Podés <b>cortar</b> o <b>pasar</b> el turno.",
+  );
+  dibujar();
+}
 
 // -------------------------------------------------------- fin de ronda
 
@@ -1842,6 +1927,29 @@ function modalesDeRed(vista) {
   }
   if (eraPoder) cerrarModal();
 
+  // El 10, esperando la decisión de su dueño.
+  //
+  // El modal con las cartas lo abre quien hizo la jugada, con lo que le
+  // devolvió el servidor. Esto es la red de seguridad para el caso en que ese
+  // navegador se recargue en mitad de la decisión: las cartas ya no están
+  // —viajaron una sola vez y no se guardan—, así que se ofrece salir sin
+  // verlas en vez de dejar la partida trabada esperando a alguien que ya no
+  // sabe qué estaba mirando.
+  if (
+    vista.fase === "cambioConVista" &&
+    vista.cambioPendiente?.indiceJugador === YO &&
+    !dom.velo.classList.contains("abierto")
+  ) {
+    abrirModal(`
+      <h2>Cambio a medias</h2>
+      <p>Habías mirado las dos cartas, pero se perdieron al recargar la página.
+         Podés dejar todo como está y seguir tu turno.</p>
+      <div class="botonera-poder">
+        <button class="accion sobria" data-accion="diez-dejar" type="button">Dejar como está</button>
+      </div>
+    `);
+  }
+
   if (vista.fase === "finRonda" || vista.fase === "finPartida") {
     abrirModalFinDeRed(vista);
   }
@@ -2116,10 +2224,19 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
         objetivo: { indice: indiceJugador, posicion },
       }),
     );
-    // El 10 muestra las dos cartas; el 9 no muestra ninguna.
-    if (r?.revelada?.propia) mostrarUnMomento(YO, propia, r.revelada.propia);
-    if (r?.revelada?.rival)
-      mostrarUnMomento(indiceJugador, posicion, r.revelada.rival);
+    // El 10 muestra las dos cartas y pregunta; el 9 cambia a ciegas y ya está.
+    //
+    // Las cartas llegan en la RESPUESTA a este pedido, no en la vista, y ésa
+    // es toda la protección: si viajaran en la vista las tendrían los cuatro.
+    // Por eso el modal se abre acá, con lo que devolvió el servidor, y no
+    // desde `modalesDeRed`, que sólo ve lo que es público.
+    if (r?.revelada?.propia || r?.revelada?.rival) {
+      revelaciones.set(clave(YO, propia), r.revelada.propia);
+      revelaciones.set(clave(indiceJugador, posicion), r.revelada.rival);
+      dibujar();
+      efectoCambio("cambioConVista", YO, propia, indiceJugador, posicion);
+      preguntarSiCambia(r.revelada, propia, indiceJugador, posicion);
+    }
     return;
   }
 

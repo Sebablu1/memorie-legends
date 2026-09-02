@@ -83,6 +83,7 @@ export const crearPartida = (configuracion, { semilla = semillaAleatoria() } = {
   descarte: [],
   levantada: null,
   poderPendiente: null,
+  cambioPendiente: null,
   ventanaDescarte: null,
   indiceCortador: null,
   ganador: null,
@@ -577,11 +578,35 @@ export function usarPoderCambio(estado, posicionPropia, indiceRival, posicionRiv
   const yo = poder.indiceJugador;
   const miMano = [...estado.jugadores[yo].mano];
   const manoRival = [...estado.jugadores[indiceRival].mano];
-  const revelada =
-    poder.tipo === "cambioConVista"
-      ? { propia: miMano[posicionPropia], rival: manoRival[posicionRival] }
-      : null;
 
+  // El 10 muestra las dos cartas y AHÍ SE DETIENE.
+  //
+  // Antes revelaba y cambiaba en la misma jugada, que es lo mismo que no
+  // mostrarlas: ver algo que ya no podés usar para decidir no es información,
+  // es un aviso de lo que te pasó. El texto del propio juego promete otra cosa
+  // —"viendo ambas antes"—, y ese "antes" sólo significa algo si después hay
+  // una decisión.
+  //
+  // Lo que se guarda son POSICIONES, nunca las cartas. Las cartas viajan por
+  // la respuesta a quien usó el poder y se pierden; guardarlas en el estado
+  // las pondría a un `vistaDe` mal escrito de distancia de toda la mesa.
+  if (poder.tipo === "cambioConVista") {
+    return {
+      estado: anotar(
+        {
+          ...estado,
+          fase: "cambioConVista",
+          poderPendiente: null,
+          cambioPendiente: { indiceJugador: yo, posicionPropia, indiceRival, posicionRival },
+        },
+        `${estado.jugadores[yo].nombre} mira su carta y una de ${estado.jugadores[indiceRival].nombre}`,
+        { tipo: "miroParaCambiar", actor: yo, objetivo: indiceRival },
+      ),
+      revelada: { propia: miMano[posicionPropia], rival: manoRival[posicionRival] },
+    };
+  }
+
+  const revelada = null;
   const mia = miMano[posicionPropia];
   miMano[posicionPropia] = manoRival[posicionRival];
   manoRival[posicionRival] = mia;
@@ -619,6 +644,67 @@ export function usarPoderCambio(estado, posicionPropia, indiceRival, posicionRiv
     ),
     revelada,
   };
+}
+
+/**
+ * Segunda mitad del 10: ya vio las dos cartas y decide.
+ *
+ * El conocimiento que queda depende de lo que decidió, y no es lo mismo:
+ *
+ *   - Si CAMBIA, la carta que era del rival pasa a ser suya, así que saber su
+ *     número ya no es saber nada de nadie. Lo que sí queda es que la carta que
+ *     él entregó está ahora en la mano del rival, y su número lo vio.
+ *   - Si NO CAMBIA, cada carta se queda donde estaba, y lo que vio es la carta
+ *     del rival, que sigue siendo del rival. Ése es el conocimiento.
+ *
+ * Derivarlo mal en cualquiera de los dos casos le daría al jugador un derecho
+ * sobre una carta que no está donde él cree.
+ */
+export function resolverCambioConVista(estado, cambiar) {
+  const pendiente = estado.cambioPendiente;
+  if (estado.fase !== "cambioConVista" || !pendiente) return estado;
+
+  const { indiceJugador: yo, posicionPropia, indiceRival, posicionRival } = pendiente;
+  const miMano = [...estado.jugadores[yo].mano];
+  const manoRival = [...estado.jugadores[indiceRival].mano];
+  const mia = miMano[posicionPropia];
+  const suya = manoRival[posicionRival];
+
+  const sinPendiente = { ...estado, fase: "postLevantada", cambioPendiente: null };
+
+  if (!cambiar) {
+    return anotar(
+      {
+        ...sinPendiente,
+        conocimientos: recordar(estado, {
+          actor: yo,
+          objetivo: indiceRival,
+          numero: suya?.numero,
+          origen: "poder10",
+        }),
+      },
+      `${estado.jugadores[yo].nombre} miró las dos cartas y no cambió`,
+    );
+  }
+
+  miMano[posicionPropia] = suya;
+  manoRival[posicionRival] = mia;
+
+  return anotar(
+    {
+      ...sinPendiente,
+      conocimientos: recordar(estado, {
+        actor: yo,
+        objetivo: indiceRival,
+        numero: mia?.numero,
+        origen: "poder10",
+      }),
+      jugadores: estado.jugadores.map((j, i) =>
+        i === yo ? { ...j, mano: miMano } : i === indiceRival ? { ...j, mano: manoRival } : j,
+      ),
+    },
+    `${estado.jugadores[yo].nombre} cambió su ${posicionPropia} por la ${posicionRival} de ${estado.jugadores[indiceRival].nombre}`,
+  );
 }
 
 /**

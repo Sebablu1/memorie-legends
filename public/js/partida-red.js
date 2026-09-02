@@ -207,6 +207,17 @@ export const levantar = (codigo) => accion(codigo, "levantar");
 export const cambiarCarta = (codigo, posicion) => accion(codigo, "cambiar", { posicion });
 export const tirarCarta = (codigo) => accion(codigo, "tirar");
 export const saltarPoder = (codigo) => accion(codigo, "saltarPoder");
+
+/**
+ * Segunda mitad del 10: ya vio las dos cartas y dice si cambia.
+ *
+ * El sí o el no viaja en `objetivo`, que en las demás acciones es un jugador.
+ * Reusar el campo no es lindo, pero cambiarle el nombre obligaría a tocar el
+ * protocolo entero; lo que importa es que el servidor lo lee como booleano
+ * estricto, así que un pedido incompleto NO cambia las cartas.
+ */
+export const resolverCambio = (codigo, cambiar) =>
+  accion(codigo, "resolverCambio", { objetivo: cambiar === true });
 export const cortar = (codigo) => accion(codigo, "cortar");
 export const pasarTurno = (codigo) => accion(codigo, "pasar");
 

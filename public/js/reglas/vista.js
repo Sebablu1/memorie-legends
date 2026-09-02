@@ -110,6 +110,28 @@ export function vistaDe(estado, indiceQuienMira) {
     // El poder pendiente es público (todos ven que alguien lo activó).
     poderPendiente: estado.poderPendiente,
 
+    /**
+     * El 10, entre que muestra las dos cartas y que su dueño decide.
+     *
+     * A la mesa le llega QUIÉN está decidiendo y sobre quién, que es lo mismo
+     * que se cuenta de los poderes 7 y 8. Las POSICIONES sólo van al que usó
+     * el poder: decirle a todos "está mirando la segunda de Bruno" convierte
+     * el poder en un anuncio público de dónde está lo que se vio, y encima
+     * serviría igual si después decide no cambiar.
+     *
+     * Al dueño sí le viajan enteras, y no por comodidad: si recarga la página
+     * en mitad de la decisión, su navegador no tiene otra forma de saber qué
+     * eligió.
+     */
+    cambioPendiente: estado.cambioPendiente
+      ? estado.cambioPendiente.indiceJugador === indiceQuienMira
+        ? estado.cambioPendiente
+        : {
+            indiceJugador: estado.cambioPendiente.indiceJugador,
+            indiceRival: estado.cambioPendiente.indiceRival,
+          }
+      : null,
+
     // A quién puede atacar QUIEN MIRA, y nada más.
     //
     // Viaja el permiso, nunca el número conocido: si viajara, el navegador

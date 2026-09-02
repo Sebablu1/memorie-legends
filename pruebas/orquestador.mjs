@@ -407,14 +407,54 @@ console.log("\n=== 6. Poderes 7, 8, 9 y 10 ===");
     uid: "ana", codigo: CODIGO, accion: "poderCambio", clientActionId: "p10",
     posicion: 0, objetivo: { indice: 1, posicion: 2 },
   }));
-  ok(cambio.valor, "el cambio se aplica", cambio.error?.message);
+  ok(cambio.valor, "el 10 se dispara", cambio.error?.message);
+  ok(cambio.valor.revelada?.propia?.id && cambio.valor.revelada?.rival?.id,
+     "revela las dos cartas a quien lo usó", cambio.valor.revelada);
+
+  // Y AHÍ SE DETIENE. Antes revelaba y cambiaba en la misma jugada, que es lo
+  // mismo que no mostrar nada: ver algo que ya no podés usar para decidir no
+  // es información. Ahora las cartas siguen donde estaban hasta que su dueño
+  // conteste.
+  const enEspera = db.leer(`partidas/${CODIGO}`).estado;
+  ok(enEspera.fase === "cambioConVista", "y espera la decisión", enEspera.fase);
+  ok(enEspera.jugadores[0].mano[0].id === mia.id, "sin haber cambiado nada todavía");
+  ok(enEspera.jugadores[1].mano[2].id === suya.id, "en ninguna de las dos manos");
+
+  // Que no lo resuelva otro. Hoy el dueño del cambio es el del turno, pero
+  // atar el permiso al turno sería confiar en esa coincidencia.
+  const resuelveOtro = await capturar(() => red.accionDeTurno({
+    uid: "beto", codigo: CODIGO, accion: "resolverCambio", clientActionId: "r10x", objetivo: true,
+  }));
+  ok(Boolean(resuelveOtro.error), "y otro jugador no puede resolverlo", resuelveOtro.error?.message);
+
+  const resuelto = await capturar(() => red.accionDeTurno({
+    uid: "ana", codigo: CODIGO, accion: "resolverCambio", clientActionId: "r10", objetivo: true,
+  }));
+  ok(resuelto.valor, "el dueño sí", resuelto.error?.message);
   const luego = db.leer(`partidas/${CODIGO}`).estado;
-  ok(luego.jugadores[0].mano[0].id === suya.id, "las cartas se intercambiaron", luego.jugadores[0].mano[0].id);
+  ok(luego.jugadores[0].mano[0].id === suya.id, "recién ahí se intercambian", luego.jugadores[0].mano[0].id);
   ok(luego.jugadores[1].mano[2].id === mia.id, "en las dos manos");
+  ok(luego.fase === "postLevantada", "y vuelve a su decisión de cortar", luego.fase);
+  ok(luego.cambioPendiente == null, "sin dejar el cambio colgado");
   ok(luego.jugadores.every((j) => j.mano.every((c) => c === null || c?.id)),
      "y no quedó ninguna carta fantasma en ninguna mano");
-  ok(cambio.valor.revelada?.propia?.id && cambio.valor.revelada?.rival?.id,
-     "el 10 revela las dos cartas a quien lo usó", cambio.valor.revelada);
+
+  // --- el 10 que decide NO cambiar ---
+  await guardar(conPoder(10, "cambioConVista"));
+  const antes2 = db.leer(`partidas/${CODIGO}`).estado;
+  const mia2 = antes2.jugadores[0].mano[0];
+  const suya2 = antes2.jugadores[1].mano[2];
+  await red.accionDeTurno({
+    uid: "ana", codigo: CODIGO, accion: "poderCambio", clientActionId: "p10b",
+    posicion: 0, objetivo: { indice: 1, posicion: 2 },
+  });
+  await red.accionDeTurno({
+    uid: "ana", codigo: CODIGO, accion: "resolverCambio", clientActionId: "r10b", objetivo: false,
+  });
+  const sinCambiar = db.leer(`partidas/${CODIGO}`).estado;
+  ok(sinCambiar.jugadores[0].mano[0].id === mia2.id, "decir que no deja cada carta donde estaba");
+  ok(sinCambiar.jugadores[1].mano[2].id === suya2.id, "en las dos manos");
+  ok(sinCambiar.fase === "postLevantada", "y también vuelve a la decisión de cortar", sinCambiar.fase);
 
   // --- posiciones fuera de rango en el cambio ---
   await guardar(conPoder(9, "cambioCiego"));
