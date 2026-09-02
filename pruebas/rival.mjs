@@ -86,9 +86,25 @@ console.log("\n=== 1. El poder 8 deja saber, el 7 no ===");
   ok(!("posicion" in c), "y NO se guarda la posición: ésa es toda la mecánica");
 
   // El 7 mira la carta propia: eso no autoriza nada contra nadie.
+  //
+  // Antes esto se comprobaba con `conocimientos.length === 0`, y dejó de valer
+  // cuando el 7 empezó a dejar constancia de QUÉ vio —hace falta para que un 9
+  // o un 10 le enseñen algo a quien los sufre. Lo que importaba nunca fue que
+  // la lista estuviera vacía sino que no diera derechos, así que ahora se
+  // afirma eso: la entrada existe, y no habilita a nadie contra nadie.
   const propio = { ...mesa(), fase: "poder", poderPendiente: { tipo: "mirarPropia", numero: 7, indiceJugador: 0 } };
   const r7 = M.usarPoderMirar(propio, 0, 0);
-  ok(r7.estado.conocimientos.length === 0, "mirar una carta propia no deja conocimiento de nadie");
+
+  ok(M.objetivosDe(r7.estado, 0).length === 0,
+     "mirar una carta propia no autoriza a atacar a nadie", M.objetivosDe(r7.estado, 0));
+  ok(r7.estado.conocimientos.every((c) => c.actor === c.objetivo),
+     "y lo único que queda anotado es sobre uno mismo", r7.estado.conocimientos);
+
+  const propia = r7.estado.conocimientos[0];
+  ok(propia?.origen === "poder7", "con su origen", propia?.origen);
+  ok(propia?.posicion === 0 && typeof propia?.idCarta === "string",
+     "la posición y la carta concreta, que es lo que permite saber después si sigue ahí",
+     propia);
 }
 
 console.log("\n=== 2. El 10 muestra, espera, y deja saber según lo que se decidió ===");

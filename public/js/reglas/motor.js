@@ -188,9 +188,23 @@ export function empezarRonda(estado) {
   );
 }
 
-/** Cada jugador elige UNA carta y la ve durante MS_MIRAR. */
+/**
+ * Cada jugador elige UNA carta y la ve durante MS_MIRAR.
+ *
+ * Queda anotado QUÉ vio, no sólo dónde miró. `posicionMirada` ya guardaba la
+ * posición, pero la posición sola no dice qué carta había: si después se la
+ * cambian, nadie puede distinguir "sabía y se la robaron" de "nunca supo".
+ * Esa diferencia es la que hace falta para que el 9 y el 10 le enseñen algo a
+ * quien los sufre.
+ */
 export const mirar = (estado, indiceJugador, posicion = 0) => ({
   ...estado,
+  conocimientos: recordarPropia(estado, {
+    jugador: indiceJugador,
+    posicion,
+    carta: estado.jugadores[indiceJugador]?.mano?.[posicion],
+    origen: "mirada",
+  }),
   jugadores: estado.jugadores.map((j, i) =>
     i === indiceJugador ? { ...j, posicionMirada: posicion } : j,
   ),
@@ -567,6 +581,91 @@ function recordar(estado, { actor, objetivo, numero, origen }) {
   return [...previos, { actor, objetivo, numero, origen, ronda: estado.ronda }];
 }
 
+/**
+ * Anota que un jugador vio una carta SUYA.
+ *
+ * Va en `conocimientos`, la misma lista que lo demás, y con `actor` igual a
+ * `objetivo`. Eso no le da ningún derecho: `puedeAtacarA` empieza pidiendo
+ * `actor !== objetivo`, así que estas entradas no habilitan nada por sí solas.
+ * Se guardan acá y no en una lista aparte por seguridad: `filtracionesEn`
+ * caza cualquier objeto con `actor`, `objetivo` y `numero`, así que si un día
+ * alguien publicara esto en la vista, el detector lo vería. Una estructura
+ * nueva con otra forma se le escaparía.
+ *
+ * Se guarda el `id` de la carta además del número. Ahí está el truco que hace
+ * que esto no necesite limpiarse nunca: al leerlo se compara contra la carta
+ * que HAY en esa posición, y si no es la misma, el recuerdo simplemente no
+ * cuenta. Sin eso habría que invalidarlo a mano en las cinco funciones que
+ * mueven cartas de una mano —cambiar, descartar, acertarle a un rival,
+ * fallarle, y los propios poderes 9 y 10— y olvidarse de una sola le daría a
+ * alguien un derecho sobre una carta que ya no está donde él cree.
+ */
+function recordarPropia(estado, { jugador, posicion, carta, origen }) {
+  const previos = estado.conocimientos ?? [];
+  if (!carta) return previos;
+  // Una creencia por posición: mirar dos veces la misma no acumula, reemplaza.
+  const otros = previos.filter(
+    (c) => !(c.actor === jugador && c.objetivo === jugador && c.posicion === posicion),
+  );
+  return [
+    ...otros,
+    {
+      actor: jugador,
+      objetivo: jugador,
+      numero: carta.numero,
+      posicion,
+      idCarta: carta.id,
+      origen,
+      ronda: estado.ronda,
+    },
+  ];
+}
+
+/**
+ * Qué recuerda un jugador de su propia carta ahí, si todavía es verdad.
+ *
+ * Devuelve el recuerdo sólo si la carta que hay en esa posición es la misma
+ * que vio. Si se la cambiaron, se la descartaron o le pusieron otra boca
+ * abajo, el recuerdo está viejo y esto devuelve null — que es lo correcto: el
+ * jugador cree saber algo que ya no es cierto, y el juego no puede premiarlo
+ * por una creencia equivocada.
+ */
+function loQueSabeDeSuCarta(estado, jugador, posicion) {
+  const memo = (estado.conocimientos ?? []).find(
+    (c) => c.actor === jugador && c.objetivo === jugador && c.posicion === posicion,
+  );
+  if (!memo) return null;
+  const actual = estado.jugadores[jugador]?.mano?.[posicion];
+  return actual && actual.id === memo.idCarta ? memo : null;
+}
+
+/**
+ * A la víctima de un 9 o un 10 le sacaron una carta que ella conocía.
+ *
+ * Entonces ahora sabe dónde está: en la mano del que usó el poder. Es
+ * conocimiento ganado igual que cualquier otro —lo vio con sus ojos— y le da
+ * el mismo derecho: puede intentar descartársela.
+ *
+ * Se comprueba ANTES del intercambio, contra el estado sin tocar, porque
+ * después la carta ya no está ahí y el recuerdo dejaría de validar.
+ *
+ * Devuelve `{ conocimientos, supo }`. `supo` es null si no sabía nada, y
+ * entonces no se agrega ni se anuncia nada: no todo cambio enseña algo.
+ */
+function loQueAprendeLaVictima(estado, conocimientos, { victima, activador, posicion }) {
+  const memo = loQueSabeDeSuCarta(estado, victima, posicion);
+  if (!memo) return { conocimientos, supo: null };
+  return {
+    conocimientos: recordar({ ...estado, conocimientos }, {
+      actor: victima,
+      objetivo: activador,
+      numero: memo.numero,
+      origen: "cambio",
+    }),
+    supo: memo,
+  };
+}
+
 export function usarPoderMirar(estado, indiceObjetivo, posicion) {
   const poder = estado.poderPendiente;
   if (estado.fase !== "poder" || !poder) return { estado, revelada: null };
@@ -579,14 +678,28 @@ export function usarPoderMirar(estado, indiceObjetivo, posicion) {
 
   const carta = estado.jugadores[indiceObjetivo].mano[posicion];
 
-  // El 8 mira la mano de otro: de ahí sale el conocimiento. El 7 mira la
-  // propia y no genera ninguno —saber lo tuyo no te autoriza sobre nadie.
-  const conocimientos = recordar(estado, {
-    actor: poder.indiceJugador,
-    objetivo: indiceObjetivo,
-    numero: carta?.numero,
-    origen: "poder8",
-  });
+  // El 8 mira la mano de otro: de ahí sale el derecho a atacarlo. El 7 mira la
+  // propia y sigue sin dar ninguno —saber lo tuyo no te autoriza sobre nadie—,
+  // pero ahora SÍ queda anotado qué vio.
+  //
+  // Es un recuerdo, no un permiso: `puedeAtacarA` exige `actor !== objetivo`,
+  // así que esta entrada no habilita nada. Sirve para una sola cosa: si
+  // después alguien le cambia esa carta con un 9 o un 10, se puede distinguir
+  // a quien le robaron algo que conocía de quien nunca supo qué tenía.
+  const conocimientos =
+    poder.tipo === "mirarPropia"
+      ? recordarPropia(estado, {
+          jugador: poder.indiceJugador,
+          posicion,
+          carta,
+          origen: "poder7",
+        })
+      : recordar(estado, {
+          actor: poder.indiceJugador,
+          objetivo: indiceObjetivo,
+          numero: carta?.numero,
+          origen: "poder8",
+        });
 
   // Queda escrito en el registro QUÉ se hizo y SOBRE QUIÉN, nunca qué carta
   // era ni en qué posición estaba. El registro lo lee toda la mesa: decir "la
@@ -663,7 +776,7 @@ export function usarPoderCambio(estado, posicionPropia, indiceRival, posicionRiv
   //
   // El 9 cambia a ciegas —`revelada` es null— y por eso no deja ninguno: no
   // se puede recordar lo que no se vio.
-  const conocimientos = revelada
+  const delActivador = revelada
     ? recordar(estado, {
         actor: yo,
         objetivo: indiceRival,
@@ -672,22 +785,52 @@ export function usarPoderCambio(estado, posicionPropia, indiceRival, posicionRiv
       })
     : (estado.conocimientos ?? []);
 
-  return {
-    estado: anotar(
-      {
-        ...estado,
-        fase: "postLevantada",
-        poderPendiente: null,
-        conocimientos,
-        jugadores: estado.jugadores.map((j, i) =>
-          i === yo ? { ...j, mano: miMano } : i === indiceRival ? { ...j, mano: manoRival } : j,
-        ),
-      },
-      `${estado.jugadores[yo].nombre} cambió su ${posicionPropia} por la ${posicionRival} de ${estado.jugadores[indiceRival].nombre}`,
+  // Y lo que aprende el otro. El 9 cambia a ciegas para QUIEN LO USA, pero no
+  // para quien lo sufre: si la víctima sabía qué carta tenía ahí —la miró al
+  // principio de la ronda, o con un 7— acaba de ver adónde se fue. Eso es
+  // conocimiento ganado con los ojos, igual que el de cualquier poder, y da
+  // el mismo derecho.
+  const { conocimientos, supo } = loQueAprendeLaVictima(estado, delActivador, {
+    victima: indiceRival,
+    activador: yo,
+    posicion: posicionRival,
+  });
+
+  const cambiado = {
+    ...estado,
+    fase: "postLevantada",
+    poderPendiente: null,
+    conocimientos,
+    jugadores: estado.jugadores.map((j, i) =>
+      i === yo ? { ...j, mano: miMano } : i === indiceRival ? { ...j, mano: manoRival } : j,
     ),
+  };
+
+  const conElCambio = anotar(
+    cambiado,
+    `${estado.jugadores[yo].nombre} cambió su ${posicionPropia} por la ${posicionRival} de ${estado.jugadores[indiceRival].nombre}`,
+  );
+
+  return {
+    estado: supo ? anotarLoQueSupo(conElCambio, indiceRival, yo) : conElCambio,
     revelada,
   };
 }
+
+/**
+ * Anuncia que a alguien le robaron una carta que conocía.
+ *
+ * Sin el número y sin la posición, como todos los avisos de este juego. Que la
+ * mesa se entere de que la víctima ahora sabe algo del que usó el poder es
+ * legítimo y hasta necesario —cualquiera pudo ver el intercambio— pero de qué
+ * carta se trata no lo sabe nadie más que ella.
+ */
+const anotarLoQueSupo = (estado, victima, activador) =>
+  anotar(
+    estado,
+    `${estado.jugadores[victima].nombre} sabe qué carta le tocó a ${estado.jugadores[activador].nombre}`,
+    { tipo: "supoPorCambio", actor: victima, objetivo: activador },
+  );
 
 /**
  * Segunda mitad del 10: ya vio las dos cartas y decide.
@@ -736,15 +879,26 @@ export function resolverCambioConVista(estado, cambiar) {
   miMano[posicionPropia] = suya;
   manoRival[posicionRival] = mia;
 
-  return anotar(
+  const delActivador = recordar(estado, {
+    actor: yo,
+    objetivo: indiceRival,
+    numero: mia?.numero,
+    origen: "poder10",
+  });
+
+  // El mismo caso que en el 9: si la víctima conocía la carta que le sacaron,
+  // ahora sabe en qué mano está. Va sólo en esta rama porque en la otra no se
+  // cambió nada, y sin cambio no hay nada que aprender.
+  const { conocimientos, supo } = loQueAprendeLaVictima(estado, delActivador, {
+    victima: indiceRival,
+    activador: yo,
+    posicion: posicionRival,
+  });
+
+  const conElCambio = anotar(
     {
       ...sinPendiente,
-      conocimientos: recordar(estado, {
-        actor: yo,
-        objetivo: indiceRival,
-        numero: mia?.numero,
-        origen: "poder10",
-      }),
+      conocimientos,
       jugadores: estado.jugadores.map((j, i) =>
         i === yo ? { ...j, mano: miMano } : i === indiceRival ? { ...j, mano: manoRival } : j,
       ),
@@ -755,6 +909,8 @@ export function resolverCambioConVista(estado, cambiar) {
     // las dice. Se deja fuera por la misma razón que en los poderes 7 y 8.
     { tipo: "resolvioElDiez", actor: yo, objetivo: indiceRival, cambio: true },
   );
+
+  return supo ? anotarLoQueSupo(conElCambio, indiceRival, yo) : conElCambio;
 }
 
 /**
