@@ -553,3 +553,17 @@ footer {
   text-decoration: none;
   color: inherit;
 }
+
+/* ------------------------------------------------------- el paño del sitio
+
+   Un degradado cálido sobre negro, como fieltro con una luz encima. Con CSS y
+   no con una imagen: el sitio se abre desde teléfonos con datos móviles, y una
+   textura de 200 KB por pantalla se nota más que el brillo que agrega.
+
+   `fixed` para que la luz no se desplace al hacer scroll: si se moviera, en
+   una página larga se vería que es un degradado y no una superficie. */
+
+body {
+  background: var(--fieltro);
+  background-attachment: fixed;
+}

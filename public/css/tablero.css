@@ -136,6 +136,175 @@
   margin-top: auto;
 }
 
+/* ------------------------------------------ la caja única de jugar
+
+   Una sola tarjeta, y adentro la elección del modo. Antes eran dos lado a
+   lado, y eso hacía parecer que eran dos juegos distintos: es el mismo juego,
+   lo que cambia es si la partida cuesta Leyendas. */
+
+.caja-jugar {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 34px 30px 30px;
+  text-align: center;
+}
+
+/* Las cuatro esquinas, como el marco de una carta cara.
+
+   Son un solo pseudoelemento con cuatro degradados: cada uno pinta una escuadra
+   en su esquina y no llega al medio. Cuatro elementos separados darían lo mismo
+   en pantalla y cuatro veces más marcado. */
+.caja-jugar .marco-esquinas {
+  position: absolute;
+  inset: 12px;
+  pointer-events: none;
+  border-radius: 8px;
+  background:
+    linear-gradient(var(--oro), var(--oro)) left top / 18px 1px no-repeat,
+    linear-gradient(var(--oro), var(--oro)) left top / 1px 18px no-repeat,
+    linear-gradient(var(--oro), var(--oro)) right top / 18px 1px no-repeat,
+    linear-gradient(var(--oro), var(--oro)) right top / 1px 18px no-repeat,
+    linear-gradient(var(--oro), var(--oro)) left bottom / 18px 1px no-repeat,
+    linear-gradient(var(--oro), var(--oro)) left bottom / 1px 18px no-repeat,
+    linear-gradient(var(--oro), var(--oro)) right bottom / 18px 1px no-repeat,
+    linear-gradient(var(--oro), var(--oro)) right bottom / 1px 18px no-repeat;
+  opacity: 0.4;
+  transition: opacity 0.3s ease;
+}
+
+.caja-jugar:hover .marco-esquinas {
+  opacity: 0.75;
+}
+
+/* El icono, en un medallón. Un emoji suelto sobre el paño se ve como un emoji
+   suelto; dentro de un disco con relieve se ve como una ficha. */
+.caja-jugar .icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px;
+  height: 62px;
+  margin: 0 auto 4px;
+  border-radius: 50%;
+  font-size: 1.7rem;
+  background: radial-gradient(circle at 35% 30%, rgba(212, 168, 67, 0.28), rgba(0, 0, 0, 0.6));
+  border: 1px solid var(--borde);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+.caja-jugar h3 {
+  font-size: 1.75rem;
+  letter-spacing: 0.5px;
+}
+
+/* Los textos de los paneles vuelven a la izquierda: un párrafo centrado de
+   tres líneas se lee peor, y acá hay que entender qué cuesta cada modo. */
+.caja-jugar .panel-modo p,
+.caja-jugar .campo,
+.caja-jugar .ayuda-entrada {
+  text-align: left;
+}
+
+/* El selector: dos radios de verdad, dibujados como un control segmentado.
+
+   Los radios se esconden pero SIGUEN ahí, así que el teclado y los lectores de
+   pantalla los ven; lo que se pinta es la etiqueta. Con `display: none` se
+   saldrían del orden de tabulación, que es justo lo que no se quiere. */
+
+.selector-modo {
+  /* `position: relative` para que el radio escondido se ancle ACÁ y no en la
+     tarjeta entera. Sin esto se iba a la esquina superior izquierda de la
+     caja, debajo del título, y quedaba tapado. */
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  border: none;
+  padding: 4px;
+  margin: 6px 0 4px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: var(--relieve-hueco);
+}
+
+/* El radio se esconde a la vista pero SIGUE en el árbol: el teclado y los
+   lectores de pantalla lo ven, y el clic va a su etiqueta, que es lo que un
+   jugador toca. Con `display: none` saldría del orden de tabulación. */
+.selector-modo input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  pointer-events: none;
+}
+
+.selector-modo label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 11px;
+  cursor: pointer;
+  text-align: center;
+  border: 1px solid transparent;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.selector-modo label b {
+  font-size: 0.92rem;
+  color: var(--texto);
+  letter-spacing: 0.3px;
+}
+
+.selector-modo label small {
+  font-size: 0.7rem;
+  color: var(--texto-tenue);
+}
+
+.selector-modo label:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* El elegido se levanta: relieve dorado, como una ficha puesta encima. */
+.selector-modo input:checked + label {
+  background: linear-gradient(180deg, rgba(212, 168, 67, 0.22), rgba(212, 168, 67, 0.08));
+  border-color: var(--borde);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 3px 12px rgba(0, 0, 0, 0.4);
+}
+
+.selector-modo input:checked + label b {
+  color: var(--oro-claro);
+}
+
+/* El foco tiene que verse: el radio está escondido, así que el contorno lo
+   dibuja su etiqueta. Sin esto, quien navega con tabulador no sabe dónde
+   está. */
+.selector-modo input:focus-visible + label {
+  outline: 2px solid var(--oro);
+  outline-offset: 2px;
+}
+
+/* Los dos paneles existen siempre; se esconde uno. */
+.panel-modo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.panel-modo[hidden] {
+  display: none;
+}
+
+@media (max-width: 560px) {
+  .selector-modo {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ------------------------------------------ botones "de juego" */
 
 .accion.grande {

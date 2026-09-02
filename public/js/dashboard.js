@@ -103,6 +103,40 @@ if (sesion) {
   arrancarSalas();
 }
 
+// --------------------------------------------------------- el modo
+
+/**
+ * Qué se muestra según el modo elegido.
+ *
+ * Los dos paneles existen siempre en el HTML: sólo se esconde uno. Eso importa
+ * porque `dashboard.js` llena el desplegable de entradas al arrancar, sin
+ * esperar a que nadie elija nada — si el panel se construyera al cambiar de
+ * modo, habría dos momentos distintos en que la página puede estar a medias.
+ *
+ * La sección de salas abiertas también sigue el modo: sólo tiene sentido
+ * cuando se está mirando el juego por Leyendas.
+ */
+function mostrarModo(modo) {
+  const enLeyendas = modo === "leyendas";
+  $("panelEntrenamiento").hidden = enLeyendas;
+  $("panelLeyendas").hidden = !enLeyendas;
+
+  const salas = document.querySelector(".panel-salas");
+  if (salas) salas.hidden = !enLeyendas;
+
+  limpiarAviso();
+}
+
+for (const id of ["modoEntrenamiento", "modoLeyendas"]) {
+  $(id).addEventListener("change", (evento) => {
+    if (evento.target.checked) mostrarModo(evento.target.value);
+  });
+}
+
+// El estado inicial sale del radio marcado en el HTML, no de un valor escrito
+// acá: si mañana cambia cuál viene marcado, esto lo sigue sin tocarse.
+mostrarModo(document.querySelector('input[name="modo"]:checked')?.value ?? "entrenamiento");
+
 // ------------------------------------------------------------ entradas
 
 // Las entradas salen de las reglas, no escritas a mano: si mañana se agrega

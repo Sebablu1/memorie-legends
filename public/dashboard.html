@@ -52,25 +52,52 @@
 
       <h2 class="titulo-elegir">¿Cómo querés jugar?</h2>
 
-      <!-- Las dos formas de jugar, y la diferencia que más importa entre ellas:
-           una no toca Leyendas nunca y la otra cobra entrada. Por eso están
-           separadas y no son dos botones del mismo formulario. -->
-      <section class="rejilla dos-columnas modos-de-juego">
-        <article class="tarjeta-modo entrenamiento">
-          <span class="icono">🃏</span>
-          <h3>Jugar</h3>
-          <p class="modo-lema">Entrenamiento contra la máquina</p>
+      <!-- UNA sola caja para jugar, y adentro la elección del modo.
+           Antes eran dos tarjetas lado a lado, y eso hacía parecer que eran dos
+           juegos distintos. Es el mismo juego: lo que cambia es si la partida
+           cuesta Leyendas o no.
+
+           La elección son dos `radio` de verdad, no dos botones con una clase
+           "activa". Un radio ya sabe que es una opción entre varias: llega
+           marcado al lector de pantalla, se mueve con las flechas y funciona
+           aunque el JavaScript no cargue. -->
+      <section class="tarjeta-modo caja-jugar">
+        <span class="marco-esquinas" aria-hidden="true"></span>
+        <span class="icono" aria-hidden="true">🃏</span>
+        <h3>Jugar</h3>
+        <p class="modo-lema">Elegí el modo</p>
+
+        <fieldset class="selector-modo">
+          <legend class="oculto-visual">Modo de juego</legend>
+
+          <input type="radio" name="modo" id="modoEntrenamiento" value="entrenamiento" checked />
+          <label for="modoEntrenamiento">
+            <b>Entrenamiento</b>
+            <small>Gratis, contra la máquina</small>
+          </label>
+
+          <input type="radio" name="modo" id="modoLeyendas" value="leyendas" />
+          <label for="modoLeyendas">
+            <b>Por Leyendas</b>
+            <small>En línea, con entrada</small>
+          </label>
+        </fieldset>
+
+        <!-- ENTRENAMIENTO -->
+        <div class="panel-modo" id="panelEntrenamiento">
           <p>
             Tres rivales con cuatro niveles de dificultad. <b>No cuesta Leyendas</b> y no
             suma al ranking: es para practicar la memoria y los reflejos.
           </p>
           <a class="accion grande" id="btnEntrenar" href="mesa.html">Jugar ahora</a>
-        </article>
+        </div>
 
-        <article class="tarjeta-modo amigos">
-          <span class="icono">👥</span>
-          <h3>Jugar con amigos</h3>
-          <p class="modo-lema">Sala privada por código</p>
+        <!-- POR LEYENDAS -->
+        <div class="panel-modo" id="panelLeyendas" hidden>
+          <p>
+            Sala privada por código, hasta cuatro jugadores. <b>Cuesta la entrada</b>
+            que elijas, y el pozo se reparte entre el primero y el segundo.
+          </p>
 
           <label class="campo" for="entradaSala">
             <span>Entrada</span>
@@ -96,7 +123,7 @@
             />
             <button class="accion sobria" id="btnUnirse" type="button">Unirse</button>
           </div>
-        </article>
+        </div>
       </section>
 
       <div class="aviso-salas" id="mensaje" role="status" aria-live="polite"></div>

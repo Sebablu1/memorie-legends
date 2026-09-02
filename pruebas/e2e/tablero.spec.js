@@ -41,6 +41,19 @@ const SESION_FALSA = `
   export function formatearEspera() { return "listo"; }
 `;
 
+/**
+ * Elige un modo como lo hace un jugador: tocando la etiqueta.
+ *
+ * El radio está escondido a la vista —lo dibuja su `label`— así que `check()`
+ * intenta pinchar una caja de un píxel y se choca con lo que tenga encima.
+ * Tocar la etiqueta es lo que pasa de verdad, y de paso comprueba que la
+ * etiqueta esté bien asociada a su radio.
+ */
+async function elegirModo(page, id) {
+  await page.locator(`label[for="${id}"]`).click();
+  await expect(page.locator(`#${id}`)).toBeChecked();
+}
+
 async function abrirTablero(page) {
   const errores = [];
   page.on("pageerror", (e) => errores.push(String(e.message)));
@@ -83,10 +96,50 @@ test("están los controles con los ids acordados", async ({ page }) => {
   await expect(page.locator("#btnEntrenar")).toHaveAttribute("href", "mesa.html");
 });
 
-test("el título central y la sección de salas", async ({ page }) => {
+test("una sola caja de jugar, con el modo adentro", async ({ page }) => {
+  await abrirTablero(page);
+
+  // UNA caja, no dos tarjetas lado a lado: es el mismo juego, lo que cambia es
+  // si la partida cuesta Leyendas.
+  await expect(page.locator(".caja-jugar")).toHaveCount(1);
+  await expect(page.locator("#modoEntrenamiento")).toHaveCount(1);
+  await expect(page.locator("#modoLeyendas")).toHaveCount(1);
+
+  // Arranca en entrenamiento: es el modo que no cuesta nada.
+  await expect(page.locator("#modoEntrenamiento")).toBeChecked();
+  await expect(page.locator("#panelEntrenamiento")).toBeVisible();
+  await expect(page.locator("#panelLeyendas")).toBeHidden();
+  await expect(page.locator("#btnEntrenar")).toBeVisible();
+
+  // Al elegir Leyendas cambia lo que se ve, y aparecen los controles de sala.
+  await elegirModo(page, "modoLeyendas");
+  await expect(page.locator("#panelLeyendas")).toBeVisible();
+  await expect(page.locator("#panelEntrenamiento")).toBeHidden();
+  await expect(page.locator("#entradaSala")).toBeVisible();
+  await expect(page.locator("#btnCrearSala")).toBeVisible();
+  await expect(page.locator("#codigoSala")).toBeVisible();
+
+  // Y se puede volver.
+  await elegirModo(page, "modoEntrenamiento");
+  await expect(page.locator("#panelEntrenamiento")).toBeVisible();
+  await expect(page.locator("#panelLeyendas")).toBeHidden();
+});
+
+test("las salas abiertas sólo se muestran en el modo por Leyendas", async ({ page }) => {
+  // Un listado de salas por Leyendas no tiene sentido mientras se está
+  // mirando el entrenamiento.
+  await abrirTablero(page);
+  await expect(page.locator(".panel-salas")).toBeHidden();
+
+  await elegirModo(page, "modoLeyendas");
+  await expect(page.locator(".panel-salas")).toBeVisible();
+  await expect(page.locator(".panel-salas h2")).toContainText(/salas/i);
+});
+
+test("el título central y la tabla de salas", async ({ page }) => {
   await abrirTablero(page);
   await expect(page.locator(".titulo-elegir")).toHaveText(/cómo querés jugar/i);
-  await expect(page.locator(".panel-salas h2")).toContainText(/salas/i);
+  await elegirModo(page, "modoLeyendas");
 
   // Las cinco columnas pedidas.
   const encabezados = await page.locator(".tabla-salas thead th").allInnerTexts();
@@ -105,11 +158,24 @@ test("el desplegable de entradas sale de las reglas, no escrito a mano", async (
 
 test("el campo de código fuerza mayúsculas y descarta lo que no va", async ({ page }) => {
   await abrirTablero(page);
+  // Vive en el panel por Leyendas, que arranca escondido.
+  await elegirModo(page, "modoLeyendas");
   const campo = page.locator("#codigoSala");
   await campo.fill("");
   await campo.type("ab-c 2*3");
   expect(await campo.inputValue()).toBe("ABC23");
   await expect(campo).toHaveAttribute("maxlength", "6");
+});
+
+test("el modo se puede elegir con el teclado", async ({ page }) => {
+  // Ésta es la razón de usar `radio` de verdad y no dos botones con una clase
+  // "activa": un radio ya sabe moverse con las flechas y llega marcado al
+  // lector de pantalla, sin que haya que programar nada.
+  await abrirTablero(page);
+  await page.locator("#modoEntrenamiento").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator("#modoLeyendas")).toBeChecked();
+  await expect(page.locator("#panelLeyendas")).toBeVisible();
 });
 
 test("el tablero no ofrece el lobby viejo por ningún lado", async ({ page }) => {
