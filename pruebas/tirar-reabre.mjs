@@ -106,6 +106,81 @@ console.log("\n=== 1. Tirar una carta común reabre los reflejos ===");
   ok(tras.jugadores[1].mano[0] === null, "y se la saca de encima");
 }
 
+// ====================== 2 bis. y NO lo pierde aunque otro acierte
+
+/**
+ * El acierto de un rival NO le roba el turno al que tiró.
+ *
+ * Esto estuvo roto y se encontró jugando. `intentarDescarte` reconstruía la
+ * ventana desde cero en vez de copiarla, así que perdía `volverA`: cualquier
+ * acierto durante la ventana que abría un tiro hacía que al cerrarse la mesa
+ * volviera a `turno` en lugar de `postLevantada`, y el que había tirado se
+ * quedaba sin su decisión de cortar. `intentarDescarteRival`, dos funciones más
+ * abajo, siempre lo hizo bien.
+ *
+ * La prueba de la sección 2 no lo veía porque cerraba la ventana sin que nadie
+ * intentara nada.
+ */
+console.log("\n=== 2 bis. Que otro acierte no le roba la decisión al que tiró ===");
+{
+  const conCuatro = () => {
+    const b = M.empezarRonda(M.crearPartida([
+      { id: "A", nombre: "A" }, { id: "B", nombre: "B" },
+      { id: "C", nombre: "C" }, { id: "D", nombre: "D" },
+    ], { semilla: 4242 }));
+    const seis = carta("Copa", 6);
+    const libres = b.mazo.filter((c) => c.id !== seis.id);
+    return {
+      ...b,
+      fase: "levantada",
+      indiceTurno: 0,
+      levantada: { ...seis, visible: true },
+      ventanaDescarte: null,
+      descarte: [{ ...carta("Oro", 4), visible: true }],
+      mazo: libres,
+      // C tiene un 6: puede acertar sobre la muestra que deja A al tirar.
+      jugadores: b.jugadores.map((j, i) =>
+        i === 2 ? { ...j, mano: [carta("Basto", 6), ...j.mano.slice(1)] } : j,
+      ),
+    };
+  };
+
+  for (const [comoAbre, abrir] of [
+    ["tirar", (x) => M.tirarCarta(x)],
+    ["cambiar", (x) => M.cambiarCarta(x, 0)],
+  ]) {
+    let s = abrir(conCuatro());
+    ok(s.ventanaDescarte?.volverA === "postLevantada",
+       `${comoAbre}: la ventana nace sabiendo adónde volver`);
+
+    s = M.intentarDescarte(s, 2, 0);   // C acierta
+    ok(s.ventanaDescarte?.volverA === "postLevantada",
+       `${comoAbre}: y NO pierde ese dato cuando C acierta`,
+       s.ventanaDescarte?.volverA);
+
+    s = M.cerrarVentanaDescarte(s);
+    ok(s.fase === "postLevantada",
+       `${comoAbre}: cerrada, A sigue en su decisión`, s.fase);
+    ok(s.indiceTurno === 0, `${comoAbre}: y el turno sigue siendo de A`, s.indiceTurno);
+    ok(M.puedeCortar(s) === true, `${comoAbre}: A puede cortar`);
+  }
+
+  // Un error tampoco: se prueba aparte porque toma otro camino en la función.
+  let e = M.tirarCarta(conCuatro());
+  e = M.intentarDescarte(e, 3, 0);     // D se equivoca
+  e = M.cerrarVentanaDescarte(e);
+  ok(e.fase === "postLevantada" && e.indiceTurno === 0,
+     "y que otro se equivoque tampoco cambia de quién es el turno",
+     { fase: e.fase, turno: e.indiceTurno });
+
+  // La de la RONDA, en cambio, sigue desembocando en el turno: no lleva
+  // `volverA` y no debe empezar a llevarlo por accidente.
+  let r = M.terminarMirada(conCuatro());
+  r = M.intentarDescarte(r, 2, 0);
+  r = M.cerrarVentanaDescarte(r);
+  ok(r.fase === "turno", "la ventana de la ronda sigue cerrando al turno", r.fase);
+}
+
 // ============================================ 2. el que tiró no pierde nada
 
 console.log("\n=== 2. El que tiró conserva su decisión de cortar ===");
@@ -260,6 +335,8 @@ console.log("\n=== 5. En red: tirar abre una ventana NUEVA ===");
   });
   const C = "TIR001", DOS = ["ana", "beto"];
   const partida = () => docs.get(`partidas/${C}`).datos;
+  /** La vista publicada de un jugador: lo único que ve su navegador. */
+  const vistaDe = (uid) => docs.get(`partidas/${C}/vistas/${uid}`)?.datos;
   const vence = (v) => v.abiertaEn + v.duracionMs + v.graciaMs;
 
   await red.repartir({ codigo: C, jugadores: DOS, nombres: DOS });
@@ -302,6 +379,20 @@ console.log("\n=== 5. En red: tirar abre una ventana NUEVA ===");
     } catch (e) { return { err: e.message }; } })();
     ok(/otra ronda/i.test(viejo.err ?? ""), "y un intento de la ventana vieja se rechaza", viejo.err);
 
+    // EL OTRO JUGADOR INTENTA DESCARTAR durante la ventana.
+    //
+    // Esto es lo que estuvo roto: el intento reconstruía la ventana y perdía
+    // `volverA`, así que al cerrarse la mesa volvía a `turno` en vez de a
+    // `postLevantada` y el que había tirado se quedaba sin cortar. En red se
+    // nota más, porque casi siempre hay alguien intentando.
+    const otro = DOS.find((u) => u !== enTurno);
+    await (async () => { try {
+      await red.intentarDescarte({
+        uid: otro, codigo: C, windowId: p.ventana.id, posicion: 0,
+        clientActionId: "otroIntenta", declarado: 300, latencia: 30, incertidumbre: 15,
+      });
+    } catch { /* que acierte o no da igual: lo que importa es el turno */ } })();
+
     // Al cerrarse vuelve a la decisión del que tiró.
     reloj = vence(p.ventana) + 1;
     await red.avanzarPartida({ codigo: C });
@@ -309,7 +400,18 @@ console.log("\n=== 5. En red: tirar abre una ventana NUEVA ===");
     await red.avanzarPartida({ codigo: C });
     ok(partida().estado.fase === "postLevantada",
        "cerrada, vuelve a su decisión de cortar", partida().estado.fase);
-    ok(DOS[partida().estado.indiceTurno] === enTurno, "y sigue siendo su turno");
+    ok(DOS[partida().estado.indiceTurno] === enTurno,
+       "y sigue siendo su turno, aunque el otro haya intentado descartar",
+       { turno: DOS[partida().estado.indiceTurno], tiro: enTurno });
+
+    // Y la vista que recibe cada uno dice lo mismo: el turno viaja tal cual,
+    // así que si el motor lo tiene bien, los cuatro navegadores lo ven bien.
+    for (const uid of DOS) {
+      const v = vistaDe(uid);
+      ok(DOS[v.indiceTurno] === enTurno,
+         `la vista de ${uid} también dice que el turno es de ${enTurno}`,
+         { ve: DOS[v.indiceTurno] });
+    }
   } else {
     ok(true, "(esta vez la levantada trajo poder; el caso va abajo igual)");
   }

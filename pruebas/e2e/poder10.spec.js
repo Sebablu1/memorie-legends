@@ -19,7 +19,7 @@
 import { test, expect } from "@playwright/test";
 import {
   SEL, abrirMesa, elegirCartaParaMirar, esperarPista, esperarReloj,
-  esperarMiTurno, segundosDelReloj, registro,
+  esperarMiTurno, segundosDelReloj, registro, SEG_RONDA, SEG_REAPERTURA,
 } from "./mesa.js";
 
 /** Semillas a probar hasta que una reparta un poder en el primer turno. */
@@ -57,12 +57,13 @@ test("un poder tirado abre PRIMERO la ventana y DESPUÉS el poder", async ({ pag
   test.skip(semilla === null, "ninguna semilla repartió un poder en el primer turno");
 
   // 🔮 Usar poder: antes tiraba y saltaba derecho al modal del poder. Ahora
-  // tira, y la mesa tiene sus dos segundos antes de que el poder aparezca.
+  // tira, y la mesa tiene su ventana antes de que el poder aparezca.
   await page.locator('[data-accion="usar-poder"]').click();
 
   await esperarReloj(page, /Descarte/i);
   const segundos = await segundosDelReloj(page);
-  expect(segundos, "la mesa reacciona antes que el poder").toBeLessThanOrEqual(2);
+  expect(segundos, "la mesa reacciona antes que el poder").toBeLessThanOrEqual(SEG_REAPERTURA);
+  expect(segundos, "y es la ventana corta, no la de la ronda").toBeLessThan(SEG_RONDA);
 
   // Y recién después llega la elección del objetivo.
   await expect(page.locator("#modal .objetivos")).toBeVisible({ timeout: 15_000 });

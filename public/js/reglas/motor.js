@@ -20,12 +20,16 @@ export const MS_DESCARTE = 5000;
 /**
  * Las ventanas que abren tirar y cambiar.
  *
- * Dos segundos, más cortas a propósito. Acá la mesa ya está mirando la muestra
- * y sólo tiene que reaccionar al número nuevo: no hay que reconstruir nada. Y
- * ocurren varias veces por ronda —una por tiro y una por cambio—, así que cada
- * segundo de más se paga muchas veces.
+ * Tres segundos. Más cortas que la de la ronda a propósito —acá la mesa ya
+ * está mirando la muestra y sólo reacciona al número nuevo— pero no dos, que
+ * fue lo primero que se probó y quedó corto: hay que mirar la carta, buscarla
+ * en la propia mano y hacer DOBLE clic, y en red además el pedido tiene que
+ * viajar. Dos segundos alcanzaban para reaccionar, no para jugar.
+ *
+ * Ocurren varias veces por ronda —una por tiro y una por cambio— así que cada
+ * segundo se paga muchas veces; de ahí que no sean cinco.
  */
-export const MS_REAPERTURA = 2000;
+export const MS_REAPERTURA = 3000;
 
 export const PODERES = {
   7: "mirarPropia",
@@ -251,6 +255,14 @@ export function intentarDescarte(estado, indiceJugador, posicion) {
       descarte,
       jugadores: estado.jugadores.map((j, i) => (i === indiceJugador ? { ...j, mano } : j)),
       ventanaDescarte: {
+        // El spread NO es decorativo: la ventana lleva `volverA`, que dice
+        // adónde devolver la mesa al cerrarse. Sin él, esto reconstruía la
+        // ventana desde cero y lo perdía, así que un acierto de CUALQUIERA
+        // durante la ventana que abrió un tiro le borraba al que tiró su
+        // decisión de cortar: la mesa volvía a `turno` en vez de a
+        // `postLevantada`. `intentarDescarteRival`, dos funciones más abajo,
+        // siempre lo hizo bien; esta no.
+        ...estado.ventanaDescarte,
         huboPrimero: estado.ventanaDescarte.huboPrimero || fuePrimero,
         intentos: [
           ...estado.ventanaDescarte.intentos,

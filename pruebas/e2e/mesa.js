@@ -8,6 +8,19 @@
  */
 
 import { expect } from "@playwright/test";
+import { MS_DESCARTE, MS_REAPERTURA } from "../../public/js/reglas/motor.js";
+
+/**
+ * Las dos duraciones, en segundos y leidas del motor.
+ *
+ * Se importan en vez de escribirlas. Estaban a mano —"toBeLessThanOrEqual(2)"—
+ * y al pasar las reaperturas de 2 s a 3 tres pruebas se pusieron en rojo sin
+ * que nada estuviera mal: afirmaban un numero, no una regla. Lo que hay que
+ * afirmar es que la reapertura es MAS CORTA que la de la ronda y que dura lo
+ * que dice la constante.
+ */
+export const SEG_RONDA = MS_DESCARTE / 1000;
+export const SEG_REAPERTURA = MS_REAPERTURA / 1000;
 
 /** Semilla del reparto. Cualquiera sirve mientras no cambie. */
 export const SEMILLA = 4242;

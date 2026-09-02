@@ -16,10 +16,10 @@ import { test, expect } from "@playwright/test";
 import {
   SEL, abrirMesa, elegirCartaParaMirar, esperarPista, esperarReloj,
   esperarMiTurno, segundosDelReloj, numeroDeLaMuestra, tirarLaLevantada,
-  llegarADecidirCorte,
+  llegarADecidirCorte, SEG_RONDA, SEG_REAPERTURA,
 } from "./mesa.js";
 
-test("tirar cambia la muestra y abre una ventana de 2 segundos", async ({ page }) => {
+test("tirar cambia la muestra y abre la ventana corta", async ({ page }) => {
   const errores = await abrirMesa(page);
   await elegirCartaParaMirar(page);
   await esperarMiTurno(page);
@@ -32,7 +32,8 @@ test("tirar cambia la muestra y abre una ventana de 2 segundos", async ({ page }
 
   await esperarReloj(page, /Descarte/i);
   const segundos = await segundosDelReloj(page);
-  expect(segundos, "una reapertura dura 2 s, no los 5 de la ronda").toBeLessThanOrEqual(2);
+  expect(segundos, "dura lo de una reapertura").toBeLessThanOrEqual(SEG_REAPERTURA);
+  expect(segundos, "y menos que la ventana de la ronda").toBeLessThan(SEG_RONDA);
   expect(segundos).toBeGreaterThan(0);
 
   // Y la carta tirada quedó de muestra: eso es lo que les da algo a lo que
@@ -87,7 +88,8 @@ test("cambiar una carta propia también abre la ventana", async ({ page }) => {
 
   await esperarReloj(page, /Descarte/i);
   const segundos = await segundosDelReloj(page);
-  expect(segundos, "también dura 2 s").toBeLessThanOrEqual(2);
+  expect(segundos, "también dura lo de una reapertura").toBeLessThanOrEqual(SEG_REAPERTURA);
+  expect(segundos, "y menos que la de la ronda").toBeLessThan(SEG_RONDA);
   expect(await numeroDeLaMuestra(page)).not.toBe(muestraAntes);
 
   expect(errores).toEqual([]);
