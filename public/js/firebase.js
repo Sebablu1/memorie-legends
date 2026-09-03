@@ -1,18 +1,22 @@
-// 🔥 Configuración de Firebase
-const firebaseConfig = {
-  apiKey: "AIzaSyAd3EscVwcQwXOq3oudzGb3NBLK_AAAdh0",
-  authDomain: "memorie-legends.firebaseapp.com",
-  projectId: "memorie-legends",
-  storageBucket: "memorie-legends.firebasestorage.app",
-  messagingSenderId: "346846781965",
-  appId: "1:346846781965:web:0e2697c00d148c5f9cab44",
-  measurementId: "G-G7C88LEY7G",
-};
+/**
+ * Firebase completo: la sesión, Firestore y las Cloud Functions.
+ *
+ * Lo importan las diez pantallas que hablan con el servidor. La superficie que
+ * exporta es EXACTAMENTE la de antes de partir el archivo, así que ninguna de
+ * ellas cambió: lo que se movió está en `firebase-nucleo.js`, y acá se
+ * reexporta.
+ *
+ * Quien sólo necesite saber si hay sesión —hoy, la portada— importa el núcleo
+ * directamente y se ahorra 107 KB de Firestore que no iba a usar.
+ */
 
-// Importar Firebase
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import {
-  getAuth,
+// La app y la sesión salen del núcleo. Se reexportan tal cual para que quien
+// importe de acá siga encontrando todo donde estaba.
+export {
+  app,
+  auth,
+  googleProvider,
+  SUPPORT_EMAIL,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   onAuthStateChanged,
@@ -20,7 +24,11 @@ import {
   sendPasswordResetEmail,
   GoogleAuthProvider,
   signInWithPopup,
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+} from "./firebase-nucleo.js";
+
+// Y `app` también hace falta acá adentro, para construir Firestore y Functions.
+import { app } from "./firebase-nucleo.js";
+
 import {
   getFirestore,
   doc,
@@ -48,50 +56,33 @@ import {
   httpsCallable,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
-// Inicializar
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 const db = getFirestore(app);
 // Las funciones viven en us-central1, que es la región por defecto.
 const funciones = getFunctions(app);
 
-// 🔑 Crear el proveedor de Google
-const googleProvider = new GoogleAuthProvider();
-
 /**
  * App Check, si está configurado.
  *
- * Se enciende acá y no en cada pantalla porque hay nueve páginas que llaman a
- * funciones y acordarse en todas es acordarse en ocho. Va sin `await`: no
- * tiene que retrasar la carga de nada, y el SDK sabe esperar el token cuando
- * le hace falta.
+ * Vive en ESTE archivo y no en el núcleo, y eso es deliberado: App Check
+ * protege las llamadas al servidor, y las llamadas al servidor son justamente
+ * lo que este archivo agrega. Queda atado por construcción — no se puede
+ * importar `getDoc` ni `httpsCallable` sin arrastrar también App Check.
  *
- * Mientras no haya clave, esto es una función que devuelve `false` y ya. Ver
- * `app-check.js`.
+ * Es mejor que acordarse pantalla por pantalla: acá olvidarse es imposible.
+ *
+ * Va sin `await`: no tiene que retrasar la carga de nada, y el SDK sabe
+ * esperar el token cuando le hace falta. Mientras no haya clave, o en un
+ * dominio que no sea el de producción, es una función que devuelve `false` y
+ * ya. Ver `app-check.js`.
  */
 import("./app-check.js")
   .then((m) => m.encenderAppCheck())
   .catch((e) => console.error("No se pudo cargar app-check.js:", e));
 
-// ✅ Correo de soporte
-const SUPPORT_EMAIL = "soporte.memorie.legends@gmail.com";
-
-// ✅ EXPORTAR TODO (sin duplicar SUPPORT_EMAIL)
 export {
-  app,
-  auth,
   db,
   funciones,
   httpsCallable,
-  googleProvider,
-  SUPPORT_EMAIL,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  onAuthStateChanged,
-  signOut,
-  sendPasswordResetEmail,
-  GoogleAuthProvider,
-  signInWithPopup,
   doc,
   getDoc,
   setDoc,

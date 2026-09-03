@@ -98,7 +98,8 @@ function tocaElServidor(modulo, vistos = new Set()) {
   if (/httpsCallable\(|runTransaction\(/.test(codigo)) return true;
 
   for (const [, ruta] of codigo.matchAll(/from\s+"\.\/([a-z0-9/-]+)\.js"/g)) {
-    if (ruta === "firebase") continue;
+    // Ni en `firebase.js` ni en el núcleo: los dos son la superficie del SDK.
+    if (ruta === "firebase" || ruta === "firebase-nucleo") continue;
     if (tocaElServidor(ruta, vistos)) return true;
   }
   return false;
@@ -129,14 +130,60 @@ console.log("\n=== 2. Ninguna página que llame al servidor queda excluida ===")
      problemas);
 }
 
-console.log("\n=== 3. La portada sí está excluida, que es el punto ===");
+console.log("\n=== 3. App Check va atado al archivo que habla con el servidor ===");
+{
+  // Ésta es la garantía FUERTE, y no la lista: App Check se enciende desde el
+  // MISMO archivo que exporta Firestore y las funciones, así que no se puede
+  // importar `getDoc` sin arrastrarlo. Una lista hay que acordarse de
+  // actualizarla; esto no se puede olvidar porque es el mismo archivo.
+  const completo = leer("js/firebase.js");
+  const nucleo = leer("js/firebase-nucleo.js");
+
+  ok(/import\("\.\/app-check\.js"\)/.test(completo),
+     "firebase.js enciende App Check");
+  ok(!/app-check/.test(nucleo),
+     "y el núcleo NO: quien sólo mira la sesión no carga reCAPTCHA");
+  ok(/firebase-firestore\.js/.test(completo) && !/firebase-firestore\.js/.test(nucleo),
+     "Firestore vive en firebase.js, no en el núcleo");
+  ok(/firebase-functions\.js/.test(completo) && !/firebase-functions\.js/.test(nucleo),
+     "y las funciones también");
+
+  // Y que partir el archivo no le haya sacado nada a quien lo importa.
+  const nombres = (t) => {
+    const n = new Set();
+    for (const [, bloque] of t.matchAll(/export\s*\{([^}]*)\}/g)) {
+      for (const x of bloque.split(",")) {
+        const limpio = x.trim().split(/\s+as\s+/).pop();
+        if (limpio) n.add(limpio);
+      }
+    }
+    return n;
+  };
+  const exporta = nombres(completo);
+  const imprescindibles = ["auth", "db", "funciones", "httpsCallable", "doc", "getDoc",
+    "setDoc", "onSnapshot", "runTransaction", "onAuthStateChanged", "signOut"];
+  const faltan = imprescindibles.filter((n) => !exporta.has(n));
+  ok(faltan.length === 0,
+     `firebase.js sigue exportando lo que usan las diez pantallas (${exporta.size} nombres)`,
+     faltan);
+}
+
+console.log("\n=== 4. La portada no arrastra nada de eso ===");
 {
   const modulos = modulosDe(leer("index.html"));
   ok(modulos.length > 0, "la portada carga JavaScript", modulos);
   ok(!modulos.some((m) => tocaElServidor(m)),
      "y ninguno de sus módulos toca el servidor", modulos);
+
+  // Lo que de verdad ahorra los 450 KB: que no importe `firebase.js`.
+  const codigo = leer("js/portada.js");
+  ok(/from\s+"\.\/firebase-nucleo\.js"/.test(codigo),
+     "importa del núcleo");
+  ok(!/from\s+"\.\/firebase\.js"/.test(codigo),
+     "y NO de firebase.js, que arrastraría Firestore, Functions y App Check");
+
   ok(excluidas.includes("/") && excluidas.includes("/index.html"),
-     "las dos rutas con que se sirve están excluidas", excluidas);
+     "y además está en la lista, como segunda red", excluidas);
 }
 
 // ────────────────────────────────────────────────────────────────────
