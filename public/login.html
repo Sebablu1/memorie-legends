@@ -4,7 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Memorie Legends - Login</title>
-    <link rel="icon" href="img/memorie-legends2.png" />
+    <link rel="icon" href="img/favicon.png" />
+
+    <!-- El logo empieza a bajar YA.
+
+         Sin esto el navegador no se entera de que existe hasta que terminó de
+         leer el CSS, y es el elemento más grande de la pantalla: lo que
+         Lighthouse mide como LCP. Adelanta el momento en que la página se ve
+         completa, sin cambiar nada de lo que se ve. -->
+    <link rel="preload" as="image" href="img/memorie-legends3.webp" fetchpriority="high" />
     <link rel="stylesheet" href="css/tema.css" />
     <link rel="stylesheet" href="css/style.css" />
     <style>
@@ -215,7 +223,7 @@
            logos distintos en la misma pantalla —el velo mostraba uno y el
            formulario otro— y encima obligaba a bajar dos imágenes cuando con
            una alcanza: ésta ya está en la caché cuando el velo aparece. -->
-      <img src="img/memorie-legends3.png" alt="Memorie Legends" width="420" height="280" />
+      <img src="img/memorie-legends3.webp" alt="Memorie Legends" width="420" height="280" />
       <div class="girador" aria-hidden="true"></div>
       <p id="veloTexto">Cargando…</p>
     </div>
@@ -239,7 +247,7 @@
       <div class="marca-login">
         <img
           class="logo-login"
-          src="img/memorie-legends3.png"
+          src="img/memorie-legends3.webp"
           alt="Memorie Legends"
           width="420"
           height="280"

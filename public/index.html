@@ -9,7 +9,15 @@
       content="Memorie Legends: juego de memoria y estrategia con baraja española. Jugá contra la máquina o con amigos."
     />
     <title>Memorie Legends</title>
-    <link rel="icon" href="img/memorie-legends2.png" />
+    <link rel="icon" href="img/favicon.png" />
+    <!-- El logo empieza a bajar YA.
+
+         Sin esto el navegador no se entera de que existe hasta que terminó de
+         leer el CSS, y esta imagen es el elemento más grande de la pantalla:
+         lo que Lighthouse mide como LCP. Precargarla adelanta el momento en
+         que la página se ve completa, sin cambiar nada de lo que se ve. -->
+    <link rel="preload" as="image" href="img/memorie-legends3.webp" fetchpriority="high" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -26,7 +34,7 @@
       <div class="barra-contenido">
         <a href="/" class="marca">
           <img
-            src="img/memorie-legends2.png"
+            src="img/memorie-legends2.webp"
             alt="Memorie Legends"
             class="logo-img"
           />
@@ -55,7 +63,7 @@
         <h1 class="titulo-portada">
           <img
             class="portada-logo"
-            src="img/memorie-legends3.png"
+            src="img/memorie-legends3.webp"
             alt="Memorie Legends"
             width="420"
             height="280"
