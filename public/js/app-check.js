@@ -68,6 +68,36 @@ const CLAVE_RECAPTCHA = "6Lcd56UtAAAAAME1Ckf4zKXIY_CC8OaZ_t3Kffm-";
 const DOMINIOS = ["memorie-legends.web.app", "memorie-legends.firebaseapp.com"];
 
 /**
+ * Las páginas que NO necesitan App Check.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ ESTA LISTA EXISTE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * App Check protege las llamadas al servidor. Una página que no hace ninguna
+ * no gana nada con él, y sí paga: reCAPTCHA son 345 KB que además hay que
+ * ejecutar. Medido en la portada, esa carga sola era 770 ms de hilo principal
+ * bloqueado y la diferencia entre 69 y 87 puntos de Lighthouse en móvil.
+ *
+ * La portada es la única página del sitio que carga Firebase y usa sólo
+ * `onAuthStateChanged` — mirar si hay sesión para mandar al panel. No lee
+ * Firestore y no llama a ninguna función. Se comprobó una por una: todas las
+ * demás que cargan JavaScript tocan una cosa o la otra, y las legales no
+ * cargan ninguno.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ES UNA LISTA DE EXCLUIDOS, NO DE INCLUIDOS, Y ESO IMPORTA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Al revés —una lista de páginas que SÍ lo llevan— una pantalla nueva nacería
+ * sin App Check, y el día que se ponga en modo obligatorio sus llamadas
+ * fallarían sin que nadie entendiera por qué. Así, una pantalla nueva lo lleva
+ * por omisión: lo peor que puede pasar es que cargue 345 KB de más, que se
+ * nota y se arregla. Olvidarse al revés no se nota hasta que rompe.
+ */
+const SIN_APP_CHECK = new Set(["/", "/index.html"]);
+
+/**
  * Enciende App Check si hay clave y estamos en un dominio autorizado.
  *
  * Se importa dinámicamente: el módulo de App Check son unos 20 KB que no
@@ -78,6 +108,7 @@ const DOMINIOS = ["memorie-legends.web.app", "memorie-legends.firebaseapp.com"];
 export async function encenderAppCheck() {
   if (!CLAVE_RECAPTCHA) return false;
   if (!DOMINIOS.includes(window.location.hostname)) return false;
+  if (SIN_APP_CHECK.has(window.location.pathname)) return false;
 
   try {
     // ENTERPRISE, no v3. Son dos proveedores distintos del SDK y no son
