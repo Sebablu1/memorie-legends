@@ -17,7 +17,7 @@ bien antes de encender nada.
 | App Check — obligatorio | ⬜ pendiente, a propósito (ver §1) |
 | 2FA (TOTP) — código escrito y QR comprobado | ✅ hecho |
 | 2FA (TOTP) — encendido en el servidor | ✅ hecho por API (ver §2) |
-| 2FA — probado por una persona de verdad | ⬜ falta tu prueba (ver §2) |
+| 2FA — probado por una persona de verdad | ✅ hecho |
 | Reportes | ✅ funcionando |
 | Pagos (Mercado Pago) | ⬜ faltan los secretos (ver §3) |
 
@@ -64,10 +64,14 @@ desplegar functions; son dos minutos.
 
 ---
 
-## 2. Verificación en dos pasos (TOTP) — encendida, falta tu prueba
+## 2. Verificación en dos pasos (TOTP) — funcionando
 
-**Estado:** completa por código y **encendida en el servidor**. No queda nada
-por configurar; queda probarla con una cuenta descartable.
+**Estado: terminada.** Escrita, encendida en el servidor y **probada de punta a
+punta por una persona**: escanear el QR, entrar con el código, y que lo pida al
+volver. Los jugadores ya la pueden usar desde *Tu cuenta*.
+
+Lo que sigue abajo queda como referencia: cómo se encendió, cómo se apaga si
+hace falta, y qué hacer si alguien se queda afuera.
 
 **Se descartó el SMS** después de haberlo empezado. Los motivos, por si vuelve
 a discutirse: cuesta por mensaje y se paga cada vez que alguien entra, obliga a
@@ -129,7 +133,7 @@ Eso demuestra que el interruptor funciona. Lo que **no** demuestra —y por eso
 siguen los pasos de abajo— es que la pantalla del jugador haga bien las tres
 cosas que le tocan: mostrar el QR, aceptar el código, y pedirlo al entrar.
 
-### Probalo con una cuenta descartable ANTES de contárselo a nadie
+### Lo que se probó (ya hecho)
 
 Esto es lo que más me importa de toda la lista. El riesgo no es que no
 funcione: es que funcione a medias y alguien quede afuera de su cuenta con
