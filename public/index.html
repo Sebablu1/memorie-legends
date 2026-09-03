@@ -41,12 +41,27 @@
 
     <main>
       <section class="portada">
-        <img
-          class="portada-logo"
-          src="img/memorie-legends2.png"
-          alt=""
-        />
-        <h1>Memorie Legends</h1>
+        <!-- El logo ES el título.
+
+             Va DENTRO del <h1> en vez de al lado. Sacar el título y dejar la
+             imagen suelta habría dejado la página sin encabezado: para un
+             buscador y para un lector de pantalla, esta pantalla habría pasado
+             a no tener nombre. Así el nombre sigue estando —en el `alt`, que
+             es texto— y lo que desaparece es sólo la repetición visual.
+
+             Por eso el `alt` dejó de estar vacío. Antes podía estarlo porque el
+             <h1> de al lado decía lo mismo; ahora es el único lugar donde el
+             nombre existe. -->
+        <h1 class="titulo-portada">
+          <img
+            class="portada-logo"
+            src="img/memorie-legends3.png"
+            alt="Memorie Legends"
+            width="420"
+            height="280"
+            fetchpriority="high"
+          />
+        </h1>
         <p class="lema">Memoria, reflejos y estrategia con baraja especial</p>
         <p class="entrada">
           Cuatro cartas boca abajo. Mirás una sola. A partir de ahí, todo

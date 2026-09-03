@@ -141,19 +141,28 @@ input::placeholder {
   box-shadow: var(--sombra-oro-fuerte);
 }
 
+/* El compañero del botón de oro.
+
+   Era plata plana y quedaba como una pieza de otra caja: al lado del dorado
+   del logo, un bloque gris claro sobre fondo negro se lleva la mirada que
+   tendría que llevarse el botón principal. Ahora es cuero oscuro con filo
+   dorado — misma familia, distinto rango. */
 .btn-plata {
-  background: var(--plata-honda);
-  color: var(--negro);
-  border: none;
-  font-weight: 600;
+  background: linear-gradient(180deg, #2a2119 0%, #17120c 100%);
+  color: var(--oro-claro);
+  border: 1px solid rgba(212, 168, 67, 0.45);
+  font-weight: 700;
   border-radius: 12px;
   padding: 12px 24px;
   cursor: pointer;
-  transition: background 0.3s ease;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .btn-plata:hover:not(:disabled) {
-  background: var(--plata-clara);
+  background: linear-gradient(180deg, #3a2e21 0%, #201810 100%);
+  border-color: rgba(212, 168, 67, 0.8);
+  box-shadow: 0 0 18px rgba(212, 168, 67, 0.18);
 }
 
 .btn-oro:disabled,

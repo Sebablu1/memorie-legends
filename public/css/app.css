@@ -429,8 +429,18 @@ a.accion {
   cursor: pointer;
   color: #1a1206;
   background: linear-gradient(180deg, var(--oro-claro) 0%, var(--oro) 46%, var(--oro-hondo) 100%);
+  /* Cuatro sombras y cada una hace una cosa distinta:
+       1. el canto de abajo, que es lo que da el volumen de ficha;
+       2. la sombra que apoya la pieza sobre el fondo;
+       3. un filo hondo por dentro, para que el borde no sea un corte plano;
+       4. la luz de arriba, como el brillo de un metal pulido.
+     Sin la tercera, el dorado se ve impreso; con ella, acuñado. */
   box-shadow: 0 5px 0 #6b530f, 0 12px 22px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    inset 0 0 0 1px rgba(107, 83, 15, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  /* La letra hundida en el metal. Es lo que separa un botón de un rectángulo
+     dorado con texto encima. */
+  text-shadow: 0 1px 0 rgba(255, 240, 200, 0.45);
   transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
 }
 
@@ -452,19 +462,38 @@ button.accion:disabled {
   box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
 }
 
+/* El secundario: cuero y bronce, no plata.
+
+   Era un degradado gris claro, y ese era el problema: un botón de aplicación
+   moderna en una pantalla que quiere parecer una mesa de taberna. Al lado del
+   dorado del logo se leía como algo de otro sitio.
+
+   Ahora es oscuro con filo dorado. Sigue siendo claramente la opción de menor
+   peso —el primario brilla, éste no— pero pertenece al mismo mundo. Y sobre
+   fondo oscuro el filo se ve mejor que un bloque claro, que en un panel negro
+   pega un salto de contraste que atrae más la vista que el botón principal. */
 button.accion.sobria,
 a.accion.sobria {
-  color: var(--negro, #0a0a0a);
-  background: linear-gradient(180deg, var(--plata-clara) 0%, var(--plata-honda) 100%);
-  box-shadow: 0 5px 0 #6b6b6b, 0 12px 22px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  color: var(--oro-claro);
+  background: linear-gradient(180deg, #2a2119 0%, #17120c 100%);
+  box-shadow: 0 5px 0 #0b0906, 0 12px 22px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(212, 168, 67, 0.45),
+    inset 0 1px 0 rgba(240, 208, 96, 0.16);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 }
 
 button.accion.sobria:hover:not(:disabled),
 a.accion.sobria:hover {
-  background: linear-gradient(180deg, #e2e2e2 0%, var(--plata-clara) 100%);
-  box-shadow: 0 8px 0 #6b6b6b, 0 18px 30px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  background: linear-gradient(180deg, #3a2e21 0%, #201810 100%);
+  box-shadow: 0 8px 0 #0b0906, 0 18px 30px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(212, 168, 67, 0.75),
+    inset 0 1px 0 rgba(240, 208, 96, 0.25);
+}
+
+button.accion.sobria:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #0b0906, 0 6px 12px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(212, 168, 67, 0.6);
 }
 
 /* ------------------------------------------------------- mensajes */

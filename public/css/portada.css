@@ -6,14 +6,32 @@
   margin-bottom: 30px;
 }
 
+/* El logo de la portada, que ahora también hace de título.
+
+   Se le quitaron el marco dorado, las esquinas redondeadas y el `object-fit:
+   cover`. Los tres eran para el logo cuadrado anterior: alrededor de uno
+   transparente, el marco encierra aire, y `cover` recorta lo que sobre para
+   llenar la caja —y lo que sobra en un logo así son las puntas del laurel—.
+
+   El tamaño creció respecto de los 132px de antes porque ahora carga con el
+   doble de trabajo: es el logo Y el título. Con el ancho viejo quedaba un
+   hueco donde estaba el nombre escrito. */
 .portada-logo {
-  width: 132px;
-  height: 132px;
-  border-radius: 28px;
-  object-fit: cover;
-  border: 2px solid var(--oro);
-  box-shadow: var(--sombra-oro), 0 20px 50px rgba(0, 0, 0, 0.6);
-  margin-bottom: 22px;
+  display: block;
+  margin: 0 auto 18px;
+  width: clamp(180px, 42vw, 300px);
+  /* `auto` y no un número: el logo es 3:2 y fijar el alto lo aplastaría. */
+  height: auto;
+  filter: drop-shadow(0 0 22px rgba(212, 168, 67, 0.4));
+}
+
+/* El <h1> que lo envuelve no aporta nada visual: existe para que la página
+   tenga encabezado. Se le sacan los estilos de texto, que sin texto sólo
+   agregarían espacio en blanco. */
+.titulo-portada {
+  margin: 0;
+  font-size: 0;
+  line-height: 0;
 }
 
 .portada h1 {
@@ -83,7 +101,37 @@
 
 @media (max-width: 600px) {
   .portada { padding: 26px 12px 34px; }
-  .portada-logo { width: 96px; height: 96px; border-radius: 22px; }
   .portada-botones { flex-direction: column; align-items: stretch; }
-  .barra .derecha .accion { padding: 9px 12px; font-size: 0.7rem; }
+
+  /* La cabecera, en dos renglones.
+
+     En el teléfono la marca y los dos accesos no entran en una línea, así que
+     la barra los envolvía sola — pero los dejaba apretados contra el borde
+     derecho y pegados entre sí, porque `margin-left: auto` los seguía
+     empujando aunque ya estuvieran en su propio renglón.
+
+     Ahora se les da el renglón entero y se centran. El `flex: 1` los hace del
+     mismo ancho: dos botones de anchos distintos leen como si uno importara
+     más que el otro, y acá son dos caminos igual de válidos —entrar o
+     registrarse—. */
+  .barra-contenido {
+    justify-content: center;
+    row-gap: 10px;
+  }
+
+  .barra .derecha {
+    margin-left: 0;
+    width: 100%;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .barra .derecha .accion {
+    flex: 1 1 0;
+    /* Un tope, para que en una tablet angosta no se estiren hasta parecer dos
+       barras. */
+    max-width: 200px;
+    padding: 11px 10px;
+    font-size: 0.7rem;
+  }
 }
