@@ -51,6 +51,33 @@
 
       <div id="avisoServidor"></div>
 
+      <!-- El ofrecimiento de los dos pasos.
+
+           Oculto por defecto y lo destapa `dashboard.js` sólo si la cuenta NO
+           los tiene puestos. Al revés —visible y que el JavaScript lo esconda—
+           se lo mostraría un instante a quien ya los activó, que es a quien
+           menos falta le hace.
+
+           Va acá y no en `cuenta.html` porque ahí ya está: el problema era que
+           nadie entra a esa pantalla por su cuenta. Ofrecerlo al caer del
+           login es lo que hace que exista para alguien que no lo anda
+           buscando. -->
+      <section class="oferta-dos-pasos" id="ofertaDosPasos" hidden>
+        <span class="icono-oferta" aria-hidden="true">🔐</span>
+        <div class="texto-oferta">
+          <b>Protegé tu cuenta con dos pasos</b>
+          <p>
+            Además de tu contraseña, te pedimos un código de tu teléfono para
+            entrar. Lleva un minuto y es lo que hace que robarte la contraseña
+            no alcance.
+          </p>
+        </div>
+        <div class="botones-oferta">
+          <a class="accion" href="cuenta.html">Activar</a>
+          <button class="accion sobria" id="btnAhoraNo" type="button">Ahora no</button>
+        </div>
+      </section>
+
       <h2 class="titulo-elegir">¿Cómo querés jugar?</h2>
 
       <!-- UNA sola caja para jugar, y adentro la elección del modo.

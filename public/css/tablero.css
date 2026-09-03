@@ -593,3 +593,79 @@
     left: -60%;
   }
 }
+
+
+/* ------------------------------------------ ofrecer los dos pasos
+
+   Un aviso, no una alarma. Va en dorado tenue y no en rojo: nada está mal,
+   sólo hay algo que conviene hacer. Un cartel que grita cuando no pasa nada
+   es lo que entrena a la gente a ignorar los que sí importan. */
+
+/* El `hidden` tiene que seguir escondiendo.
+
+   Ésta es la trampa de siempre y ya mordió una vez acá: el atributo `hidden`
+   es sólo un `display: none` de la hoja del navegador, así que cualquier
+   `display` de autor le gana. Con `display: flex` a secas, el aviso quedaba a
+   la vista SIEMPRE —incluso para quien ya tiene los dos pasos puestos— y el
+   `hidden` del HTML no hacía nada. */
+.oferta-dos-pasos[hidden] {
+  display: none;
+}
+
+.oferta-dos-pasos {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 0 0 22px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(212, 168, 67, 0.3);
+  background: linear-gradient(180deg, rgba(212, 168, 67, 0.07), rgba(0, 0, 0, 0.25));
+}
+
+.oferta-dos-pasos .icono-oferta {
+  font-size: 1.7rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* El texto se lleva el espacio que sobre, y los botones el suyo. Sin esto, en
+   una pantalla intermedia el párrafo se parte en cuatro líneas de tres
+   palabras al lado de dos botones sueltos. */
+.oferta-dos-pasos .texto-oferta {
+  flex: 1 1 260px;
+}
+
+.oferta-dos-pasos b {
+  display: block;
+  color: var(--oro-claro, #f0d089);
+  margin-bottom: 3px;
+}
+
+.oferta-dos-pasos p {
+  margin: 0;
+  color: var(--texto-tenue);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.oferta-dos-pasos .botones-oferta {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* En un teléfono los botones pasan a ocupar el ancho entero y se reparten:
+   apilados y angostos, "Ahora no" queda tan destacado como "Activar", y no
+   son lo mismo. */
+@media (max-width: 560px) {
+  .oferta-dos-pasos .botones-oferta {
+    width: 100%;
+  }
+
+  .oferta-dos-pasos .botones-oferta > * {
+    flex: 1;
+    text-align: center;
+  }
+}

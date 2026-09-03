@@ -20,6 +20,7 @@
 
 import { db, collection, query, where, onSnapshot } from "./firebase.js";
 import { exigirSesion, mostrarSaldo, conectarBotonSalir, formatearEspera } from "./sesion.js";
+import { estadoMfa } from "./mfa.js";
 import { crearSala, unirseASala, ErrorDeServidor } from "./servidor.js";
 import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/salas.js";
 import { esperaRuleta } from "./reglas/economia.js";
@@ -62,6 +63,18 @@ if (avisoPendiente) {
   sessionStorage.removeItem("avisoLobby");
 }
 
+/**
+ * Cuánto se calla después de un "ahora no".
+ *
+ * Una semana. El ofrecimiento vale la pena —quien tiene Leyendas guardadas se
+ * juega dinero— pero un aviso que reaparece en cada carga deja de ser una
+ * sugerencia y pasa a ser algo que uno aprende a saltear sin leer. Y entonces
+ * tampoco lo lee el día que sí lo habría aceptado.
+ */
+const MS_ENTRE_OFRECIMIENTOS = 7 * 24 * 60 * 60 * 1000;
+
+const LLAVE_OFERTA = "ofertaDosPasosPospuesta";
+
 // ------------------------------------------------------ sesión y perfil
 
 const sesion = await exigirSesion();
@@ -80,6 +93,7 @@ if (sesion) {
   if (usuario.photoURL) $("avatar").src = usuario.photoURL;
 
   mostrarSaldo(perfil.saldo);
+  ofrecerDosPasos();
   $("statSaldo").textContent = perfil.saldo.toLocaleString("es-UY");
   $("statPartidas").textContent = perfil.partidas;
   $("statVictorias").textContent = perfil.victorias;
@@ -344,3 +358,43 @@ function arrancarSalas() {
     },
   );
 }
+
+
+// ------------------------------------------ ofrecer los dos pasos
+
+/**
+ * Muestra el ofrecimiento, si corresponde.
+ *
+ * No corresponde en tres casos: si ya tiene los dos pasos puestos, si los
+ * pospuso hace poco, o si no se pudo averiguar. Ese último es importante: ante
+ * la duda NO se muestra. Ofrecerle activar los dos pasos a alguien que ya los
+ * tiene no es un error inocente —lo manda a una pantalla donde va a leer que
+ * ya está activo y va a pensar que algo se rompió—.
+ *
+ * El "ahora no" se recuerda en `localStorage`, que es por dispositivo y lo
+ * puede borrar cualquiera. Está bien que así sea: acá no se decide nada, sólo
+ * se evita repetir un cartel. Lo que NO puede vivir ahí es si la cuenta tiene
+ * o no los dos pasos, y eso se le pregunta siempre a Firebase.
+ */
+async function ofrecerDosPasos() {
+  const caja = $("ofertaDosPasos");
+  if (!caja) return;
+
+  const pospuesto = Number(localStorage.getItem(LLAVE_OFERTA) ?? 0);
+  if (Date.now() - pospuesto < MS_ENTRE_OFRECIMIENTOS) return;
+
+  try {
+    const { activo } = await estadoMfa();
+    if (activo) return;
+  } catch {
+    // Si no se pudo saber, no se ofrece. Ver la nota de arriba.
+    return;
+  }
+
+  caja.hidden = false;
+}
+
+$("btnAhoraNo")?.addEventListener("click", () => {
+  localStorage.setItem(LLAVE_OFERTA, String(Date.now()));
+  $("ofertaDosPasos").hidden = true;
+});
