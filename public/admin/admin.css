@@ -69,6 +69,23 @@ body {
   margin-left: auto;
 }
 
+/* El `hidden` tiene que esconder, pase lo que pase.
+
+   El atributo `hidden` no es más que un `display: none` de la hoja del
+   navegador, así que CUALQUIER regla de autor con `display` lo anula. Hoy
+   `main` no tiene ninguna y el panel se esconde bien —está comprobado—, pero
+   basta con que alguien le ponga `display: grid` a `main` un martes para que
+   el panel entero quede a la vista de cualquiera que abra esta URL.
+
+   No filtraría datos: las ocho funciones comprueban el correo en el servidor y
+   rechazan a todo el mundo. Pero mostraría el mapa de lo que hay del otro
+   lado, y eso no hace falta regalarlo. Dos líneas para que no dependa de que
+   nadie se equivoque. */
+#panel[hidden],
+#entrar[hidden] {
+  display: none !important;
+}
+
 /* ------------------------------------------------------------ cajas */
 
 main {
@@ -461,4 +478,29 @@ select {
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
+}
+
+
+/* El separador entre los dos modos de entrar. Dos rayas y una palabra: deja
+   claro que son alternativas y no pasos de un mismo formulario. */
+.separador {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--texto-tenue);
+  font-size: 0.8rem;
+}
+
+.separador::before,
+.separador::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* El botón de Google ocupa el ancho: es el camino recomendado y tiene que
+   verse como tal al lado de un formulario de dos campos. */
+#btnGoogle {
+  width: 100%;
 }

@@ -31,6 +31,19 @@
          evita mostrar una pantalla que no va a funcionar. -->
     <main id="entrar" class="tarjeta angosta">
       <h2>Entrar</h2>
+
+      <!-- Con Google primero, porque es lo que la cuenta de soporte tiene.
+           Se comprobó contra Firebase Auth: su único proveedor es google.com,
+           así que el formulario de abajo NO puede funcionar con ella — daría
+           "credenciales inválidas" sin explicar que el problema es el método,
+           no la contraseña.
+
+           El formulario se deja igual: si algún día se le agrega contraseña a
+           la cuenta, sirve. Lo que cambió es cuál se ofrece primero. -->
+      <button class="btn" id="btnGoogle" type="button">Entrar con Google</button>
+
+      <div class="separador"><span>o con correo y contraseña</span></div>
+
       <form id="formEntrar" autocomplete="on">
         <label>
           Correo

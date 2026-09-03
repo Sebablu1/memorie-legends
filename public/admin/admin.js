@@ -20,6 +20,8 @@ import {
   httpsCallable,
   SUPPORT_EMAIL,
   signInWithEmailAndPassword,
+  signInWithPopup,
+  googleProvider,
   onAuthStateChanged,
   signOut,
 } from "../js/firebase.js";
@@ -31,6 +33,7 @@ const dom = {
   btnSalir: $("btnSalir"),
   entrar: $("entrar"),
   formEntrar: $("formEntrar"),
+  btnGoogle: $("btnGoogle"),
   correo: $("correo"),
   clave: $("clave"),
   avisoEntrar: $("avisoEntrar"),
@@ -79,6 +82,34 @@ const fecha = (ms) =>
 
 // ------------------------------------------------------------- sesión
 
+/**
+ * Entrar con Google.
+ *
+ * Es el camino que corresponde: la cuenta de soporte tiene `google.com` como
+ * único proveedor, comprobado contra Firebase Auth. Con el formulario de
+ * correo y contraseña esa cuenta no puede entrar, y el error que devuelve
+ * Firebase —"credenciales inválidas"— hace pensar que está mal la contraseña
+ * cuando lo que está mal es el método.
+ *
+ * Entrar no da acceso a nada por sí solo: quién puede ver el panel lo decide
+ * `onAuthStateChanged` más abajo, y qué datos se entregan lo deciden las Cloud
+ * Functions contra el correo del token. Esto sólo abre la sesión.
+ */
+dom.btnGoogle.addEventListener("click", async () => {
+  dom.btnGoogle.disabled = true;
+  decir(dom.avisoEntrar, "Abriendo Google…");
+  try {
+    await signInWithPopup(auth, googleProvider);
+  } catch (error) {
+    dom.btnGoogle.disabled = false;
+    const cerrada = /popup-closed|cancelled-popup/.test(error?.code ?? "");
+    decir(dom.avisoEntrar,
+      cerrada ? "Cerraste la ventana de Google." : "No pudimos entrar con Google.",
+      "mal");
+    console.error(error);
+  }
+});
+
 dom.formEntrar.addEventListener("submit", async (evento) => {
   evento.preventDefault();
   decir(dom.avisoEntrar, "Entrando…");
@@ -102,6 +133,11 @@ onAuthStateChanged(auth, (usuario) => {
   dom.btnSalir.hidden = !usuario;
   dom.entrar.hidden = Boolean(esAdmin);
   dom.panel.hidden = !esAdmin;
+
+  // El botón se rehabilita siempre que la pantalla de entrada esté a la vista:
+  // si entró alguien que no era, tiene que poder salir y probar con la cuenta
+  // correcta sin recargar.
+  dom.btnGoogle.disabled = Boolean(esAdmin);
 
   if (usuario && !esAdmin) {
     decir(dom.avisoEntrar, "Esta sección no es para esta cuenta.", "mal");
