@@ -127,14 +127,18 @@ body.acceso .container > * {
      del medio no hacía nada. Un clamp que nunca usa su valor central es un
      ancho fijo escrito de forma complicada.
 
-     Con 34vw sí varía: 120 px a 320, 133 a 390, y el techo de 170 desde los
-     500. En los tres casos el logo ocupa cerca de la mitad del ancho útil de
-     la caja, que es lo que hace que se vea igual de proporcionado en un
-     teléfono y en un monitor.
+     Con 42vw sí varía: 150 px a 320, 164 a 390, y el techo de 210 desde los
+     500. En los tres casos el logo ocupa cerca del 58% del ancho útil de la
+     caja, que es lo que hace que se vea igual de proporcionado en un teléfono
+     y en un monitor.
+
+     Los números subieron una vez, mirando la página ya publicada: con el tope
+     en 170 el logo quedaba correcto pero tímido para ser lo único que hay
+     arriba del formulario.
 
      Y tiene que verse: al sacar el <h1>, este logo es lo único que dice de qué
      sitio es esta pantalla. */
-  width: clamp(120px, 34vw, 170px);
+  width: clamp(150px, 42vw, 210px);
   /* `auto` y no un número: el logo es 3:2 y fijar el alto lo aplastaría. */
   height: auto;
   filter: drop-shadow(0 0 14px rgba(212, 168, 67, 0.45));
