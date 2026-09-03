@@ -16,7 +16,8 @@ bien antes de encender nada.
 | App Check — clave puesta, token viajando | ✅ hecho |
 | App Check — obligatorio | ⬜ pendiente, a propósito (ver §1) |
 | 2FA (TOTP) — código escrito y QR comprobado | ✅ hecho |
-| 2FA — probado de punta a punta | ⬜ falta tu prueba (ver §2) |
+| 2FA (TOTP) — encendido en el servidor | ✅ hecho por API (ver §2) |
+| 2FA — probado por una persona de verdad | ⬜ falta tu prueba (ver §2) |
 | Reportes | ✅ funcionando |
 | Pagos (Mercado Pago) | ⬜ faltan los secretos (ver §3) |
 
@@ -63,10 +64,10 @@ desplegar functions; son dos minutos.
 
 ---
 
-## 2. Verificación en dos pasos (TOTP) — probala antes de anunciarla
+## 2. Verificación en dos pasos (TOTP) — encendida, falta tu prueba
 
-**Estado:** completa por código. Identity Platform ya está activo, así que no
-queda nada por configurar salvo una comprobación.
+**Estado:** completa por código y **encendida en el servidor**. No queda nada
+por configurar; queda probarla con una cuenta descartable.
 
 **Se descartó el SMS** después de haberlo empezado. Los motivos, por si vuelve
 a discutirse: cuesta por mensaje y se paga cada vez que alguien entra, obliga a
@@ -74,16 +75,59 @@ pedirle el teléfono a cada jugador —un dato personal que hoy no tenemos y que
 habría que cuidar— y se lo roban con un cambio de SIM, que es el ataque común
 contra cuentas con dinero. Un código de una aplicación no viaja por ningún lado.
 
-### Lo único que puede faltar
+### Ya está encendido, y no se hizo desde la consola
 
-Si al activar los dos pasos aparece *"todavía no está habilitada en el
-servidor"*, es que falta el interruptor de TOTP, que es aparte de Identity
-Platform:
+La opción no aparecía en la consola por un motivo concreto: **el segundo factor
+estaba apagado del todo** (`state: DISABLED`, sin ningún factor), y la consola
+no ofrece elegir TOTP mientras no haya nada encendido. Lo que estaba habilitado
+en Authentication era el ingreso *con* teléfono, que es otra función con nombre
+parecido.
 
-**Consola → Authentication → Settings → pestaña "Multi-factor" → habilitar
-"Authenticator app (TOTP)".**
+Se encendió por la API de administración, con `herramientas/mfa.mjs`:
 
-Es un clic. Cualquier otro mensaje sí es un problema del código; contámelo.
+```
+{ "state": "ENABLED", "factorIds": [], "providerConfigs": [
+    { "state": "ENABLED", "totpProviderConfig": { "adjacentIntervals": 5 } } ] }
+```
+
+`adjacentIntervals: 5` son ±5 ventanas de 30 segundos, o sea **±2,5 minutos**
+de tolerancia al desfase entre el reloj del teléfono y el del servidor. Es
+holgado a propósito: un teléfono con la hora unos segundos corrida es lo más
+común del mundo, y el precio de ser estricto lo paga alguien que no puede
+entrar a su cuenta.
+
+`factorIds` quedó vacío: el SMS no estaba encendido y no se encendió.
+
+### La herramienta
+
+```bash
+CLAVE=/ruta/a/la/clave.json node herramientas/mfa.mjs
+```
+
+Sin argumentos muestra cómo está. `--activar` enciende TOTP, `--apagar` lo
+apaga, `--probar` comprueba de punta a punta que el servidor emite un secreto
+—crea una cuenta temporal y la borra siempre, incluso si algo falla a la
+mitad—.
+
+**`--apagar` es la vuelta atrás.** Si los dos pasos dan problemas, no hay que
+esperar a nadie. Ojo con una cosa: apagar **no** le quita el factor a quien ya
+lo tenga puesto; para eso hay que ir a Consola → Authentication → Users.
+
+La credencial es una clave de cuenta de servicio y da **control total** del
+proyecto. No está en el repositorio y `.gitignore` ahora tapa el nombre que la
+consola les pone al descargarlas (`*-firebase-adminsdk-*.json`), que antes
+faltaba. Si alguna vez se filtra: Google Cloud → IAM → Cuentas de servicio,
+revocar y generar otra.
+
+### Ya comprobado
+
+Una cuenta temporal con el correo verificado pidió inscribir un segundo factor
+y **el servidor le emitió el secreto**: 6 dígitos cada 30 segundos. La cuenta se
+borró; el proyecto quedó con las 6 de siempre.
+
+Eso demuestra que el interruptor funciona. Lo que **no** demuestra —y por eso
+siguen los pasos de abajo— es que la pantalla del jugador haga bien las tres
+cosas que le tocan: mostrar el QR, aceptar el código, y pedirlo al entrar.
 
 ### Probalo con una cuenta descartable ANTES de contárselo a nadie
 
@@ -151,5 +195,5 @@ https://us-central1-memorie-legends.cloudfunctions.net/webhookPago
 |---|---|---|
 | App Check (cliente) | `public/js/app-check.js` → `CLAVE_RECAPTCHA` | ✅ puesta (Enterprise) |
 | App Check (servidor) | `functions/index.js` → `EXIGIR_APP_CHECK` | `false` — a propósito |
-| 2FA (TOTP) | Consola → Authentication → Settings → Multi-factor | ✅ Identity Platform activo |
+| 2FA (TOTP) | `node herramientas/mfa.mjs --activar` / `--apagar` | ✅ ENABLED, ±5 ventanas |
 | Pagos | `functions:secrets:set` | ⬜ sin secretos |

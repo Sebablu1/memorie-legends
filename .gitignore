@@ -48,8 +48,19 @@ build/
 *.crt
 
 # Firebase Admin
+#
+# El primer nombre es el de la documentación; el segundo, el que la consola le
+# pone DE VERDAD al descargar una clave: `<proyecto>-firebase-adminsdk-<hash>
+# .json`. Faltaba, y es el que aparece en la carpeta de descargas de cualquiera
+# que haya generado una.
+#
+# Lo que hay dentro de ese archivo es control total del proyecto: leer
+# cualquier dato, borrar cualquier cuenta, mover cualquier saldo. Subirlo a un
+# repositorio, aunque sea privado, es entregarlo — los repositorios se
+# clonan, se hacen públicos por error y se indexan.
 serviceAccountKey.json
 *.key.json
+*-firebase-adminsdk-*.json
 # Volcado del código para pegar en el chat. No es parte del sitio.
 proyecto_completo.txt
 
