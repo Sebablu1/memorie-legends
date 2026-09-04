@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Memorie Legends - Registro</title>
     <link rel="icon" href="img/favicon.png" />
+
+    <!-- El logo empieza a bajar YA: es lo más grande de la pantalla, y sin
+         esto el navegador no se entera de que existe hasta terminar el CSS. -->
+    <link rel="preload" as="image" href="img/memorie-legends3.webp" fetchpriority="high" />
     <link rel="stylesheet" href="css/tema.css" />
     <link rel="stylesheet" href="css/style.css" />
     <style>
@@ -29,10 +33,67 @@
 </head>
   <body class="acceso">
     <div class="container">
-      <h1 class="marca-titulo"><a href="dashboard.html"><img src="img/memorie-legends2.webp" alt="Memorie Legends" class="logo-img"><span class="logo-text">Memorie Legends</span></a></h1>
+      <!-- El mismo logo que la caja de iniciar sesión.
+
+           Antes era el cuadrado con marco, más el nombre escrito al lado. Dos
+           pantallas hermanas con dos logos distintos se ven como dos sitios, y
+           éstas son las dos puertas del mismo.
+
+           Va dentro de un <h1> aunque no tenga texto a la vista: sin él, la
+           página se quedaba con un <h2> y ningún encabezado por encima, o sea
+           sin nombre para un buscador y para un lector de pantalla. El nombre
+           lo lleva el `alt`, que es texto de verdad. Es el mismo recurso que
+           usa la portada.
+
+           `width`/`height` son los del archivo: le reservan el espacio al
+           navegador para que el formulario no salte cuando la imagen baja. -->
+      <h1 class="marca-login">
+        <img
+          class="logo-login"
+          src="img/memorie-legends3.webp"
+          alt="Memorie Legends"
+          width="420"
+          height="280"
+          fetchpriority="high"
+        />
+      </h1>
       <h2>Crear Cuenta</h2>
 
       <div id="mensaje" class="mensaje"></div>
+
+      <!-- Con Google primero, igual que en el login.
+
+           Va arriba y no abajo porque es el camino más corto: no hay que
+           elegir contraseña ni verificar el correo después. Quien prefiera
+           correo tiene el formulario justo debajo. -->
+      <button id="googleBtn" type="button" class="google-btn">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 48 48"
+        >
+          <path
+            fill="#FFC107"
+            d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
+          />
+          <path
+            fill="#FF3D00"
+            d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
+          />
+          <path
+            fill="#4CAF50"
+            d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"
+          />
+          <path
+            fill="#1976D2"
+            d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
+          />
+        </svg>
+        Crear cuenta con Google
+      </button>
+
+      <div class="or-divider">o</div>
 
       <form id="registerForm">
         <div class="form-group">
