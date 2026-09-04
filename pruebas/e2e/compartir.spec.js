@@ -22,6 +22,7 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 const SITIO = "https://memorie-legends.web.app";
 const TARJETA = `${SITIO}/img/compartir.jpg`;
@@ -126,11 +127,15 @@ test("los títulos y las descripciones son distintos entre páginas", async ({
     titulos.add(e.ogTitulo[0]);
     descripciones.add(e.ogDesc[0]);
 
-    // Ni tan corta que no diga nada, ni tan larga que se corte a la mitad:
-    // WhatsApp y las redes muestran alrededor de 160 caracteres.
+    // Entre 140 y 160 caracteres.
+    //
+    // Por debajo se desaprovecha el espacio que Google y WhatsApp ya reservaron;
+    // por encima cortan la frase a la mitad, y una descripción cortada suele
+    // perder justo lo que la hacía útil —el final, donde está la invitación a
+    // entrar—.
     const largo = e.ogDesc[0].length;
-    expect(largo, `${archivo}: descripción de ${largo} caracteres`).toBeGreaterThan(40);
-    expect(largo, `${archivo}: descripción de ${largo} caracteres`).toBeLessThanOrEqual(200);
+    expect(largo, `${archivo}: descripción de ${largo} caracteres`).toBeGreaterThanOrEqual(140);
+    expect(largo, `${archivo}: descripción de ${largo} caracteres`).toBeLessThanOrEqual(160);
   }
 
   expect(titulos.size, "hay títulos repetidos entre páginas").toBe(PAGINAS.length);
@@ -166,4 +171,39 @@ test("la miniatura existe, es JPG, mide 1200x630 y pesa poco", async ({ page }) 
   expect(medida, "la miniatura no se pudo cargar").not.toBeNull();
   expect(medida.ancho).toBe(1200);
   expect(medida.alto).toBe(630);
+});
+
+test("las tres descripciones de una página dicen lo mismo", async ({ page }) => {
+  // Cada página lleva la descripción TRES veces: la de los buscadores, la de
+  // Open Graph y la de Twitter. Actualizar una y olvidarse de las otras es el
+  // error fácil, y el resultado es un enlace que dice una cosa en Google y otra
+  // en WhatsApp — sin que nada falle.
+  for (const archivo of PAGINAS) {
+    const e = await etiquetasDe(page, archivo);
+    expect(
+      new Set([e.descripcion[0], e.ogDesc[0]]).size,
+      `${archivo}: la descripción de los buscadores no coincide con la de Open Graph`,
+    ).toBe(1);
+  }
+});
+
+test("la miniatura sale del logo con corona y laureles", async () => {
+  // No se puede mirar un JPG y saber de qué archivo salió. Lo que sí se puede
+  // es comprobar la RECETA: `herramientas/tarjeta.mjs` es lo que la genera, y
+  // vive en el repositorio justamente para que esto sea comprobable.
+  //
+  // La primera versión de la tarjeta la hizo un script de un solo uso que
+  // después se borró: quedó la imagen, pero nadie podía volver a generarla ni
+  // saber qué logo tenía adentro.
+  const receta = readFileSync("herramientas/tarjeta.mjs", "utf8");
+
+  expect(receta, "la tarjeta ya no usa el logo con corona y laureles").toContain(
+    "img/memorie-legends3.png",
+  );
+  expect(receta).toContain("export const ANCHO = 1200");
+  expect(receta).toContain("export const ALTO = 630");
+
+  // Y que siga escribiendo un JPG donde las etiquetas dicen que está.
+  expect(receta).toContain("public/img/compartir.jpg");
+  expect(receta).toContain('type: "jpeg"');
 });
