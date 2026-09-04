@@ -433,7 +433,7 @@ test("la duración viene en Extendida, que es la de siempre", async ({ page }) =
   await expect(page.locator("#tipoPartida")).toHaveValue("extendida");
 });
 
-test("la ayuda dice también con cuántos puntos se queda afuera", async ({ page }) => {
+test("la ayuda repite la duración elegida", async ({ page }) => {
   await abrirTablero(page);
 
   await page.selectOption("#tipoPartida", "corta");

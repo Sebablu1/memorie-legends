@@ -227,7 +227,7 @@ function actualizarAyudaEntrenamiento() {
       : `${rivales.map((r) => r.nombre).join(", ")}, en ${etiqueta(nivel)}`;
 
   const partida = MODOS_PARTIDA.find((m) => m.clave === $("tipoPartida")?.value);
-  const duracion = partida ? ` Afuera a los ${partida.limite} puntos.` : "";
+  const duracion = partida ? ` Partida de ${partida.limite} puntos.` : "";
 
   caja.textContent = `Contra ${contra}.${duracion}`;
 }
