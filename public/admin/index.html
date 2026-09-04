@@ -58,6 +58,44 @@
       <p class="aviso" id="avisoEntrar" role="status"></p>
     </main>
 
+    <!-- El segundo paso.
+
+         Esta pantalla lo necesita MÁS que el login normal: la cuenta que entra
+         acá es la única que puede cancelar salas, dar de baja jugadores y ver
+         el pozo retenido, así que es la primera que conviene que tenga dos
+         pasos — y la primera que se queda afuera si el panel no sabe pedirlos.
+
+         Que faltara no se notó hasta que el administrador activó los suyos: el
+         `signInWithPopup` lanzaba `auth/multi-factor-auth-required`, que no es
+         un fallo sino la mitad del camino, y acá se mostraba como "no pudimos
+         entrar con Google". -->
+    <main id="segundoPaso" class="tarjeta angosta" hidden>
+      <h2>Verificación en dos pasos</h2>
+      <p class="nota" id="pistaSegundoPaso">
+        Escribí el código que muestra tu aplicación.
+      </p>
+      <form id="formSegundoPaso">
+        <label>
+          Código
+          <input
+            id="codigoMfa"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            pattern="[0-9]{6}"
+            placeholder="000000"
+            required
+          />
+        </label>
+        <button class="btn" type="submit">Entrar</button>
+      </form>
+      <div class="acciones">
+        <button class="btn sobrio" id="btnVolverAdmin" type="button">Volver</button>
+      </div>
+      <p class="aviso" id="avisoSegundoPaso" role="status"></p>
+    </main>
+
     <main id="panel" hidden>
       <section class="totales">
         <div class="dato"><b id="totalSalas">—</b><span>salas vivas</span></div>
@@ -131,6 +169,34 @@
         </div>
         <div class="aviso" id="avisoReportes"></div>
         <div class="lista" id="listaReportes"></div>
+      </section>
+
+      <!-- Administradores. Última sección a propósito: es la que menos se
+           toca y la que más cuidado pide. -->
+      <section>
+        <h2>Administradores</h2>
+        <p class="nota">
+          Quién puede entrar acá. Se identifica por el <b>correo</b>, así que
+          tiene que ser el mismo con el que esa persona inicia sesión. Cada
+          alta y cada baja queda registrada con quién la hizo.
+        </p>
+        <p class="nota">
+          La cuenta principal <b>no se puede quitar</b> —es el seguro contra
+          quedarse sin nadie adentro— y <b>nadie puede quitarse a sí mismo</b>:
+          para eso hay que pedírselo a otro administrador.
+        </p>
+
+        <div class="acciones">
+          <label class="campo-admin" for="correoAdmin">
+            <span class="oculto-visual">Correo del nuevo administrador</span>
+            <input id="correoAdmin" type="email" placeholder="correo@ejemplo.com"
+                   autocomplete="off" spellcheck="false" />
+          </label>
+          <button class="btn" id="btnAgregarAdmin" type="button">Agregar</button>
+          <button class="btn sobrio" id="btnVerAdmins" type="button">Refrescar</button>
+        </div>
+        <div class="aviso" id="avisoAdmins"></div>
+        <div class="lista" id="listaAdmins"></div>
       </section>
 
       <section>

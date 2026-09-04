@@ -24,6 +24,7 @@
 
 import { crearReportes, MOTIVOS, MS_ENTRE_REPORTES_AL_MISMO, LARGO_COMENTARIO }
   from "../functions/reportes.js";
+import { crearAdministradores } from "../functions/administradores.js";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -123,7 +124,8 @@ function montar() {
   db._poner("users/caro", { username: "Caro", credits: 0 });
 
   const mod = crearReportes({
-    db, error, ahora: () => reloj, marcaDeTiempo: () => "T", emailAdmin: ADMIN,
+    db, error, ahora: () => reloj, marcaDeTiempo: () => "T",
+    administradores: crearAdministradores({ db, error, correoRaiz: ADMIN }),
   });
   return { db, mod };
 }
@@ -283,7 +285,8 @@ console.log("\n=== 7. La bandeja trae los nombres resueltos ===");
 
   // Una cuenta borrada no rompe el listado.
   const conFantasma = crearReportes({
-    db, error, ahora: () => reloj, marcaDeTiempo: () => "T", emailAdmin: ADMIN,
+    db, error, ahora: () => reloj, marcaDeTiempo: () => "T",
+    administradores: crearAdministradores({ db, error, correoRaiz: ADMIN }),
   });
   db._poner("reportes/r_viejo", {
     denunciante: "ana", denunciado: "borrado", motivo: "otro", comentario: "", estado: "pendiente", creado: 1,

@@ -34,7 +34,8 @@ export function crearAdmin({
   marcaDeTiempo,
   error,
   estados = ESTADOS_SALA,
-  emailAdmin,
+  // Quién puede administrar. Ver `administradores.js`.
+  administradores,
   // La colección de perfiles. Se inyecta como todo lo demás para no repetir
   // el nombre de la colección en dos archivos.
   usuarios = "users",
@@ -42,23 +43,20 @@ export function crearAdmin({
   campoSaldo = "credits",
 }) {
   /**
-   * Comprueba que quien llama es el administrador.
+   * Comprueba que quien llama puede administrar.
    *
-   * Se exige el correo VERIFICADO. Sin eso, cualquiera que registre una cuenta
-   * con esa dirección sin confirmarla entraría; con la verificación, hace falta
-   * además haber recibido el correo, que es el control que de verdad importa.
+   * La comprobación NO vive acá: se inyecta desde `administradores.js`, que es
+   * el único lugar donde se decide quién es administrador. Antes esto comparaba
+   * contra un correo cableado, y cuando aparecieron los reportes hubo que
+   * escribir la misma comparación en un segundo archivo. Dos definiciones de
+   * quién manda es como se cuela una que quedó vieja.
+   *
+   * Es asíncrona porque ahora hay una lista que consultar. Todos los métodos ya
+   * lo eran, así que sólo se agregó el `await`.
    */
-  function exigirAdmin(context) {
-    const token = context?.auth?.token;
-    if (!token) throw error("unauthenticated", "Iniciá sesión para continuar.");
-
-    const correo = String(token.email ?? "").trim().toLowerCase();
-    if (correo !== emailAdmin.toLowerCase() || token.email_verified !== true) {
-      // Mismo mensaje para "no sos vos" y "no verificaste el correo": desde
-      // afuera no conviene poder distinguir uno del otro.
-      throw error("permission-denied", "Esta sección no es para vos.");
-    }
-    return context.auth.uid;
+  async function exigirAdmin(context) {
+    const { uid } = await administradores.exigir(context);
+    return uid;
   }
 
   /** Lo que una sala retiene: sólo lo que se cobró de verdad. */
@@ -75,7 +73,7 @@ export function crearAdmin({
    * que todavía puede hacer algo, no el historial.
    */
   async function listarSalas(context) {
-    exigirAdmin(context);
+    await exigirAdmin(context);
 
     const snap = await db.collection(salas).get();
     const vivas = [];
@@ -208,7 +206,7 @@ export function crearAdmin({
   }
 
   async function cancelarSala(context, { codigo }) {
-    const quien = exigirAdmin(context);
+    const quien = await exigirAdmin(context);
     return cancelarUna(codigo, quien);
   }
 
@@ -221,7 +219,7 @@ export function crearAdmin({
    * fracasar a todas por culpa de una.
    */
   async function cancelarTodasEnEspera(context) {
-    const quien = exigirAdmin(context);
+    const quien = await exigirAdmin(context);
 
     const snap = await db.collection(salas).where("estado", "==", estados.ESPERANDO).get();
     const codigos = snap.docs.map((d) => d.id);
@@ -261,7 +259,7 @@ export function crearAdmin({
    * ver exactamente qué se guardó, no una versión limpia.
    */
   async function revisarNombres(context) {
-    exigirAdmin(context);
+    await exigirAdmin(context);
 
     // Los caracteres que un nombre normal no tiene y que son los que hacen
     // falta para salirse del texto. No se busca "código malicioso": eso no se
@@ -309,7 +307,7 @@ export function crearAdmin({
    * hay que ver el saldo y las partidas.
    */
   async function listarUsuarios(context) {
-    exigirAdmin(context);
+    await exigirAdmin(context);
 
     const snap = await db.collection(usuarios).get();
     const cuentas = [];
@@ -369,7 +367,7 @@ export function crearAdmin({
    * su propia confirmación.
    */
   async function eliminarUsuario(context, { uid }) {
-    const quien = exigirAdmin(context);
+    const quien = await exigirAdmin(context);
 
     const objetivo = String(uid ?? "").trim();
     if (!objetivo) throw error("invalid-argument", "Falta el uid.");

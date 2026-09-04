@@ -11,6 +11,7 @@
  */
 
 import { crearAdmin } from "../functions/admin.js";
+import { crearAdministradores } from "../functions/administradores.js";
 import { ESTADOS_SALA } from "../public/js/reglas/salas.js";
 
 let fallos = 0;
@@ -108,7 +109,7 @@ const montar = (datos) => {
     db, salas: "rooms", partidas: "partidas",
     moverLeyendas: banco.moverLeyendas, motivo: "apuesta",
     marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
-    emailAdmin: ADMIN,
+    administradores: crearAdministradores({ db, error, correoRaiz: ADMIN }),
   });
   return { db, admin, banco };
 };
@@ -365,7 +366,8 @@ console.log("\n=== Revisar nombres guardados ===");
   };
   const panel = crearAdmin({
     db, salas: "rooms", partidas: "partidas", moverLeyendas: null,
-    motivo: "x", marcaDeTiempo: () => "T", error, emailAdmin: ADMIN,
+    motivo: "x", marcaDeTiempo: () => "T", error,
+    administradores: crearAdministradores({ db, error, correoRaiz: ADMIN }),
   });
 
   // Sólo el administrador, con el correo verificado.
@@ -439,10 +441,17 @@ console.log("\n=== Cuentas: listar y dar de baja ===");
     }),
   });
 
-  const nuevoPanel = () => crearAdmin({
-    db: hacerDb(), salas: "rooms", partidas: "partidas", moverLeyendas: null,
-    motivo: "x", marcaDeTiempo: () => "T", error, emailAdmin: ADMIN,
-  });
+  const nuevoPanel = () => {
+    // UNA sola base para el panel y para la comprobación de administrador: si
+    // fueran dos, la comprobación miraría una colección vacía distinta de la
+    // que usa el panel, y la prueba pasaría por el motivo equivocado.
+    const db = hacerDb();
+    return crearAdmin({
+      db, salas: "rooms", partidas: "partidas", moverLeyendas: null,
+      motivo: "x", marcaDeTiempo: () => "T", error,
+      administradores: crearAdministradores({ db, error, correoRaiz: ADMIN }),
+    });
+  };
   const comoAdmin = { auth: { uid: "admin-uid", token: { email: ADMIN, email_verified: true } } };
 
   // --- permisos ---

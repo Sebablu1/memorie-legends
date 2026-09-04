@@ -504,3 +504,30 @@ select {
 #btnGoogle {
   width: 100%;
 }
+
+
+/* El campo del correo del nuevo administrador. Se lleva el espacio que sobra
+   en la fila: un correo entero no entra en un campo del ancho de un botón. */
+.campo-admin {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.campo-admin input {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+}
+
+/* La fila de un administrador lleva correo, fechas y quién lo agregó: se deja
+   envolver antes que salirse en una pantalla angosta. */
+#listaAdmins .fila {
+  flex-wrap: wrap;
+}
+
+/* Un botón apagado tiene que verse apagado. Los dos casos son legítimos —el
+   raíz y uno mismo— y el motivo está en el `title`. */
+#listaAdmins .btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

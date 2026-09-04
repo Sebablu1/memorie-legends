@@ -58,7 +58,8 @@ export function crearReportes({
   marcaDeTiempo,
   reportes = "reportes",
   usuarios = "users",
-  emailAdmin,
+  // Quién puede administrar. Ver `administradores.js`.
+  administradores,
 }) {
   const ref = (id) => db.collection(reportes).doc(id);
 
@@ -135,14 +136,17 @@ export function crearReportes({
 
   // ------------------------------------------------------------ el panel
 
-  function exigirAdmin(context) {
-    const token = context?.auth?.token;
-    if (!token) throw error("unauthenticated", "Iniciá sesión para continuar.");
-    const correo = String(token.email ?? "").trim().toLowerCase();
-    if (correo !== emailAdmin.toLowerCase() || token.email_verified !== true) {
-      throw error("permission-denied", "Esta sección no es para vos.");
-    }
-    return context.auth.uid;
+  /**
+   * Quién puede administrar lo decide `administradores.js`, no este archivo.
+   *
+   * Acá había una copia de la comprobación, escrita cuando el único
+   * administrador era un correo cableado. Con la lista, dos copias serían dos
+   * respuestas distintas a la misma pregunta el día que una se actualice y la
+   * otra no.
+   */
+  async function exigirAdmin(context) {
+    const { uid } = await administradores.exigir(context);
+    return uid;
   }
 
   /**
@@ -152,7 +156,7 @@ export function crearReportes({
    * por su dueño: el panel no puede pedirle a Firestore el nombre de nadie.
    */
   async function listar(context, { estado, limite = 50 } = {}) {
-    exigirAdmin(context);
+    await exigirAdmin(context);
 
     const tope = Math.min(Math.max(Number(limite) || 50, 1), 200);
     let consulta = db.collection(reportes).orderBy("creado", "desc").limit(tope);
@@ -210,7 +214,7 @@ export function crearReportes({
 
   /** Marca un reporte como resuelto o ignorado. No toca la cuenta denunciada. */
   async function resolver(context, { id, estado, nota }) {
-    const admin = exigirAdmin(context);
+    const admin = await exigirAdmin(context);
 
     if (typeof id !== "string" || !id.trim()) {
       throw error("invalid-argument", "Falta el reporte.");

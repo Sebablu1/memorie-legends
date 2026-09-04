@@ -66,6 +66,7 @@ import {
 import { crearSalirDeSalaEnEspera } from "./salida.js";
 import { crearAdmin } from "./admin.js";
 import { crearReportes } from "./reportes.js";
+import { crearAdministradores } from "./administradores.js";
 import { crearMercadoPago, pagoCoincideConOrden } from "./mercadopago.js";
 
 import {
@@ -554,6 +555,25 @@ const SECRETOS_MP = ["MP_ACCESS_TOKEN", "MP_WEBHOOK_SECRET"];
 const URL_WEBHOOK = "https://us-central1-memorie-legends.cloudfunctions.net/webhookPago";
 const URL_VUELTA = "https://memorie-legends.web.app/tienda.html";
 
+/**
+ * Quién puede administrar.
+ *
+ * `CORREO_ADMIN` queda como administrador RAÍZ: cableado, y no se puede quitar
+ * desde ningún lado. Es el seguro contra quedarse sin nadie adentro — que la
+ * lista falle, que alguien se borre por error— y ese día se arregla entrando,
+ * no con una credencial de servicio.
+ *
+ * Se construye ANTES que `panel` y `moderacion` porque los dos lo reciben: hay
+ * una sola definición de quién manda, y los dos módulos la consultan en vez de
+ * llevar cada uno su copia.
+ */
+const administradores = crearAdministradores({
+  db,
+  error: errorHttp,
+  marcaDeTiempo,
+  correoRaiz: CORREO_ADMIN,
+});
+
 const panel = crearAdmin({
   db,
   salas: SALAS,
@@ -566,7 +586,7 @@ const panel = crearAdmin({
   marcaDeTiempo,
   error: errorHttp,
   estados: ESTADOS_SALA,
-  emailAdmin: CORREO_ADMIN,
+  administradores,
 });
 
 /**
@@ -581,7 +601,7 @@ const moderacion = crearReportes({
   error: errorHttp,
   ahora: () => Date.now(),
   marcaDeTiempo,
-  emailAdmin: CORREO_ADMIN,
+  administradores,
 });
 
 export const listarSalasAdmin = functions.https.onCall((_data, context) =>
@@ -642,6 +662,26 @@ export const resolverReporteAdmin = functions.https.onCall((data, context) =>
     estado: data?.estado,
     nota: data?.nota,
   }));
+
+// ------------------------------------------------- administradores
+
+/**
+ * Quiénes pueden administrar.
+ *
+ * Las tres comprueban primero que quien llama YA sea administrador: darse
+ * permisos a uno mismo tiene que ser imposible, y por eso la comprobación vive
+ * en `administradores.exigir`, del lado del servidor, contra el correo
+ * verificado del token.
+ */
+export const listarAdministradores = functions.https.onCall((_data, context) =>
+  administradores.listar(context));
+
+export const agregarAdministrador = functions.https.onCall((data, context) =>
+  administradores.agregar(context, { correo: data?.correo }));
+
+/** Nadie puede quitarse a sí mismo ni quitar al raíz. Ver `administradores.js`. */
+export const quitarAdministrador = functions.https.onCall((data, context) =>
+  administradores.quitar(context, { correo: data?.correo }));
 
 // ------------------------------------------------------ partida en red
 

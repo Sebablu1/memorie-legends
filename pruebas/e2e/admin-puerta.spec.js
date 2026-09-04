@@ -110,3 +110,54 @@ test("el mayúsculas/minúsculas no bloquea al administrador de verdad", async (
   await abrirComo(page, { uid: "root", email: "Soporte.Memorie.Legends@Gmail.com" });
   expect(await seVe(page, "#panel"), "rechaza al administrador por una mayúscula").toBe(true);
 });
+
+
+test("el panel pide el código cuando la cuenta tiene dos pasos", async ({ page }) => {
+  // El fallo que arregla: la cuenta de soporte activó los dos pasos y el panel
+  // no sabía pedirlos. `signInWithPopup` lanzaba
+  // `auth/multi-factor-auth-required` —que no es un fallo sino la mitad del
+  // camino— y la pantalla lo mostraba como "no pudimos entrar con Google".
+  // El administrador quedaba afuera de su propio panel sin ninguna pista.
+  await page.route("**/js/mfa.js", (r) =>
+    r.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body: `
+      export const necesitaSegundoPaso = (e) => e?.code === "auth/multi-factor-auth-required";
+      export async function opcionesDeSegundoPaso(){
+        return { resolucion: {}, metodos: [{ indice: 0, nombre: "Google Authenticator" }] };
+      }
+      export async function terminarConCodigo(){ return {}; }
+    ` }));
+
+  await page.route("**/js/firebase.js", (r) =>
+    r.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body: `
+      export const app={}; export const auth={}; export const db={}; export const funciones={};
+      export const googleProvider={};
+      export const SUPPORT_EMAIL=${JSON.stringify(ADMIN)};
+      export function httpsCallable(){ return async () => ({ data: {} }); }
+      export function onAuthStateChanged(a, fn){ setTimeout(() => fn(null), 80); return () => {}; }
+      export async function signInWithEmailAndPassword(){}
+      export async function signInWithPopup(){
+        const e = new Error("mfa"); e.code = "auth/multi-factor-auth-required"; throw e;
+      }
+      export function signOut(){}
+    ` }));
+
+  await page.goto("/admin/index.html");
+  await expect(page.locator("#btnGoogle")).toBeVisible({ timeout: 9000 });
+  await expect(page.locator("#segundoPaso")).toBeHidden();
+
+  await page.locator("#btnGoogle").click();
+
+  await expect(page.locator("#segundoPaso"),
+    "no pide el código: el administrador con dos pasos no puede entrar").toBeVisible({ timeout: 9000 });
+  await expect(page.locator("#entrar"),
+    "deja los dos formularios a la vista a la vez").toBeHidden();
+  await expect(page.locator("#codigoMfa")).toBeVisible();
+
+  // Y NO se muestra como un error, que era el fallo.
+  await expect(page.locator("#avisoEntrar")).not.toContainText(/no pudimos/i);
+
+  // Hay salida: quien no tenga el teléfono a mano puede volver.
+  await page.locator("#btnVolverAdmin").click();
+  await expect(page.locator("#entrar")).toBeVisible();
+  await expect(page.locator("#segundoPaso")).toBeHidden();
+});

@@ -21,6 +21,7 @@
 import { db, collection, query, where, onSnapshot } from "./firebase.js";
 import { exigirSesion, mostrarSaldo, conectarBotonSalir, formatearEspera } from "./sesion.js";
 import { estadoMfa } from "./mfa.js";
+import { SUPPORT_EMAIL } from "./firebase.js";
 import { crearSala, unirseASala, ErrorDeServidor } from "./servidor.js";
 import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/salas.js";
 import { esperaRuleta } from "./reglas/economia.js";
@@ -94,6 +95,18 @@ if (sesion) {
 
   mostrarSaldo(perfil.saldo);
   ofrecerDosPasos();
+
+  // El enlace al panel, sólo para la cuenta de soporte.
+  //
+  // Esto NO es una comprobación de seguridad y no hay que confundirlo con una:
+  // quien edite el DOM lo destapa en dos segundos. Lo que decide quién entra
+  // son las ocho Cloud Functions, que miran el correo del token verificado y
+  // rechazan a todos los demás — está probado con una cuenta real. Esto sólo
+  // ahorra tener que acordarse de la URL.
+  if ((usuario.email ?? "").toLowerCase() === SUPPORT_EMAIL.toLowerCase()) {
+    const enlace = $("enlaceAdmin");
+    if (enlace) enlace.hidden = false;
+  }
   $("statSaldo").textContent = perfil.saldo.toLocaleString("es-UY");
   $("statPartidas").textContent = perfil.partidas;
   $("statVictorias").textContent = perfil.victorias;

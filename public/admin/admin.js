@@ -26,6 +26,12 @@ import {
   signOut,
 } from "../js/firebase.js";
 
+import {
+  necesitaSegundoPaso,
+  opcionesDeSegundoPaso,
+  terminarConCodigo,
+} from "../js/mfa.js";
+
 const $ = (id) => document.getElementById(id);
 
 const dom = {
@@ -34,6 +40,12 @@ const dom = {
   entrar: $("entrar"),
   formEntrar: $("formEntrar"),
   btnGoogle: $("btnGoogle"),
+  segundoPaso: $("segundoPaso"),
+  formSegundoPaso: $("formSegundoPaso"),
+  codigoMfa: $("codigoMfa"),
+  avisoSegundoPaso: $("avisoSegundoPaso"),
+  pistaSegundoPaso: $("pistaSegundoPaso"),
+  btnVolverAdmin: $("btnVolverAdmin"),
   correo: $("correo"),
   clave: $("clave"),
   avisoEntrar: $("avisoEntrar"),
@@ -56,6 +68,11 @@ const dom = {
   filtroReportes: $("filtroReportes"),
   avisoReportes: $("avisoReportes"),
   listaReportes: $("listaReportes"),
+  correoAdmin: $("correoAdmin"),
+  btnAgregarAdmin: $("btnAgregarAdmin"),
+  btnVerAdmins: $("btnVerAdmins"),
+  avisoAdmins: $("avisoAdmins"),
+  listaAdmins: $("listaAdmins"),
 };
 
 const listar = httpsCallable(funciones, "listarSalasAdmin");
@@ -66,6 +83,9 @@ const listarUsuarios = httpsCallable(funciones, "listarUsuariosAdmin");
 const eliminarUsuario = httpsCallable(funciones, "eliminarUsuarioAdmin");
 const listarReportes = httpsCallable(funciones, "listarReportesAdmin");
 const resolverReporte = httpsCallable(funciones, "resolverReporteAdmin");
+const listarAdmins = httpsCallable(funciones, "listarAdministradores");
+const agregarAdmin = httpsCallable(funciones, "agregarAdministrador");
+const quitarAdmin = httpsCallable(funciones, "quitarAdministrador");
 
 const decir = (donde, texto, clase = "") => {
   donde.textContent = texto;
@@ -102,6 +122,7 @@ dom.btnGoogle.addEventListener("click", async () => {
     await signInWithPopup(auth, googleProvider);
   } catch (error) {
     dom.btnGoogle.disabled = false;
+    if (await manejarSegundoPaso(error)) return;
     const cerrada = /popup-closed|cancelled-popup/.test(error?.code ?? "");
     decir(dom.avisoEntrar,
       cerrada ? "Cerraste la ventana de Google." : "No pudimos entrar con Google.",
@@ -117,6 +138,7 @@ dom.formEntrar.addEventListener("submit", async (evento) => {
     await signInWithEmailAndPassword(auth, dom.correo.value.trim(), dom.clave.value);
     dom.clave.value = "";
   } catch (error) {
+    if (await manejarSegundoPaso(error)) return;
     // Sin detallar si falló el correo o la contraseña.
     decir(dom.avisoEntrar, "No pudimos entrar con esos datos.", "mal");
     console.error(error);
@@ -124,6 +146,81 @@ dom.formEntrar.addEventListener("submit", async (evento) => {
 });
 
 dom.btnSalir.addEventListener("click", () => signOut(auth));
+
+// --------------------------------------------- segundo paso
+
+/**
+ * La resolución pendiente del segundo factor.
+ *
+ * Es el objeto que trae el error del login, y es lo ÚNICO que permite terminar
+ * de entrar. Si se pierde, hay que rehacer el login desde el principio. Por
+ * eso no se tira cuando el código está mal: se avisa y se reintenta con la
+ * misma resolución.
+ */
+let resolucionPendiente = null;
+
+function pedirSegundoPaso({ resolucion, metodos }) {
+  resolucionPendiente = resolucion;
+  dom.entrar.hidden = true;
+  dom.segundoPaso.hidden = false;
+  if (metodos[0]) {
+    dom.pistaSegundoPaso.textContent = `Escribí el código que muestra ${metodos[0].nombre}.`;
+  }
+  decir(dom.avisoSegundoPaso, "");
+  dom.codigoMfa.focus();
+}
+
+function volverAEntrar() {
+  resolucionPendiente = null;
+  dom.segundoPaso.hidden = true;
+  dom.entrar.hidden = false;
+  dom.codigoMfa.value = "";
+  dom.btnGoogle.disabled = false;
+  decir(dom.avisoEntrar, "");
+}
+
+/**
+ * Si el error era "falta el segundo paso", abre esa pantalla.
+ *
+ * `auth/multi-factor-auth-required` NO es un fallo: la contraseña —o la cuenta
+ * de Google— ya se aceptó y falta el código. Tratarlo como error, que es lo
+ * que hacía antes esta pantalla, deja al administrador leyendo "no pudimos
+ * entrar" sin ninguna pista de qué le falta.
+ */
+async function manejarSegundoPaso(error) {
+  if (!necesitaSegundoPaso(error)) return false;
+  try {
+    pedirSegundoPaso(await opcionesDeSegundoPaso(error));
+  } catch (fallo) {
+    decir(dom.avisoEntrar, fallo?.message ?? "No pudimos pedirte el código.", "mal");
+  }
+  return true;
+}
+
+dom.btnVolverAdmin.addEventListener("click", volverAEntrar);
+
+dom.formSegundoPaso.addEventListener("submit", async (evento) => {
+  evento.preventDefault();
+  if (!resolucionPendiente) return volverAEntrar();
+
+  const boton = dom.formSegundoPaso.querySelector('button[type="submit"]');
+  boton.disabled = true;
+  decir(dom.avisoSegundoPaso, "Comprobando…");
+
+  try {
+    await terminarConCodigo(resolucionPendiente, dom.codigoMfa.value);
+    // Entró. `onAuthStateChanged` se ocupa del resto.
+  } catch (error) {
+    boton.disabled = false;
+    // La resolución NO se tira: los códigos duran 30 segundos y lo más
+    // probable es que se haya vencido mientras lo escribía.
+    dom.codigoMfa.value = "";
+    dom.codigoMfa.focus();
+    decir(dom.avisoSegundoPaso, error?.message ?? "Ese código no sirvió.", "mal");
+  }
+});
+
+// ------------------------------------------------------------- sesión
 
 onAuthStateChanged(auth, (usuario) => {
   const correo = (usuario?.email ?? "").toLowerCase();
@@ -133,6 +230,13 @@ onAuthStateChanged(auth, (usuario) => {
   dom.btnSalir.hidden = !usuario;
   dom.entrar.hidden = Boolean(esAdmin);
   dom.panel.hidden = !esAdmin;
+
+  // Con sesión resuelta, la pantalla del código ya no va: o entró, o hay que
+  // volver a empezar. Dejarla puesta muestra dos formularios a la vez.
+  if (usuario) {
+    dom.segundoPaso.hidden = true;
+    resolucionPendiente = null;
+  }
 
   // El botón se rehabilita siempre que la pantalla de entrada esté a la vista:
   // si entró alguien que no era, tiene que poder salir y probar con la cuenta
@@ -569,3 +673,116 @@ async function marcar(reporte, estado, fila) {
 
 dom.btnVerReportes.addEventListener("click", verReportes);
 dom.filtroReportes.addEventListener("change", verReportes);
+
+
+// ------------------------------------------------------ administradores
+
+/**
+ * Quiénes pueden entrar acá.
+ *
+ * Todo se dibuja con `createElement` y `textContent`. Acá entran correos que
+ * escribió una persona a mano en un campo de texto: es exactamente el tipo de
+ * dato que no se pega con `innerHTML`.
+ *
+ * Las tres reglas —no quitar al raíz, no quitarse a uno mismo, dejar constancia
+ * de quién hizo qué— las aplica el SERVIDOR, en `administradores.js`. Lo de acá
+ * es sólo no ofrecer botones que van a fallar: apagarlos en la pantalla no
+ * protege nada, pero un botón que siempre da error es peor que no tenerlo.
+ */
+function filaDeAdmin(admin) {
+  const fila = document.createElement("div");
+  fila.className = "fila";
+
+  const campo = (texto, clase = "campo") => {
+    const el = document.createElement("span");
+    el.className = clase;
+    el.textContent = texto;
+    return el;
+  };
+
+  const etiqueta = document.createElement("span");
+  etiqueta.className = `etiqueta ${admin.raiz ? "jugando" : "esperando"}`;
+  etiqueta.textContent = admin.raiz ? "principal" : "administrador";
+
+  fila.append(etiqueta, campo(admin.correo, "campo"));
+
+  if (admin.soyYo) fila.append(campo("(vos)", "campo tenue"));
+  if (admin.desde) fila.append(campo(`desde ${fecha(admin.desde)}`, "campo tenue"));
+  if (admin.agregadoPor) fila.append(campo(`lo agregó ${admin.agregadoPor}`, "campo tenue"));
+
+  const boton = document.createElement("button");
+  boton.type = "button";
+  boton.className = "btn peligro chico";
+  boton.textContent = "Quitar";
+
+  // Los dos casos que el servidor rechaza. Se apagan con el motivo puesto en
+  // el `title`, para que no parezca que el botón está roto.
+  if (admin.raiz) {
+    boton.disabled = true;
+    boton.title = "La cuenta principal no se puede quitar.";
+  } else if (admin.soyYo) {
+    boton.disabled = true;
+    boton.title = "No podés quitarte a vos mismo. Pedíselo a otro administrador.";
+  } else {
+    boton.addEventListener("click", () => sacarAdmin(admin, boton));
+  }
+
+  fila.append(boton);
+  return fila;
+}
+
+async function verAdmins() {
+  dom.btnVerAdmins.disabled = true;
+  decir(dom.avisoAdmins, "Cargando…");
+  try {
+    const { data } = await listarAdmins();
+    dom.listaAdmins.replaceChildren(...data.administradores.map(filaDeAdmin));
+    decir(dom.avisoAdmins, `${data.administradores.length} con acceso al panel.`, "bien");
+  } catch (error) {
+    decir(dom.avisoAdmins, error?.message ?? "No pudimos leer la lista.", "mal");
+    console.error(error);
+  } finally {
+    dom.btnVerAdmins.disabled = false;
+  }
+}
+
+dom.btnAgregarAdmin.addEventListener("click", async () => {
+  const correo = dom.correoAdmin.value.trim();
+  if (!correo) {
+    decir(dom.avisoAdmins, "Escribí el correo de quien va a administrar.", "mal");
+    dom.correoAdmin.focus();
+    return;
+  }
+
+  // Sí se pregunta: esto le da a otra persona acceso a cancelar salas, dar de
+  // baja cuentas y ver el pozo retenido. Y un correo mal escrito autoriza a
+  // quien no era.
+  if (!window.confirm(`¿Darle acceso al panel a ${correo}?`)) return;
+
+  dom.btnAgregarAdmin.disabled = true;
+  decir(dom.avisoAdmins, "Agregando…");
+  try {
+    await agregarAdmin({ correo });
+    dom.correoAdmin.value = "";
+    await verAdmins();
+    decir(dom.avisoAdmins, `${correo} ya puede administrar.`, "bien");
+  } catch (error) {
+    decir(dom.avisoAdmins, error?.message ?? "No pudimos agregarlo.", "mal");
+  } finally {
+    dom.btnAgregarAdmin.disabled = false;
+  }
+});
+
+async function sacarAdmin(admin, boton) {
+  if (!window.confirm(`¿Quitarle el acceso al panel a ${admin.correo}?`)) return;
+  boton.disabled = true;
+  try {
+    await quitarAdmin({ correo: admin.correo });
+    await verAdmins();
+  } catch (error) {
+    boton.disabled = false;
+    decir(dom.avisoAdmins, error?.message ?? "No pudimos quitarlo.", "mal");
+  }
+}
+
+dom.btnVerAdmins.addEventListener("click", verAdmins);
