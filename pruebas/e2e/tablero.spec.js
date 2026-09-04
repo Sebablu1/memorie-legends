@@ -390,7 +390,12 @@ test("el ancla del menú cae en el panel de jugar", async ({ page }) => {
   // `dashboard.html`: dos nombres para la misma cosa. Con el ancla, "Jugar"
   // deja al jugador mirando los selectores.
   await abrirTablero(page);
-  await expect(page.locator('nav a[href="#jugar"]')).toBeVisible();
+
+  // El menú vive en el cajón, así que hay que abrirlo para verlo. Antes estaba
+  // suelto en la barra; el enlace es el mismo, cambió dónde se lo encuentra.
+  await page.locator("#btnMenu").click();
+  await expect(page.locator('#cajonMenu nav a[href="#jugar"]')).toBeVisible();
+
   await expect(page.locator("#jugar")).toContainText(/Elegí el modo/i);
 
   // Y el destino existe de verdad: un ancla rota no avisa, simplemente no

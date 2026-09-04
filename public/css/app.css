@@ -644,8 +644,11 @@ body {
 /* --------------------------------------------------------- el botón */
 
 .hamburguesa {
-  /* En pantalla grande no existe. */
-  display: none;
+  /* En TODOS los tamaños. El menú plegable dejó de ser cosa del teléfono: la
+     barra queda con el logo, el saldo y el botón, y los enlaces viven en el
+     cajón. Una barra con siete enlaces y un saldo compite consigo misma; con
+     tres cosas se lee de un vistazo. */
+  display: inline-flex;
   margin-left: auto;
   padding: 10px;
   border: 1px solid var(--borde);
@@ -869,6 +872,29 @@ body.con-menu-abierto {
   overflow: hidden;
 }
 
+/* El hamburguesa de una barra SIN menú —la portada— sólo aparece cuando el
+   contenido no entra. Lo marca `menu.js`, que es donde se sabe si hay enlaces
+   que plegar. Sin esto, en una pantalla ancha habría un botón que esconde las
+   dos llamadas principales y abre un cajón vacío. */
+@media (min-width: 769px) {
+  .hamburguesa.solo-si-no-entra {
+    display: none;
+  }
+}
+
+/* Los enlaces viven en el cajón, en cualquier tamaño de pantalla.
+
+   Se esconden ANTES del primer dibujado, no cuando `menu.js` los muda: si no,
+   la barra se dibujaba con los siete adentro y se achicaba medio segundo
+   después, empujando la página entera. Ver la nota de `.con-js` más abajo.
+
+   `.barra-contenido > nav` y no `.barra nav`: cuando el menú está en el cajón
+   ya no es descendiente de la barra, y esta regla tiene que dejar de
+   alcanzarlo o se escondería también ahí. */
+.con-js .barra-contenido > nav {
+  display: none;
+}
+
 /* ------------------------------------------------- el punto de corte */
 
 @media (max-width: 768px) {
@@ -889,7 +915,9 @@ body.con-menu-abierto {
      apagado, la clase no aparece, los enlaces se ven como siempre y la
      página sigue siendo navegable. Esconderlos sin esa condición dejaría a
      esa persona sin menú y sin hamburguesa —el botón tampoco andaría—. */
-  .con-js .barra-contenido > nav,
+  /* En el teléfono también se guarda el saldo y el botón de salir: al lado
+     del logo no entran sin apretarlo todo. En pantalla grande se quedan en la
+     barra —ver la regla de abajo, fuera de esta media query—. */
   .con-js .barra-contenido > .derecha {
     display: none;
   }

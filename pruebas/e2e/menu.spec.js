@@ -14,8 +14,10 @@
  *      no hace nada.
  *   2. Que el cajón se pueda cerrar. Si la X, el velo y la tecla Escape
  *      fallaran a la vez, el menú quedaría tapando la página sin salida.
- *   3. Que al volver a pantalla grande el menú vuelva a la barra. Girar el
- *      teléfono no puede dejar la barra vacía.
+ *   3. Que cambiar de tamaño no pierda ni duplique nada. Los enlaces viven
+ *      siempre en el cajón; lo que se muda es el saldo, que en pantalla grande
+ *      se queda en la barra y en el teléfono se guarda. Dos `#saldo` a la vez
+ *      serían uno actualizándose y otro congelado.
  */
 
 import { test, expect } from "@playwright/test";
@@ -58,35 +60,66 @@ test("en el teléfono manda el hamburguesa; el menú horizontal no está", async
   await expect(page.locator("#cajonMenu nav")).toHaveCount(1);
 });
 
-test("en pantalla grande manda la barra; el hamburguesa se esconde", async ({
-  page,
-}) => {
+test("en pantalla grande el hamburguesa también manda", async ({ page }) => {
+  // El menú plegable dejó de ser cosa del teléfono. Una barra con siete
+  // enlaces, el saldo y el botón de salir compite consigo misma; con el logo,
+  // el saldo y un botón se lee de un vistazo.
   await abrirTablero(page, ESCRITORIO);
 
-  await expect(page.locator(".barra-contenido nav")).toBeVisible();
-  await expect(page.locator(".barra-contenido .derecha")).toBeVisible();
-  await expect(page.locator("#btnMenu")).toBeHidden();
+  await expect(page.locator("#btnMenu")).toBeVisible();
+  await expect(page.locator(".barra-contenido nav")).toHaveCount(0);
+  await expect(page.locator("#cajonMenu nav")).toHaveCount(1);
 });
 
-test("girar el teléfono devuelve el menú a la barra, sin perderlo", async ({
-  page,
-}) => {
-  await abrirTablero(page);
+test("pero el saldo se queda en la barra, no se esconde", async ({ page }) => {
+  // Ésta es la diferencia entre los dos tamaños, y es a propósito: cuánto le
+  // queda a uno es información que conviene tener a la vista sin abrir nada.
+  // En el teléfono no entra al lado del logo; en una pantalla grande, sí.
+  await abrirTablero(page, ESCRITORIO);
 
-  // Se marca el nodo para poder reconocerlo después. Si en vez de mudarse se
-  // copiara, la marca no viajaría y esto lo delata.
+  await expect(page.locator(".barra-contenido .derecha")).toBeVisible();
+  await expect(page.locator(".barra-contenido #saldo")).toBeVisible();
+  await expect(page.locator("#cajonMenu .derecha")).toHaveCount(0);
+
+  // Y en el teléfono, al revés.
+  await page.setViewportSize(MOVIL);
+  await expect(page.locator("#cajonMenu .derecha")).toHaveCount(1);
+  await expect(page.locator(".barra-contenido .derecha")).toHaveCount(0);
+});
+
+test("el cajón abre y cierra igual en pantalla grande", async ({ page }) => {
+  await abrirTablero(page, ESCRITORIO);
+  const cajon = page.locator("#cajonMenu");
+
+  await expect(cajon).toBeHidden();
+  await page.locator("#btnMenu").click();
+  await expect(cajon).toBeVisible();
+  await expect(cajon.locator('nav a[href="ranking.html"]')).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(cajon).toBeHidden();
+});
+
+test("cambiar de tamaño no pierde el menú ni lo duplica", async ({ page }) => {
+  // Los enlaces viven SIEMPRE en el cajón, así que lo que se muda al cambiar
+  // de tamaño es el saldo. Se marca el nodo para reconocerlo: si en vez de
+  // mudarse se copiara, la marca no viajaría y habría dos `#saldo` — uno
+  // actualizándose y otro congelado.
+  await abrirTablero(page);
   await page.evaluate(() => {
-    document.querySelector("#cajonMenu nav").dataset.marca = "el-mismo";
+    document.querySelector("#cajonMenu .derecha").dataset.marca = "el-mismo";
   });
 
   await page.setViewportSize(ESCRITORIO);
-  await expect(
-    page.locator('.barra-contenido nav[data-marca="el-mismo"]'),
-  ).toBeVisible();
+  await expect(page.locator('.barra-contenido .derecha[data-marca="el-mismo"]')).toBeVisible();
+  expect(await page.locator("#saldo").count(), "hay dos saldos").toBe(1);
 
-  // Y de vuelta.
   await page.setViewportSize(MOVIL);
-  await expect(page.locator('#cajonMenu nav[data-marca="el-mismo"]')).toHaveCount(1);
+  await expect(page.locator('#cajonMenu .derecha[data-marca="el-mismo"]')).toHaveCount(1);
+  expect(await page.locator("#saldo").count(), "hay dos saldos").toBe(1);
+
+  // Y el menú sigue siendo uno solo, en el cajón, todo el tiempo.
+  expect(await page.locator("nav").count()).toBe(1);
 });
 
 // =====================================================================

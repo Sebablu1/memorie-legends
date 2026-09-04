@@ -40,11 +40,15 @@
  */
 
 /**
- * Hasta acá, cajón. De acá para arriba, menú horizontal.
+ * Hasta acá, en la barra no entra nada más que el logo y el botón.
  *
- * 768px es el ancho de una tableta en vertical. Con siete enlaces más el
- * saldo y el botón de salir, por debajo de eso la barra se parte en dos
- * líneas y empuja la página hacia abajo.
+ * Ojo: esto YA NO decide si hay cajón. El cajón es el menú en todos los
+ * tamaños —los enlaces viven siempre ahí— y lo único que este corte decide es
+ * dónde se dibujan el saldo y el botón de salir: en la barra si hay lugar, y
+ * dentro del cajón si no.
+ *
+ * 768px es el ancho de una tableta en vertical. Por debajo, el saldo al lado
+ * del logo deja la barra apretada y sin aire.
  */
 const CORTE = 768;
 
@@ -112,7 +116,7 @@ if (barra && (nav || derecha)) {
     [...document.body.children].filter((el) => el !== cajon && el !== fondo);
 
   function abrir() {
-    if (abierto || !angosta.matches) return;
+    if (abierto) return;
     abierto = true;
 
     cajon.classList.add("abierto");
@@ -163,20 +167,33 @@ if (barra && (nav || derecha)) {
    * nodos, girar el teléfono no pierde nada: ni el escuchador de salir, ni el
    * estado del enlace de administración, ni el saldo ya pintado.
    */
+  /**
+   * La portada no tiene `<nav>`, y eso cambia las cosas.
+   *
+   * Su barra son "Iniciar sesión" y "Crear cuenta": no hay ningún menú que
+   * plegar. En un teléfono igual conviene guardarlos —al lado del logo no
+   * entran— pero en una pantalla ancha sobra lugar, y esconder las dos
+   * llamadas principales detrás de un botón que además abriría un cuarto
+   * vacío sería peor de todas las formas posibles.
+   *
+   * Así que ahí el hamburguesa se muestra sólo en pantalla angosta. Lo hace el
+   * CSS con esta clase; la decisión de si existe un menú se toma acá, que es
+   * donde se sabe.
+   */
+  if (!nav) boton.classList.add("solo-si-no-entra");
+
   function acomodar() {
-    if (angosta.matches) {
-      if (nav) cajon.append(nav);
-      if (derecha) cajon.append(derecha);
-      if (!abierto) apagarCajon();
-      return;
+    // Los enlaces viven SIEMPRE en el cajón, en cualquier tamaño.
+    if (nav) cajon.append(nav);
+
+    // El saldo y el botón de salir, en cambio, se quedan en la barra mientras
+    // haya lugar. Es información que conviene tener a la vista sin abrir nada.
+    if (derecha) {
+      if (angosta.matches) cajon.append(derecha);
+      else barra.insertBefore(derecha, boton);
     }
 
-    // Pantalla grande: vuelve todo a la barra, en su orden original. El
-    // hamburguesa queda al final y el CSS lo esconde.
-    cerrarMenu({ devolverFoco: false });
-    if (nav) barra.insertBefore(nav, boton);
-    if (derecha) barra.insertBefore(derecha, boton);
-    apagarCajon();
+    if (!abierto) apagarCajon();
   }
 
   // --------------------------------------------------------------- escuchas
