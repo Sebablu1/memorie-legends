@@ -905,6 +905,17 @@ body.con-menu-abierto {
      Con el alto puesto de antemano, el botón aparece dentro de un lugar que ya
      estaba guardado y no se mueve nada. Se comprobó bloqueando `menu.js`: sin
      él el desplazamiento era 0,0008, o sea que todo venía de acá. */
+  /* El logo ocupa el alto del hamburguesa desde el principio.
+
+     `min-height` sobre `.barra-contenido` no alcanzaba: con `box-sizing:
+     border-box` ese mínimo incluye el relleno, así que la fila la seguía
+     midiendo el hijo más alto — el logo, de 40px. Cuando `menu.js` agregaba el
+     botón de 44, la barra crecía 4px y toda la página bajaba. Poniéndolo sobre
+     el propio logo, la fila mide 44 haya botón o no. */
+  .barra .marca {
+    min-height: 44px;
+  }
+
   .barra-contenido {
     min-height: 44px;
 

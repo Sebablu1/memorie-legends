@@ -31,6 +31,26 @@
   line-gap-override: 0%;
 }
 
+/* El mismo respaldo, pero para texto EN MAYÚSCULAS.
+
+   El de arriba se midió con una frase en minúsculas y quedó en 106,4%. En
+   mayúsculas la proporción es otra: Inter mide 2939 y Arial 2982, o sea 98,6%.
+   Usar el de minúsculas dejaba el respaldo un 8% más ancho de la cuenta, y el
+   lema de la portada se partía en TRES líneas hasta que llegaba Inter y volvía
+   a dos. Ese salto de 19px era casi todo el desplazamiento que quedaba a
+   390px.
+
+   Va aparte y no reemplaza al otro porque las dos proporciones son ciertas:
+   depende de qué letras se dibujen. */
+@font-face {
+  font-family: "Inter respaldo mayus";
+  src: local("Arial"), local("Helvetica"), local("Liberation Sans");
+  size-adjust: 98.6%;
+  ascent-override: 98.4%;
+  descent-override: 24.4%;
+  line-gap-override: 0%;
+}
+
 @font-face {
   font-family: "Playfair respaldo";
   src: local("Georgia"), local("Times New Roman"), local("Liberation Serif");

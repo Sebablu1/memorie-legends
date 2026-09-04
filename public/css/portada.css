@@ -44,6 +44,10 @@
 }
 
 .portada .lema {
+  /* Respaldo medido para MAYÚSCULAS: este texto va en versalitas y con la
+     proporción de minúsculas se partía en una línea de más mientras Inter
+     bajaba. Ver el bloque de @font-face en tema.css. */
+  font-family: "Inter", "Inter respaldo mayus", "Segoe UI", Tahoma, sans-serif;
   color: var(--plata);
   font-size: clamp(0.95rem, 2.4vw, 1.15rem);
   letter-spacing: 2px;
