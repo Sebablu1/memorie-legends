@@ -217,3 +217,44 @@ test.describe("con animaciones", () => {
     expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
   });
 });
+
+// =====================================================================
+// 5. La marca de "te toca" dice la verdad
+// =====================================================================
+
+test("en la mirada y en el descarte no le toca a nadie", async ({ page }) => {
+  // El fallo que arregla, reportado como "el turno no avanza": la mesa marcaba
+  // al jugador de mano como EN TURNO desde que empezaba la ronda —durante la
+  // mirada y durante toda la ventana de reflejos— y lo seguía marcando después.
+  //
+  // Pero en esas dos fases no le toca a nadie: puede descartar cualquiera, a la
+  // vez. Quien descartaba veía su propio asiento encendido antes, durante y
+  // después, y la conclusión razonable era que el turno se le había quedado
+  // pegado. El turno estaba bien; lo que mentía era la marca.
+  const errores = await abrirMesa(page);
+
+  const enTurno = () => page.locator(".jugador.en-turno").count();
+
+  // Durante la mirada.
+  await expect(page.locator(SEL.pista)).toContainText(/mirar/i);
+  expect(await enTurno(), "alguien aparece en turno durante la mirada").toBe(0);
+
+  await page.locator(`${SEL.miMano} .carta[data-posicion="0"]`).click();
+
+  // Durante el descarte.
+  await expect(page.locator(SEL.reloj)).toContainText(/descarte/i, { timeout: 20_000 });
+  expect(await enTurno(), "alguien aparece en turno durante el descarte").toBe(0);
+
+  // Y cuando SÍ le toca a alguien, se marca: una puerta que nunca se abre
+  // tampoco sirve.
+  await expect(page.locator(SEL.levantar)).toBeEnabled({ timeout: 40_000 });
+  expect(await enTurno(), "nadie queda marcado cuando el turno sí existe").toBe(1);
+
+  // Y el marcado es de quien tiene el turno de verdad.
+  await expect(
+    page.locator('.jugador[data-jugador="0"]'),
+    "el turno es mío pero está marcado otro asiento",
+  ).toHaveClass(/en-turno/);
+
+  expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
+});

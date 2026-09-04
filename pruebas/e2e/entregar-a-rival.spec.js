@@ -104,7 +104,9 @@ test("mirar una carta ajena habilita entregarle una carta a ese rival", async ({
       const texto = (s) => document.querySelector(s)?.textContent ?? "";
       const cartaDe = (j, p) =>
         document.querySelector(`.jugador[data-jugador="${j}"] .carta[data-posicion="${p}"]`);
-      const mias = () => document.querySelectorAll(`${sel.miMano} .carta[data-posicion]`);
+      const mias = () => document.querySelectorAll(`${sel.miMano} .carta[data-posicion]`).length;
+      const suyas = () =>
+        document.querySelectorAll(`.jugador[data-jugador="${rival}"] .carta[data-posicion]`).length;
 
       // Se espera a que ALGUIEN tire y reabra la ventana. Puede tardar: antes
       // juegan las IA que estén en el medio. El plazo es generoso a propósito,
@@ -120,13 +122,13 @@ test("mirar una carta ajena habilita entregarle una carta a ese rival", async ({
 
       // 1. La mano del rival quedó marcada como atacable — la mano ENTERA,
       //    nunca una posición: se sabe qué tiene, no dónde.
-      const suyas = [...document.querySelectorAll(
+      const cartasSuyas = [...document.querySelectorAll(
         `.jugador[data-jugador="${rival}"] .carta[data-posicion]`)];
-      const atacables = suyas.filter((c) => c.classList.contains("atacable")).length;
+      const atacables = cartasSuyas.filter((c) => c.classList.contains("atacable")).length;
 
       // 2. Dos toques sobre una carta suya apuntan el ataque y piden la
       //    entrega. El primero no: tiene que avisar que falta el otro.
-      const suya = suyas[0];
+      const suya = cartasSuyas[0];
       suya.click();
       const trasUnToque = texto(sel.pista);
       suya.click();
@@ -135,17 +137,21 @@ test("mirar una carta ajena habilita entregarle una carta a ese rival", async ({
 
       // 3. Y ahora un solo toque en una carta propia ejecuta la jugada. Un
       //    solo toque a propósito: la decisión ya se confirmó al apuntar.
-      const cuantasAntes = mias().length;
-      cartaDe(0, [...mias()][0].dataset.posicion).click();
+      const cuantasAntes = mias();
+      const suyasAntes = suyas();
+      const primera = document.querySelector(`${sel.miMano} .carta[data-posicion]`);
+      cartaDe(0, primera.dataset.posicion).click();
       await dormir(700);
 
       return {
         atacables,
-        cuantasSuyas: suyas.length,
+        cuantasSuyas: cartasSuyas.length,
         trasUnToque,
         trasDosToques,
         cuantasAntes,
-        cuantasDespues: mias().length,
+        cuantasDespues: mias(),
+        suyasAntes,
+        suyasDespues: suyas(),
         pistaFinal: texto(sel.pista),
       };
     },
@@ -165,11 +171,36 @@ test("mirar una carta ajena habilita entregarle una carta a ese rival", async ({
     `tras dos toques la pista dice "${visto.trasDosToques}"`,
   ).toMatch(/carta tuya/i);
 
-  // La jugada se ejecutó: acierte o falle, la mano propia CAMBIA. Al acertar
-  // se entrega una carta; al fallar entra una de castigo. Lo que no puede
-  // pasar es que no ocurra nada, que era el estado anterior.
+  // La jugada se ejecutó, y las cantidades lo demuestran.
+  //
+  // Mi mano cambia en EXACTAMENTE una carta, para cualquiera de los dos
+  // desenlaces: al acertar entrego una y quedo con menos; al fallar recibo una
+  // de castigo y quedo con más. Cambiar en dos, o no cambiar, serían las dos
+  // formas de estar roto.
+  const cambio = visto.cuantasDespues - visto.cuantasAntes;
   expect(
-    visto.cuantasDespues !== visto.cuantasAntes,
-    `la mano quedó en ${visto.cuantasDespues} y la pista dice "${visto.pistaFinal}"`,
-  ).toBe(true);
+    Math.abs(cambio),
+    `mi mano pasó de ${visto.cuantasAntes} a ${visto.cuantasDespues}; la pista dice "${visto.pistaFinal}"`,
+  ).toBe(1);
+
+  // Y la del rival NO cambia de cantidad, gane o pierda. Al acertar se le va
+  // una carta y le entra la mía EN SU LUGAR —por eso sigue igual—; al fallar no
+  // se le toca nada. Si su mano creciera, la carta se estaría duplicando en vez
+  // de transferirse.
+  expect(
+    visto.suyasDespues,
+    `la mano del rival pasó de ${visto.suyasAntes} a ${visto.suyasDespues}: la carta no se transfirió, se duplicó`,
+  ).toBe(visto.suyasAntes);
+
+  // Acá NO se comprueba cuál de los dos desenlaces fue.
+  //
+  // La primera versión lo intentaba leyendo la pista, y se equivocaba: el texto
+  // menciona "entregar" en los dos casos, así que daba por acierto un fallo.
+  // Y no hay forma de forzar el acierto desde el navegador — la posición de la
+  // carta buscada depende del reparto, que cambia en cada ronda.
+  //
+  // Que al acertar la carta propia se va de mi mano y aparece EN EL LUGAR
+  // EXACTO de la del rival está probado en `pruebas/turnos-y-entrega.mjs`, con
+  // el estado armado a mano y sin azar. Lo que esta prueba aporta es lo que
+  // aquélla no puede ver: que los toques del navegador llegan al motor.
 });

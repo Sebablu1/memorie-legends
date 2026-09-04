@@ -398,8 +398,24 @@ const revelaciones = new Map();
 
 
 
+/**
+ * Fases en las que "el turno" quiere decir algo.
+ *
+ * En la mirada y en el descarte NO le toca a nadie: puede actuar todo el mundo
+ * a la vez. Marcar ahí al jugador de mano —que es lo que hacía— le decía a esa
+ * persona que era su turno durante toda la ventana de reflejos, y seguía
+ * diciéndoselo después. Se leía como que el turno nunca avanzaba, cuando en
+ * realidad todavía no había empezado.
+ *
+ * En el final de ronda tampoco: ahí se está mirando el marcador.
+ */
+const FASES_CON_TURNO = new Set(["turno", "levantada", "postLevantada", "poder"]);
+
 function dibujarJugador(jugador, i) {
-  const enTurno = i === estado.indiceTurno && !jugador.eliminado;
+  const enTurno =
+    FASES_CON_TURNO.has(estado.fase) &&
+    i === estado.indiceTurno &&
+    !jugador.eliminado;
   const propio = i === YO;
   const rondaTerminada =
     estado.fase === "finRonda" || estado.fase === "finPartida";
