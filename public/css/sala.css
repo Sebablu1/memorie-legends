@@ -51,7 +51,7 @@
 }
 
 .codigo {
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-size: clamp(2.2rem, 8vw, 3.2rem);
   letter-spacing: 0.5rem;
   line-height: 1;
@@ -281,7 +281,7 @@
 }
 
 .velo .modal h2 {
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   color: var(--oro);
   font-size: 1.3rem;
   margin-bottom: 10px;

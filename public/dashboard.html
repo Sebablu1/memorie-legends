@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="es">
   <head>
+    <!-- Una línea, y va acá arriba a propósito: corre ANTES del primer
+         dibujado y le dice al CSS que el menú plegable va a existir. Ver la
+         regla `.con-js` en app.css. -->
+    <script>document.documentElement.classList.add("con-js")</script>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#05070b" />
@@ -139,10 +144,10 @@
              termina de bajar. -->
         <img
           class="logo-caja"
-          src="img/memorie-legends.webp"
+          src="img/memorie-legends3-chico.webp"
           alt="Memorie Legends"
-          width="612"
-          height="408"
+          width="300"
+          height="200"
           decoding="async"
         />
 

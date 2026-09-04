@@ -59,7 +59,7 @@
 .bloque { margin: 22px 0; }
 
 .titulo-seccion {
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-size: 1.5rem;
   color: var(--oro);
   text-align: center;
@@ -213,7 +213,7 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-size: 1.3rem;
   font-weight: 700;
   color: var(--negro);
@@ -250,7 +250,7 @@
 
 .poder .cifra {
   display: block;
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-size: 1.7rem;
   line-height: 1;
   color: var(--tinte, var(--oro));
@@ -311,7 +311,7 @@
 }
 
 .cierre h2 {
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   color: var(--oro);
   font-size: 1.4rem;
   margin-bottom: 6px;

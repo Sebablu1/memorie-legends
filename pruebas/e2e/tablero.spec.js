@@ -156,7 +156,7 @@ test("el logo carga y entra en la caja en cualquier pantalla", async ({ page }) 
       };
     });
 
-    expect(m.cargo, `la imagen del logo no cargó (¿falta public/img/memorie-legends.png?)`).toBe(true);
+    expect(m.cargo, `la imagen del logo no cargó (¿falta public/img/memorie-legends3-chico.webp?)`).toBe(true);
     expect(m.texto, "el logo necesita alt: es lo que se lee si no carga").toBeTruthy();
     expect(m.desborde, `el logo se sale ${m.desborde}px de la caja en ${donde}`).toBe(0);
 

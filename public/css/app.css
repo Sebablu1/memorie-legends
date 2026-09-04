@@ -32,7 +32,7 @@
 }
 
 body {
-  font-family: "Inter", "Segoe UI", Tahoma, sans-serif;
+  font-family: "Inter", "Inter respaldo", "Segoe UI", Tahoma, sans-serif;
   color: var(--texto);
   min-height: 100vh;
   display: flex;
@@ -96,7 +96,7 @@ body {
 }
 
 .barra .marca span {
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: 0.5px;
@@ -191,7 +191,7 @@ main {
 }
 
 .titulo-pagina {
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-size: 2rem;
   margin-bottom: 6px;
   background: linear-gradient(180deg, var(--oro-claro), var(--oro));
@@ -592,7 +592,7 @@ footer {
 }
 
 .logo-text {
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-weight: 700;
   letter-spacing: 0.5px;
   vertical-align: middle;
@@ -769,7 +769,7 @@ body {
 
 .titulo-cajon {
   margin: 0;
-  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, "Times New Roman", serif;
   font-size: 1.25rem;
   color: var(--oro);
   letter-spacing: 0.5px;
@@ -807,7 +807,7 @@ body {
 }
 
 .cajon-menu nav a {
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "Inter", "Inter respaldo", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 1rem;
   color: var(--texto-tenue);
   text-decoration: none;
@@ -874,6 +874,52 @@ body.con-menu-abierto {
 @media (max-width: 768px) {
   .hamburguesa {
     display: inline-flex;
+  }
+
+  /* El menú ya nace escondido, antes de que corra el JavaScript.
+
+     Sin esto, la barra se dibujaba con los siete enlaces adentro —en dos
+     líneas— y `menu.js` los mudaba al cajón medio segundo después. La
+     cabecera se achicaba 42px de golpe y TODA la página saltaba hacia
+     arriba. Medido: 0,124 de "cambio de diseño", que era prácticamente todo
+     el que tenía la portada.
+
+     Cuelga de `.con-js` a propósito. Ese nombre lo pone un script de una
+     línea en el `<head>`, que corre antes de dibujar; si el JavaScript está
+     apagado, la clase no aparece, los enlaces se ven como siempre y la
+     página sigue siendo navegable. Esconderlos sin esa condición dejaría a
+     esa persona sin menú y sin hamburguesa —el botón tampoco andaría—. */
+  .con-js .barra-contenido > nav,
+  .con-js .barra-contenido > .derecha {
+    display: none;
+  }
+
+  /* Y se le reserva al hamburguesa su alto, antes de que exista.
+
+     El botón lo crea `menu.js`, que corre después del primer dibujado. Mide
+     44px —el mínimo que se puede tocar sin apuntar— y el logo mide 40: al
+     aparecer, la barra crecía esos 4px y empujaba la página entera hacia
+     abajo. Cuatro píxeles parecen nada, pero mueven TODO lo que hay debajo, y
+     así se contaban 0,124 de "cambio de diseño".
+
+     Con el alto puesto de antemano, el botón aparece dentro de un lugar que ya
+     estaba guardado y no se mueve nada. Se comprobó bloqueando `menu.js`: sin
+     él el desplazamiento era 0,0008, o sea que todo venía de acá. */
+  .barra-contenido {
+    min-height: 44px;
+
+    /* Y el logo se queda a la izquierda desde el principio.
+
+       Ésta era la causa de verdad, y no se veía a simple vista porque el
+       salto era HORIZONTAL. Una regla de `max-width: 700px` centra la barra
+       —tenía sentido cuando el menú ocupaba el ancho y se partía en dos
+       líneas—. Con el menú escondido queda un solo hijo, el logo, y centrado
+       se planta en el medio. Después aparece el hamburguesa, que se va a la
+       derecha con `margin-left: auto`, y empuja el logo 107px hacia la
+       izquierda: toda la página cuenta como desplazada.
+
+       `space-between` deja al logo donde va a terminar, esté o no el botón. */
+    justify-content: space-between;
   }
 }
 

@@ -26,7 +26,7 @@ body {
     radial-gradient(ellipse 80% 50% at 50% 0%, rgba(212, 168, 67, 0.06), transparent 70%),
     var(--fondo);
   color: var(--texto);
-  font-family: "Inter", "Segoe UI", Tahoma, sans-serif;
+  font-family: "Inter", "Inter respaldo", "Segoe UI", Tahoma, sans-serif;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -59,7 +59,7 @@ header {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-size: 1.3rem;
   font-weight: 700;
   color: var(--oro);
@@ -107,7 +107,7 @@ main {
 
 .legal-container h1 {
   color: var(--oro);
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-size: 2.5rem;
   line-height: 1.2;
   margin-bottom: 20px;
@@ -291,7 +291,7 @@ footer {
 }
 
 .logo-text {
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-weight: 700;
   letter-spacing: 0.5px;
   vertical-align: middle;

@@ -98,7 +98,9 @@ test("la pantalla de carga está en el HTML, no la inventa el JavaScript", async
   const html = await (await page.request.get("/mesa.html")).text();
   expect(html).toContain('id="veloCarga"');
   expect(html).toContain("Cargando entrenamiento");
-  expect(html, "el logo del velo").toContain("memorie-legends3.png");
+  // WebP y no PNG: el velo mostraba el original de 149 KB para dibujarlo a
+  // 260px. El WebP pesa 29 y es lo primero que se descarga al entrar a la mesa.
+  expect(html, "el logo del velo").toContain("memorie-legends3.webp");
 });
 
 test("y se va sola cuando la mesa está lista", async ({ page }) => {

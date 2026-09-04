@@ -146,7 +146,7 @@ fieldset.campo { border: none; padding: 0; margin-inline: 0; }
 
 #codigoSala {
   text-align: center;
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-size: 1.5rem;
   letter-spacing: 0.4rem;
   text-transform: uppercase;

@@ -35,7 +35,7 @@
 }
 
 .portada h1 {
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-size: clamp(2.1rem, 6vw, 3.4rem);
   line-height: 1.1;
   color: var(--oro);
@@ -114,7 +114,20 @@
      mismo ancho: dos botones de anchos distintos leen como si uno importara
      más que el otro, y acá son dos caminos igual de válidos —entrar o
      registrarse—. */
-  .barra-contenido {
+  /* Esto ya sólo aplica cuando NO hay JavaScript.
+
+     Se escribió cuando "Iniciar sesión" y "Crear cuenta" vivían en la barra y
+     se partían en dos renglones. Hoy viven en el cajón del menú, así que en un
+     teléfono la barra tiene un solo hijo visible —el logo— y centrarlo lo
+     plantaba en el medio. Después aparecía el hamburguesa, se iba a la derecha
+     con `margin-left: auto`, y empujaba el logo 107px: el desplazamiento
+     horizontal que se contaba como 0,124 de "cambio de diseño", y que costó
+     encontrar porque uno busca saltos verticales.
+
+     Con `html:not(.con-js)` la regla sigue viva para quien tenga el JavaScript
+     apagado —que sí ve los dos botones en la barra— y desaparece para todos
+     los demás. */
+  html:not(.con-js) .barra-contenido {
     justify-content: center;
     row-gap: 10px;
   }

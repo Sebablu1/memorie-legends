@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="es">
   <head>
+    <!-- Una línea, y va acá arriba a propósito: corre ANTES del primer
+         dibujado y le dice al CSS que el menú plegable va a existir. Ver la
+         regla `.con-js` en app.css. -->
+    <script>document.documentElement.classList.add("con-js")</script>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0a0a0a" />

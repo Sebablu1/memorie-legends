@@ -3,6 +3,43 @@
    Todo el sitio lee de acá. Si cambia un color, cambia una vez.
    ============================================================ */
 
+/* ============================================================
+   RESPALDOS CON LAS MEDIDAS AJUSTADAS
+
+   Mientras las tipografías del juego bajan, el texto se dibuja con la del
+   sistema. Cuando llegan, cambia — y si la del sistema ocupaba otro espacio,
+   todo lo de abajo se corre. Medido en la portada: 0,104 de "cambio de
+   diseño", casi todo el que tenía la página.
+
+   Estos dos respaldos son Arial y Georgia con las medidas corregidas para que
+   ocupen EXACTAMENTE lo mismo que Inter y Playfair. Así el cambio ocurre igual
+   —la letra se ve distinta un instante— pero nada se mueve de lugar.
+
+   Los números no son a ojo: se midieron con el navegador, comparando el ancho
+   de una misma frase y las cajas de cada tipografía. Si algún día se cambia
+   Inter o Playfair por otra, hay que volver a medirlos o esto empieza a
+   mentir. La receta está en el registro de este cambio.
+   ============================================================ */
+
+@font-face {
+  font-family: "Inter respaldo";
+  /* `local()`: no descarga nada, usa la que ya está en la máquina. */
+  src: local("Arial"), local("Helvetica"), local("Liberation Sans");
+  size-adjust: 106.4%;
+  ascent-override: 91.2%;
+  descent-override: 22.6%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Playfair respaldo";
+  src: local("Georgia"), local("Times New Roman"), local("Liberation Serif");
+  size-adjust: 89%;
+  ascent-override: 121.3%;
+  descent-override: 28.1%;
+  line-gap-override: 0%;
+}
+
 :root {
   /* --- negros --- */
   --negro: #0a0a0a;

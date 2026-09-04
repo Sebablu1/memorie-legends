@@ -14,7 +14,7 @@
 .titulo-elegir {
   margin: 34px 0 18px;
   text-align: center;
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-size: clamp(1.4rem, 3.6vw, 2.1rem);
   letter-spacing: 1px;
   color: var(--oro);
@@ -110,7 +110,7 @@
 
 .tarjeta-modo h3 {
   margin: 0;
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-size: 1.4rem;
   color: var(--texto);
 }

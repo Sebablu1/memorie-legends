@@ -746,7 +746,7 @@ body::after {
 .reloj-turno[hidden] { display: none; }
 
 .reloj-numero {
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-size: 1.6rem;
   font-weight: 700;
   line-height: 1;
@@ -1603,7 +1603,7 @@ button.accion.con-poder {
 }
 
 .mesa-pendiente h1 {
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-size: 1.6rem;
   color: var(--oro);
 }
