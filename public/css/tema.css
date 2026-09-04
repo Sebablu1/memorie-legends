@@ -30,6 +30,16 @@
   --borde: rgba(212, 168, 67, 0.28);
   --borde-suave: rgba(255, 255, 255, 0.08);
 
+  /* El cajón del menú (ver `js/menu.js` y el bloque de `app.css`).
+
+     El fondo es más opaco que el de la barra a propósito: la barra se apoya
+     sobre la página con `backdrop-filter` y se quiere que se transparente un
+     poco. El cajón, no — abajo hay texto y cartas, y un panel translúcido
+     encima de eso no se lee. */
+  --cajon-fondo: #0d0d10;
+  --cajon-ancho: min(320px, 86vw);
+  --cajon-velo: rgba(3, 5, 9, 0.68);
+
   /* --- sombras --- */
   --sombra-oro: 0 8px 30px rgba(212, 168, 67, 0.25);
   --sombra-oro-fuerte: 0 6px 30px rgba(212, 168, 67, 0.4);

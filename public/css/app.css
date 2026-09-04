@@ -624,3 +624,269 @@ body {
   background: var(--fieltro);
   background-attachment: fixed;
 }
+
+
+/* =====================================================================
+   EL MENÚ PLEGABLE
+   =====================================================================
+
+   Hasta 768px —una tableta en vertical— los enlaces y el bloque de la
+   derecha se mudan a un cajón que entra desde el costado. Por encima de
+   ese ancho vuelven a la barra y todo esto queda apagado.
+
+   Quien muda los nodos es `js/menu.js`, y son los MISMOS elementos: no se
+   copian. Ahí está explicado por qué importa.
+
+   Como el `<nav>` deja de estar dentro de `.barra` cuando está en el
+   cajón, las reglas `.barra nav a` dejan de alcanzarlo. Por eso acá se
+   escribe su aspecto entero en vez de retocar el de la barra. */
+
+/* --------------------------------------------------------- el botón */
+
+.hamburguesa {
+  /* En pantalla grande no existe. */
+  display: none;
+  margin-left: auto;
+  padding: 10px;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  /* El objetivo táctil entero, no sólo las rayas: 44px es el mínimo que
+     se puede tocar sin apuntar. */
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.hamburguesa:hover {
+  border-color: var(--oro);
+  background: rgba(212, 168, 67, 0.08);
+}
+
+.hamburguesa .rayas {
+  position: relative;
+  display: block;
+  width: 22px;
+  height: 16px;
+}
+
+.hamburguesa i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--oro);
+  transition: transform 0.3s ease, opacity 0.2s ease, top 0.3s ease;
+}
+
+.hamburguesa i:nth-child(1) { top: 0; }
+.hamburguesa i:nth-child(2) { top: 7px; }
+.hamburguesa i:nth-child(3) { top: 14px; }
+
+/* Abierto: las tres rayas se vuelven una X.
+
+   Se cuelga de `aria-expanded` y no de una clase aparte. Así el dibujo no
+   puede decir una cosa mientras el atributo dice otra — que es lo que un
+   lector de pantalla anuncia—: son el mismo dato. */
+.hamburguesa[aria-expanded="true"] i:nth-child(1) {
+  top: 7px;
+  transform: rotate(45deg);
+}
+.hamburguesa[aria-expanded="true"] i:nth-child(2) {
+  opacity: 0;
+}
+.hamburguesa[aria-expanded="true"] i:nth-child(3) {
+  top: 7px;
+  transform: rotate(-45deg);
+}
+
+/* ---------------------------------------------------------- el velo */
+
+.fondo-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: var(--cajon-velo);
+  opacity: 0;
+  visibility: hidden;
+  /* La visibilidad cambia SIN transición, pero recién al final: si se
+     apagara de entrada, el desvanecido no se vería. */
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+
+.fondo-menu.visible {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.3s ease, visibility 0s;
+}
+
+/* --------------------------------------------------------- el cajón */
+
+.cajon-menu {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  width: var(--cajon-ancho);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+
+  background: var(--cajon-fondo);
+  border-left: 1px solid var(--borde);
+  box-shadow: -18px 0 44px rgba(0, 0, 0, 0.6);
+
+  /* Entra desde la derecha porque de ese lado está el botón: el panel sale
+     de donde se lo tocó, y en un teléfono ese lado es el que alcanza el
+     pulgar. */
+  transform: translateX(100%);
+  visibility: hidden;
+  transition: transform 0.3s ease, visibility 0s linear 0.3s;
+}
+
+.cajon-menu.abierto {
+  transform: none;
+  visibility: visible;
+  transition: transform 0.3s ease, visibility 0s;
+}
+
+.cabecera-cajon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--borde-suave);
+}
+
+.titulo-cajon {
+  margin: 0;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  font-size: 1.25rem;
+  color: var(--oro);
+  letter-spacing: 0.5px;
+}
+
+.cerrar-menu {
+  min-width: 40px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--oro);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.cerrar-menu:hover {
+  border-color: var(--oro);
+  background: rgba(212, 168, 67, 0.08);
+  color: var(--oro-claro);
+}
+
+/* ------------------------------------------- los enlaces, ya adentro */
+
+.cajon-menu nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+
+.cajon-menu nav a {
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 1rem;
+  color: var(--texto-tenue);
+  text-decoration: none;
+  /* Alto de dedo, y el área de toque ocupa todo el ancho del cajón: no hay
+     que apuntarle a la palabra. */
+  padding: 13px 12px;
+  border-radius: 10px;
+  border-bottom: none;
+  transition: color 0.2s, background 0.2s;
+}
+
+.cajon-menu nav a:hover,
+.cajon-menu nav a[aria-current="page"] {
+  color: var(--oro-claro);
+  background: rgba(212, 168, 67, 0.1);
+}
+
+/* La página en la que uno está, además, marcada al costado: el color solo
+   no alcanza para quien no distingue el dorado del plata. */
+.cajon-menu nav a[aria-current="page"] {
+  box-shadow: inset 3px 0 0 var(--oro);
+}
+
+/* ------------------------------------- el saldo y el botón de salir */
+
+.cajon-menu .derecha {
+  /* `margin-top: auto` los manda al pie del cajón: son el cierre, no un
+     enlace más de la lista. */
+  margin: auto 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--borde-suave);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Saldo y avatar comparten renglón; los botones se llevan uno entero.
+   En la portada, donde `.derecha` son "Iniciar sesión" y "Crear cuenta",
+   esto los deja apilados y a todo el ancho, que es como se tocan bien. */
+.cajon-menu .derecha > .accion,
+.cajon-menu .derecha > button {
+  flex: 1 0 100%;
+  justify-content: center;
+  text-align: center;
+}
+
+/* Cajón sin lista de enlaces —la portada—: los botones suben al principio,
+   donde cae la vista, en vez de quedar al pie de una pantalla vacía. */
+.cajon-menu.sin-enlaces .derecha {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* Con el cajón abierto la página de atrás no se mueve. Sin esto, arrastrar
+   sobre el velo scrollea lo de abajo y al cerrar uno aparece en otro lado. */
+body.con-menu-abierto {
+  overflow: hidden;
+}
+
+/* ------------------------------------------------- el punto de corte */
+
+@media (max-width: 768px) {
+  .hamburguesa {
+    display: inline-flex;
+  }
+}
+
+/* Con movimiento reducido el cajón aparece y desaparece, sin deslizarse.
+   Sigue habiendo cajón: lo que se saca es el viaje, no la función. */
+@media (prefers-reduced-motion: reduce) {
+  .cajon-menu,
+  .cajon-menu.abierto,
+  .fondo-menu,
+  .fondo-menu.visible {
+    transition: none;
+  }
+  .hamburguesa i {
+    transition: none;
+  }
+}
