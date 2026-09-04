@@ -350,3 +350,50 @@ test("la ayuda dice contra quién se va a jugar", async ({ page }) => {
   await expect(page.locator("#ayudaEntrenamiento")).toContainText(/Fácil/i);
   await expect(page.locator("#ayudaEntrenamiento")).not.toContainText(/Experto/i);
 });
+
+test("a la mesa se entra por el tablero, no desde el menú", async ({ page }) => {
+  // El menú de las páginas con sesión llevaba directo a `mesa.html`, salteando
+  // la configuración: se jugaba con lo último que hubiera quedado guardado, sin
+  // pasar por los selectores de rivales y dificultad.
+  //
+  // Se leen las páginas servidas en vez de navegarlas: son HTML estático, así
+  // que alcanza con pedirlas, y de paso se cubren de una vez todas las que
+  // comparten el menú —incluidas las que exigen sesión, que habría que
+  // falsificar una por una para visitarlas—.
+  const conMenu = [
+    "dashboard.html",
+    "ranking.html",
+    "ruleta.html",
+    "tienda.html",
+    "cuenta.html",
+    "como-se-juega.html",
+  ];
+
+  for (const pagina of conMenu) {
+    const html = await (await page.request.get(`/${pagina}`)).text();
+    const aLaMesa = [...html.matchAll(/<a[^>]+href="[^"]*mesa\.html[^"]*"[^>]*>/g)].map(
+      (m) => m[0],
+    );
+
+    // La única excepción es el botón de jugar del tablero: ése SÍ va a la mesa,
+    // y es el que guarda la configuración antes de irse.
+    const inesperados = aLaMesa.filter((a) => !a.includes('id="btnEntrenar"'));
+    expect(
+      inesperados,
+      `${pagina} enlaza a la mesa sin pasar por la configuración: ${inesperados.join(" ")}`,
+    ).toEqual([]);
+  }
+});
+
+test("el ancla del menú cae en el panel de jugar", async ({ page }) => {
+  // "Jugar" y "Inicio" apuntarían al mismo sitio si el enlace fuera sólo
+  // `dashboard.html`: dos nombres para la misma cosa. Con el ancla, "Jugar"
+  // deja al jugador mirando los selectores.
+  await abrirTablero(page);
+  await expect(page.locator('nav a[href="#jugar"]')).toBeVisible();
+  await expect(page.locator("#jugar")).toContainText(/Elegí el modo/i);
+
+  // Y el destino existe de verdad: un ancla rota no avisa, simplemente no
+  // hace nada al tocarla.
+  await expect(page.locator("#jugar #cantidadIAs")).toBeVisible();
+});
