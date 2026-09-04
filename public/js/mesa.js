@@ -1300,6 +1300,69 @@ function marcarEnviada(posicion) {
   dibujar();
 }
 
+/**
+ * Cuánto puede pasar entre los dos toques de un descarte.
+ *
+ * Cuatrocientos milisegundos, que es más o menos lo que usan los sistemas
+ * operativos para su propio doble clic. Sólo se usa cuando el navegador no
+ * cuenta los toques por su cuenta —o sea, en iOS—; donde `detail` funciona,
+ * manda el navegador y este número no interviene.
+ */
+const MS_ENTRE_TOQUES = 400;
+
+/**
+ * La ráfaga de toques en curso: sobre qué carta y desde cuándo.
+ *
+ * `yaConto` es lo que hace que una ráfaga dispare UN solo descarte. Sin él,
+ * tres toques seguidos serían dos intentos y el jugador se comería dos cartas
+ * de castigo por apurarse.
+ */
+let rafaga = { clave: null, cuando: 0, yaConto: false };
+
+/**
+ * ¿Este toque es el SEGUNDO de una ráfaga sobre la misma carta?
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ NO ALCANZA CON `evento.detail`
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque en iPhone no funciona. `detail` lo cuenta el navegador, y Safari en
+ * iOS sintetiza cada toque como un clic con `detail: 1`: nunca llega el 2, así
+ * que el descarte no se disparaba jamás. En PC y en Android sí cuenta, y ahí
+ * `detail === 2` sigue siendo la respuesta —la da el sistema operativo, con la
+ * noción de doble clic que el jugador ya tiene configurada—.
+ *
+ * Así que se usan los dos: el del navegador cuando existe, y éste cuando no.
+ * No se sustituyó el primero por el segundo porque el del sistema es el que
+ * respeta la preferencia de cada persona.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ESTO NO AGREGA NI UN MILISEGUNDO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Importa, porque este toque es una jugada de reflejos y el servidor ordena
+ * los intentos con 60 ms de tolerancia. La comprobación es una resta y dos
+ * comparaciones dentro del mismo manejador del clic: el descarte sale en el
+ * mismo instante que salía antes. NO hay temporizador esperando un tercer
+ * toque, que es la forma habitual —y lenta— de detectar un doble toque.
+ */
+function esSegundoToque(clave, cuando) {
+  const sigueLaRafaga =
+    rafaga.clave === clave && cuando - rafaga.cuando <= MS_ENTRE_TOQUES;
+
+  if (!sigueLaRafaga) {
+    // Otra carta, o pasó demasiado: empieza una ráfaga nueva y éste es el
+    // primer toque, que nunca descarta.
+    rafaga = { clave, cuando, yaConto: false };
+    return false;
+  }
+
+  rafaga.cuando = cuando;
+  if (rafaga.yaConto) return false; // del tercero en adelante, ya se disparó
+  rafaga.yaConto = true;
+  return true;
+}
+
 document.addEventListener("click", async (evento) => {
   const cartaEl = evento.target.closest(".carta[data-posicion]");
   if (!cartaEl) return;
@@ -1309,16 +1372,42 @@ document.addEventListener("click", async (evento) => {
   const indiceJugador = Number(jugadorEl.dataset.jugador);
   const posicion = Number(cartaEl.dataset.posicion);
 
-  // Descartar exige DOS toques. `detail` lo cuenta el navegador con su propia
-  // noción de doble clic —la del sistema operativo—, así que no hace falta
-  // ningún temporizador nuestro. El primer toque llega con detail 1 y no
-  // descarta: un roce accidental dejó de costar una carta de castigo.
+  // Descartar exige DOS toques. El primero no descarta: un roce accidental
+  // dejó de costar una carta de castigo.
   //
-  // Es `=== 2`, no `>= 2`. Una ráfaga de tres clics llega como detail 1, 2 y
-  // 3: con `>= 2` se dispararían DOS intentos y el jugador se comería dos
-  // castigos por un triple clic. `=== 2` es el segundo toque de la ráfaga, y
-  // hay exactamente uno por ráfaga, sea de dos clics o de diez.
-  const dobleClic = evento.detail === 2;
+  // Las dos formas de contarlos, y hace falta tener las dos:
+  //
+  //   `detail === 2`   lo cuenta el navegador con la noción de doble clic del
+  //                    sistema operativo. Es la buena donde funciona: respeta
+  //                    la preferencia de cada persona. Es `=== 2` y no `>= 2`
+  //                    porque una ráfaga de tres llega como 1, 2 y 3, y con
+  //                    `>= 2` se dispararían DOS intentos.
+  //
+  //   `esSegundoToque` la nuestra, para iOS, donde Safari manda cada toque con
+  //                    `detail: 1` y el 2 no llega nunca. Ver la nota larga
+  //                    arriba: no agrega latencia.
+  //
+  // En PC las dos dicen que sí en el mismo evento, y como es un solo evento
+  // hay una sola llamada. En iPhone sólo dice que sí la segunda.
+  // No se llama `clave` a propósito: ése es el nombre de una función que este
+  // archivo importa de `modulos/cartas.js`, y una constante con el mismo
+  // nombre la taparía dentro de este manejador. Hoy acá no se la llama, así
+  // que no rompería nada — y por eso mismo el día que alguien la use sería un
+  // "clave is not a function" que no se entiende.
+  const cartaTocada = `${indiceJugador}:${posicion}`;
+
+  // `esSegundoToque` se llama SIEMPRE y en su propia línea, no dentro del `||`.
+  //
+  // Escrito como `evento.detail === 2 || esSegundoToque(...)`, el `||` corta la
+  // evaluación: en el segundo clic `detail === 2` ya es verdadero y la función
+  // NO corre, así que su cuenta se queda sin ver ese toque. Entonces cree que
+  // el TERCERO es el segundo y dispara un intento más — dos cartas de castigo
+  // por un triple clic.
+  //
+  // Lo atajó la prueba "tres clics seguidos son UN intento, no tres", que
+  // existía desde antes justamente para esto.
+  const segundoToquePropio = esSegundoToque(cartaTocada, evento.timeStamp);
+  const dobleClic = evento.detail === 2 || segundoToquePropio;
 
   // En red no se decide nada acá: se pide y se espera la vista nueva.
   if (enRed()) {

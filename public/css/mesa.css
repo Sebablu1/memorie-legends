@@ -1947,3 +1947,24 @@ button.accion.con-poder {
   font-size: 1.6rem;
   color: var(--oro, #d4a843);
 }
+
+
+/* ------------------------------------------- el doble toque en iPhone
+
+   Sin esto, en iOS el doble toque sobre una carta es el gesto de ZOOM: Safari
+   se lo queda y el segundo toque no llega como clic. El descarte —que pide dos
+   toques— no se disparaba nunca en iPhone, mientras que en PC y en Android
+   funcionaba bien.
+
+   `manipulation` deja el desplazamiento y el pellizco para agrandar, y sólo
+   apaga el doble toque para hacer zoom. Va SOBRE LAS CARTAS y no en el body a
+   propósito: apagarlo en toda la página le sacaría a alguien con poca visión
+   la forma más rápida de acercar el resto del tablero.
+
+   Y de paso quita el retraso que iOS mete antes de decidir si un toque era
+   simple o doble. En una ventana de reflejos donde el servidor ordena los
+   intentos con 60 ms de tolerancia, ese retraso no es una molestia: es una
+   desventaja sistemática para quien juegue desde un iPhone. */
+.carta[data-posicion] {
+  touch-action: manipulation;
+}
