@@ -149,7 +149,7 @@ export const misCartas = (page) => page.locator(`${SEL.miMano} .carta`);
 
 /** Atraviesa la mirada del principio de la ronda eligiendo una carta. */
 export async function elegirCartaParaMirar(page) {
-  await esperarPista(page, /mirar/i);
+  await esperarPista(page, /tu carta/i);
   await misCartas(page).first().click();
 }
 

@@ -28,7 +28,7 @@ test("un clic solo no descarta; hacen falta dos", async ({ page }) => {
 
   // Un clic: la interfaz avisa que hacen falta dos y no toca la mano.
   await misCartas(page).first().click();
-  await expect(page.locator(SEL.pista)).toContainText(/dos veces/i);
+  await expect(page.locator(SEL.pista)).toContainText(/doble toque/i);
   expect(await misCartas(page).count()).toBe(antes);
 
   expect(errores).toEqual([]);

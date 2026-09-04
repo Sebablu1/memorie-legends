@@ -827,7 +827,17 @@ button.accion {
   position: relative;
   flex: none;
   padding: 12px 20px;
-  border: none;
+
+  /* El filo dorado, que antes no estaba: es lo que emparenta estos botones con
+     el marco de las cartas y con las cajas del tablero. Va con `border` y no
+     con un `outline`, para que entre en la caja y no se coma un píxel de la
+     fila al aparecer en `:hover`. */
+  border: 1px solid rgba(212, 168, 67, 0.6);
+
+  /* Cuarenta y cuatro píxeles es el mínimo que se toca sin apuntar. Con el
+     relleno de arriba ya se llega, pero puesto explícito no depende de que
+     nadie afine el `padding` más adelante. */
+  min-height: 44px;
   border-radius: 11px;
   font-size: 0.78rem;
   font-weight: 800;
@@ -858,8 +868,14 @@ button.accion:active:not(:disabled) {
 }
 
 button.accion:disabled {
-  filter: grayscale(0.85) brightness(0.6);
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.4);
+  /* Apagado, no gris.
+     `grayscale` solo dejaba los cuatro botones del mismo tono de plomo y no se
+     distinguía cuál era cuál. Con opacidad se sigue leyendo que el de cortar
+     es el rojo, sólo que ahora no se puede. */
+  opacity: 0.5;
+  filter: none;
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
   cursor: not-allowed;
 }
 
@@ -874,6 +890,13 @@ button.accion:not(:disabled)::after {
   background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.55), transparent);
   transform: skewX(-18deg);
   animation: barrido 4.5s ease-in-out infinite;
+}
+
+/* El brillo que barre sólo en los que se pueden tocar. El selector de arriba
+   ya lo limita con `:not(:disabled)`; esto es el cinturón: un botón apagado
+   que destella invita a tocarlo. */
+button.accion:disabled::after {
+  content: none;
 }
 
 @keyframes barrido {

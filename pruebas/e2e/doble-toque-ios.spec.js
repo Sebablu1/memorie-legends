@@ -146,7 +146,7 @@ async function tocarEnLaVentana(
       // primera carta propia, igual que el que hace `elegirCartaParaMirar`
       // desde afuera.
       await hasta(
-        () => /mirar/i.test(texto(sel.pista)),
+        () => /tu carta/i.test(texto(sel.pista)),
         () => `no llegó la mirada: la pista dice "${texto(sel.pista)}"`,
       );
       tocar([0, 0]);
@@ -201,7 +201,7 @@ test("dos toques con detail:1 —como iOS— descartan", async ({ page }) => {
   expect(visto.trasElPrimero.cartas, "un solo toque descartó").toBe(
     visto.antes,
   );
-  expect(visto.trasElPrimero.pista).toMatch(/dos veces/i);
+  expect(visto.trasElPrimero.pista).toMatch(/doble toque/i);
 
   // El segundo, sí. Descartar acierta o falla —depende de la carta— pero en
   // los dos casos la mano CAMBIA: al acertar se va la carta, al fallar entra

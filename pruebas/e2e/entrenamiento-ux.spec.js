@@ -57,7 +57,7 @@ async function unToqueEnLaVentana(page) {
     };
 
     await hasta(
-      () => /mirar/i.test(texto(sel.pista)),
+      () => /tu carta/i.test(texto(sel.pista)),
       () => `no llegó la mirada: "${texto(sel.pista)}"`,
     );
     carta(0).click();
@@ -114,20 +114,20 @@ test("la pista del descarte es corta y dice qué hacer", async ({ page }) => {
   await abrirMesa(page);
   const { pista } = await unToqueEnLaVentana(page);
 
-  // Un solo toque: la pista tiene que explicar que falta el otro Y qué buscar.
-  // Las dos cosas, porque un jugador nuevo que sólo lee "tocá dos veces" toca
-  // dos veces cualquier carta y se come el castigo.
-  expect(pista).toMatch(/dos veces/i);
-  expect(pista).toMatch(/muestra/i);
+  // Un solo toque: la pista tiene que decir que falta el otro.
+  expect(pista).toMatch(/doble toque/i);
 
-  // Corta. Diez palabras y no ocho: ésta es la única pista que tiene que decir
-  // dos cosas a la vez, y es el texto exacto que se pidió. El resto de las
-  // pistas de la mesa entran en seis o siete.
+  // Y ser corta de verdad.
+  //
+  // Antes decía además qué buscar —"la carta igual a la muestra"— y esta prueba
+  // lo exigía. Se sacó a pedido, para que la barra se lea de un vistazo. Es un
+  // intercambio consciente: la pista ya no le enseña la regla a quien juega por
+  // primera vez, y eso lo tiene que explicar "Cómo se juega".
   const palabras = pista.trim().split(/\s+/).length;
   expect(
     palabras,
     `la pista tiene ${palabras} palabras: "${pista}"`,
-  ).toBeLessThanOrEqual(10);
+  ).toBeLessThanOrEqual(6);
 });
 
 test("el brillo dorado dice cuándo se puede tocar", async ({ page }) => {

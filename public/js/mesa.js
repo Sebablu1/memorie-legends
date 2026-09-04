@@ -280,8 +280,11 @@ let memorias = estado.jugadores.map(() => IA.crearMemoria());
  */
 /**
  * Tiempo para levantar del mazo. Si se agota, el jugador pierde la levantada
- * y el turno pasa al siguiente. El resto del turno (cambiar o tirar, el poder,
- * cortar o pasar) no tiene reloj: se decide sin apuro.
+ * y el turno pasa al siguiente.
+ *
+ * Decidir entre cortar y pasar tiene su propio reloj, más largo
+ * (`MS_PASO_AUTOMATICO`, 30 segundos): es la decisión que más se piensa. El
+ * resto del turno —cambiar o tirar, resolver el poder— no tiene reloj.
  */
 const MS_TURNO = 8000;
 
@@ -299,8 +302,8 @@ const cancelarTemporizador = relojes.cancelar;
 const cancelarRelojTurno = relojes.cancelarRelojTurno;
 const pintarReloj = relojes.pintarReloj;
 // El remate se queda acá: qué hacer al llegar a cero depende de la partida.
-const iniciarRelojTurno = (fase, indice) =>
-  relojes.iniciarRelojTurno(fase, indice, resolverPorTiempo);
+const iniciarRelojTurno = (fase, indice, alVencer, ms) =>
+  relojes.iniciarRelojTurno(fase, indice, alVencer, ms);
 
 const RITMO = {
   entreTurnos: 1100,
@@ -552,7 +555,6 @@ function dibujar() {
   marcarCartasJugables();
   actualizarBotones();
   sincronizarReloj();
-  sincronizarPasoAutomatico();
   avisarSiMeToca();
 }
 
@@ -788,57 +790,60 @@ function resolverPorTiempo(indice) {
  * una ventana de descarte que interrumpe y devuelve la mesa a `postLevantada`
  * dejaría el turno sin cuenta, porque al salir de la fase se canceló.
  */
-let pasoAutomatico = null;
-
-function cancelarPasoAutomatico() {
-  if (pasoAutomatico) clearTimeout(pasoAutomatico.timeout);
-  pasoAutomatico = null;
-}
-
-function sincronizarPasoAutomatico() {
-  const activo =
-    !enRed() &&
-    estado.fase === "postLevantada" &&
-    estado.indiceTurno === YO;
-
-  if (!activo) {
-    cancelarPasoAutomatico();
-    return;
-  }
-
-  const clave = `${estado.ronda}:${estado.turnosRonda}`;
-  if (pasoAutomatico?.clave === clave) return; // ya está contando este turno
-
-  cancelarPasoAutomatico();
-  pasoAutomatico = {
-    clave,
-    timeout: setTimeout(() => {
-      pasoAutomatico = null;
-      // Se vuelve a comprobar: entre que arrancó la cuenta y ahora pudo pasar
-      // cualquier cosa, y `pasarTurno` fuera de `postLevantada` no hace nada
-      // pero tampoco avisa.
-      if (estado.fase !== "postLevantada" || estado.indiceTurno !== YO) return;
-      sonidos.clic();
-      estado = pasarTurno(estado);
-      pista("Se acabó el tiempo para decidir: <b>pasaste</b> el turno.");
-      dibujar();
-      cicloTurnos();
-    }, MS_PASO_AUTOMATICO),
-  };
+/**
+ * Se acabó el tiempo para decidir: se pasa el turno.
+ *
+ * Lo dispara el MISMO reloj que el jugador ve contar. Antes había dos cuentas
+ * de treinta segundos —un `setTimeout` invisible y, ahora, la barra— y dos
+ * relojes para lo mismo terminan discrepando: uno se cancela y el otro no, y
+ * el turno se pasa solo mientras el número en pantalla sigue corriendo.
+ */
+function pasarPorTiempo() {
+  // Se vuelve a comprobar: entre que arrancó la cuenta y ahora pudo pasar
+  // cualquier cosa, y `pasarTurno` fuera de `postLevantada` no hace nada pero
+  // tampoco avisa.
+  if (estado.fase !== "postLevantada" || estado.indiceTurno !== YO) return;
+  sonidos.clic();
+  estado = pasarTurno(estado);
+  pista("Se acabó el tiempo para decidir: <b>pasaste</b> el turno.");
+  dibujar();
+  cicloTurnos();
 }
 
 /**
  * Arranca, reinicia o apaga el reloj según la fase. Se llama en cada dibujado,
  * así que basta con cambiar de fase para que el reloj se reinicie solo.
  */
-function sincronizarReloj() {
-  // Sólo la levantada tiene reloj.
-  const activo =
-    estado.fase === "turno" && !estado.jugadores[estado.indiceTurno]?.eliminado;
+/**
+ * Qué reloj corresponde a la fase actual, o ninguno.
+ *
+ * Son dos y miden cosas distintas: ocho segundos para levantar del mazo, y
+ * treinta para decidir entre cortar y pasar. El segundo es más largo porque es
+ * la decisión que más se piensa — y porque perderla por apuro se paga con diez
+ * puntos.
+ */
+function relojDeLaFase() {
+  if (estado.jugadores[estado.indiceTurno]?.eliminado) return null;
 
+  if (estado.fase === "turno") {
+    return { ms: MS_TURNO, alVencer: resolverPorTiempo };
+  }
+
+  // Decidir el corte. Sólo en entrenamiento y sólo si el turno es mío: en una
+  // partida por Leyendas el plazo lo lleva el servidor, y un reloj de acá
+  // compitiendo con el suyo pasaría turnos que el servidor no dio por vencidos.
+  if (!enRed() && estado.fase === "postLevantada" && estado.indiceTurno === YO) {
+    return { ms: MS_PASO_AUTOMATICO, alVencer: pasarPorTiempo };
+  }
+
+  return null;
+}
+
+function sincronizarReloj() {
+  const cual = relojDeLaFase();
   const enCurso = relojes.turnoEnCurso();
 
-  if (!activo) {
+  if (!cual) {
     if (enCurso) cancelarRelojTurno();
     return;
   }
@@ -848,8 +853,11 @@ function sincronizarReloj() {
     enCurso.fase === estado.fase &&
     enCurso.indice === estado.indiceTurno;
 
-  if (!mismaDecision) iniciarRelojTurno(estado.fase, estado.indiceTurno);
-  else pintarReloj();
+  if (!mismaDecision) {
+    iniciarRelojTurno(estado.fase, estado.indiceTurno, cual.alVencer, cual.ms);
+  } else {
+    pintarReloj();
+  }
 }
 
 // ------------------------------------------------- efectos de los poderes
@@ -1117,7 +1125,7 @@ function faseMirada() {
       return;
     }
 
-    pista("Podés mirar <b>una</b> de tus cartas");
+    pista("Tocá tu carta");
     correrTemporizador(5000, "Elegí una carta");
     dibujar();
 
@@ -1279,7 +1287,7 @@ async function cicloTurnos() {
     const jugador = estado.jugadores[estado.indiceTurno];
 
     if (!jugador.esIA) {
-      pista("Tu turno: levantá del mazo");
+      pista("Te toca levantar");
       dibujar();
       return;
     }
@@ -1487,7 +1495,7 @@ dom.btnTirar.addEventListener("click", async () => {
     return;
   }
   if (estado.fase === "postLevantada") {
-    pista("Podés <b>cortar</b> o <b>pasar</b>");
+    pista("Cortar o pasar");
   }
 });
 
@@ -1780,7 +1788,7 @@ document.addEventListener("click", async (evento) => {
   ) {
     if (!dobleClic) {
       destelloPrimerToque(cartaEl);
-      pista("¡Tocá dos veces! Ahí creés que está tu carta");
+      pista("¡Doble toque en la del rival!");
       return;
     }
     atacando = { indiceJugador, posicion };
@@ -1792,7 +1800,7 @@ document.addEventListener("click", async (evento) => {
   if (estado.fase === "descarte" && manejadorDescarte && indiceJugador === YO) {
     if (!dobleClic) {
       destelloPrimerToque(cartaEl);
-      pista("¡Tocá dos veces! Buscá la carta igual a la muestra");
+      pista("¡Doble toque si estás seguro!");
       return;
     }
     manejadorDescarte(posicion);

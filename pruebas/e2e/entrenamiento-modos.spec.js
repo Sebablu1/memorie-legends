@@ -236,7 +236,7 @@ test("en la mirada y en el descarte no le toca a nadie", async ({ page }) => {
   const enTurno = () => page.locator(".jugador.en-turno").count();
 
   // Durante la mirada.
-  await expect(page.locator(SEL.pista)).toContainText(/mirar/i);
+  await expect(page.locator(SEL.pista)).toContainText(/tu carta/i);
   expect(await enTurno(), "alguien aparece en turno durante la mirada").toBe(0);
 
   await page.locator(`${SEL.miMano} .carta[data-posicion="0"]`).click();

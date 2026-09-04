@@ -165,7 +165,7 @@ test("mirar una carta ajena habilita entregarle una carta a ese rival", async ({
     "la mano del rival no quedó marcada: en entrenamiento el ataque no existía",
   ).toBe(visto.cuantasSuyas);
 
-  expect(visto.trasUnToque, "un solo toque ya apuntó el ataque").toMatch(/dos veces/i);
+  expect(visto.trasUnToque, "un solo toque ya apuntó el ataque").toMatch(/doble toque/i);
   expect(
     visto.trasDosToques,
     `tras dos toques la pista dice "${visto.trasDosToques}"`,

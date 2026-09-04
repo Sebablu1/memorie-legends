@@ -74,7 +74,10 @@ export function crearTemporizadores({ dom, msTurno }) {
 
     caja.hidden = false;
     dom.relojNumero.textContent = segundos;
-    dom.relojRelleno.style.width = `${(restante / msTurno) * 100}%`;
+    // La barra se mide contra la duración de ESTE reloj, no contra una fija:
+    // el de levantar dura 8 segundos y el de decidir el corte, 30. Con un
+    // divisor único, el de 30 arrancaba con la barra ya casi vacía.
+    dom.relojRelleno.style.width = `${(restante / relojTurno.ms) * 100}%`;
     // Dorado hasta los 2 segundos; de ahí en más, rojo.
     caja.classList.toggle("apurado", segundos <= 2);
   }
@@ -90,13 +93,16 @@ export function crearTemporizadores({ dom, msTurno }) {
    *                  Se llama DESPUÉS de cancelar el reloj, para que lo que
    *                  haga —saltar el turno, redibujar— no encuentre en pie un
    *                  reloj que ya venció.
+   * @param ms        cuánto dura. Por defecto el del turno; la decisión de
+   *                  cortar o pasar usa uno más largo.
    */
-  function iniciarRelojTurno(fase, indice, alVencer) {
+  function iniciarRelojTurno(fase, indice, alVencer, ms = msTurno) {
     cancelarRelojTurno();
     relojTurno = {
       fase,
       indice,
-      fin: Date.now() + msTurno,
+      ms,
+      fin: Date.now() + ms,
       intervalo: setInterval(() => {
         pintarReloj();
         if (relojTurno && Date.now() >= relojTurno.fin) {
