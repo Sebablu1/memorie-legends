@@ -146,7 +146,7 @@ async function tocarEnLaVentana(
       // primera carta propia, igual que el que hace `elegirCartaParaMirar`
       // desde afuera.
       await hasta(
-        () => /elegí/i.test(texto(sel.pista)),
+        () => /mirar/i.test(texto(sel.pista)),
         () => `no llegó la mirada: la pista dice "${texto(sel.pista)}"`,
       );
       tocar([0, 0]);

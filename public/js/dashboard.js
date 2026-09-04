@@ -24,6 +24,9 @@ import { estadoMfa } from "./mfa.js";
 import { SUPPORT_EMAIL } from "./firebase.js";
 import { crearSala, unirseASala, ErrorDeServidor } from "./servidor.js";
 import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/salas.js";
+// Sólo nombres y etiquetas: el cerebro de la IA (`reglas/ia.js`, diez mil
+// caracteres) no hace falta acá y no se trae.
+import { armarRivales, NIVELES } from "./rivales.js";
 import { esperaRuleta } from "./reglas/economia.js";
 
 const $ = (id) => document.getElementById(id);
@@ -163,6 +166,73 @@ for (const id of ["modoEntrenamiento", "modoLeyendas"]) {
 // El estado inicial sale del radio marcado en el HTML, no de un valor escrito
 // acá: si mañana cambia cuál viene marcado, esto lo sigue sin tocarse.
 mostrarModo(document.querySelector('input[name="modo"]:checked')?.value ?? "entrenamiento");
+
+// ------------------------------------------------- armar el entrenamiento
+
+/**
+ * La configuración de la mesa de entrenamiento.
+ *
+ * Antes esto vivía en `lobby.html`, una pantalla intermedia entre el tablero y
+ * la mesa. Ahora se elige acá mismo y se entra de una.
+ *
+ * El canal con la mesa es `localStorage.configMesa`, igual que antes: la mesa
+ * lo lee al arrancar y, si no lo encuentra o viene roto, usa su configuración
+ * por defecto. Por eso el botón sigue siendo un enlace —ver el comentario en
+ * el HTML—: lo peor que puede pasar si esto falla es jugar contra los tres
+ * rivales de siempre.
+ */
+function guardarConfigEntrenamiento() {
+  const cantidad = Number($("cantidadIAs")?.value) || 3;
+  const nivel = $("nivelIA")?.value ?? "medio";
+
+  localStorage.setItem(
+    "configMesa",
+    JSON.stringify({
+      // `modo: entrenamiento` es lo que garantiza que ninguna parte del
+      // sistema la trate como partida con entrada.
+      modo: "entrenamiento",
+      humanos: [{ nombre: nombreJugador }],
+      ias: armarRivales(cantidad, nivel),
+    }),
+  );
+
+  // Una sala vieja acá haría que la mesa se creyera en red. Se limpia siempre,
+  // no sólo al crear sala: quien jugó por Leyendas y vuelve a entrenar tiene
+  // ese código guardado.
+  localStorage.removeItem("roomCode");
+}
+
+/**
+ * Qué le espera al jugador, dicho antes de entrar.
+ *
+ * "Mixto" es el que más lo necesita: sin esto no hay forma de saber contra
+ * quién se va a jugar hasta estar sentado en la mesa.
+ */
+function actualizarAyudaEntrenamiento() {
+  const caja = $("ayudaEntrenamiento");
+  if (!caja) return;
+
+  const cantidad = Number($("cantidadIAs")?.value) || 3;
+  const nivel = $("nivelIA")?.value ?? "medio";
+  const rivales = armarRivales(cantidad, nivel);
+  const etiqueta = (clave) =>
+    NIVELES.find((n) => n.clave === clave)?.etiqueta ?? clave;
+
+  caja.textContent =
+    nivel === "mixto"
+      ? `Contra ${rivales.map((r) => `${r.nombre} (${etiqueta(r.dificultad)})`).join(", ")}.`
+      : `Contra ${rivales.map((r) => r.nombre).join(", ")}, en ${etiqueta(nivel)}.`;
+}
+
+for (const id of ["cantidadIAs", "nivelIA"]) {
+  $(id)?.addEventListener("change", actualizarAyudaEntrenamiento);
+}
+actualizarAyudaEntrenamiento();
+
+// Sin `preventDefault`: se guarda y se deja que el enlace navegue solo.
+// `localStorage.setItem` es síncrono, así que para cuando el navegador
+// empieza a cargar `mesa.html` la configuración ya está escrita.
+$("btnEntrenar")?.addEventListener("click", guardarConfigEntrenamiento);
 
 // ------------------------------------------------------------ entradas
 

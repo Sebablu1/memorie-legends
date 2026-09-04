@@ -49,6 +49,21 @@ export default defineConfig({
     trace: "on-first-retry",
     video: process.env.CI ? "retain-on-failure" : "off",
     screenshot: "only-on-failure",
+
+    /**
+     * Las pruebas corren como quien pidió menos movimiento.
+     *
+     * La mesa de entrenamiento reparte con las cartas volando y arranca con una
+     * cuenta regresiva de cuatro segundos. Eso está bien para jugar y es un
+     * estorbo para probar: cada prueba de mesa esperaría esos cuatro segundos
+     * antes de poder mirar nada, y son cuarenta pruebas.
+     *
+     * No es un atajo para las pruebas: `prefers-reduced-motion` es una
+     * preferencia real del sistema, la mesa la respeta de verdad y hay gente
+     * que la tiene puesta. Probar con ella activada es probar un camino que
+     * existe, no uno inventado para la ocasión.
+     */
+    reducedMotion: "reduce",
   },
 
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

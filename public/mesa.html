@@ -10,6 +10,36 @@
     <link rel="stylesheet" href="css/mesa.css" />
 </head>
   <body>
+    <!--
+      La pantalla de carga del entrenamiento.
+
+      Va escrita en el HTML y visible de entrada —no la crea el JavaScript—
+      porque su primer trabajo es tapar el momento ANTERIOR a que el JavaScript
+      corra: la mesa comprueba la sesión antes de repartir, y sin esto se veía
+      un tablero vacío con "Preparando la partida…" durante ese rato.
+
+      La quita `mesa.js` cuando terminó de repartir. Si el JavaScript nunca
+      llega a correr, se va igual: ver la regla con `animation` en mesa.css, que
+      la desvanece sola a los diez segundos. Un velo que se queda pegado es peor
+      que no tener velo.
+    -->
+    <div class="velo-carga" id="veloCarga">
+      <img
+        class="velo-carga-logo"
+        src="img/memorie-legends3.png"
+        alt="Memorie Legends"
+        width="612"
+        height="408"
+      />
+      <span class="velo-carga-aro" aria-hidden="true"></span>
+      <p class="velo-carga-texto" role="status">Cargando entrenamiento…</p>
+    </div>
+
+    <!-- La cuenta regresiva previa a la mirada. Vacía hasta que hace falta. -->
+    <div class="cuenta-atras" id="cuentaAtras" aria-hidden="true" hidden>
+      <span class="cuenta-atras-numero" id="cuentaAtrasNumero"></span>
+    </div>
+
     <div class="escena">
       <header class="cabecera">
         <img class="marca" src="img/memorie-legends2.webp" alt="Memorie Legends" />

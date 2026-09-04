@@ -410,6 +410,38 @@
   min-height: 2.2em;
 }
 
+/* ------------------------------------------ ajustes del entrenamiento
+
+   Los dos desplegables —cuántos rivales y de qué nivel— van uno al lado del
+   otro mientras entren. Son cortos y se leen como una sola decisión; apilados
+   ocupan el doble de alto y empujan el botón de jugar fuera de la pantalla en
+   un teléfono. */
+
+.ajustes-entrenamiento {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* En pantallas muy angostas sí se apilan: dos desplegables de 150px con sus
+   etiquetas en mayúsculas no entran, y el texto se corta antes que el control. */
+@media (max-width: 420px) {
+  .ajustes-entrenamiento {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Deja lugar fijo para el texto de ayuda. Sin `min-height`, cambiar de nivel
+   mueve el botón de jugar hacia arriba y hacia abajo bajo el dedo. */
+.ayuda-entrenamiento {
+  font-size: 0.76rem !important;
+  color: var(--texto-tenue);
+  min-height: 2.2em;
+  text-align: left;
+  margin-top: 8px;
+}
+
 .separador-o {
   display: flex;
   align-items: center;

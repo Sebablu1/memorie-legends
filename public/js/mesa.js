@@ -4,6 +4,11 @@ import {
   mirar,
   terminarMirada,
   intentarDescarte,
+  // Entregarle una carta a un rival ya estaba resuelto en el motor y lo usaba
+  // sólo la mesa en red. Acá se cablea el mismo camino para entrenamiento: no
+  // hizo falta tocar una línea de las reglas.
+  intentarDescarteRival,
+  puedeAtacarA,
   cerrarVentanaDescarte,
   levantar,
   cambiarCarta,
@@ -45,6 +50,23 @@ import { MS_REVELACION } from "./reglas/vista.js";
 import { abandonarPartida, ErrorDeServidor } from "./servidor.js";
 import { sonidos, alternarSilencio } from "./sonidos.js";
 import { lanzarConfeti } from "./confeti.js";
+import { exigirSesionEnMesa } from "./guardia-sesion.js";
+
+// ------------------------------------------------------------ la puerta
+
+/**
+ * Sin sesión no se reparte.
+ *
+ * Va acá arriba, antes que cualquier otra cosa, y con `await` de módulo: todo
+ * lo que sigue —incluido `crearPartida`, que corre suelto más abajo— queda
+ * detenido hasta que Firebase diga quién entró. Ponerlo después habría dejado
+ * una mesa repartida y visible durante el instante de la redirección.
+ *
+ * Vale para los dos modos. La mesa por Leyendas ya no funcionaba sin sesión
+ * —el servidor rechaza cada llamada—, pero antes eso se descubría con un error
+ * en mitad de la partida en vez de con una puerta al entrar.
+ */
+await exigirSesionEnMesa();
 
 // ------------------------------------------------------------ referencias
 
@@ -551,7 +573,7 @@ function marcarCartasJugables() {
   // la carta, así que marcar una posición sería inventarse un dato que no
   // tenemos —y regalar el juego, que consiste justamente en acordarse.
   if (estado.fase === "descarte") {
-    for (const objetivo of miVista?.puedeAtacar ?? []) {
+    for (const objetivo of aQuienPuedoAtacar()) {
       document
         .querySelectorAll(
           `.jugador[data-jugador="${objetivo}"] .carta[data-posicion]`,
@@ -560,10 +582,46 @@ function marcarCartasJugables() {
     }
   }
 
+  // Ataque a medio armar: ya se apuntó a una carta ajena y falta decir cuál
+  // se entrega. Mientras tanto, lo único que importa es la mano propia — el
+  // resto se apaga para que no queden dos decisiones abiertas a la vez.
+  if (atacando) {
+    document
+      .querySelectorAll(".carta[data-posicion]")
+      .forEach((el) => el.classList.add("apagada"));
+
+    const apuntada = document.querySelector(
+      `.jugador[data-jugador="${atacando.indiceJugador}"] .carta[data-posicion="${atacando.posicion}"]`,
+    );
+    apuntada?.classList.remove("apagada");
+    apuntada?.classList.add("apuntada");
+
+    miMano.querySelectorAll(".carta[data-posicion]").forEach((el) => {
+      el.classList.remove("apagada");
+      el.classList.add("jugable", "entregable");
+    });
+    return;
+  }
+
   if (!habilitar) return;
   miMano
     .querySelectorAll(".carta")
     .forEach((el) => el.classList.add("jugable"));
+}
+
+/**
+ * A qué rivales se les puede buscar la carta, en cualquiera de los dos modos.
+ *
+ * En red lo dice el servidor: manda la lista ya recortada y NUNCA en qué
+ * posición está la carta, porque eso es justamente lo que hay que recordar.
+ * En entrenamiento el motor corre acá, así que se le pregunta a la misma
+ * función de las reglas que usa el servidor del otro lado.
+ */
+function aQuienPuedoAtacar() {
+  if (enRed()) return miVista?.puedeAtacar ?? [];
+  return estado.jugadores
+    .map((_, i) => i)
+    .filter((i) => i !== YO && puedeAtacarA(estado, YO, i));
 }
 
 /**
@@ -820,13 +878,157 @@ async function confirmarAbandono(boton) {
 
 // ------------------------------------------------------- flujo de ronda
 
+// ------------------------------------------ la puesta en escena del reparto
+//
+// Todo lo de este bloque es SÓLO para la mesa de entrenamiento. La mesa por
+// Leyendas no reparte acá —lo hace el servidor— y su ritmo lo marcan los
+// plazos que él manda; meterle esperas del navegador la desincronizaría.
+
+/**
+ * ¿El sistema pidió menos movimiento?
+ *
+ * Se respeta de verdad: sin animación de reparto y sin cuenta regresiva. No es
+ * sólo cosmética — para alguien con sensibilidad al movimiento, veinte cartas
+ * volando y un número latiendo en pantalla completa son justo lo que hace
+ * inusable un juego.
+ *
+ * De paso es lo que mantiene rápidas las pruebas de Playwright, que corren con
+ * esta preferencia puesta: sin ella cada prueba de mesa esperaría los cuatro
+ * segundos de la cuenta regresiva antes de poder mirar nada.
+ */
+const sinMovimiento = () =>
+  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+
+/** Retraso entre carta y carta, y cuánto dura el vuelo de cada una. */
+const MS_ENTRE_CARTAS = 90;
+const MS_VUELO = 260;
+
+/** Quita la pantalla de carga con una transición suave. */
+function quitarVeloCarga() {
+  const velo = $("veloCarga");
+  if (!velo) return;
+  velo.classList.add("se-va");
+  // Se saca del DOM al terminar de desvanecerse: dejarlo con `opacity: 0`
+  // encima de la mesa deja una capa invisible que igual se come los toques.
+  setTimeout(() => velo.remove(), 500);
+}
+
+/**
+ * Reparte a la vista: las cartas salen del mazo y van a su asiento.
+ *
+ * El orden es el de una mesa de verdad — a la izquierda primero y uno mismo al
+ * final— y por eso se recorre por ASIENTO y no por índice de jugador. Los dos
+ * órdenes no coinciden: el jugador 0 es siempre el de abajo, así que repartir
+ * por índice empezaría por uno mismo.
+ *
+ * Los asientos son los contenedores fijos de `mesa.html`, no las clases de las
+ * cartas: `claseAsiento()` devuelve un color (`asiento-color-2`), no una
+ * posición, y usarlo acá mandaría las cartas a cualquier lado.
+ */
+async function animarReparto() {
+  if (enRed() || sinMovimiento()) return;
+
+  const mazo = $("pilaMazo");
+  const asientos = [
+    dom.asientos.izq,
+    dom.asientos.arriba,
+    dom.asientos.der,
+    dom.asientos.abajo,
+  ].filter(Boolean);
+  if (!mazo || !asientos.length) return;
+
+  const centro = mazo.getBoundingClientRect();
+  const cartasDe = (asiento) => asiento.querySelectorAll(".carta[data-posicion]");
+  const maxCartas = Math.max(...asientos.map((a) => cartasDe(a).length));
+  if (!maxCartas) return;
+
+  let repartidas = 0;
+  for (let vuelta = 0; vuelta < maxCartas; vuelta++) {
+    for (const asiento of asientos) {
+      const carta = cartasDe(asiento)[vuelta];
+      if (!carta) continue;
+
+      // De dónde "viene" la carta: la distancia desde su lugar final hasta el
+      // mazo, medida ahora. Se mide en vez de escribir una dirección por
+      // asiento porque la mesa se acomoda distinto en un teléfono que en una
+      // pantalla ancha.
+      const caja = carta.getBoundingClientRect();
+      const dx = centro.left + centro.width / 2 - (caja.left + caja.width / 2);
+      const dy = centro.top + centro.height / 2 - (caja.top + caja.height / 2);
+
+      carta.style.setProperty("--dx", `${Math.round(dx)}px`);
+      carta.style.setProperty("--dy", `${Math.round(dy)}px`);
+      carta.style.setProperty("--retraso-reparto", `${repartidas * MS_ENTRE_CARTAS}ms`);
+      carta.classList.add("repartiendo");
+      repartidas++;
+    }
+  }
+
+  await esperar(repartidas * MS_ENTRE_CARTAS + MS_VUELO);
+
+  // Se limpia todo: si la clase quedara puesta, el próximo `dibujar()` que
+  // reutilice el nodo volvería a animarlo sin motivo.
+  for (const el of document.querySelectorAll(".carta.repartiendo")) {
+    el.classList.remove("repartiendo");
+    el.style.removeProperty("--dx");
+    el.style.removeProperty("--dy");
+    el.style.removeProperty("--retraso-reparto");
+  }
+}
+
+/**
+ * "3, 2, 1, Preparate…" antes de la mirada.
+ *
+ * Sólo en la primera ronda de la partida. Repetirla en cada una sumaría cuatro
+ * segundos de espera obligatoria a cada ronda, y lo que se gana —avisar que
+ * arranca— ya no hace falta cuando se lleva media partida jugada.
+ */
+async function cuentaRegresiva() {
+  if (enRed() || sinMovimiento()) return;
+
+  const caja = $("cuentaAtras");
+  const numero = $("cuentaAtrasNumero");
+  if (!caja || !numero) return;
+
+  caja.hidden = false;
+  for (const paso of ["3", "2", "1", "Preparate…"]) {
+    numero.textContent = paso;
+    numero.classList.toggle("palabra", paso.length > 2);
+    // Reinicia la animación en cada paso: sin esto sólo late el primero,
+    // porque para el navegador es el mismo elemento con la misma clase.
+    numero.style.animation = "none";
+    void numero.offsetWidth;
+    numero.style.animation = "";
+    await esperar(1000);
+  }
+  caja.hidden = true;
+}
+
+/** La primera ronda es la única que lleva cuenta regresiva. */
+let primeraRonda = true;
+
 async function arrancarRonda() {
   estado = empezarRonda(estado);
   memorias = estado.jugadores.map(() => IA.crearMemoria());
   revelaciones.clear();
   cerrarModal();
   dibujar();
+
+  if (!enRed()) {
+    // El velo se va ANTES de repartir: si no, el reparto ocurriría detrás de
+    // él y no se vería, que es justo lo contrario de lo que se busca.
+    quitarVeloCarga();
+    if (!sinMovimiento()) await esperar(220);
+  }
+
   sonidos.repartir();
+  await animarReparto();
+
+  if (primeraRonda) {
+    await cuentaRegresiva();
+    primeraRonda = false;
+  }
+
   await faseMirada();
 }
 
@@ -854,7 +1056,7 @@ function faseMirada() {
       return;
     }
 
-    pista("Elegí <b>una carta</b> para mirar durante 2 segundos.");
+    pista("Podés mirar <b>una</b> de tus cartas");
     correrTemporizador(5000, "Elegí una carta");
     dibujar();
 
@@ -1016,7 +1218,7 @@ async function cicloTurnos() {
     const jugador = estado.jugadores[estado.indiceTurno];
 
     if (!jugador.esIA) {
-      pista(`Es tu turno. Levantá una carta del mazo.`);
+      pista("Tu turno: levantá del mazo");
       dibujar();
       return;
     }
@@ -1224,7 +1426,7 @@ dom.btnTirar.addEventListener("click", async () => {
     return;
   }
   if (estado.fase === "postLevantada") {
-    pista("Podés <b>cortar</b> o <b>pasar</b> el turno.");
+    pista("Podés <b>cortar</b> o <b>pasar</b>");
   }
 });
 
@@ -1298,6 +1500,49 @@ const entregaElegida = null;
 function marcarEnviada(posicion) {
   posicionEnviada = posicion;
   dibujar();
+}
+
+/** Cuánto dura el destello del primer toque. */
+const MS_PRIMER_TOQUE = 150;
+
+/**
+ * Acusa recibo del PRIMER toque de un descarte.
+ *
+ * El problema que resuelve: descartar pide dos toques, y hasta que llega el
+ * segundo la mesa no hacía nada visible. Con cinco segundos de ventana y la
+ * carta quieta, el primer toque se lee como "no me registró" y la reacción
+ * natural es tocar más fuerte o más veces —justo lo que cuesta cartas—. Un
+ * destello de 150 ms alcanza para que se entienda "te oí, falta uno".
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ ESTO NO PUEDE ESTORBAR AL DOBLE TOQUE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque no toca nada de lo que el doble toque depende:
+ *
+ *   - NO llama a `dibujar()`. Si redibujara, el nodo de la carta sería otro
+ *     objeto para cuando llegue el segundo toque. El `click` igual llegaría
+ *     —el manejador está en `document`— pero es exactamente la clase de
+ *     cambio que rompe cosas en iOS, donde el segundo toque ya viaja al
+ *     límite. Se toca una clase del elemento que ya está y nada más.
+ *   - NO cambia `pointer-events` ni la geometría: la animación es un
+ *     `transform` de dos píxeles, que no mueve la caja de impactos.
+ *   - NO interviene en la cuenta de toques. `esSegundoToque` corre antes y en
+ *     su propia línea; esto pasa después y sólo pinta.
+ *
+ * El `void offsetWidth` es para poder destellar dos veces seguidas sobre la
+ * misma carta: sin forzar el reflujo, volver a poner una clase que el
+ * navegador todavía no sacó no reinicia la animación.
+ */
+function destelloPrimerToque(cartaEl) {
+  if (!cartaEl) return;
+  cartaEl.classList.remove("carta-primer-toque");
+  void cartaEl.offsetWidth;
+  cartaEl.classList.add("carta-primer-toque");
+  setTimeout(
+    () => cartaEl.classList.remove("carta-primer-toque"),
+    MS_PRIMER_TOQUE,
+  );
 }
 
 /**
@@ -1421,7 +1666,7 @@ document.addEventListener("click", async (evento) => {
     } else {
       // Ya eligió: se explica por qué no pasa nada, en vez de ignorar el clic.
       sonidos.error();
-      pista("⚠️ Sólo podés ver <b>una</b> carta al inicio de la ronda.");
+      pista("⚠️ Una sola carta por ronda");
       const carta = cartaEl;
       carta.classList.add("rechazada");
       setTimeout(() => carta.classList.remove("rechazada"), 600);
@@ -1432,13 +1677,61 @@ document.addEventListener("click", async (evento) => {
   // Tocar la mano de otro jugador nunca hace nada, pero conviene decirlo.
   if (estado.fase === "mirar" && indiceJugador !== YO) {
     sonidos.error();
-    pista("⚠️ Sólo podés mirar una carta <b>tuya</b>.");
+    pista("⚠️ Sólo una carta <b>tuya</b>");
+    return;
+  }
+
+  // Entregar la carta propia, con un ataque ya apuntado.
+  //
+  // Un solo toque, a diferencia de todo lo demás en esta fase. La decisión ya
+  // se tomó —y se confirmó con dos toques— al apuntar la carta del rival; pedir
+  // otro doble toque acá sólo gastaría la ventana, que dura cinco segundos y
+  // ya lleva un rato abierta cuando se llega hasta acá.
+  if (
+    estado.fase === "descarte" &&
+    manejadorDescarte &&
+    atacando &&
+    indiceJugador === YO
+  ) {
+    const objetivo = atacando;
+    atacando = null;
+    estado = intentarDescarteRival(
+      estado,
+      YO,
+      objetivo.indiceJugador,
+      objetivo.posicion,
+      posicion,
+    );
+    resolverUltimoDescarte();
+    dibujar();
+    return;
+  }
+
+  // Buscar la carta propia en la mano de un rival.
+  //
+  // Sólo se puede si un poder 8 o 10 dejó ese conocimiento; `aQuienPuedoAtacar`
+  // lo resuelve con las mismas reglas que usa el servidor en el modo en red.
+  if (
+    estado.fase === "descarte" &&
+    manejadorDescarte &&
+    indiceJugador !== YO &&
+    aQuienPuedoAtacar().includes(indiceJugador)
+  ) {
+    if (!dobleClic) {
+      destelloPrimerToque(cartaEl);
+      pista("¡Tocá dos veces! Ahí creés que está tu carta");
+      return;
+    }
+    atacando = { indiceJugador, posicion };
+    dibujar();
+    pista("Ahora elegí una carta tuya para entregar.");
     return;
   }
 
   if (estado.fase === "descarte" && manejadorDescarte && indiceJugador === YO) {
     if (!dobleClic) {
-      pista("Tocá <b>dos veces</b> para descartar.");
+      destelloPrimerToque(cartaEl);
+      pista("¡Tocá dos veces! Buscá la carta igual a la muestra");
       return;
     }
     manejadorDescarte(posicion);
@@ -2770,6 +3063,10 @@ function mostrarMesaEnRedPendiente(sala) {
 }
 
 if (salaPedida) {
+  // El velo dice "Cargando entrenamiento…", que acá no corresponde. Se quita
+  // enseguida: la mesa por Leyendas tiene su propio camino y no pasa por
+  // `arrancarRonda`, que es donde se saca en entrenamiento.
+  quitarVeloCarga();
   entrarDesdeSala();
 } else {
   // Entrenamiento contra la máquina: todo local, sin Leyendas.

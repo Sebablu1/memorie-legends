@@ -140,9 +140,41 @@
         <!-- ENTRENAMIENTO -->
         <div class="panel-modo" id="panelEntrenamiento">
           <p>
-            Tres rivales con cuatro niveles de dificultad. <b>No cuesta Leyendas</b> y no
-            suma al ranking: es para practicar la memoria y los reflejos.
+            Hasta tres rivales con cuatro niveles de dificultad.
+            <b>No cuesta Leyendas</b> y no suma al ranking: es para practicar la
+            memoria y los reflejos.
           </p>
+
+          <div class="ajustes-entrenamiento">
+            <label class="campo" for="cantidadIAs">
+              <span>Rivales</span>
+              <select id="cantidadIAs">
+                <option value="1">1 rival</option>
+                <option value="2">2 rivales</option>
+                <option value="3" selected>3 rivales</option>
+              </select>
+            </label>
+
+            <label class="campo" for="nivelIA">
+              <span>Dificultad</span>
+              <select id="nivelIA">
+                <option value="facil">Fácil</option>
+                <option value="medio" selected>Medio</option>
+                <option value="dificil">Difícil</option>
+                <option value="experto">Experto</option>
+                <option value="mixto">Mixto</option>
+              </select>
+            </label>
+          </div>
+
+          <p class="ayuda-entrenamiento" id="ayudaEntrenamiento"></p>
+
+          <!--
+            Sigue siendo un enlace y no un botón: si el JavaScript falla o
+            todavía no cargó, el clic igual lleva a la mesa y se juega con la
+            configuración por defecto. Un botón, en ese caso, no haría nada.
+            El manejador guarda `configMesa` y deja que el enlace navegue solo.
+          -->
           <a class="accion grande" id="btnEntrenar" href="mesa.html">Jugar ahora</a>
         </div>
 

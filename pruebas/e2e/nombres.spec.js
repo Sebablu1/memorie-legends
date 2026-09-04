@@ -32,6 +32,21 @@ test("un nombre con HTML se muestra como texto, no se ejecuta", async ({ page })
     }));
   }, CARGA);
 
+  // La mesa exige sesión, y esta prueba no usa `abrirMesa` —necesita escribir
+  // `configMesa` con el nombre atacante antes de entrar—, así que se pone acá
+  // el mismo reemplazo. Sin esto la mesa se va a `login.html` y el ataque no
+  // llega a montarse: la prueba pasaría sin haber probado nada, que es la peor
+  // forma de pasar para una prueba de seguridad.
+  await page.route("**/js/guardia-sesion.js", (ruta) =>
+    ruta.fulfill({
+      status: 200,
+      contentType: "text/javascript; charset=utf-8",
+      body: `export async function exigirSesionEnMesa() {
+        return { uid: "jugador-de-prueba", email: "prueba@example.com" };
+      }`,
+    }),
+  );
+
   await page.goto("/mesa.html?semilla=4242");
   await expect(page.locator("#pista")).toContainText(/Elegí|carta/i);
 

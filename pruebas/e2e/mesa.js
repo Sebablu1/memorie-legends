@@ -77,6 +77,26 @@ export async function abrirMesa(page, { semilla = SEMILLA } = {}) {
     }
   });
 
+  // La mesa exige sesión. Acá se le da una de mentira.
+  //
+  // No es hacer trampa: estas pruebas miden el JUEGO —el reparto, los poderes,
+  // el corte, el doble toque— y nada de eso depende de quién entró. Sin esto,
+  // las cuarenta terminarían en `login.html` comprobando lo mismo: que la
+  // puerta funciona.
+  //
+  // Que la puerta funciona lo comprueba `mesa-sesion.spec.js`, que es la única
+  // que NO sustituye este módulo. Un solo lugar donde se prueba, y un solo
+  // lugar donde se saltea.
+  await page.route("**/js/guardia-sesion.js", (ruta) =>
+    ruta.fulfill({
+      status: 200,
+      contentType: "text/javascript; charset=utf-8",
+      body: `export async function exigirSesionEnMesa() {
+        return { uid: "jugador-de-prueba", email: "prueba@example.com" };
+      }`,
+    }),
+  );
+
   await page.goto(`/mesa.html?semilla=${semilla}`);
   await expect(page.locator(SEL.pista)).toContainText(/Elegí|carta/i);
   return errores;
@@ -119,7 +139,7 @@ export const misCartas = (page) => page.locator(`${SEL.miMano} .carta`);
 
 /** Atraviesa la mirada del principio de la ronda eligiendo una carta. */
 export async function elegirCartaParaMirar(page) {
-  await esperarPista(page, /Elegí/i);
+  await esperarPista(page, /mirar/i);
   await misCartas(page).first().click();
 }
 

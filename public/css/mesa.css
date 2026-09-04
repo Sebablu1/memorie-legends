@@ -509,6 +509,14 @@ body::after {
   pointer-events: none;
 }
 
+/* El brillo dorado dice "esto se puede tocar AHORA".
+
+   Antes sólo aparecía al pasar el ratón por encima, y en un teléfono no hay
+   ratón: la única forma de saber si le tocaba a uno era leer la barra de
+   pista. Con el aro tenue puesto de base, se ve de un vistazo — y cuando no
+   es el turno del jugador, sus cartas no lo tienen y eso también se ve. */
+.carta.jugable::after { opacity: 0.4; }
+
 .carta.jugable:hover::after,
 .carta.seleccionada::after { opacity: 1; }
 
@@ -1967,4 +1975,246 @@ button.accion.con-poder {
    desventaja sistemática para quien juegue desde un iPhone. */
 .carta[data-posicion] {
   touch-action: manipulation;
+}
+
+
+/* =====================================================================
+   ACUSE DEL PRIMER TOQUE  ·  sólo mesa de entrenamiento
+   =====================================================================
+
+   Descartar pide dos toques y, hasta que llegaba el segundo, la mesa no
+   hacía NADA visible. Con cinco segundos de ventana y la carta quieta, el
+   primer toque se lee como "no me registró", y la reacción natural es tocar
+   más veces o más fuerte — que es justo lo que cuesta cartas de castigo.
+
+   Ciento cincuenta milisegundos: se ve, y termina mucho antes de que pueda
+   llegar el segundo toque (los sistemas operativos dan unos 400 ms para el
+   doble clic). Lo que se anima es `transform`, que el navegador resuelve en
+   la capa de composición y no obliga a recalcular la página. */
+
+@keyframes primer-toque {
+  0%   { transform: rotate(var(--giro)) translateY(var(--desvio)); }
+  35%  { transform: rotate(var(--giro)) translateY(calc(var(--desvio) - 2px)); }
+  70%  { transform: rotate(var(--giro)) translateY(calc(var(--desvio) + 2px)); }
+  100% { transform: rotate(var(--giro)) translateY(var(--desvio)); }
+}
+
+.carta.carta-primer-toque {
+  animation: primer-toque 150ms ease-in-out;
+  z-index: 7;
+}
+
+/* El destello va en el `::after` que ya existe para el aro dorado, en vez de
+   en un `box-shadow` propio de la carta: así no compite con la sombra del
+   naipe ni la pisa. */
+.carta.carta-primer-toque::after {
+  opacity: 1;
+  border-color: var(--oro-claro, #f0d060);
+  box-shadow: 0 0 26px 4px rgba(240, 208, 96, 0.85);
+}
+
+/* =====================================================================
+   ENTREGAR UNA CARTA A UN RIVAL
+   ===================================================================== */
+
+/* La carta ajena ya apuntada. Queda encendida mientras el resto se apaga:
+   es lo único que sigue importando hasta elegir qué se entrega. */
+.carta.apuntada {
+  outline: 3px solid var(--oro);
+  outline-offset: 2px;
+  filter: none;
+  z-index: 6;
+}
+
+/* Y la mano propia, que es de donde sale la entrega. */
+.carta.entregable::after {
+  opacity: 1;
+}
+
+/* ---------------------------------------------------------------------
+   Con movimiento reducido, el destello se queda sin sacudida.
+
+   La sacudida es la parte que molesta a quien pide menos movimiento; el
+   brillo NO se saca, porque no es decoración: es el acuse de recibo del
+   primer toque, y sin él la mesa vuelve a parecer que ignora los toques. */
+@media (prefers-reduced-motion: reduce) {
+  .carta.carta-primer-toque {
+    animation: none;
+  }
+}
+
+
+/* =====================================================================
+   PANTALLA DE CARGA  ·  sólo mesa de entrenamiento
+   ===================================================================== */
+
+.velo-carga {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px;
+  background: var(--noche-1, #05070b);
+  transition: opacity 0.45s ease;
+
+  /* Red de seguridad.
+
+     Si el JavaScript no llega a correr —un import roto, una red que se cae a
+     la mitad— este velo se quedaría tapando la mesa para siempre. A los diez
+     segundos se desvanece solo. Diez es mucho más de lo que tarda un arranque
+     normal, así que en la práctica no se ve nunca; es para el día que sí. */
+  animation: velo-rendirse 0.5s ease 10s forwards;
+}
+
+@keyframes velo-rendirse {
+  to { opacity: 0; visibility: hidden; }
+}
+
+.velo-carga-logo {
+  width: clamp(160px, 46vw, 260px);
+  height: auto;
+  filter: drop-shadow(0 0 26px rgba(212, 168, 67, 0.45));
+}
+
+.velo-carga-aro {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid rgba(212, 168, 67, 0.25);
+  border-top-color: var(--oro, #d4a843);
+  animation: velo-girar 0.9s linear infinite;
+}
+
+@keyframes velo-girar {
+  to { transform: rotate(360deg); }
+}
+
+.velo-carga-texto {
+  margin: 0;
+  color: var(--texto-tenue, #9aa3b2);
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+}
+
+/* Al irse se apaga la red de seguridad: si no, la animación de rendición
+   seguiría corriendo y podría volver a pintar el velo por un instante. */
+.velo-carga.se-va {
+  animation: none;
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* =====================================================================
+   CUENTA REGRESIVA  ·  sólo mesa de entrenamiento
+   =====================================================================
+
+   No tapa la mesa: se pinta encima, en el centro y sin fondo, para que el
+   reparto recién terminado siga a la vista. La idea es "ya va a empezar", no
+   "esperá otra pantalla". */
+
+.cuenta-atras {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+
+  /* Un oscurecido suave y redondo detrás del número.
+
+     Sin esto el número caía justo encima de las etiquetas del centro —"MAZO",
+     "LEVANTADA", "MUESTRA"— y las dos cosas se leían mal a la vez. No es un
+     velo opaco a propósito: el reparto recién termina y se quiere que siga
+     viéndose. La idea es "ya empieza", no "esperá otra pantalla". */
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(3, 5, 9, 0.82) 0%,
+    rgba(3, 5, 9, 0.55) 28%,
+    rgba(3, 5, 9, 0) 55%
+  );
+}
+
+.cuenta-atras[hidden] {
+  display: none;
+}
+
+.cuenta-atras-numero {
+  /* Grande de verdad: en un teléfono de 390px son unos 120px de alto. El
+     primer intento usaba 22vw y el número quedaba del tamaño de una carta,
+     compitiendo con la mesa en vez de destacarse sobre ella. */
+  font-size: clamp(5rem, 31vw, 11rem);
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--oro, #d4a843);
+  text-shadow: 0 0 40px rgba(212, 168, 67, 0.6), 0 6px 24px rgba(0, 0, 0, 0.7);
+  animation: cuenta-latir 0.9s ease-out;
+}
+
+/* "Preparate…" es una palabra, no un número: con el mismo tamaño se sale de
+   la pantalla en un teléfono. */
+.cuenta-atras-numero.palabra {
+  font-size: clamp(1.6rem, 8vw, 3.2rem);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+@keyframes cuenta-latir {
+  0%   { transform: scale(0.55); opacity: 0; }
+  25%  { transform: scale(1.08); opacity: 1; }
+  70%  { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.94); opacity: 0.15; }
+}
+
+/* =====================================================================
+   REPARTO: LAS CARTAS VUELAN DESDE EL MAZO
+   =====================================================================
+
+   `--dx` y `--dy` los calcula `mesa.js` midiendo la distancia entre cada
+   carta y el mazo del centro. Se hace con medidas reales y no con una
+   dirección fija por asiento porque la mesa cambia de forma: en un teléfono
+   los asientos se acomodan distinto que en una pantalla ancha, y una
+   dirección escrita a mano manda las cartas a cualquier lado.
+
+   Se anima `transform` y `opacity`, que el navegador resuelve en la capa de
+   composición: veinte cartas volando no obligan a recalcular la página. */
+
+@keyframes volar-al-asiento {
+  from {
+    transform: translate(var(--dx, 0px), var(--dy, 0px)) scale(0.55);
+    opacity: 0;
+  }
+  55% { opacity: 1; }
+  to {
+    transform: rotate(var(--giro)) translateY(var(--desvio)) scale(1);
+    opacity: 1;
+  }
+}
+
+.carta.repartiendo {
+  animation: volar-al-asiento 260ms cubic-bezier(0.22, 0.7, 0.3, 1) both;
+  animation-delay: var(--retraso-reparto, 0ms);
+}
+
+/* ---------------------------------------------------------------------
+   Con movimiento reducido no vuela nada y no hay cuenta regresiva.
+
+   `mesa.js` mira la misma preferencia y se saltea las esperas, así que esto
+   es sólo la mitad visual: sin la otra, las cartas aparecerían quietas pero
+   el jugador igual esperaría los cuatro segundos de la cuenta. */
+@media (prefers-reduced-motion: reduce) {
+  .carta.repartiendo {
+    animation: none;
+  }
+  .cuenta-atras-numero {
+    animation: none;
+  }
+  .velo-carga-aro {
+    animation: none;
+  }
 }

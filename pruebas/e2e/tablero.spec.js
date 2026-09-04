@@ -230,3 +230,123 @@ test("el tablero no ofrece el lobby viejo por ningún lado", async ({ page }) =>
   const alLobby = await page.locator('a[href*="lobby"]').count();
   expect(alLobby, "el tablero no debe enlazar a lobby.html").toBe(0);
 });
+
+// =====================================================================
+// La configuración del entrenamiento
+// =====================================================================
+//
+// Esto vivía en `lobby.html`, una pantalla intermedia entre el tablero y la
+// mesa. Ahora se elige acá y se entra de una.
+//
+// El canal con la mesa es `localStorage.configMesa`, así que lo que hay que
+// comprobar no es qué se ve sino QUÉ SE ESCRIBE: la mesa no sabe nada de estos
+// desplegables, sólo lee esa llave. Si la forma del objeto cambia sin querer,
+// la mesa cae a su configuración por defecto y el jugador juega contra tres
+// rivales que no eligió, sin ningún error a la vista.
+
+/** Lo que quedó guardado para la mesa. */
+const configGuardada = (page) =>
+  page.evaluate(() => JSON.parse(localStorage.getItem("configMesa") ?? "null"));
+
+/**
+ * Deja que el enlace navegue, pero sirve una mesa vacía.
+ *
+ * La mesa de verdad exige sesión y, como acá no hay, se va sola a `login.html`
+ * apenas carga. Esa segunda navegación destruía el contexto en mitad del
+ * `page.evaluate` y las pruebas fallaban con "Execution context was destroyed"
+ * — un error que no dice nada de lo que se estaba probando.
+ *
+ * Lo que se quiere comprobar es qué ESCRIBE el tablero antes de irse, así que
+ * alcanza con que el destino exista y se quede quieto.
+ */
+const mesaQuieta = (page) =>
+  page.route("**/mesa.html*", (r) =>
+    r.fulfill({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: "<!doctype html><title>mesa</title>",
+    }),
+  );
+
+test("los dos selectores están, con sus opciones", async ({ page }) => {
+  await abrirTablero(page);
+
+  await expect(page.locator("#cantidadIAs")).toBeVisible();
+  await expect(page.locator("#nivelIA")).toBeVisible();
+
+  // Uno, dos o tres: son los asientos que hay alrededor de la mesa.
+  expect(await page.locator("#cantidadIAs option").count()).toBe(3);
+
+  // Los cuatro niveles del motor, más "mixto".
+  const niveles = await page.locator("#nivelIA option").evaluateAll((os) =>
+    os.map((o) => o.value),
+  );
+  expect(niveles).toEqual(["facil", "medio", "dificil", "experto", "mixto"]);
+});
+
+test("lo elegido llega a la mesa por localStorage", async ({ page }) => {
+  await abrirTablero(page);
+  await mesaQuieta(page);
+
+  await page.selectOption("#cantidadIAs", "2");
+  await page.selectOption("#nivelIA", "dificil");
+  await page.locator("#btnEntrenar").click();
+  await page.waitForURL(/mesa\.html/);
+
+  const config = await configGuardada(page);
+  expect(config.modo).toBe("entrenamiento");
+  expect(config.ias).toHaveLength(2);
+  expect(config.ias.every((ia) => ia.dificultad === "dificil")).toBe(true);
+
+  // El nombre sale del perfil, no de un valor escrito a mano: es el que la
+  // mesa muestra en el asiento de abajo.
+  expect(config.humanos[0].nombre).toBe("Probador");
+});
+
+test("mixto reparte niveles DISTINTOS, que es lo único que significa", async ({
+  page,
+}) => {
+  // Si "mixto" pusiera el mismo nivel a los tres, sería un quinto nivel
+  // llamado raro. Lo que se compra al elegirlo es que no sean todos iguales.
+  await abrirTablero(page);
+  await mesaQuieta(page);
+
+  await page.selectOption("#cantidadIAs", "3");
+  await page.selectOption("#nivelIA", "mixto");
+  await page.locator("#btnEntrenar").click();
+  await page.waitForURL(/mesa\.html/);
+
+  const config = await configGuardada(page);
+  const niveles = config.ias.map((ia) => ia.dificultad);
+  expect(niveles).toHaveLength(3);
+  expect(new Set(niveles).size, `salieron repetidos: ${niveles.join(", ")}`).toBe(3);
+  expect(niveles).not.toContain("mixto");
+});
+
+test("entrar a entrenar borra la sala vieja", async ({ page }) => {
+  // Quien jugó por Leyendas tiene un `roomCode` guardado. Si queda ahí, la
+  // mesa puede creerse en red y pedirle al servidor una partida que no existe.
+  await abrirTablero(page);
+  await mesaQuieta(page);
+  await page.evaluate(() => localStorage.setItem("roomCode", "ABC234"));
+
+  await page.locator("#btnEntrenar").click();
+  await page.waitForURL(/mesa\.html/);
+
+  expect(await page.evaluate(() => localStorage.getItem("roomCode"))).toBe(null);
+});
+
+test("la ayuda dice contra quién se va a jugar", async ({ page }) => {
+  // "Mixto" es el que más lo necesita: sin esto no hay forma de saber contra
+  // qué niveles se juega hasta estar sentado en la mesa.
+  await abrirTablero(page);
+
+  await page.selectOption("#cantidadIAs", "3");
+  await page.selectOption("#nivelIA", "mixto");
+  await expect(page.locator("#ayudaEntrenamiento")).toContainText(/Fácil/i);
+  await expect(page.locator("#ayudaEntrenamiento")).toContainText(/Experto/i);
+
+  await page.selectOption("#nivelIA", "facil");
+  await expect(page.locator("#ayudaEntrenamiento")).toContainText(/Fácil/i);
+  await expect(page.locator("#ayudaEntrenamiento")).not.toContainText(/Experto/i);
+});
