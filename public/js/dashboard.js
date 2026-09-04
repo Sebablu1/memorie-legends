@@ -26,7 +26,7 @@ import { crearSala, unirseASala, ErrorDeServidor } from "./servidor.js";
 import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/salas.js";
 // Sólo nombres y etiquetas: el cerebro de la IA (`reglas/ia.js`, diez mil
 // caracteres) no hace falta acá y no se trae.
-import { armarRivales, NIVELES } from "./rivales.js";
+import { armarRivales, NIVELES, limiteDelModo, MODOS_PARTIDA } from "./rivales.js";
 import { esperaRuleta } from "./reglas/economia.js";
 
 const $ = (id) => document.getElementById(id);
@@ -193,6 +193,9 @@ function guardarConfigEntrenamiento() {
       modo: "entrenamiento",
       humanos: [{ nombre: nombreJugador }],
       ias: armarRivales(cantidad, nivel),
+      // Con cuántos puntos se queda afuera. La mesa lo lee y se lo pasa al
+      // motor; si faltara, el motor juega con su valor de siempre.
+      limitePuntos: limiteDelModo($("tipoPartida")?.value),
     }),
   );
 
@@ -218,13 +221,18 @@ function actualizarAyudaEntrenamiento() {
   const etiqueta = (clave) =>
     NIVELES.find((n) => n.clave === clave)?.etiqueta ?? clave;
 
-  caja.textContent =
+  const contra =
     nivel === "mixto"
-      ? `Contra ${rivales.map((r) => `${r.nombre} (${etiqueta(r.dificultad)})`).join(", ")}.`
-      : `Contra ${rivales.map((r) => r.nombre).join(", ")}, en ${etiqueta(nivel)}.`;
+      ? rivales.map((r) => `${r.nombre} (${etiqueta(r.dificultad)})`).join(", ")
+      : `${rivales.map((r) => r.nombre).join(", ")}, en ${etiqueta(nivel)}`;
+
+  const partida = MODOS_PARTIDA.find((m) => m.clave === $("tipoPartida")?.value);
+  const duracion = partida ? ` Afuera a los ${partida.limite} puntos.` : "";
+
+  caja.textContent = `Contra ${contra}.${duracion}`;
 }
 
-for (const id of ["cantidadIAs", "nivelIA"]) {
+for (const id of ["cantidadIAs", "nivelIA", "tipoPartida"]) {
   $(id)?.addEventListener("change", actualizarAyudaEntrenamiento);
 }
 actualizarAyudaEntrenamiento();

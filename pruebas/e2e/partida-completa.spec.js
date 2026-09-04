@@ -62,13 +62,22 @@ test("la partida arranca igual con la misma semilla", async ({ page }) => {
    * abajo" en cualquier partida. La primera versión comparaba sólo eso y falló
    * por una coincidencia real —las semillas 4242 y 99 reparten las dos un
    * Copa-6 en la posición 0—, con lo que dos repartos distintos daban la misma
-   * cadena. La muestra está siempre a la vista y desempata.
+   * cadena. La muestra desempata.
+   *
+   * Se ESPERA a que la muestra esté dada vuelta antes de leerla. La mesa la
+   * mantiene tapada mientras dura la mirada —para que el jugador mire su carta
+   * sin dos cosas a la vez— y leerla antes devolvía "boca abajo" para todas
+   * las semillas: volvía el desempate a la nada y esta prueba fallaba
+   * culpando a la semilla de algo que no había hecho.
    */
   const huellaDelReparto = async () => {
+    const muestraCarta = page.locator("#muestraCarta .carta");
+    await expect(muestraCarta).toHaveClass(/visible/, { timeout: 20_000 });
+
     const mano = await page.locator(`${SEL.miMano} .carta`).evaluateAll(
       (cartas) => cartas.map((c) => c.getAttribute("aria-label")),
     );
-    const muestra = await page.locator("#muestraCarta .carta").getAttribute("aria-label");
+    const muestra = await muestraCarta.getAttribute("aria-label");
     return `${muestra} || ${mano.join(",")}`;
   };
 

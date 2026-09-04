@@ -44,8 +44,18 @@ export const SEL = {
  * un módulo ocurre antes de que corra una sola línea del juego, y engancharse
  * después no lo vería.
  */
-export async function abrirMesa(page, { semilla = SEMILLA } = {}) {
+export async function abrirMesa(page, { semilla = SEMILLA, config } = {}) {
   const errores = [];
+
+  // Una `configMesa` a medida, para las pruebas que necesitan una mesa
+  // distinta de la de siempre —menos rivales, o una partida más corta—.
+  // Se escribe ANTES de cargar: `mesa.js` la lee al arrancar y no vuelve a
+  // mirarla.
+  if (config) {
+    await page.addInitScript((c) => {
+      localStorage.setItem("configMesa", JSON.stringify(c));
+    }, config);
+  }
 
   // El azar del navegador, fijado antes de que cargue una sola línea del
   // juego.

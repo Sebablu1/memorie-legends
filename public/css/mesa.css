@@ -2218,3 +2218,62 @@ button.accion.con-poder {
     animation: none;
   }
 }
+
+
+/* =====================================================================
+   EL CURSOR Y LA SELECCIÓN DE TEXTO
+   =====================================================================
+
+   Descartar son DOS toques seguidos, y en una PC dos clics seguidos son un
+   doble clic: el navegador lo entiende como "seleccionar la palabra que hay
+   debajo". Las cartas llevan texto adentro —el número de posición— así que
+   cada descarte dejaba el número resaltado en azul y el puntero convertido en
+   la barra de escribir. Se veía como un error de la página.
+
+   `user-select: none` lo apaga. Va sobre la mesa entera y no sólo sobre las
+   cartas porque el arrastre no respeta fronteras: empezar sobre una carta y
+   terminar sobre el paño seleccionaba todo lo del medio.
+
+   NO se pone en `body`: el registro de jugadas y el marcador final son texto
+   que uno querría poder copiar. */
+
+.mesa,
+.asiento,
+.carta,
+.pila,
+.acciones {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* `-webkit-touch-callout` es lo mismo para iOS: sin esto, mantener el dedo
+   sobre una carta abre el menú de "copiar / compartir imagen" en mitad de la
+   ventana de reflejos. */
+.carta {
+  -webkit-touch-callout: none;
+}
+
+/* El puntero dice qué se puede tocar, y nada más.
+
+   Antes cualquier hueco de la mesa heredaba el puntero de mano de algún
+   contenedor, así que la mesa entera parecía tocable. Ahora la mano aparece
+   sólo sobre lo que responde: una carta jugable, el mazo cuando se puede
+   levantar, la levantada con poder y los botones. */
+.mesa,
+.asiento,
+.pila,
+.carta {
+  cursor: default;
+}
+
+.carta.jugable,
+.carta.atacable,
+.carta.elegible-poder {
+  cursor: pointer;
+}
+
+/* Y lo apagado se dice apagado: el puntero avisa antes del clic que ahí no
+   hay nada, en vez de dejar que uno lo descubra tocando. */
+.carta.apagada {
+  cursor: not-allowed;
+}

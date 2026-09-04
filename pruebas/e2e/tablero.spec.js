@@ -397,3 +397,48 @@ test("el ancla del menú cae en el panel de jugar", async ({ page }) => {
   // hace nada al tocarla.
   await expect(page.locator("#jugar #cantidadIAs")).toBeVisible();
 });
+
+test("la duración elegida viaja a la mesa como limitePuntos", async ({ page }) => {
+  // La mesa no sabe nada de "corta" ni de "extendida": lee un número. Si el
+  // tablero guardara la palabra en vez del número, el motor la ignoraría y
+  // todas las partidas volverían a ser de 150 sin que nada fallara.
+  await abrirTablero(page);
+  await mesaQuieta(page);
+
+  for (const [duracion, limite] of [
+    ["corta", 60],
+    ["normal", 100],
+    ["extendida", 150],
+  ]) {
+    // Se vuelve al tablero en cada vuelta: el clic anterior navegó a la mesa,
+    // y ahí ya no existe el desplegable. Las rutas quedaron registradas en la
+    // página, así que alcanza con volver a pedirla.
+    await page.goto("/dashboard.html");
+    await page.waitForSelector("#tipoPartida");
+
+    await page.selectOption("#tipoPartida", duracion);
+    await page.locator("#btnEntrenar").click();
+    await page.waitForURL(/mesa\.html/);
+
+    const config = await configGuardada(page);
+    expect(config.limitePuntos, `la partida ${duracion}`).toBe(limite);
+  }
+});
+
+test("la duración viene en Extendida, que es la de siempre", async ({ page }) => {
+  // Quien no toque nada tiene que jugar lo que jugaba antes de que estos modos
+  // existieran. Un valor por defecto distinto cambiaría el juego para todos
+  // sin avisar.
+  await abrirTablero(page);
+  await expect(page.locator("#tipoPartida")).toHaveValue("extendida");
+});
+
+test("la ayuda dice también con cuántos puntos se queda afuera", async ({ page }) => {
+  await abrirTablero(page);
+
+  await page.selectOption("#tipoPartida", "corta");
+  await expect(page.locator("#ayudaEntrenamiento")).toContainText(/60 puntos/);
+
+  await page.selectOption("#tipoPartida", "extendida");
+  await expect(page.locator("#ayudaEntrenamiento")).toContainText(/150 puntos/);
+});

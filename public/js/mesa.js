@@ -239,12 +239,39 @@ const partidaEconomica = {
  * es elegirse su propio mazo contra la máquina.
  */
 const semillaPedida = Number(new URLSearchParams(location.search).get("semilla"));
-const opcionesDeReparto =
-  !enRed() && Number.isFinite(semillaPedida) && semillaPedida !== 0
+/**
+ * Con cuántos puntos se queda afuera en ESTA mesa.
+ *
+ * Lo elige el tablero (partida corta, normal o extendida) y viaja en
+ * `configMesa`. Si no viene —una configuración vieja guardada, o alguien que
+ * entró por la URL— el motor usa su valor de siempre, 150.
+ *
+ * Sólo vale para el entrenamiento. En una partida por Leyendas el estado lo
+ * arma el servidor y este número no interviene.
+ */
+const limitePedido = Number(config.limitePuntos);
+const limitePuntos =
+  !enRed() && Number.isFinite(limitePedido) && limitePedido > 0
+    ? limitePedido
+    : LIMITE_ELIMINACION;
+
+const opcionesDeReparto = {
+  ...(!enRed() && Number.isFinite(semillaPedida) && semillaPedida !== 0
     ? { semilla: semillaPedida }
-    : undefined;
+    : {}),
+  limitePuntos,
+};
 
 let estado = crearPartida(jugadoresConfig, opcionesDeReparto);
+
+// El lema de la cabecera dice el límite de ESTA partida, no uno escrito a mano.
+// Con las partidas cortas, un "límite 150" fijo estaría mintiendo — y es el
+// único lugar donde el jugador puede confirmar qué eligió antes de empezar.
+{
+  const lema = $("lemaMesa");
+  const cuantos = jugadoresConfig.length;
+  if (lema) lema.textContent = `Mesa de ${cuantos} · límite ${limitePuntos}`;
+}
 let memorias = estado.jugadores.map(() => IA.crearMemoria());
 
 /**
@@ -451,9 +478,27 @@ function dibujar() {
     if (!orden.includes(nombre)) el.innerHTML = asientoVacio();
   });
 
+  /**
+   * La muestra, tapada mientras dura la mirada.
+   *
+   * El motor la pone boca arriba al repartir, y está bien que lo haga: la
+   * muestra es pública desde que empieza la ronda. Pero mostrarla YA le da al
+   * jugador dos cosas a la vez —elegir qué carta propia mirar, y memorizar la
+   * muestra— justo en los dos segundos en que tendría que estar mirando la
+   * suya. En el teléfono, donde todo entra en una pantalla, se veía como que
+   * la muestra se daba vuelta antes de tiempo.
+   *
+   * Así que acá se dibuja de dorso hasta que la mirada termina. No cambia el
+   * estado ni las reglas: cuando abre la ventana de descarte —que es cuando la
+   * muestra importa— ya está dada vuelta para todos.
+   *
+   * Sólo en entrenamiento. En red el ritmo lo marca el servidor y la vista
+   * llega hecha; retenerla acá desincronizaría lo que se ve de lo que vale.
+   */
   const muestra = estado.descarte[0];
+  const muestraTapada = !enRed() && estado.fase === "mirar";
   dom.muestraCarta.innerHTML = muestra
-    ? dibujarCarta(muestra, { visible: true })
+    ? dibujarCarta(muestra, { visible: !muestraTapada })
     : `<div class="hueco vacio"></div>`;
   dom.descarteContador.textContent = `${estado.descarte.length} en la pila`;
 
@@ -1955,6 +2000,22 @@ dom.modal.addEventListener("click", async (evento) => {
     memorias = estado.jugadores.map(() => IA.crearMemoria());
     revelaciones.clear();
     dibujar();
+
+    // El reparto también se ve en las rondas siguientes, no sólo en la
+    // primera.
+    //
+    // `empezarRonda` baraja una baraja NUEVA en cada ronda —está comprobado en
+    // `pruebas/limite-puntos.mjs`: cinco rondas dan cinco repartos distintos—
+    // pero eso ocurría sin que se notara: las cartas aparecían ya puestas. Ver
+    // volar las cartas es lo que hace evidente que se repartió de nuevo, y
+    // evita la sospecha razonable de que la ronda dos juega con el mazo de la
+    // uno.
+    //
+    // La cuenta regresiva NO se repite: es para avisar que arranca la partida,
+    // y a esta altura ya se está jugando.
+    sonidos.repartir();
+    await animarReparto();
+
     await faseMirada();
     return;
   }
@@ -2126,7 +2187,7 @@ async function mostrarFinRonda() {
     abrirModal(`
       <div class="corona">${ganaste ? "🏆" : "🃏"}</div>
       <h2>${ganaste ? "¡Ganaste!" : `${estado.ganador?.nombre ?? "Nadie"} gana la partida`}</h2>
-      <p>Último jugador por debajo de ${LIMITE_ELIMINACION} puntos.</p>
+      <p>Último jugador por debajo de ${estado.limitePuntos ?? LIMITE_ELIMINACION} puntos.</p>
       ${tabla}
       <button class="accion" onclick="location.reload()" type="button">Jugar otra</button>
     `);

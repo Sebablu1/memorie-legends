@@ -432,6 +432,13 @@
   }
 }
 
+/* Un campo que ocupa las dos columnas de la rejilla. Lo usa la duración de
+   la partida, cuyo texto ("Extendida — afuera a los 150 puntos") no entra en
+   media columna sin cortarse. */
+.ajustes-entrenamiento .campo-ancho {
+  grid-column: 1 / -1;
+}
+
 /* Deja lugar fijo para el texto de ayuda. Sin `min-height`, cambiar de nivel
    mueve el botón de jugar hacia arriba y hacia abajo bajo el dedo. */
 .ayuda-entrenamiento {

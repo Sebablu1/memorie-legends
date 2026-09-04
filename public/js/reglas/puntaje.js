@@ -48,12 +48,25 @@ export function resolverCorte(jugadores, indiceCortador) {
 }
 
 /**
- * Queda eliminado quien SUPERA los 150. Con 150 exactos sigue en juego.
+ * Queda eliminado quien SUPERA el límite. Con el límite exacto sigue en juego.
  * Se guarda la ronda de eliminación: define el orden final de la partida.
+ *
+ * El límite es un parámetro, no una constante, porque el entrenamiento deja
+ * elegir partidas más cortas: 60, 100 o 150 puntos. Lo único que cambia es el
+ * número — el castigo por cortar mal, el bono por quedarse sin cartas y el
+ * "con el límite exacto seguís" son los mismos en los tres.
+ *
+ * El valor por defecto es 150, que es lo que hace que nada de lo que ya
+ * existía tenga que cambiar: las partidas por Leyendas y el servidor llaman
+ * sin este argumento y siguen jugando como siempre.
  */
-export const aplicarEliminacion = (jugadores, ronda = null) =>
+export const aplicarEliminacion = (
+  jugadores,
+  ronda = null,
+  limite = LIMITE_ELIMINACION,
+) =>
   jugadores.map((j) =>
-    j.eliminado || j.puntos <= LIMITE_ELIMINACION
+    j.eliminado || j.puntos <= limite
       ? j
       : { ...j, eliminado: true, eliminadoEnRonda: ronda },
   );

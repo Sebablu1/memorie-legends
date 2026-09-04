@@ -59,3 +59,27 @@ export function armarRivales(cantidad, nivel) {
     dificultad: mezcla ? mezcla[i] : nivel,
   }));
 }
+
+/**
+ * Con cuántos puntos se queda afuera, según el tipo de partida.
+ *
+ * El número es lo ÚNICO que cambia entre los tres. El castigo por cortar mal,
+ * el bono por llegar sin cartas y la regla de que con el límite exacto se
+ * sigue jugando son los mismos: lo que se elige es cuánto dura la partida, no
+ * cómo se juega.
+ *
+ * 150 va primero en la lista de dureza pero último acá, y viene marcado como
+ * el de siempre: es el que jugaba todo el mundo hasta ahora, así que es el que
+ * tiene que seguir viniendo elegido.
+ */
+export const MODOS_PARTIDA = [
+  { clave: "corta", etiqueta: "Corta", limite: 60, resumen: "unas pocas rondas" },
+  { clave: "normal", etiqueta: "Normal", limite: 100, resumen: "una partida media" },
+  { clave: "extendida", etiqueta: "Extendida", limite: 150, resumen: "la de siempre" },
+];
+
+export const MODO_POR_DEFECTO = "extendida";
+
+/** El límite de un modo, o el de siempre si el nombre no existe. */
+export const limiteDelModo = (clave) =>
+  MODOS_PARTIDA.find((m) => m.clave === clave)?.limite ?? 150;

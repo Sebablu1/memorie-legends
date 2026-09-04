@@ -1,5 +1,11 @@
 import { crearBaraja, barajar, TAM_MANO } from "./baraja.js";
-import { resolverCorte, aplicarEliminacion, comprobarFinPartida, cartasVivas } from "./puntaje.js";
+import {
+  resolverCorte,
+  aplicarEliminacion,
+  comprobarFinPartida,
+  cartasVivas,
+  LIMITE_ELIMINACION,
+} from "./puntaje.js";
 import { azarDesde, semillaAleatoria } from "./azar.js";
 
 export const MS_MIRAR = 2000;
@@ -95,8 +101,19 @@ export const crearJugador = ({ id, nombre, esIA = false, dificultad = "medio" })
  * booleanos, arrays y objetos planos. Ninguna función, ningún Map, ninguna
  * instancia de clase. Eso es lo que permite guardarlo y recuperarlo tal cual.
  */
-export const crearPartida = (configuracion, { semilla = semillaAleatoria() } = {}) => ({
+export const crearPartida = (
+  configuracion,
+  { semilla = semillaAleatoria(), limitePuntos = LIMITE_ELIMINACION } = {},
+) => ({
   fase: "inicio",
+  /**
+   * Con cuántos puntos se queda afuera.
+   *
+   * Viaja en el estado y no en una constante del módulo porque el
+   * entrenamiento deja elegir partidas más cortas. Por defecto, 150: quien
+   * cree la partida sin decir nada juega lo de siempre.
+   */
+  limitePuntos,
   ronda: 0,
   indiceMano: 0,
   indiceTurno: 0,
@@ -951,7 +968,11 @@ export function cortar(estado) {
   const cortePerfecto = cartasVivas(cortador.mano).length === 0;
 
   const { jugadores, corteFallido } = resolverCorte(estado.jugadores, indiceCortador);
-  const eliminados = aplicarEliminacion(jugadores, estado.ronda);
+  const eliminados = aplicarEliminacion(
+    jugadores,
+    estado.ronda,
+    estado.limitePuntos ?? LIMITE_ELIMINACION,
+  );
   const fin = comprobarFinPartida(eliminados);
 
   // Si todos se pasaron de 150 en la misma ronda y quedaron empatados en el

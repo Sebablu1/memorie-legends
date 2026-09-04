@@ -193,6 +193,17 @@
                 <option value="mixto">Mixto</option>
               </select>
             </label>
+
+            <!-- Cuánto dura la partida. Ocupa las dos columnas: el texto de
+                 cada opción lleva el número de puntos y no entra en media. -->
+            <label class="campo campo-ancho" for="tipoPartida">
+              <span>Duración</span>
+              <select id="tipoPartida">
+                <option value="corta">Corta — afuera a los 60 puntos</option>
+                <option value="normal">Normal — afuera a los 100 puntos</option>
+                <option value="extendida" selected>Extendida — afuera a los 150 puntos</option>
+              </select>
+            </label>
           </div>
 
           <p class="ayuda-entrenamiento" id="ayudaEntrenamiento"></p>
