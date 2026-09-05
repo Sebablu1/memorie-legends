@@ -91,6 +91,7 @@ const dom = {
   temporizadorTexto: $("temporizadorTexto"),
   temporizadorRelleno: $("temporizadorRelleno"),
   pista: $("pista"),
+  anuncio: $("anuncio"),
   btnLevantar: $("btnLevantar"),
   btnTirar: $("btnTirar"),
   btnCortar: $("btnCortar"),
@@ -483,6 +484,13 @@ function dibujarRegistro() {
 
 function dibujar() {
   dom.ronda.textContent = estado.ronda || "-";
+
+  // El color del cartel sale de la fase, y de acá sale la fase.
+  //
+  // Va como atributo y no como clase para que el CSS tenga UN lugar donde
+  // mirar: `[data-fase="descarte"]` y listo, sin ir agregando y sacando media
+  // docena de clases que después hay que acordarse de limpiar.
+  if (dom.anuncio) dom.anuncio.dataset.fase = estado.fase ?? "";
 
   const orden = asientosParaMesa(estado.jugadores.length);
   Object.values(dom.asientos).forEach((el) => (el.innerHTML = ""));
@@ -1125,8 +1133,8 @@ function faseMirada() {
       return;
     }
 
-    pista("Tocá tu carta");
-    correrTemporizador(5000, "Elegí una carta");
+    pista("MIRÁ TU CARTA");
+    correrTemporizador(5000);
     dibujar();
 
     let resuelto = false;
@@ -1139,7 +1147,7 @@ function faseMirada() {
 
       estado = mirar(estado, YO, pos);
       pista("Memorizá esta carta…");
-      correrTemporizador(MS_MIRAR, "Mirando");
+      correrTemporizador(MS_MIRAR);
       await revelarUnMomento(YO, pos);
       cancelarTemporizador();
 
@@ -1224,11 +1232,12 @@ async function trasPonerMuestra() {
  */
 function faseDescarte(alCerrar, duracion = MS_DESCARTE) {
   return new Promise((listo) => {
-    pista(
-      "<b>¡Reflejos!</b> Tocá una carta que creas igual a la muestra. Sólo el primero se salva; " +
-        "equivocarse suma una carta. Podés no hacer nada.",
-    );
-    correrTemporizador(duracion, "Descarte", { reflejos: true });
+    // "DESCARTE" y nada más. Antes explicaba la regla entera —sólo el primero
+    // se salva, equivocarse suma una carta— y son cinco segundos en los que
+    // nadie lee tres renglones: se mira la muestra y se toca. La regla se
+    // aprende en "Cómo se juega", no en la ventana en la que hay que usarla.
+    pista("DESCARTE");
+    correrTemporizador(duracion);
     sonidos.aviso();
     dibujar();
 
@@ -1287,7 +1296,7 @@ async function cicloTurnos() {
     const jugador = estado.jugadores[estado.indiceTurno];
 
     if (!jugador.esIA) {
-      pista("Te toca levantar");
+      pista("LEVANTAR");
       dibujar();
       return;
     }
@@ -1495,7 +1504,7 @@ dom.btnTirar.addEventListener("click", async () => {
     return;
   }
   if (estado.fase === "postLevantada") {
-    pista("Cortar o pasar");
+    pista("CORTAR O PASAR");
   }
 });
 
@@ -1823,7 +1832,7 @@ document.addEventListener("click", async (evento) => {
       abrirModalPoder();
       return;
     }
-    pista("Podés <b>cortar</b> o <b>pasar</b> el turno.");
+    pista("CORTAR O PASAR");
   }
 });
 
@@ -1984,7 +1993,7 @@ dom.modal.addEventListener("click", async (evento) => {
     dibujar();
     pista(
       usar
-        ? "Podés <b>cortar</b> o <b>pasar</b> el turno."
+        ? "CORTAR O PASAR"
         : "Tiraste la carta sin usar el poder. Podés <b>cortar</b> o <b>pasar</b> el turno.",
     );
     return;
@@ -2063,7 +2072,7 @@ dom.modal.addEventListener("click", async (evento) => {
     cartel(tipo);
     await revelarUnMomento(i, pos);
     cancelarTemporizador();
-    pista("Podés <b>cortar</b> o <b>pasar</b> el turno.");
+    pista("CORTAR O PASAR");
     dibujar();
     return;
   }
@@ -2109,7 +2118,7 @@ dom.modal.addEventListener("click", async (evento) => {
   await esperar(1100);
 
   seleccionPropia = null;
-  pista("Podés <b>cortar</b> o <b>pasar</b> el turno.");
+  pista("CORTAR O PASAR");
   dibujar();
 });
 

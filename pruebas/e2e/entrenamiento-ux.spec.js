@@ -25,7 +25,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { abrirMesa, elegirCartaParaMirar, SEL } from "./mesa.js";
+import { abrirMesa, elegirCartaParaMirar, misCartas, SEL } from "./mesa.js";
 
 
 /**
@@ -153,6 +153,56 @@ test("la pista vive fuera de la caja de los botones", async ({ page }) => {
   ).toBeLessThanOrEqual(barra.y + 1);
 });
 
+test("el cartel dice la fase y el tiempo en el mismo sitio", async ({ page }) => {
+  // La instrucción y el reloj eran dos cosas separadas que decían lo mismo con
+  // distintas palabras. Lo que se defiende acá es que sigan siendo una: el
+  // texto DENTRO del cartel, y el reloj al lado, no en otro rincón.
+  await abrirMesa(page);
+
+  expect(
+    await page.locator("#anuncio #pista").count(),
+    "la pista se volvió a salir del cartel",
+  ).toBe(1);
+  expect(await page.locator("#anuncio #temporizador").count()).toBe(1);
+  expect(await page.locator("#anuncio #relojTurno").count()).toBe(1);
+
+  // Y el cartel lleva la fase puesta, que es de donde sale su color. Sin esto
+  // el cartel se queda del color de la fase anterior y miente.
+  await expect(page.locator("#anuncio")).toHaveAttribute("data-fase", "mirar");
+  await expect(page.locator("#anuncio")).toContainText(/mirá tu carta/i);
+
+  await misCartas(page).first().click();
+  await expect(page.locator("#anuncio")).toHaveAttribute("data-fase", "descarte", {
+    timeout: 20_000,
+  });
+  await expect(page.locator("#anuncio")).toContainText(/descarte/i);
+});
+
+test("el reloj de la ventana cuenta hacia abajo, no se queda en cero", async ({
+  page,
+}) => {
+  // La barra la pintaba una transición de CSS que duraba lo que la ventana.
+  // Con `prefers-reduced-motion` —que es como corre esta suite, y como lo
+  // tiene puesto mucha gente— la regla general la bajaba a 0.05 ms: la barra
+  // saltaba a vacía en el primer cuadro y decía que no quedaba tiempo cuando
+  // quedaban cinco segundos. Ahora la pinta el reloj, tick a tick.
+  await abrirMesa(page);
+  await misCartas(page).first().click();
+  await expect(page.locator("#anuncio")).toHaveAttribute("data-fase", "descarte", {
+    timeout: 20_000,
+  });
+
+  const ancho = () =>
+    page.locator("#temporizadorRelleno").evaluate((el) => parseFloat(el.style.width));
+
+  const antes = await ancho();
+  expect(antes, `la barra arrancó en ${antes}%`).toBeGreaterThan(50);
+
+  await page.waitForTimeout(1200);
+  const despues = await ancho();
+  expect(despues, `la barra no bajó: ${antes}% -> ${despues}%`).toBeLessThan(antes);
+});
+
 test("la caja de los botones es del ancho de los botones, y va centrada", async ({
   page,
 }) => {
@@ -200,6 +250,87 @@ test("los botones no se corren de sitio cuando aparece el reloj", async ({
     conReloj.x,
     `el botón se corrió de ${sinReloj.x} a ${conReloj.x} al aparecer el reloj`,
   ).toBe(sinReloj.x);
+});
+
+// =====================================================================
+// El teléfono chico
+// =====================================================================
+//
+// Todo lo de acá se rompió de verdad, no en teoría: a 320 px la cabecera
+// desbordaba y la página scrolleaba de costado; el paño se derramaba sobre la
+// botonera y las cartas tapaban el cartel; y cuando los cuatro botones no
+// entraban en una fila, "Pasar" quedaba solo, estirado de lado a lado.
+
+const CHICO = { width: 320, height: 568 };
+
+test("en el teléfono más chico no hay scroll lateral", async ({ page }) => {
+  await page.setViewportSize(CHICO);
+  await abrirMesa(page);
+
+  const seSale = await page.evaluate(() => ({
+    ancho: document.documentElement.scrollWidth,
+    hueco: document.documentElement.clientWidth,
+  }));
+  expect(
+    seSale.ancho,
+    `la página mide ${seSale.ancho}px en un hueco de ${seSale.hueco}px`,
+  ).toBeLessThanOrEqual(seSale.hueco);
+});
+
+test("las cartas no se meten encima del cartel ni de los botones", async ({
+  page,
+}) => {
+  await page.setViewportSize(CHICO);
+  await abrirMesa(page);
+
+  const visto = await page.evaluate(() => {
+    const c = document.querySelector("#anuncio").getBoundingClientRect();
+
+    // Se mide por geometría y no con `elementFromPoint`: el cartel es sordo al
+    // tacto a propósito, así que preguntar "qué hay en este punto" nunca lo
+    // devuelve y daría todo por tapado.
+    let solape = 0;
+    document.querySelectorAll(".carta").forEach((el) => {
+      const r = el.getBoundingClientRect();
+      const alto = Math.min(r.bottom, c.bottom) - Math.max(r.top, c.top);
+      const ancho = Math.min(r.right, c.right) - Math.max(r.left, c.left);
+      if (alto > 0 && ancho > 0) solape = Math.max(solape, alto);
+    });
+
+    // Los botones sí se preguntan por punto: ahí lo que importa es a quién le
+    // llega el toque, y una carta encima se lo queda.
+    const tapados = [...document.querySelectorAll("button.accion")]
+      .filter((b) => {
+        const r = b.getBoundingClientRect();
+        const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return !b.contains(e) && e !== b;
+      })
+      .map((b) => b.textContent.trim());
+
+    return { solape: Math.round(solape), tapados };
+  });
+
+  expect(visto.solape, "las cartas se derraman sobre el cartel").toBeLessThanOrEqual(2);
+  expect(
+    visto.tapados,
+    `hay cartas encima de estos botones: ${visto.tapados.join(", ")}`,
+  ).toEqual([]);
+});
+
+test("si los cuatro botones no entran en una fila, van dos y dos", async ({
+  page,
+}) => {
+  // Con `flex-grow` y a lo que salga, entraban tres arriba y "Pasar" quedaba
+  // solo abajo del ancho de la pantalla: tres veces más grande que los otros,
+  // para la jugada más inocua de las cuatro.
+  await page.setViewportSize(CHICO);
+  await abrirMesa(page);
+
+  const anchos = await page
+    .locator("button.accion")
+    .evaluateAll((bs) => bs.map((b) => Math.round(b.getBoundingClientRect().width)));
+
+  expect(new Set(anchos).size, `los botones miden ${anchos.join(", ")}`).toBe(1);
 });
 
 test("el brillo dorado dice cuándo se puede tocar", async ({ page }) => {

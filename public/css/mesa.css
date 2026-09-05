@@ -668,166 +668,189 @@ body::after {
 
 .levantada-caja.con-poder .etiqueta { color: var(--ambar); }
 
-/* =============================================== temporizador */
+/* ==================================================== el cartel
 
-.temporizador {
-  flex: none;
-  display: none;
-  align-items: center;
-  gap: 12px;
-  padding: 7px 14px;
-  border-radius: 999px;
-  background: rgba(5, 8, 14, 0.9);
-  border: 1px solid rgba(212, 168, 67, 0.35);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(6px);
-}
+   Una sola pieza: qué hay que hacer, y cuánto queda para hacerlo.
 
-.temporizador.activo { display: flex; }
+   Antes eran dos —la instrucción por un lado, el reloj por el otro— y decían
+   lo mismo con distintas palabras, una al lado de la otra: "Tocá tu carta"
+   junto a "ELEGÍ UNA CARTA 2.4s". Dos lugares donde mirar para entender un
+   solo momento del juego.
 
-.temporizador .texto {
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--oro-claro);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
+   El color hace el trabajo que hacía el rótulo repetido: oro cuando la
+   jugada es tuya, rojo cuando corren los reflejos, plata cuando hay que
+   decidir el corte. Se ve antes de leerlo.
 
-.temporizador .barra {
-  width: 130px;
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
-  overflow: hidden;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
-}
+   Todo el tono sale de tres variables. Cambiar de fase es cambiar `data-fase`
+   en el cartel y nada más: el borde, el texto, la barra y el latido salen de
+   ahí. Un color suelto escrito en cada regla es como se termina con tres
+   rojos distintos que no combinan. */
 
-.temporizador .relleno {
-  display: block;
-  height: 100%;
-  width: 100%;
-  transform-origin: left;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--oro-claro), var(--oro));
-}
-
-.temporizador.reflejos {
-  border-color: rgba(233, 69, 96, 0.6);
-  animation: alerta 0.9s ease-in-out infinite;
-}
-
-.temporizador.reflejos .texto { color: #f0cfc9; }
-
-.temporizador.reflejos .relleno {
-  background: linear-gradient(90deg, var(--ambar), var(--rojo));
-}
-
-@keyframes alerta {
-  0%, 100% { box-shadow: 0 10px 26px rgba(0, 0, 0, 0.6), 0 0 0 0 rgba(233, 69, 96, 0.4); }
-  50%      { box-shadow: 0 10px 26px rgba(0, 0, 0, 0.6), 0 0 26px 4px rgba(233, 69, 96, 0.35); }
-}
-
-/* ============================================== reloj del turno */
-
-.reloj-turno {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 16px;
-  border-radius: 999px;
-  background: rgba(6, 9, 14, 0.9);
-  border: 1px solid rgba(212, 168, 67, 0.35);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
-  transition: border-color 0.3s, box-shadow 0.3s;
-}
-
-.reloj-turno[hidden] { display: none; }
-
-.reloj-numero {
-  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
-  font-size: 1.6rem;
-  font-weight: 700;
-  line-height: 1;
-  min-width: 22px;
-  text-align: center;
-  color: #d4a843;
-  font-variant-numeric: tabular-nums;
-  transition: color 0.3s;
-}
-
-.reloj-barra {
-  width: 120px;
-  height: 7px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
-  overflow: hidden;
-}
-
-.reloj-relleno {
-  display: block;
-  height: 100%;
-  width: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #f0d060, #d4a843);
-  transition: width 0.12s linear, background 0.3s;
-}
-
-/* Últimos dos segundos: rojo y latido. */
-.reloj-turno.apurado {
-  border-color: rgba(231, 76, 60, 0.7);
-  animation: relojApurado 0.7s ease-in-out infinite;
-}
-
-.reloj-turno.apurado .reloj-numero { color: #e74c3c; }
-.reloj-turno.apurado .reloj-relleno { background: linear-gradient(90deg, #e74c3c, #a93226); }
-
-@keyframes relojApurado {
-  0%, 100% { box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6), 0 0 0 0 rgba(231, 76, 60, 0.4); }
-  50% { box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6), 0 0 18px 3px rgba(231, 76, 60, 0.35); }
-}
-
-@media (max-width: 720px) {
-  .reloj-turno { padding: 6px 12px; gap: 9px; }
-  .reloj-numero { font-size: 1.25rem; }
-  .reloj-barra { width: 80px; }
-}
-
-/* ================================================== acciones */
-
-/* La instrucción, en su propio renglón y fuera de la caja de los botones.
-   Dentro de la botonera se leía como el rótulo de la caja; acá, centrada y
-   sobre el paño, se lee como lo que es: lo que hay que hacer ahora.
-
-   Sin borde ni relieve a propósito. Una segunda caja debajo del paño y encima
-   de la botonera partiría la pantalla en tres bloques que compiten. */
 .tira-pista {
   grid-area: pista;
   display: flex;
   align-items: center;
   justify-content: center;
-
-  /* En una pantalla angosta la instrucción y el reloj no entran en el mismo
-     renglón, y prefiero dos líneas centradas a un reloj aplastado. */
-  flex-wrap: wrap;
-  gap: 8px;
   min-width: 0;
+
+  /* Por encima del paño, y sordo al tacto.
+   *
+   * En su fila el cartel no le estorba a nadie, pero un mensaje largo —"Se
+   * cortó la conexión con la partida"— lo parte en dos renglones, y en un
+   * teléfono bajo esos 16 px de más empujan la mesa hasta que las cartas se
+   * meten encima. Justo el mensaje que hay que poder leer, tapado.
+   *
+   * Se resuelve con el orden de pintado en vez de recortando la mesa: si algo
+   * se derrama, se derrama por DEBAJO. Y `pointer-events: none` es la otra
+   * mitad — un cartel que se pone delante de una carta no puede además
+   * comerse el toque que iba a la carta. */
+  position: relative;
+  z-index: 3;
+  pointer-events: none;
 }
 
-.tira-pista .pista {
+.anuncio {
+  --tono: var(--oro);
+  --tono-claro: var(--oro-claro);
+  --tono-filo: rgba(212, 168, 67, 0.5);
+  --tono-halo: rgba(212, 168, 67, 0.35);
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
   max-width: 100%;
-  padding: 5px 16px;
+  min-width: 0;
+  padding: 6px 16px;
   border-radius: 999px;
-  font-size: 0.9rem;
-  line-height: 1.35;
-  color: #e7e2d6;
-  background: rgba(0, 0, 0, 0.42);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+
+  /* Casi opaco. Cuando el cartel se pone delante de una carta —pasa con un
+     mensaje largo en un teléfono bajo— un fondo translúcido deja el dorso de
+     la carta asomando entre las letras. */
+  background: rgba(5, 8, 14, 0.96);
+  border: 1px solid var(--tono-filo);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: border-color 0.3s, box-shadow 0.3s;
 }
 
-.tira-pista .pista b { color: var(--oro-claro); }
+.anuncio .pista {
+  min-width: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.4px;
+  color: var(--tono-claro);
+}
+
+/* Dentro de un texto ya coloreado, la palabra importante se destaca en
+   blanco: subirle más el tono al tono no destaca nada. */
+.anuncio .pista b { color: #fff; }
+
+/* --- las dos cuentas atrás, con la misma forma --- */
+
+.anuncio .temporizador,
+.anuncio .reloj-turno {
+  display: none;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.anuncio .temporizador.activo,
+.anuncio .reloj-turno { display: flex; }
+.anuncio .reloj-turno[hidden] { display: none; }
+
+/* Cinturón: si por un cruce de fases los dos quedaran encendidos a la vez, el
+   cartel mostraría dos barras contando cosas distintas. Manda la grande. */
+.anuncio .temporizador.activo ~ .reloj-turno { display: none; }
+
+.anuncio .barra,
+.anuncio .reloj-barra {
+  /* Se encoge con la pantalla: en un teléfono de 320 px una barra fija de
+     130 px empuja el texto fuera del cartel. */
+  width: clamp(44px, 13vw, 120px);
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* Las dos se pintan por ancho desde JavaScript, tick a tick. La transición
+   corta es sólo para que el salto entre ticks no se vea escalonado; si el
+   sistema pide menos movimiento se apaga sola, y la barra sigue diciendo la
+   verdad porque el ancho lo pone el reloj, no la animación. */
+.anuncio .relleno,
+.anuncio .reloj-relleno {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--tono-claro), var(--tono));
+  transition: width 0.12s linear;
+}
+
+.anuncio .texto,
+.anuncio .reloj-numero {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--tono-claro);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+
+  /* Ancho reservado, y no es un capricho: el cartel está centrado, así que
+     cada vez que "10.0s" pasa a "9.9s" el cartel entero se corría un pelo.
+     Con el hueco fijo, el número cambia y nada más se mueve. */
+  min-width: 3.1em;
+  text-align: right;
+}
+
+/* --- el color de cada fase --- */
+
+.anuncio[data-fase="descarte"] {
+  --tono: var(--rojo);
+  --tono-claro: #ff9d84;
+  --tono-filo: rgba(233, 69, 96, 0.6);
+  --tono-halo: rgba(233, 69, 96, 0.4);
+  animation: latido 0.9s ease-in-out infinite;
+}
+
+.anuncio[data-fase="postLevantada"] {
+  --tono: #8d96a3;
+  --tono-claro: #e2e8f0;
+  --tono-filo: rgba(226, 232, 240, 0.45);
+  --tono-halo: rgba(226, 232, 240, 0.3);
+}
+
+/* Los últimos dos segundos del reloj del turno, en rojo y latiendo. Pisa al
+   color de la fase a propósito: que se acabe el tiempo es más urgente que
+   saber en qué fase estás.
+
+   La clase la pone el reloj sobre el cartel, en vez de resolverlo acá con un
+   `:has()`. Es una línea de JavaScript contra un selector que en un iPhone con
+   iOS viejo no existe — y ahí el aviso de los dos segundos finales, que es
+   justo el que hay que ver, no se vería. */
+.anuncio.apurado {
+  --tono: #a93226;
+  --tono-claro: #ff7a6a;
+  --tono-filo: rgba(231, 76, 60, 0.7);
+  --tono-halo: rgba(231, 76, 60, 0.4);
+  animation: latido 0.7s ease-in-out infinite;
+}
+
+@keyframes latido {
+  0%, 100% { box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5), 0 0 0 0 var(--tono-halo); }
+  50%      { box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5), 0 0 22px 3px var(--tono-halo); }
+}
+
+@media (max-width: 720px) {
+  .anuncio { gap: 8px; padding: 5px 12px; }
+  .anuncio .pista { font-size: 0.78rem; letter-spacing: 0.2px; }
+  .anuncio .texto,
+  .anuncio .reloj-numero { font-size: 0.72rem; min-width: 2.9em; }
+}
+
+/* ================================================== acciones */
 
 /* La caja de los botones: del ancho de los botones, y centrada.
 
@@ -949,14 +972,38 @@ button.accion:disabled::after {
   100%    { left: 130%; }
 }
 
-/* Cortar es la jugada que decide la ronda, y el botón lo dice.
+/* Cortar: rojo vivo, y que se vea desde la otra punta de la mesa.
 
-   El rojo de antes iba de `#d9604f` al `--rojo` de la paleta y moría en un
-   marrón: sobre el negro de la barra quedaba apagado, más ladrillo que rubí.
-   Éste sube el brillo arriba, satura el medio y hunde el pie, que es lo que
-   hace que una superficie parezca una piedra y no una calcomanía. El halo
-   rojo de afuera es tenue a propósito: marca cuál es el botón grave sin
-   convertirlo en una alarma. */
+   Va con clase propia y no con `.peligro`, aunque los dos sean rojos. Son dos
+   rojos distintos a propósito: `.peligro` es el rojo apagado de lo que uno
+   lamenta —lo usa "Abandonar", en el modal de salir— y éste es el rojo
+   encendido de la jugada que decide la ronda. Si fueran el mismo, el botón
+   que uno quiere apretar y el que no querría apretar nunca se verían igual.
+
+   El halo de afuera es lo que lo despega del negro de la caja: sin él, un
+   rojo vivo sobre fondo oscuro se apaga solo. */
+button.accion.corte {
+  color: #fff;
+  border-color: rgba(255, 190, 180, 0.75);
+  background: linear-gradient(180deg, #ff8a72 0%, #ff3020 42%, #c1160a 100%);
+  box-shadow:
+    0 6px 0 #7d0f04,
+    0 14px 26px rgba(0, 0, 0, 0.45),
+    0 0 34px rgba(255, 48, 32, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.28);
+}
+
+button.accion.corte:hover:not(:disabled) {
+  box-shadow:
+    0 9px 0 #7d0f04,
+    0 20px 34px rgba(0, 0, 0, 0.5),
+    0 0 44px rgba(255, 48, 32, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.28);
+}
+
+/* El rojo se queda para lo que de verdad es grave: abandonar la partida. */
 button.accion.peligro {
   color: #fff;
   border-color: rgba(255, 150, 130, 0.5);
@@ -964,7 +1011,6 @@ button.accion.peligro {
   box-shadow:
     0 6px 0 #5a140b,
     0 14px 26px rgba(0, 0, 0, 0.45),
-    0 0 20px rgba(216, 64, 46, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.45),
     inset 0 -3px 8px rgba(0, 0, 0, 0.3);
 }
@@ -973,36 +1019,42 @@ button.accion.peligro:hover:not(:disabled) {
   box-shadow:
     0 9px 0 #5a140b,
     0 20px 34px rgba(0, 0, 0, 0.5),
-    0 0 26px rgba(216, 64, 46, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.5),
     inset 0 -3px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Acero, no gris.
+/* Acero oscuro, con un filo de oro.
 
-   La plata de antes era un degradado de dos tonos planos —`#d0d0d0` a
-   `#a0a0a0`— y al lado del oro y del rojo parecía un botón desactivado que se
-   podía tocar. Ahora tiene banda de luz arriba, tono frío en el medio y pie
-   oscuro: se ve metal. Y se queda por debajo del oro en la jerarquía, que es
-   lo que tiene que pasar — tirar y pasar son las jugadas de trámite. */
+   Tercer intento, y los dos anteriores enseñaron algo. La plata plana
+   —`#d0d0d0` a `#a0a0a0`— parecía muerta: dos tonos sin una sola luz. El
+   aluminio claro estaba vivo pero pasaba lo contrario: dos botones casi
+   blancos al lado del oro y del rojo, gritando más fuerte que las jugadas que
+   deciden la ronda. Tirar y pasar son de trámite y tienen que verse de
+   trámite.
+
+   Éste es oscuro y metálico: banda de luz arriba, cuerpo gris frío, pie
+   hundido, y una línea de oro finita que lo emparenta con el filo de las
+   cartas. Se lee como botón sin pelearse con nadie. */
 button.accion.sobria {
-  color: #0d1116;
-  border-color: rgba(226, 232, 240, 0.45);
-  background: linear-gradient(180deg, #d5dbe3 0%, #b6bec9 38%, #97a0ac 62%, #7e8794 100%);
+  color: #f2f5f9;
+  border-color: rgba(212, 168, 67, 0.35);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  background: linear-gradient(180deg, #98a0aa 0%, #626a75 40%, #3b414a 100%);
   box-shadow:
-    0 6px 0 #4a515b,
+    0 6px 0 #262a30,
     0 14px 26px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.75),
-    inset 0 -3px 8px rgba(0, 0, 0, 0.25);
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.32);
 }
 
 button.accion.sobria:hover:not(:disabled) {
-  background: linear-gradient(180deg, #e8edf3 0%, #c9d1db 38%, #a8b1bd 62%, #8d96a3 100%);
+  border-color: rgba(212, 168, 67, 0.6);
+  background: linear-gradient(180deg, #aab2bd 0%, #727b87 40%, #464d57 100%);
   box-shadow:
-    0 9px 0 #4a515b,
+    0 9px 0 #262a30,
     0 20px 34px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    inset 0 -3px 8px rgba(0, 0, 0, 0.22);
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.3);
 }
 
 /* =================================================== lateral */
@@ -1609,16 +1661,9 @@ button.accion.con-poder {
   .pila .etiqueta { margin-bottom: 4px; }
   .pila .contador { margin-top: 4px; font-size: 0.62rem; }
 
-  /* Sin estirar: ahora comparte renglón con la pista, y un temporizador que
-     se come el espacio sobrante deja la instrucción descentrada. */
-  .temporizador { padding: 6px 10px; gap: 8px; }
-  .temporizador .barra { width: 90px; }
-  .temporizador .texto { font-size: 0.72rem; }
-
   /* En el teléfono la caja sí ocupa el ancho: apretar cuatro botones en el
      medio de la pantalla deja los dedos peleándose por 60 px cada uno. */
   .acciones { width: auto; flex-wrap: wrap; padding: 8px 10px; gap: 6px; }
-  .tira-pista .pista { padding: 4px 12px; font-size: 0.8rem; }
   button.accion { flex: 1 1 auto; padding: 11px 12px; font-size: 0.7rem; letter-spacing: 1px; }
 
   .modal { padding: 20px; }
@@ -1671,6 +1716,79 @@ button.accion.con-poder {
     --carta-alto: clamp(46px, 7.6dvh, 62px);
     --carta-ancho: calc(var(--carta-alto) * 0.667);
   }
+}
+
+/* Pantallas BAJAS: un teléfono chico acostado, un iPhone SE, media ventana.
+ *
+ * El paño no entraba y se derramaba hacia abajo: la mano propia terminaba
+ * dibujada encima del cartel y de la botonera. Dos cosas rotas de una vez —el
+ * cartel es el único lugar donde la mesa dice qué hacer, y una carta encima de
+ * un botón se come el toque que iba al botón—.
+ *
+ * Se recorta donde no duele: cartas más chicas, menos aire entre asientos y
+ * una baranda más fina. Los rótulos de las pilas y los contadores se quedan:
+ * cuántas cartas van quedando en el mazo decide cuándo cortar.
+ *
+ * Va por ALTO y no por ancho. El problema nunca fue que la pantalla sea
+ * angosta —a 390x844 sobra sitio— sino que sea baja. */
+@media (max-width: 560px) and (max-height: 730px) {
+  :root { --carta-alto: clamp(36px, 6dvh, 50px); }
+
+  .jugador.propio {
+    --carta-alto: clamp(58px, 11.5dvh, 92px);
+    padding: 5px 10px 6px;
+  }
+
+  .jugador { padding: 4px 8px 5px; }
+  .mesa { gap: 3px; padding: 2px 0; border-width: 9px; }
+  .pila .etiqueta { margin-bottom: 3px; }
+  .pila .contador { margin-top: 3px; }
+}
+
+/* Y un escalón más para lo más bajo que existe: un iPhone SE son 568 px de
+   alto, y ahí ni con lo de arriba entra. Es el único sitio donde las cartas
+   bajan de 36 px; se ven chicas, y es preferible a que la mano tape el
+   botón que hay que tocar. */
+@media (max-width: 560px) and (max-height: 620px) {
+  :root { --carta-alto: clamp(30px, 5.2dvh, 42px); }
+  .jugador.propio { --carta-alto: clamp(48px, 9.6dvh, 76px); padding: 3px 8px 4px; }
+  .jugador { padding: 2px 6px 3px; }
+  .mesa { gap: 2px; padding: 0; border-width: 6px; }
+  .pila .etiqueta { font-size: 0.52rem; letter-spacing: 1px; margin-bottom: 1px; }
+  .pila .contador { font-size: 0.58rem; margin-top: 1px; }
+}
+
+/* Cuando los cuatro botones no entran en una fila, dos y dos.
+ *
+ * Con `flex-grow` y a lo que salga, entraban tres arriba y "Pasar" quedaba
+ * solo abajo estirado de lado a lado: un botón del ancho de la pantalla, tres
+ * veces más grande que los otros tres, para la jugada más inocua de las
+ * cuatro. El tamaño de un botón es una manera de decir cuánto importa, y ése
+ * decía lo que no era.
+ *
+ * El corte va en 385 px, que es donde dejan de entrar los cuatro. Por encima
+ * se quedan en una sola fila, y no es cosmética: en un teléfono alto sobran
+ * 25 px hasta el borde, y una segunda fila de botones los desborda. */
+@media (max-width: 385px) {
+  button.accion { flex: 1 1 calc(50% - 3px); }
+}
+
+/* Un teléfono chico de verdad: 320 px.
+ *
+ * A ese ancho la cabecera no entraba —logo, título, la ficha de la ronda y
+ * tres botones redondos suman 328 px de contenido en 284 de hueco— y la mesa
+ * entera scrolleaba de costado. En un juego que se toca, un desplazamiento
+ * lateral parásito es peor que feo: se arrastra el dedo para descartar y lo
+ * que se mueve es la página.
+ *
+ * Se achica el rótulo y la ficha de la ronda; los botones redondos NO se
+ * tocan, que son los que hay que poder acertar con el pulgar. */
+@media (max-width: 400px) {
+  .cabecera { gap: 8px; padding: 5px 8px; }
+  .cabecera h1 { font-size: 0.74rem; letter-spacing: 0.6px; }
+  .cabecera .derecha { gap: 6px; }
+  .chip-ronda { padding: 3px 8px; font-size: 0.62rem; letter-spacing: 0.6px; }
+  .chip-ronda strong { font-size: 0.85rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

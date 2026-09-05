@@ -122,43 +122,44 @@
         </main>
       </div>
 
-      <!-- La pista dice qué se puede hacer en cada momento. Es el canal
-           principal del juego para quien no ve la mesa, así que se anuncia
-           sola. `polite` y no `assertive`: no debe cortar lo que el lector
-           esté leyendo.
+      <!-- UN SOLO CARTEL: qué hay que hacer, y cuánto queda para hacerlo.
 
-           Vive FUERA de la caja de los botones, y es a propósito: metida ahí
-           adentro se leía como el rótulo de la botonera —una etiqueta de la
-           caja— y no como lo que en realidad es, la voz de la mesa diciendo
-           qué toca hacer ahora. Afuera y centrada, se lee sola. -->
+           Antes eran dos cosas separadas que decían lo mismo con distintas
+           palabras —"Tocá tu carta" al lado de "ELEGÍ UNA CARTA 2.4s"— y el
+           jugador tenía que mirar a dos lugares para entender un solo momento
+           del juego. Ahora la instrucción vive DENTRO del reloj, y el color
+           del cartel dice en qué fase está la mesa: oro para lo tuyo, rojo
+           para los reflejos, plata para la decisión del corte.
+
+           `#pista` sigue existiendo, y no por comodidad: es el canal por el
+           que la mesa cuenta TODO —el doble toque, los avisos de error, lo
+           que pasa en una partida por Leyendas— y es lo único que oye quien
+           no ve la pantalla. Lo que desapareció es la barra separada, no el
+           mensaje. `polite` y no `assertive`: no debe cortar al lector.
+
+           Las cuentas atrás van con `aria-hidden`: el texto se repinta cada
+           80 ms y anunciarlo sería un lector hablando sin parar. El cambio de
+           fase ya lo cuenta la pista. -->
       <div class="tira-pista">
-        <div class="pista" id="pista" role="status" aria-live="polite">Preparando la partida…</div>
+        <div class="anuncio" id="anuncio">
+          <span class="pista" id="pista" role="status" aria-live="polite">Preparando la partida…</span>
 
-        <!-- Las dos cuentas atrás —la de la mirada y la del turno— viven acá,
-             al lado de la instrucción que las explica, y no dentro de la caja
-             de los botones. Sobre el paño tapaban la ficha del jugador de
-             enfrente justo cuando hay que mirar la mesa; y dentro de la caja
-             la ensanchaban al aparecer, corriendo los cuatro botones de sitio
-             en mitad de una decisión contra reloj.
+          <span class="temporizador" id="temporizador" aria-hidden="true">
+            <span class="barra"><i class="relleno" id="temporizadorRelleno"></i></span>
+            <span class="texto" id="temporizadorTexto"></span>
+          </span>
 
-             El texto del temporizador se repinta cada 80 ms. Anunciarlo sería
-             un lector hablando sin parar, así que queda oculto para la
-             accesibilidad: el cambio de fase ya lo cuenta la pista. -->
-        <div class="temporizador" id="temporizador" aria-hidden="true">
-          <span class="texto" id="temporizadorTexto"></span>
-          <span class="barra"><i class="relleno" id="temporizadorRelleno"></i></span>
-        </div>
-
-        <div class="reloj-turno" id="relojTurno" aria-hidden="true" hidden>
-          <span class="reloj-numero" id="relojNumero">8</span>
-          <span class="reloj-barra"><i class="reloj-relleno" id="relojRelleno"></i></span>
+          <span class="reloj-turno" id="relojTurno" aria-hidden="true" hidden>
+            <span class="reloj-barra"><i class="reloj-relleno" id="relojRelleno"></i></span>
+            <span class="reloj-numero" id="relojNumero">8s</span>
+          </span>
         </div>
       </div>
 
       <div class="acciones">
         <button id="btnLevantar" class="accion" disabled>Levantar</button>
         <button id="btnTirar" class="accion sobria" disabled>Tirar</button>
-        <button id="btnCortar" class="accion peligro" disabled>Cortar</button>
+        <button id="btnCortar" class="accion corte" disabled>Cortar</button>
         <button id="btnPasar" class="accion sobria" disabled>Pasar</button>
       </div>
 

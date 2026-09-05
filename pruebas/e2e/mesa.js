@@ -27,7 +27,18 @@ export const SEMILLA = 4242;
 
 export const SEL = {
   pista: "#pista",
-  reloj: "#temporizadorTexto",
+
+  /**
+   * El cartel entero, no sólo el número.
+   *
+   * Antes apuntaba a `#temporizadorTexto`, que decía "DESCARTE 4.6s": el
+   * rótulo y los segundos en el mismo nodo. Ahora el rótulo es la pista y ahí
+   * quedan sólo los segundos, así que las pruebas que esperan a que se abra
+   * la ventana —`esperarReloj(page, /Descarte/i)`— tienen que mirar el cartel,
+   * que es donde conviven las dos cosas. `segundosDelReloj` sigue sacando el
+   * número de acá igual que antes.
+   */
+  reloj: "#anuncio",
   modal: "#modal",
   levantar: "#btnLevantar",
   tirar: "#btnTirar",

@@ -30,23 +30,34 @@ export function crearTemporizadores({ dom, msTurno }) {
 
   // ------------------------------------------------ la barra grande
 
-  function correr(ms, etiqueta, { reflejos = false } = {}) {
+  /**
+   * Arranca la barra grande.
+   *
+   * Ya no lleva etiqueta ni sabe si es una ventana de reflejos. Llevaba las
+   * dos cosas —"DESCARTE" y una clase que la pintaba de rojo— y las dos las
+   * dice ahora el cartel: el rótulo es la pista, y el color sale de la fase.
+   * Este reloj pinta lo único que sabe: cuánto queda.
+   */
+  function correr(ms) {
     cancelar();
     dom.temporizador.classList.add("activo");
-    dom.temporizador.classList.toggle("reflejos", reflejos);
-
-    const relleno = dom.temporizadorRelleno;
-    relleno.style.transition = "none";
-    relleno.style.transform = "scaleX(1)";
-    // Fuerza un reflow para que la transición arranque desde el estado inicial.
-    void relleno.offsetWidth;
-    relleno.style.transition = `transform ${ms}ms linear`;
-    relleno.style.transform = "scaleX(0)";
 
     const fin = Date.now() + ms;
+    const relleno = dom.temporizadorRelleno;
+
+    // La barra se pinta a mano, tick a tick, igual que la del reloj del turno.
+    //
+    // Antes era una transición de CSS de `scaleX(1)` a `scaleX(0)` que duraba
+    // lo mismo que la ventana. Se veía mejor —el navegador la interpola sin
+    // pasar por JavaScript— pero se apagaba entera con `prefers-reduced-motion`:
+    // la regla general que baja todas las transiciones a 0.05 ms la mandaba al
+    // final de una, y quien tiene esa preferencia puesta veía la barra vacía
+    // desde el primer momento. Vacía no es "sin animación": es un dato
+    // equivocado, que dice que no queda tiempo cuando quedan cinco segundos.
     const pintar = () => {
       const restante = Math.max(0, fin - Date.now());
-      dom.temporizadorTexto.textContent = `${etiqueta} ${(restante / 1000).toFixed(1)}s`;
+      dom.temporizadorTexto.textContent = `${(restante / 1000).toFixed(1)}s`;
+      relleno.style.width = `${(restante / ms) * 100}%`;
     };
     pintar();
     temporizadorActual = setInterval(pintar, 80);
@@ -55,7 +66,7 @@ export function crearTemporizadores({ dom, msTurno }) {
   function cancelar() {
     if (temporizadorActual) clearInterval(temporizadorActual);
     temporizadorActual = null;
-    dom.temporizador.classList.remove("activo", "reflejos");
+    dom.temporizador.classList.remove("activo");
   }
 
   // --------------------------------------------- el reloj del turno
@@ -66,6 +77,7 @@ export function crearTemporizadores({ dom, msTurno }) {
 
     if (!relojTurno) {
       caja.hidden = true;
+      dom.anuncio?.classList.remove("apurado");
       return;
     }
 
@@ -73,19 +85,26 @@ export function crearTemporizadores({ dom, msTurno }) {
     const segundos = Math.ceil(restante / 1000);
 
     caja.hidden = false;
-    dom.relojNumero.textContent = segundos;
+    // Con la "s" puesta, y no un número pelado: los dos relojes viven en el
+    // mismo cartel y tienen que leerse como lo mismo medido igual.
+    dom.relojNumero.textContent = `${segundos}s`;
     // La barra se mide contra la duración de ESTE reloj, no contra una fija:
     // el de levantar dura 8 segundos y el de decidir el corte, 30. Con un
     // divisor único, el de 30 arrancaba con la barra ya casi vacía.
     dom.relojRelleno.style.width = `${(restante / relojTurno.ms) * 100}%`;
-    // Dorado hasta los 2 segundos; de ahí en más, rojo.
-    caja.classList.toggle("apurado", segundos <= 2);
+    // Dorado hasta los 2 segundos; de ahí en más, rojo. La marca va también en
+    // el cartel, que es lo que se pinta: adentro está sólo la barra.
+    const apurado = segundos <= 2;
+    caja.classList.toggle("apurado", apurado);
+    dom.anuncio?.classList.toggle("apurado", apurado);
   }
 
   function cancelarRelojTurno() {
     if (relojTurno?.intervalo) clearInterval(relojTurno.intervalo);
     relojTurno = null;
     if (dom.reloj) dom.reloj.hidden = true;
+    // Sin esto el cartel se queda rojo después de que el reloj se fue.
+    dom.anuncio?.classList.remove("apurado");
   }
 
   /**

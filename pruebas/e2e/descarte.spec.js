@@ -22,7 +22,7 @@ import {
 test("un clic solo no descarta; hacen falta dos", async ({ page }) => {
   const errores = await abrirMesa(page);
   await elegirCartaParaMirar(page);
-  await esperarReloj(page, /Descarte/);
+  await esperarReloj(page, /descarte/i);
 
   const antes = await misCartas(page).count();
 
@@ -40,7 +40,7 @@ test("tres clics seguidos son UN intento, no tres", async ({ page }) => {
   // segunda carta de castigo por el mismo error.
   const errores = await abrirMesa(page);
   await elegirCartaParaMirar(page);
-  await esperarReloj(page, /Descarte/);
+  await esperarReloj(page, /descarte/i);
 
   const antes = await misCartas(page).count();
   const carta = misCartas(page).first();
@@ -63,7 +63,7 @@ test("la ventana de la ronda dura 5 segundos, no 2", async ({ page }) => {
   // 2 s y el juego quedó frenético, así que se volvió atrás. Esto lo vigila.
   const errores = await abrirMesa(page);
   await elegirCartaParaMirar(page);
-  await esperarReloj(page, /Descarte/);
+  await esperarReloj(page, /descarte/i);
 
   const segundos = await segundosDelReloj(page);
   expect(segundos).toBeGreaterThan(3.5);
