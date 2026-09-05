@@ -130,6 +130,78 @@ test("la pista del descarte es corta y dice qué hacer", async ({ page }) => {
   ).toBeLessThanOrEqual(6);
 });
 
+test("la pista vive fuera de la caja de los botones", async ({ page }) => {
+  // Metida dentro de la botonera, la instrucción se leía como el rótulo de la
+  // caja: un texto chico arriba a la izquierda de cuatro botones. La sacamos
+  // afuera, centrada y sobre el paño, para que se lea como lo que es.
+  //
+  // No alcanza con mirar el CSS: lo que se puede volver a romper es el HTML —
+  // alguien devuelve el `<div>` adentro de `.acciones` y todo sigue
+  // funcionando, sólo que la mesa vuelve a explicarse mal.
+  await abrirMesa(page);
+
+  expect(
+    await page.locator(".acciones #pista").count(),
+    "la pista volvió adentro de la caja de los botones",
+  ).toBe(0);
+
+  const pista = await page.locator("#pista").boundingBox();
+  const barra = await page.locator(".acciones").boundingBox();
+  expect(
+    pista.y + pista.height,
+    "la pista se solapa con la botonera",
+  ).toBeLessThanOrEqual(barra.y + 1);
+});
+
+test("la caja de los botones es del ancho de los botones, y va centrada", async ({
+  page,
+}) => {
+  await abrirMesa(page);
+
+  const caja = await page.locator(".acciones").boundingBox();
+  const paño = await page.locator(".mesa-zona").boundingBox();
+
+  expect(caja.width, "la caja sigue cruzando la pantalla entera").toBeLessThan(
+    paño.width * 0.8,
+  );
+
+  // Centrada respecto del paño, no de la ventana: a partir de 1080px hay una
+  // columna de marcador a la derecha, y centrar contra la ventana dejaría la
+  // botonera corrida de la mesa que tiene encima.
+  const centroCaja = caja.x + caja.width / 2;
+  const centroPaño = paño.x + paño.width / 2;
+  expect(
+    Math.abs(centroCaja - centroPaño),
+    `la caja está corrida ${Math.round(centroCaja - centroPaño)}px del eje de la mesa`,
+  ).toBeLessThanOrEqual(1);
+});
+
+test("los botones no se corren de sitio cuando aparece el reloj", async ({
+  page,
+}) => {
+  // El reloj entra y sale según la fase, y la caja es del ancho de lo que
+  // contiene: con el reloj adentro, cada aparición la ensancharía y correría
+  // los cuatro botones de sitio. Por eso el reloj vive arriba, con la pista.
+  //
+  // Un botón que se mueve justo cuando hay que decidir contra reloj es un
+  // botón que se falla, así que esto queda escrito: si alguien devuelve el
+  // reloj a la botonera, se entera acá.
+  await abrirMesa(page);
+
+  const boton = page.locator(SEL.pasar);
+  const sinReloj = await boton.boundingBox();
+
+  await page.evaluate(() => {
+    document.querySelector("#relojTurno").hidden = false;
+  });
+  const conReloj = await boton.boundingBox();
+
+  expect(
+    conReloj.x,
+    `el botón se corrió de ${sinReloj.x} a ${conReloj.x} al aparecer el reloj`,
+  ).toBe(sinReloj.x);
+});
+
 test("el brillo dorado dice cuándo se puede tocar", async ({ page }) => {
   await abrirMesa(page);
 

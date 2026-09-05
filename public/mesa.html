@@ -122,17 +122,26 @@
         </main>
       </div>
 
-      <div class="acciones">
-        <!-- La pista dice qué se puede hacer en cada momento. Es el canal
-             principal del juego para quien no ve la mesa, así que se anuncia
-             sola. `polite` y no `assertive`: no debe cortar lo que el lector
-             esté leyendo. -->
+      <!-- La pista dice qué se puede hacer en cada momento. Es el canal
+           principal del juego para quien no ve la mesa, así que se anuncia
+           sola. `polite` y no `assertive`: no debe cortar lo que el lector
+           esté leyendo.
+
+           Vive FUERA de la caja de los botones, y es a propósito: metida ahí
+           adentro se leía como el rótulo de la botonera —una etiqueta de la
+           caja— y no como lo que en realidad es, la voz de la mesa diciendo
+           qué toca hacer ahora. Afuera y centrada, se lee sola. -->
+      <div class="tira-pista">
         <div class="pista" id="pista" role="status" aria-live="polite">Preparando la partida…</div>
 
-        <!-- La cuenta atrás de la mirada y de los reflejos vive acá, junto a la
-             instrucción que la explica. Sobre el paño tapaba la ficha del
-             jugador de enfrente justo cuando hay que mirar la mesa. -->
-        <!-- El texto del temporizador se repinta cada 80 ms. Anunciarlo sería
+        <!-- Las dos cuentas atrás —la de la mirada y la del turno— viven acá,
+             al lado de la instrucción que las explica, y no dentro de la caja
+             de los botones. Sobre el paño tapaban la ficha del jugador de
+             enfrente justo cuando hay que mirar la mesa; y dentro de la caja
+             la ensanchaban al aparecer, corriendo los cuatro botones de sitio
+             en mitad de una decisión contra reloj.
+
+             El texto del temporizador se repinta cada 80 ms. Anunciarlo sería
              un lector hablando sin parar, así que queda oculto para la
              accesibilidad: el cambio de fase ya lo cuenta la pista. -->
         <div class="temporizador" id="temporizador" aria-hidden="true">
@@ -144,6 +153,9 @@
           <span class="reloj-numero" id="relojNumero">8</span>
           <span class="reloj-barra"><i class="reloj-relleno" id="relojRelleno"></i></span>
         </div>
+      </div>
+
+      <div class="acciones">
         <button id="btnLevantar" class="accion" disabled>Levantar</button>
         <button id="btnTirar" class="accion sobria" disabled>Tirar</button>
         <button id="btnCortar" class="accion peligro" disabled>Cortar</button>
