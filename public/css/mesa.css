@@ -1567,7 +1567,11 @@ button.accion.con-poder {
 }
 
 @media (max-width: 950px) {
-  body { padding: 8px; }
+  /* El aire de los bordes y el que separa las cuatro bandas. En un teléfono
+     son 20 px de márgenes y 30 de huecos que no se ven pero se cobran: cada
+     píxel que se le quita al aire se lo lleva la carta. */
+  body { padding: 6px; }
+  .escena { gap: 6px; }
 
   .cabecera { padding: 5px 10px; gap: 8px; }
   .cabecera h1 { font-size: 0.92rem; letter-spacing: 1px; }
@@ -1627,7 +1631,7 @@ button.accion.con-poder {
      cartas el abanico casi no las monta, así que suman ancho completo más el
      hueco entre ellas. Con muchas, el solape crece más rápido que la cuenta. */
   .jugador.propio {
-    --carta-alto: clamp(74px, 12.3dvh, 100px);
+    --carta-alto: min(clamp(74px, 14.5dvh, 128px), 29vw);
     --carta-ancho: calc(var(--carta-alto) * 0.667);
     padding: 6px 8px 8px;
   }
@@ -1651,11 +1655,11 @@ button.accion.con-poder {
 
   .centro { gap: 10px; justify-content: center; }
   .pila .carta {
-    --carta-alto: clamp(58px, 10dvh, 81px);
+    --carta-alto: clamp(58px, 12.1dvh, 111px);
     --carta-ancho: calc(var(--carta-alto) * 0.667);
   }
   .levantada-caja .carta {
-    --carta-alto: clamp(64px, 11dvh, 89px);
+    --carta-alto: clamp(64px, 13.3dvh, 122px);
     --carta-ancho: calc(var(--carta-alto) * 0.667);
   }
   .pila .etiqueta { margin-bottom: 4px; }
@@ -1713,7 +1717,7 @@ button.accion.con-poder {
   }
 
   :root {
-    --carta-alto: clamp(46px, 7.6dvh, 62px);
+    --carta-alto: min(clamp(46px, 9.2dvh, 84px), 17.5vw);
     --carta-ancho: calc(var(--carta-alto) * 0.667);
   }
 }
@@ -1736,17 +1740,36 @@ button.accion.con-poder {
    en vez de repartirse alrededor del óvalo, y cinco filas piden más alto que
    tres. A 375x667 sobra sitio con el óvalo y falta con la pila. */
 @media (max-width: 560px) and (max-height: 730px) {
-  :root { --carta-alto: clamp(34px, 6dvh, 52px); }
-  .jugador.propio { --carta-alto: clamp(52px, 10.5dvh, 88px); padding: 4px 8px 5px; }
-  .pila .carta { --carta-alto: clamp(40px, 8dvh, 68px); }
-  .levantada-caja .carta { --carta-alto: clamp(44px, 8.8dvh, 76px); }
+  :root { --carta-alto: clamp(34px, 8.3dvh, 62px); }
+  .jugador.propio { --carta-alto: clamp(52px, 14.1dvh, 105px); padding: 4px 8px 5px; }
+  .pila .carta { --carta-alto: clamp(40px, 11dvh, 82px); }
+  .levantada-caja .carta { --carta-alto: clamp(44px, 12dvh, 90px); }
   .jugador { padding: 3px 7px 4px; }
   .mesa { gap: 2px; padding: 1px 0; border-width: 8px; }
   .pila .etiqueta { margin-bottom: 3px; }
   .pila .contador { margin-top: 3px; }
 }
 
-@media (max-height: 660px) {
+/* Y el más chico de pie, que es el único que no llega con lo de arriba. */
+@media (max-width: 560px) and (max-height: 600px) {
+  :root { --carta-alto: clamp(26px, 6.5dvh, 44px); }
+  .jugador.propio { --carta-alto: clamp(42px, 11dvh, 75px); padding: 2px 6px 3px; }
+  .pila .carta { --carta-alto: clamp(32px, 8.6dvh, 58px); }
+  .levantada-caja .carta { --carta-alto: clamp(34px, 9.4dvh, 64px); }
+  .jugador { padding: 2px 6px 3px; }
+  .mesa { gap: 1px; padding: 0; border-width: 6px; }
+  .pila .etiqueta { font-size: 0.52rem; margin-bottom: 1px; }
+  .pila .contador { font-size: 0.55rem; margin-top: 1px; }
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   De acá para abajo, la mesa del ÓVALO: 561 px de ancho para arriba.
+   Van separadas de las de la pila a propósito. Las dos reparten el mismo
+   alto entre cosas distintas —cinco filas contra tres bandas— y cuando
+   compartían escalón, subirle el tamaño a una se lo bajaba a la otra.
+   ───────────────────────────────────────────────────────────────────── */
+
+@media (min-width: 561px) and (max-height: 660px) {
   :root { --carta-alto: clamp(30px, 5.6dvh, 50px); }
 
   .jugador.propio {
@@ -1765,7 +1788,7 @@ button.accion.con-poder {
 
 /* Un escalón más para lo más bajo que existe de pie: un iPhone SE son 568 px,
    y ahí ni con lo de arriba entra. */
-@media (max-height: 580px) {
+@media (min-width: 561px) and (max-height: 580px) {
   :root { --carta-alto: clamp(26px, 5dvh, 42px); }
   .jugador.propio { --carta-alto: clamp(42px, 8.8dvh, 74px); padding: 2px 6px 3px; }
   .pila .carta { --carta-alto: clamp(32px, 6.8dvh, 56px); }
@@ -1786,7 +1809,7 @@ button.accion.con-poder {
  * ceder a la vez: cartas, nombres, la baranda y los rótulos de las pilas —los
  * contadores se quedan, que deciden cuándo cortar—. Entra, pero apretado; de
  * pie se juega mejor. */
-@media (max-height: 500px) {
+@media (min-width: 561px) and (max-height: 500px) {
   :root { --carta-alto: clamp(20px, 4.8dvh, 34px); }
   .jugador.propio { --carta-alto: clamp(30px, 8.4dvh, 52px); padding: 1px 6px 2px; }
   .pila .carta { --carta-alto: clamp(24px, 6.6dvh, 42px); }
@@ -1827,8 +1850,21 @@ button.accion.con-poder {
  * El corte va en 385 px, que es donde dejan de entrar los cuatro. Por encima
  * se quedan en una sola fila, y no es cosmética: en un teléfono alto sobran
  * 25 px hasta el borde, y una segunda fila de botones los desborda. */
-@media (max-width: 385px) {
-  button.accion { flex: 1 1 calc(50% - 3px); }
+/* Los cuatro en una fila, todo lo que se pueda.
+ *
+ * Dos filas de botones cuestan 112 px contra 62, y esos 50 px salen del paño:
+ * a 375 px de ancho las cartas quedaban en 43 px por tener la botonera
+ * partida. Apretando el relleno y el espaciado de las letras entran los cuatro
+ * en una fila hasta bien abajo, y el alto táctil de 44 px no se toca.
+ *
+ * Por debajo de 355 px ni así entran, y ahí sí van dos y dos. */
+@media (max-width: 420px) {
+  .acciones { padding: 8px 6px; gap: 5px; }
+  button.accion { padding: 11px 7px; font-size: 0.66rem; letter-spacing: 0.4px; }
+}
+
+@media (max-width: 355px) {
+  button.accion { flex: 1 1 calc(50% - 3px); font-size: 0.7rem; letter-spacing: 1px; }
 }
 
 /* Un teléfono chico de verdad: 320 px.
