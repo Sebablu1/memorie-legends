@@ -317,6 +317,45 @@ test("las cartas no se meten encima del cartel ni de los botones", async ({
   ).toEqual([]);
 });
 
+test("con el teléfono acostado la mesa sigue entrando", async ({ page }) => {
+  // Éste estaba roto del todo y no lo decía. Los escalones que achican la mesa
+  // en pantallas bajas estaban atados a `max-width: 560px`, así que acostado
+  // —740 de ancho, 360 de alto— no se aplicaba ninguno: la mano se dibujaba
+  // 200 px por debajo del paño, encima del cartel y de los cuatro botones, que
+  // quedaban tapados y no recibían un solo toque.
+  //
+  // Se prueba a lo ancho y bajo, que es la forma que tiene el problema. Ir por
+  // `orientation` no serviría: una ventana de escritorio corta tiene el mismo
+  // problema y no está "acostada".
+  await page.setViewportSize({ width: 740, height: 360 });
+  await abrirMesa(page);
+
+  const visto = await page.evaluate(() => {
+    const mesa = document.querySelector(".mesa").getBoundingClientRect();
+    const propio = document.querySelector('.jugador[data-jugador="0"]').getBoundingClientRect();
+    const tapados = [...document.querySelectorAll("button.accion")]
+      .filter((b) => {
+        const r = b.getBoundingClientRect();
+        const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return !b.contains(e) && e !== b;
+      })
+      .map((b) => b.textContent.trim());
+    const doc = document.documentElement;
+    return {
+      desborde: Math.round(propio.bottom - mesa.bottom),
+      tapados,
+      alto: Math.min(...[...document.querySelectorAll("button.accion")].map((b) =>
+        Math.round(b.getBoundingClientRect().height))),
+      scroll: doc.scrollHeight > doc.clientHeight || doc.scrollWidth > doc.clientWidth,
+    };
+  });
+
+  expect(visto.desborde, "tu mano se sale del paño").toBeLessThanOrEqual(0);
+  expect(visto.tapados, `botones tapados: ${visto.tapados.join(", ")}`).toEqual([]);
+  expect(visto.alto, "los botones se achicaron por debajo del dedo").toBeGreaterThanOrEqual(44);
+  expect(visto.scroll, "la mesa se sale de la pantalla").toBe(false);
+});
+
 test("si los cuatro botones no entran en una fila, van dos y dos", async ({
   page,
 }) => {

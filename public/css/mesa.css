@@ -1731,31 +1731,89 @@ button.accion.con-poder {
  *
  * Va por ALTO y no por ancho. El problema nunca fue que la pantalla sea
  * angosta —a 390x844 sobra sitio— sino que sea baja. */
+/* El teléfono de pie necesita el escalón ANTES que los demás, y por eso éste
+   sí mira el ancho: por debajo de 560 px los asientos se apilan en cinco filas
+   en vez de repartirse alrededor del óvalo, y cinco filas piden más alto que
+   tres. A 375x667 sobra sitio con el óvalo y falta con la pila. */
 @media (max-width: 560px) and (max-height: 730px) {
-  :root { --carta-alto: clamp(36px, 6dvh, 50px); }
-
-  .jugador.propio {
-    --carta-alto: clamp(58px, 11.5dvh, 92px);
-    padding: 5px 10px 6px;
-  }
-
-  .jugador { padding: 4px 8px 5px; }
-  .mesa { gap: 3px; padding: 2px 0; border-width: 9px; }
+  :root { --carta-alto: clamp(34px, 6dvh, 52px); }
+  .jugador.propio { --carta-alto: clamp(52px, 10.5dvh, 88px); padding: 4px 8px 5px; }
+  .pila .carta { --carta-alto: clamp(40px, 8dvh, 68px); }
+  .levantada-caja .carta { --carta-alto: clamp(44px, 8.8dvh, 76px); }
+  .jugador { padding: 3px 7px 4px; }
+  .mesa { gap: 2px; padding: 1px 0; border-width: 8px; }
   .pila .etiqueta { margin-bottom: 3px; }
   .pila .contador { margin-top: 3px; }
 }
 
-/* Y un escalón más para lo más bajo que existe: un iPhone SE son 568 px de
-   alto, y ahí ni con lo de arriba entra. Es el único sitio donde las cartas
-   bajan de 36 px; se ven chicas, y es preferible a que la mano tape el
-   botón que hay que tocar. */
-@media (max-width: 560px) and (max-height: 620px) {
-  :root { --carta-alto: clamp(30px, 5.2dvh, 42px); }
-  .jugador.propio { --carta-alto: clamp(48px, 9.6dvh, 76px); padding: 3px 8px 4px; }
+@media (max-height: 660px) {
+  :root { --carta-alto: clamp(30px, 5.6dvh, 50px); }
+
+  .jugador.propio {
+    --carta-alto: clamp(46px, 9.6dvh, 84px);
+    padding: 4px 8px 5px;
+  }
+
+  .pila .carta { --carta-alto: clamp(36px, 7.4dvh, 64px); }
+  .levantada-caja .carta { --carta-alto: clamp(40px, 8.2dvh, 72px); }
+
+  .jugador { padding: 3px 7px 4px; }
+  .mesa { gap: 2px; padding: 1px 0; border-width: 8px; }
+  .pila .etiqueta { font-size: 0.55rem; letter-spacing: 1px; margin-bottom: 2px; }
+  .pila .contador { font-size: 0.6rem; margin-top: 2px; }
+}
+
+/* Un escalón más para lo más bajo que existe de pie: un iPhone SE son 568 px,
+   y ahí ni con lo de arriba entra. */
+@media (max-height: 580px) {
+  :root { --carta-alto: clamp(26px, 5dvh, 42px); }
+  .jugador.propio { --carta-alto: clamp(42px, 8.8dvh, 74px); padding: 2px 6px 3px; }
+  .pila .carta { --carta-alto: clamp(32px, 6.8dvh, 56px); }
+  .levantada-caja .carta { --carta-alto: clamp(34px, 7.4dvh, 62px); }
   .jugador { padding: 2px 6px 3px; }
-  .mesa { gap: 2px; padding: 0; border-width: 6px; }
-  .pila .etiqueta { font-size: 0.52rem; letter-spacing: 1px; margin-bottom: 1px; }
-  .pila .contador { font-size: 0.58rem; margin-top: 1px; }
+  .mesa { gap: 1px; padding: 0; border-width: 6px; }
+  .pila .etiqueta { font-size: 0.52rem; margin-bottom: 1px; }
+  .pila .contador { font-size: 0.55rem; margin-top: 1px; }
+}
+
+/* Y el caso que estaba del todo roto: el teléfono ACOSTADO.
+ *
+ * Ahí no sobraban 50 px, faltaban 200: la mano se dibujaba entera por debajo
+ * del paño, encima del cartel y de los cuatro botones, que quedaban tapados y
+ * sin recibir un solo toque. La mesa era injugable y no lo decía.
+ *
+ * Es cuatro personas y trece cartas en 360 px de alto, así que todo tiene que
+ * ceder a la vez: cartas, nombres, la baranda y los rótulos de las pilas —los
+ * contadores se quedan, que deciden cuándo cortar—. Entra, pero apretado; de
+ * pie se juega mejor. */
+@media (max-height: 500px) {
+  :root { --carta-alto: clamp(20px, 4.8dvh, 34px); }
+  .jugador.propio { --carta-alto: clamp(30px, 8.4dvh, 52px); padding: 1px 6px 2px; }
+  .pila .carta { --carta-alto: clamp(24px, 6.6dvh, 42px); }
+  .levantada-caja .carta { --carta-alto: clamp(26px, 7.2dvh, 46px); }
+
+  .jugador { padding: 1px 5px 2px; }
+  .jugador .nombre { font-size: 0.68rem; }
+  .jugador .puntos { font-size: 0.56rem; }
+  .jugador .ficha { width: 18px; height: 18px; }
+  .mano { gap: 2px; padding-top: 2px; }
+  .mesa { gap: 1px; border-width: 4px; }
+  .centro { gap: 8px; }
+  .pila .etiqueta { display: none; }
+  .pila .contador { font-size: 0.54rem; margin-top: 1px; }
+
+  /* El aire entre las cuatro bandas de la pantalla. Son 30 px repartidos en
+     tres huecos, y acostado son 30 px que el paño no tiene. */
+  .escena { gap: 4px; }
+  body { padding: 5px; }
+
+  .cabecera { padding: 3px 8px; }
+  .cabecera .marca { width: 26px; height: 26px; }
+  .btn-icono { width: 30px; height: 30px; }
+  .anuncio { padding: 3px 12px; }
+  .anuncio .pista { font-size: 0.74rem; }
+  .acciones { padding: 5px 8px; gap: 6px; }
+  button.accion { padding: 8px 12px; }
 }
 
 /* Cuando los cuatro botones no entran en una fila, dos y dos.
