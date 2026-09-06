@@ -2,7 +2,7 @@
  * Cloud Functions de Memorie Legends.
  *
  * Todo lo que toca Leyendas vive acá y NUNCA en el navegador: saldos, apuestas,
- * ruleta, bonos, premios de ranking y acreditación de compras. El cliente sólo
+ * bonos, premios de ranking y acreditación de compras. El cliente sólo
  * pide; el servidor decide y escribe.
  *
  * Reglas de Firestore que acompañan a esto (ver firestore.rules): las
@@ -39,8 +39,6 @@ import {
   LEYENDAS_REGISTRO,
   BONO_DIARIO,
   LEYENDAS_POR_REFERIDO,
-  girarRuleta,
-  esperaRuleta,
   esperaBonoDiario,
   premioPorPuesto,
   paquetePorId,
@@ -208,41 +206,6 @@ export const reclamarBonoDiario = functions.https.onCall(async (_data, context) 
       { merge: true },
     );
     return { leyendas: BONO_DIARIO, saldo: r.saldo };
-  });
-});
-
-// ---------------------------------------------------------------- ruleta
-
-/** Aleatoriedad criptográfica: el premio no puede depender de Math.random. */
-const azarSeguro = () => crypto.randomInt(0, 2 ** 48) / 2 ** 48;
-
-export const girarLaRuleta = functions.https.onCall(async (_data, context) => {
-  const uid = exigirSesion(context, "girarLaRuleta");
-  await limite.exigirRitmoDePlata(uid, "girarLaRuleta");
-
-  return db.runTransaction(async (tx) => {
-    const snap = await tx.get(db.collection(USUARIOS).doc(uid));
-    const ultimo = snap.exists ? snap.data().ultimoGiroRuleta : null;
-    const restante = esperaRuleta(ultimo?.toDate?.() ?? ultimo, Date.now());
-
-    if (restante > 0) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        `La ruleta vuelve en ${Math.ceil(restante / 3600000)} horas.`,
-      );
-    }
-
-    // El premio se sortea en el servidor: el cliente sólo recibe el resultado.
-    const { premio, rareza } = girarRuleta(azarSeguro);
-
-    const r = await moverLeyendas(tx, { uid, delta: premio, motivo: MOTIVOS.RULETA });
-    tx.set(
-      db.collection(USUARIOS).doc(uid),
-      { ultimoGiroRuleta: admin.firestore.FieldValue.serverTimestamp() },
-      { merge: true },
-    );
-
-    return { premio, rareza, saldo: r.saldo };
   });
 });
 

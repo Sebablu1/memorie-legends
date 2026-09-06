@@ -39,7 +39,7 @@ const CLAVE = "JBSWY3DPEHPK3PXP";
 const SESION = `
   export const COLECCION="users"; export const CAMPO_SALDO="credits";
   export async function exigirSesion(){return{usuario:{uid:"u1"},
-    perfil:{uid:"u1",nombre:"Probador",saldo:500,partidas:0,victorias:0,ultimoGiro:0,ultimoBono:0}};}
+    perfil:{uid:"u1",nombre:"Probador",saldo:500,partidas:0,victorias:0,ultimoBono:0}};}
   export function mostrarSaldo(){} export function conectarBotonSalir(){}`;
 
 /**

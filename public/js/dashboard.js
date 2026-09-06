@@ -19,7 +19,7 @@
  */
 
 import { db, collection, query, where, onSnapshot } from "./firebase.js";
-import { exigirSesion, mostrarSaldo, conectarBotonSalir, formatearEspera } from "./sesion.js";
+import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
 import { estadoMfa } from "./mfa.js";
 import { SUPPORT_EMAIL } from "./firebase.js";
 import { crearSala, unirseASala, ErrorDeServidor } from "./servidor.js";
@@ -27,7 +27,6 @@ import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/
 // Sólo nombres y etiquetas: el cerebro de la IA (`reglas/ia.js`, diez mil
 // caracteres) no hace falta acá y no se trae.
 import { armarRivales, NIVELES, limiteDelModo, MODOS_PARTIDA } from "./rivales.js";
-import { esperaRuleta } from "./reglas/economia.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -113,22 +112,6 @@ if (sesion) {
   $("statSaldo").textContent = perfil.saldo.toLocaleString("es-UY");
   $("statPartidas").textContent = perfil.partidas;
   $("statVictorias").textContent = perfil.victorias;
-
-  // Estado de la ruleta: mismo cálculo que usa la propia página.
-  const restante = esperaRuleta(perfil.ultimoGiro || null);
-  $("statRuleta").textContent = formatearEspera(restante);
-
-  const etiqueta = $("etiquetaRuleta");
-  const pie = $("pieRuleta");
-  if (restante > 0) {
-    etiqueta.textContent = formatearEspera(restante);
-    etiqueta.className = "etiqueta espera";
-    pie.textContent = "Todavía no →";
-  } else {
-    etiqueta.textContent = "Giro listo";
-    etiqueta.className = "etiqueta lista";
-    pie.textContent = "Girar ahora →";
-  }
 
   arrancarSalas();
 }

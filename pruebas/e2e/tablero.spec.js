@@ -33,7 +33,7 @@ const SESION_FALSA = `
     return {
       usuario: { uid: "uid-de-prueba", photoURL: null },
       perfil: { uid: "uid-de-prueba", nombre: "Probador", saldo: 500,
-                partidas: 3, victorias: 1, ultimoGiro: 0, ultimoBono: 0 },
+                partidas: 3, victorias: 1, ultimoBono: 0 },
     };
   }
   export function mostrarSaldo() {}
@@ -363,7 +363,6 @@ test("a la mesa se entra por el tablero, no desde el menú", async ({ page }) =>
   const conMenu = [
     "dashboard.html",
     "ranking.html",
-    "ruleta.html",
     "tienda.html",
     "cuenta.html",
     "como-se-juega.html",

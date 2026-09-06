@@ -1,5 +1,5 @@
 /**
- * Economía de Memorie Legends: Leyendas (la moneda del juego), apuestas, ruleta y paquetes.
+ * Economía de Memorie Legends: Leyendas (la moneda del juego), apuestas y paquetes.
  *
  * Módulo puro y determinista (acepta un rng inyectable). No toca Firestore
  * ni el DOM: las mutaciones de saldo tienen que ejecutarse en el servidor.
@@ -11,71 +11,6 @@ export const LEYENDAS_REGISTRO = 50; // una sola vez, al crear la cuenta
 export const BONO_DIARIO = 10;
 export const HORAS_BONO_DIARIO = 24;
 export const LEYENDAS_POR_REFERIDO = 20;
-
-// --------------------------------------------------------------- ruleta
-
-export const HORAS_RULETA = 48;
-
-/**
- * Premios de la ruleta con su peso relativo.
- *
- * ⚠️ El peso es la fuente de verdad; el porcentaje de la tabla original
- * coincide en 11 de los 12 premios. La excepción es el de 2500: la tabla
- * dice 0,001% (1 en 100.000) pero el peso 1 sobre 9931 da 0,0101%
- * (1 en 9.931), diez veces más frecuente. Para respetar el 1-en-100.000
- * hay que poner PESO_JACKPOT en 0.09931 (o multiplicar los otros pesos x10).
- */
-export const PESO_JACKPOT = 1;
-
-export const PREMIOS_RULETA = [
-  { premio: 1, peso: 4000, rareza: "comun" },
-  { premio: 2, peso: 2500, rareza: "comun" },
-  { premio: 3, peso: 1500, rareza: "normal" },
-  { premio: 4, peso: 800, rareza: "normal" },
-  { premio: 5, peso: 500, rareza: "raro" },
-  { premio: 10, peso: 300, rareza: "raro" },
-  { premio: 50, peso: 150, rareza: "epico" },
-  { premio: 100, peso: 100, rareza: "epico" },
-  { premio: 200, peso: 50, rareza: "legendario" },
-  { premio: 500, peso: 20, rareza: "legendario" },
-  { premio: 1000, peso: 10, rareza: "mitico" },
-  { premio: 2500, peso: PESO_JACKPOT, rareza: "mitico" },
-];
-
-export const PESO_TOTAL_RULETA = PREMIOS_RULETA.reduce((s, p) => s + p.peso, 0);
-
-/** Probabilidad real de cada premio, para mostrarla sin mentirle al jugador. */
-export const probabilidadesRuleta = () =>
-  PREMIOS_RULETA.map((p) => ({
-    ...p,
-    probabilidad: p.peso / PESO_TOTAL_RULETA,
-    unoEn: PESO_TOTAL_RULETA / p.peso,
-  }));
-
-/** Leyendas que la ruleta entrega en promedio por giro. */
-export const valorEsperadoRuleta = () =>
-  PREMIOS_RULETA.reduce((s, p) => s + p.premio * p.peso, 0) / PESO_TOTAL_RULETA;
-
-/**
- * Un giro. El rng se inyecta para poder testearlo y para que el servidor
- * use una fuente criptográfica en lugar de Math.random.
- */
-export function girarRuleta(rng = Math.random) {
-  let acumulado = rng() * PESO_TOTAL_RULETA;
-  for (const p of PREMIOS_RULETA) {
-    acumulado -= p.peso;
-    if (acumulado <= 0) return { premio: p.premio, rareza: p.rareza };
-  }
-  const ultimo = PREMIOS_RULETA[PREMIOS_RULETA.length - 1];
-  return { premio: ultimo.premio, rareza: ultimo.rareza };
-}
-
-/** Milisegundos que faltan para el próximo giro (0 si ya está disponible). */
-export function esperaRuleta(ultimoGiro, ahora = Date.now()) {
-  if (!ultimoGiro) return 0;
-  const listo = new Date(ultimoGiro).getTime() + HORAS_RULETA * 3600_000;
-  return Math.max(0, listo - ahora);
-}
 
 export function esperaBonoDiario(ultimoBono, ahora = Date.now()) {
   if (!ultimoBono) return 0;
@@ -210,7 +145,6 @@ export const precioPorLeyenda = (paquete) => paquete.precio / leyendasDePaquete(
 export const MOTIVOS = {
   REGISTRO: "registro",
   BONO_DIARIO: "bono_diario",
-  RULETA: "ruleta",
   REFERIDO: "referido",
   APUESTA: "apuesta",
   // Sumidero de la casa: no va al pozo ni a otro jugador.

@@ -8,7 +8,7 @@
  * Hoy cualquiera con la clave web —que viaja en cada carga del sitio y NO es
  * un secreto— puede llamar a las funciones desde un script propio. El límite
  * de ritmo frena el bucle de una pestaña, pero no a alguien que se arma un
- * cliente para pedir salas en masa o llamar a la ruleta desde un servidor.
+ * cliente para pedir salas en masa o llamar a las funciones desde un servidor.
  *
  * App Check agrega una prueba de que el pedido sale de un navegador de verdad
  * cargando ESTE sitio. No reemplaza a la autenticación —quién sos lo sigue

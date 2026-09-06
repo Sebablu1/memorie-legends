@@ -72,7 +72,6 @@ form.addEventListener("submit", async (e) => {
       gamesPlayed: 0,
       wins: 0,
       createdAt: new Date().toISOString(),
-      lastSpin: 0, // ✅ Para la ruleta (timestamp)
     });
 
     console.log("✅ Usuario guardado en Firestore");
@@ -160,7 +159,6 @@ async function crearPerfilSiFalta(usuario) {
     gamesPlayed: 0,
     wins: 0,
     createdAt: new Date().toISOString(),
-    lastSpin: 0,
     provider: usuario.providerData?.[0]?.providerId ?? "google.com",
   });
 

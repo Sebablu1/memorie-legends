@@ -36,7 +36,6 @@ const PAGINAS = [
   "dashboard.html",
   "ranking.html",
   "tienda.html",
-  "ruleta.html",
   "cuenta.html",
   "room.html",
   "mesa.html",

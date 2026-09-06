@@ -141,8 +141,17 @@ console.log("\n=== Las de plata están apretadas ===");
 
   ok(maxPlata < minMesa,
      `la más suelta de plata (${maxPlata}) es más apretada que la mesa (${minMesa})`);
-  ok(Object.keys(LIMITES_DE_PLATA).length === 4,
-     "las cuatro que mueven Leyendas tienen su propio techo");
+  // Se nombran una por una en vez de contarlas. Contar decía "son cuatro", y
+  // cuando la ruleta se eliminó pasaron a ser tres: el número saltó sin que
+  // nada estuviera mal. Con la lista, agregar una función que mueva Leyendas
+  // obliga a escribirla acá — que es justo la revisión que se quiere forzar.
+  const ESPERADAS = ["reclamarBonoDiario", "acreditarReferido", "crearOrdenDeCompra"];
+  const declaradas = Object.keys(LIMITES_DE_PLATA).sort();
+  ok(
+    JSON.stringify(declaradas) === JSON.stringify([...ESPERADAS].sort()),
+    "las que mueven Leyendas tienen su propio techo, y son exactamente éstas",
+    declaradas,
+  );
   ok(Object.values(LIMITES_DE_PLATA).every((n) => n <= 20),
      "ninguna de plata pasa de 20 por minuto");
 }
@@ -197,18 +206,18 @@ console.log("\n=== El contador de plata lee antes de escribir ===");
   let t = 7_000_000;
   const g = crearLimiteDeRitmo({ db: falsoDb, error, ahora: () => t });
 
-  for (let i = 0; i < LIMITES_DE_PLATA.girarLaRuleta; i++) {
-    await g.exigirRitmoDePlata("ana", "girarLaRuleta");
+  for (let i = 0; i < LIMITES_DE_PLATA.reclamarBonoDiario; i++) {
+    await g.exigirRitmoDePlata("ana", "reclamarBonoDiario");
   }
   ok(!leyoDespuesDeEscribir, "nunca lee después de escribir");
 
   let salto = null;
-  try { await g.exigirRitmoDePlata("ana", "girarLaRuleta"); } catch (e) { salto = e; }
+  try { await g.exigirRitmoDePlata("ana", "reclamarBonoDiario"); } catch (e) { salto = e; }
   ok(salto?.codigo === "resource-exhausted", "y frena al pasarse del techo");
 
   t += 61_000;
   let paso = true;
-  try { await g.exigirRitmoDePlata("ana", "girarLaRuleta"); } catch { paso = false; }
+  try { await g.exigirRitmoDePlata("ana", "reclamarBonoDiario"); } catch { paso = false; }
   ok(paso, "pasado el minuto vuelve a dejar pasar");
 }
 

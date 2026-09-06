@@ -17,7 +17,7 @@ const CARGA = '<img src=x onerror="window.__ejecutado=true">';
 const SESION_FALSA = `
   export const COLECCION="users"; export const CAMPO_SALDO="credits";
   export async function exigirSesion(){return{usuario:{uid:"u1",photoURL:null},
-    perfil:{uid:"u1",nombre:"Probador",saldo:500,partidas:0,victorias:0,ultimoGiro:0,ultimoBono:0}};}
+    perfil:{uid:"u1",nombre:"Probador",saldo:500,partidas:0,victorias:0,ultimoBono:0}};}
   export function mostrarSaldo(){} export function conectarBotonSalir(){}
   export function formatearEspera(){return "listo";}`;
 

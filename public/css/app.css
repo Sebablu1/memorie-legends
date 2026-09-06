@@ -1,6 +1,6 @@
 /* ============================================================
    Memorie Legends — pantallas de la aplicación:
-   dashboard, ranking, tienda y ruleta.
+   dashboard, ranking y tienda.
    Comparte el lenguaje visual de la mesa: oscuro, oro y fieltro.
    ============================================================ */
 
@@ -302,7 +302,7 @@ main {
 .tarjeta-accion.mesa { --acento-tarjeta: var(--verde); }
 .tarjeta-accion.ranking { --acento-tarjeta: var(--oro); }
 .tarjeta-accion.tienda { --acento-tarjeta: var(--azul); }
-.tarjeta-accion.ruleta { --acento-tarjeta: var(--rojo); }
+.tarjeta-accion.corte { --acento-tarjeta: var(--rojo); }
 .tarjeta-accion.amigos { --acento-tarjeta: #b87333; }
 
 /* --------------------------------------------- tarjeta ilustrada del Rey */

@@ -138,7 +138,6 @@ onAuthStateChanged(auth, async (usuario) => {
         gamesPlayed: 0,
         wins: 0,
         createdAt: new Date().toISOString(),
-        lastSpin: 0,
         provider: usuario.providerData?.[0]?.providerId ?? "password",
       });
       datos = { username: nombre };
