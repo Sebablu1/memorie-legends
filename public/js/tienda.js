@@ -1,5 +1,6 @@
 import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
 import { PAQUETES, leyendasDePaquete, precioPorLeyenda, MONEDA } from "./reglas/economia.js";
+import { montarPersonalizacion } from "./personalizacion.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -26,4 +27,13 @@ $("paquetes").innerHTML = PAQUETES.map((p) => {
 }).join("");
 
 const sesion = await exigirSesion();
-if (sesion) mostrarSaldo(sesion.perfil.saldo);
+if (sesion) {
+  mostrarSaldo(sesion.perfil.saldo);
+
+  // La otra mitad de la tienda: lo que se compra CON Leyendas.
+  //
+  // Se monta desde acá y no con un `<script>` propio para pedir la sesión UNA
+  // vez. Dos módulos llamando a `exigirSesion` en la misma carga son dos
+  // lecturas del perfil y, peor, dos saldos que pueden diferir por un instante.
+  montarPersonalizacion({ saldoInicial: sesion.perfil.saldo });
+}

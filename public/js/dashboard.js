@@ -27,6 +27,7 @@ import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/
 // Sólo nombres y etiquetas: el cerebro de la IA (`reglas/ia.js`, diez mil
 // caracteres) no hace falta acá y no se trae.
 import { armarRivales, NIVELES, limiteDelModo, MODOS_PARTIDA } from "./rivales.js";
+import { pintarAvatarCabecera } from "./avatar-cabecera.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -93,7 +94,10 @@ if (sesion) {
       ? `Llevás ${perfil.partidas} partida${perfil.partidas === 1 ? "" : "s"} y ${perfil.victorias} victoria${perfil.victorias === 1 ? "" : "s"}.`
       : "Todavía no jugaste ninguna partida. Empezá por el entrenamiento.";
 
-  if (usuario.photoURL) $("avatar").src = usuario.photoURL;
+  // El avatar comprado gana sobre la foto de Google. Es una elección
+  // explícita: alguien gastó Leyendas para verse así. Si no hay ninguno
+  // equipado, o si el catálogo no responde, queda la foto de siempre.
+  pintarAvatarCabecera({ equipado: perfil.equipado?.avatar, foto: usuario.photoURL });
 
   mostrarSaldo(perfil.saldo);
   ofrecerDosPasos();

@@ -104,3 +104,33 @@ export const salirDeSalaEnEspera = (codigo) => llamar("salirDeSalaEnEspera", { c
  */
 export const reportarJugador = ({ denunciado, motivo, comentario, codigo }) =>
   llamar("reportarJugador", { denunciado, motivo, comentario, codigo });
+
+// ------------------------------------------------- tienda de personalización
+
+/**
+ * Compra un avatar, una insignia o un dorso.
+ *
+ * Viaja el id y NADA más, y eso no es una simplificación: el precio lo lee el
+ * servidor del catálogo dentro de la misma transacción que cobra, y el tipo
+ * sale del propio artículo. Mandarlos desde acá sería darle al navegador voz
+ * en una operación de dinero — el esquema del servidor los rechaza igual.
+ *
+ * @returns {Promise<{itemId: string, tipo: string, precio: number, saldo: number|null}>}
+ */
+export const comprarItem = (itemId) => llamar("comprarItem", { itemId });
+
+/**
+ * Se pone algo que ya compró.
+ *
+ * Que sea suyo lo comprueba el servidor: acá no hay nada que validar, porque
+ * cualquier comprobación de este lado se saltea abriendo la consola.
+ *
+ * @returns {Promise<{itemId: string, tipo: string, campo: string}>}
+ */
+export const equiparItem = (itemId) => llamar("equiparItem", { itemId });
+
+/**
+ * Qué compró y qué lleva puesto, en un solo viaje.
+ * @returns {Promise<{tengo: Array<{id: string, tipo: string}>, equipado: object}>}
+ */
+export const misItems = () => llamar("misItems");

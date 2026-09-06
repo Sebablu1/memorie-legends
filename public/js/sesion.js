@@ -49,6 +49,22 @@ export async function leerPerfil(uid) {
     partidas: Number(datos.gamesPlayed ?? 0),
     victorias: Number(datos.wins ?? 0),
     ultimoBono: datos.lastDailyBonus ?? 0,
+
+    /**
+     * Lo que tiene puesto de la tienda: ids del catálogo, no imágenes.
+     *
+     * Los escribe `equiparItem` en el servidor y el navegador no puede
+     * tocarlos —las reglas de Firestore sólo le dejan cambiar el nombre y la
+     * foto—, que es lo que hace que equiparse algo exija haberlo comprado.
+     *
+     * Se leen acá, con el resto del perfil, para no pedir el mismo documento
+     * dos veces por pantalla.
+     */
+    equipado: {
+      avatar: datos.avatar ?? null,
+      insignia: datos.insignia ?? null,
+      dorso: datos.dorso ?? null,
+    },
   };
 }
 

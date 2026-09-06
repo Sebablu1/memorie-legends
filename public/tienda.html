@@ -20,6 +20,7 @@
     <link rel="stylesheet" href="css/tema.css" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="css/tablas.css" />
+    <link rel="stylesheet" href="css/tienda.css" />
     <link rel="stylesheet" href="css/pie.css" />
       <meta name="description" content="Paquetes de Leyendas con bonificación: cuanto más grande, más conviene cada una. Usalas para entrar a las salas multijugador y jugar por el pozo." />
     <!-- La tarjeta que se ve al compartir el enlace.
@@ -72,7 +73,32 @@
     </header>
 
     <main>
-      <h1 class="titulo-pagina">🛒 Comprar Leyendas</h1>
+      <h1 class="titulo-pagina">🛒 Tienda</h1>
+      <p class="subtitulo">Gastá tus Leyendas en personalizar tu mesa, o conseguí más.</p>
+
+      <!-- PERSONALIZACIÓN: lo que se compra CON Leyendas.
+
+           Va primero y en la misma página que los paquetes a propósito. Son
+           las dos mitades de una tienda —lo que se gasta y lo que se repone— y
+           separarlas en dos pantallas obligaría a mantener dos veces el mismo
+           circuito de compra. Las pestañas de adentro las dibuja
+           `personalizacion.js` desde su lista de categorías: agregar insignias
+           o dorsos es agregar una línea ahí, no una página. -->
+      <section id="personalizacion" class="panel" style="margin-bottom: 28px">
+        <h2>Personalización</h2>
+
+        <div class="pestanas-tienda" id="pestanasPersonalizacion" role="tablist"></div>
+
+        <!-- `role="status"` y `aria-live`: el resultado de una compra tiene que
+             llegarle también a quien no ve la pantalla. -->
+        <p class="aviso-tienda" id="avisoPersonalizacion" role="status" aria-live="polite"></p>
+
+        <div class="rejilla-tienda" id="rejillaPersonalizacion">
+          <div class="vacio">Cargando…</div>
+        </div>
+      </section>
+
+      <h2 class="titulo-pagina" style="font-size: 1.5rem">Comprar Leyendas</h2>
       <p class="subtitulo">Cuanto más grande el paquete, más conviene cada Leyenda.</p>
 
       <div id="avisoPagos" class="aviso">

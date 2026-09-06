@@ -194,6 +194,19 @@ body {
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
+/* El mismo círculo, cuando el avatar equipado es un glifo y no un archivo.
+   Un emoji no entra en un `<img>`, así que ahí el nodo pasa a ser un `<span>`
+   —lo cambia `avatar-cabecera.js`— y necesita centrar su contenido, que la
+   imagen resolvía sola con `object-fit`. */
+.avatar-glifo {
+  display: grid;
+  place-items: center;
+  font-size: 1.35rem;
+  line-height: 1;
+  background: radial-gradient(circle at 50% 40%, rgba(212, 168, 67, 0.22), var(--panel-alto));
+  user-select: none;
+}
+
 /* ======================================================= contenido */
 
 main {
