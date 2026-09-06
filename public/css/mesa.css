@@ -33,7 +33,7 @@
      Así, en una pantalla baja el paño encoge las cartas en vez de empujar la
      botonera fuera del viewport. `dvh` y no `vh` por la barra de direcciones
      del móvil, que cambia de alto mientras se juega. */
-  --carta-alto: clamp(58px, 10.9dvh, 84px);
+  --carta-alto: clamp(58px, 10.9dvh, 112px);
   --carta-ancho: calc(var(--carta-alto) * 0.667);
   --carta-radio: 6px;
 
@@ -406,7 +406,7 @@ body::after {
 /* Tus cartas son las que tocás bajo presión de reloj: se dimensionan aparte
    y son siempre las más grandes de la mesa. */
 .jugador.propio {
-  --carta-alto: clamp(88px, 16.8dvh, 129px);
+  --carta-alto: clamp(88px, 16.8dvh, 172px);
   --carta-ancho: calc(var(--carta-alto) * 0.667);
   padding: 8px 18px 10px;
 }
@@ -639,7 +639,7 @@ body::after {
 }
 
 .pila .carta {
-  --carta-alto: clamp(70px, 12.5dvh, 96px);
+  --carta-alto: clamp(70px, 12.5dvh, 128px);
   --carta-ancho: calc(var(--carta-alto) * 0.667);
 }
 
@@ -652,7 +652,7 @@ body::after {
 }
 
 .levantada-caja .carta {
-  --carta-alto: clamp(80px, 14.5dvh, 111px);
+  --carta-alto: clamp(80px, 14.5dvh, 148px);
   --carta-ancho: calc(var(--carta-alto) * 0.667);
   animation: aparecer 0.4s cubic-bezier(0.2, 1.2, 0.4, 1);
 }
@@ -705,7 +705,19 @@ body::after {
    * mitad — un cartel que se pone delante de una carta no puede además
    * comerse el toque que iba a la carta. */
   position: relative;
-  z-index: 3;
+
+  /* Doce, y no tres.
+   *
+   * Tres alcanzaba en el teléfono y no en la computadora, por una razón que
+   * sólo existe con puntero: `.carta.jugable:hover` se levanta con `z-index:
+   * 6` para despegarse del abanico. En el móvil no hay hover y no pasaba
+   * nunca; en la computadora el puntero vive sobre las cartas propias, así
+   * que la carta se ponía delante del cartel justo mientras uno decide.
+   *
+   * Doce pasa por encima de eso y del 8 de los efectos de poder, y sigue por
+   * debajo del cartel de poder (20), del registro (55) y del modal (60): lo
+   * que tiene que taparlo, lo sigue tapando. */
+  z-index: 12;
   pointer-events: none;
 }
 

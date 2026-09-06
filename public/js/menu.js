@@ -56,6 +56,16 @@ const barra = document.querySelector(".barra-contenido");
 const nav = barra?.querySelector("nav");
 const derecha = barra?.querySelector(".derecha");
 
+/**
+ * ¿Esta barra es la de alguien que entró?
+ *
+ * Se pregunta por el saldo y no por la página: hay ocho páginas con sesión y
+ * dos sin ella, y una lista de nombres de archivo se desactualiza sola. Si hay
+ * un contador de Leyendas, hay una cuenta detrás.
+ */
+const conSesion = Boolean(derecha?.querySelector("#saldo"));
+const salir = derecha?.querySelector("#btnSalir");
+
 // Sin barra, o con una barra vacía, no hay nada que plegar. Le pasa a las
 // pantallas de entrar y de registro, que sólo tienen el logo.
 if (barra && (nav || derecha)) {
@@ -104,6 +114,12 @@ if (barra && (nav || derecha)) {
   cerrar.innerHTML = '<span aria-hidden="true">×</span>';
   cabecera.append(cerrar);
   cajon.append(cabecera);
+
+  // El pie del cajón: donde va "Salir" cuando hay sesión. Se crea siempre y se
+  // usa sólo si hace falta — un `<div>` vacío no molesta a nadie y evita
+  // repartir la creación entre dos ramas.
+  const pie = document.createElement("div");
+  pie.className = "pie-cajon";
 
   document.body.append(fondo, cajon);
 
@@ -186,9 +202,21 @@ if (barra && (nav || derecha)) {
     // Los enlaces viven SIEMPRE en el cajón, en cualquier tamaño.
     if (nav) cajon.append(nav);
 
-    // El saldo y el botón de salir, en cambio, se quedan en la barra mientras
-    // haya lugar. Es información que conviene tener a la vista sin abrir nada.
-    if (derecha) {
+    if (derecha && conSesion) {
+      // Con la sesión abierta, la identidad no se guarda en ningún cajón: la
+      // foto y las Leyendas se quedan en la barra, pegadas al botón del menú,
+      // en el teléfono igual que en la computadora. Son las dos cosas que uno
+      // mira de reojo entre partida y partida —quién soy y cuánto me queda— y
+      // esconderlas detrás de un toque las vuelve inútiles.
+      //
+      // Lo único que baja al cajón es "Salir", que es lo contrario: se usa una
+      // vez y conviene que no esté al alcance del pulgar por accidente.
+      barra.insertBefore(derecha, boton);
+      if (salir) pie.append(salir);
+      cajon.append(pie);
+    } else if (derecha) {
+      // La portada no tiene sesión: ahí `.derecha` son "Iniciar sesión" y
+      // "Crear cuenta", y siguen guardándose en el cajón cuando no entran.
       if (angosta.matches) cajon.append(derecha);
       else barra.insertBefore(derecha, boton);
     }
