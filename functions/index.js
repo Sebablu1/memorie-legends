@@ -52,6 +52,7 @@ import { crearAbandonarPartida } from "./abandono.js";
 import { crearMotorEnRed } from "./partida-red.js";
 import { crearCierre } from "./cierre.js";
 import { crearLimiteDeRitmo } from "./limite-de-ritmo.js";
+import { crearTienda } from "./tienda.js";
 import {
   validar,
   EsquemaDeSala,
@@ -60,6 +61,7 @@ import {
   EsquemaCompra,
   EsquemaReferido,
   EsquemaReporte,
+  EsquemaItem,
 } from "./esquemas.js";
 import { crearSalirDeSalaEnEspera } from "./salida.js";
 import { crearAdmin } from "./admin.js";
@@ -566,6 +568,66 @@ const moderacion = crearReportes({
   marcaDeTiempo,
   administradores,
 });
+
+/**
+ * La tienda de personalización.
+ *
+ * Comparte `moverLeyendas` con todo lo demás: no hay un segundo camino que
+ * escriba `credits`, que es la regla que hace auditable el saldo.
+ */
+const tienda = crearTienda({
+  db,
+  moverLeyendas,
+  marcaDeTiempo,
+  error: errorHttp,
+  motivoCompra: MOTIVOS.COMPRA_PERSONALIZACION,
+  usuarios: USUARIOS,
+  administradores,
+});
+
+// ------------------------------------------------------ tienda: el jugador
+
+/**
+ * Compra un avatar, una insignia o un dorso.
+ *
+ * Viaja un id y nada más: el precio lo pone el catálogo del servidor. Tiene
+ * techo de plata porque mueve Leyendas — ver `limite-de-ritmo.js`.
+ */
+export const comprarItem = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context, "comprarItem");
+  await limite.exigirRitmoDePlata(uid, "comprarItem");
+  const { itemId } = validar(EsquemaItem, data, errorHttp);
+  return tienda.comprar(uid, itemId);
+});
+
+/**
+ * Se pone algo que ya compró.
+ *
+ * No mueve saldo, así que va con el techo común. Lo que sí comprueba es que lo
+ * tenga: sin eso la tienda sería decorativa.
+ */
+export const equiparItem = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context, "equiparItem");
+  const { itemId } = validar(EsquemaItem, data, errorHttp);
+  return tienda.equipar(uid, itemId);
+});
+
+/** Qué tiene comprado y qué tiene puesto, en un solo viaje. */
+export const misItems = functions.https.onCall(async (_data, context) => {
+  const uid = exigirSesion(context, "misItems");
+  return tienda.misItems(uid);
+});
+
+// --------------------------------------------------- tienda: el catálogo
+
+/**
+ * Llena el catálogo con la semilla de demostración.
+ *
+ * No pisa lo que ya está: sembrar dos veces no revierte los precios que el
+ * administrador haya cambiado.
+ */
+export const sembrarCatalogoAdmin = functions.https.onCall((_data, context) =>
+  tienda.sembrarCatalogo(context));
 
 export const listarSalasAdmin = functions.https.onCall((_data, context) =>
   panel.listarSalas(context));

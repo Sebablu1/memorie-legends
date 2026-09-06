@@ -28,9 +28,21 @@ service cloud.firestore {
     // Campos que el jugador SÍ puede tocar de su propio perfil.
     // Todo lo demás (saldo, estadísticas, insignias, marcas de tiempo de
     // bonos) queda reservado al servidor.
+    // `avatar` SALIÓ de esta lista al crear la tienda de personalización.
+    //
+    // Ese campo pasó a guardar el avatar EQUIPADO, o sea un id del catálogo que
+    // el jugador tiene que haber comprado. Si el navegador pudiera seguir
+    // escribiéndolo, equiparse el más caro sin pagarlo serían dos líneas en la
+    // consola y la tienda entera sería decorativa.
+    //
+    // Sacarlo no rompió nada porque nadie lo escribía: el tablero muestra la
+    // foto de Google, que viene de Auth y no de este documento. Se comprobó
+    // recorriendo todas las escrituras del cliente antes de cerrarlo.
+    //
+    // `insignia` y `dorso` nunca estuvieron acá, así que ya estaban cerrados.
     function soloCamposPropios() {
       return request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['username', 'avatar', 'photoURL']);
+             .hasOnly(['username', 'photoURL']);
     }
 
     // Saldo de bienvenida permitido al crear la cuenta. Cualquier otro
@@ -77,7 +89,17 @@ service cloud.firestore {
 
       allow delete: if false;
 
-      // Subcolecciones del perfil (rachas, historial): sólo lectura propia.
+      /**
+       * Subcolecciones del perfil: sólo lectura propia.
+       *
+       * Acá cae `users/{uid}/items`, que es donde se anota qué artículos de la
+       * tienda compró cada jugador. No hizo falta una regla nueva —esta ya
+       * decía lo correcto: su dueño lee, nadie escribe— y por eso se deja como
+       * está en vez de agregar un `match` que diga lo mismo dos veces.
+       *
+       * Que el cliente no pueda escribir es justamente lo que hace que la
+       * posesión signifique algo: la crea `comprarItem` después de cobrar.
+       */
       match /{documento=**} {
         allow read: if esDuenio(uid);
         allow write: if false;
@@ -109,6 +131,20 @@ service cloud.firestore {
     // Órdenes de compra: sólo las propias.
     match /ordenes/{id} {
       allow read: if autenticado() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    // ------------------------------------------------ catálogo de la tienda
+    //
+    // Los avatares, insignias y dorsos que están a la venta. Se lee desde el
+    // navegador para poder pintar la tienda sin una Cloud Function de por
+    // medio; se escribe SÓLO desde el servidor, porque acá viven los precios.
+    //
+    // Que el precio sea legible no es un problema: el que cobra es el que lee
+    // este mismo documento dentro de la transacción. Lo que no puede pasar es
+    // que se pueda ESCRIBIR, y eso es lo que cierra la segunda línea.
+    match /catalogo/{itemId} {
+      allow read: if autenticado();
       allow write: if false;
     }
 

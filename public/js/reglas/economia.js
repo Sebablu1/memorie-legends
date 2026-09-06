@@ -152,5 +152,17 @@ export const MOTIVOS = {
   PREMIO_PARTIDA: "premio_partida",
   PREMIO_RANKING: "premio_ranking",
   COMPRA: "compra",
-  TIENDA: "tienda",
+
+  /**
+   * Gastar Leyendas en un avatar, una insignia o un dorso.
+   *
+   * Ocupa el lugar del viejo `TIENDA: "tienda"`, que estaba declarado y no lo
+   * usaba nadie. Agregar un motivo nuevo al lado habría dejado dos nombres
+   * para lo mismo, y la gracia del libro mayor es poder preguntarle "¿en qué
+   * se fue el saldo?" y que la respuesta signifique algo.
+   *
+   * Se distingue de `COMPRA`, que es al revés: ésa ACREDITA Leyendas pagadas
+   * con dinero. Ésta las gasta.
+   */
+  COMPRA_PERSONALIZACION: "compra_personalizacion",
 };

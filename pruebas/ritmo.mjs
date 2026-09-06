@@ -145,7 +145,12 @@ console.log("\n=== Las de plata están apretadas ===");
   // cuando la ruleta se eliminó pasaron a ser tres: el número saltó sin que
   // nada estuviera mal. Con la lista, agregar una función que mueva Leyendas
   // obliga a escribirla acá — que es justo la revisión que se quiere forzar.
-  const ESPERADAS = ["reclamarBonoDiario", "acreditarReferido", "crearOrdenDeCompra"];
+  const ESPERADAS = [
+    "reclamarBonoDiario",
+    "acreditarReferido",
+    "crearOrdenDeCompra",
+    "comprarItem",
+  ];
   const declaradas = Object.keys(LIMITES_DE_PLATA).sort();
   ok(
     JSON.stringify(declaradas) === JSON.stringify([...ESPERADAS].sort()),

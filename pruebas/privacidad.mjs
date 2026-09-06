@@ -66,13 +66,27 @@ console.log("\n=== El perfil lo lee su dueño y nadie más ===");
 
   // Lo que no cambió, y no debe cambiar por accidente al tocar lo de arriba.
   ok(/allow update:\s*if\s+esDuenio\(uid\)\s*&&\s*soloCamposPropios\(\)/.test(bloque),
-     "el jugador sigue pudiendo cambiar sólo su nombre y su avatar");
+     "el jugador sigue pudiendo cambiar sólo su nombre y su foto");
   ok(/allow delete:\s*if\s+false/.test(bloque), "y sigue sin poder borrarse");
 
   // El saldo sigue fuera del alcance del navegador: es la otra mitad, y la que
   // de verdad impide que alguien se regale Leyendas.
-  ok(/hasOnly\(\['username',\s*'avatar',\s*'photoURL'\]\)/.test(reglas),
-     "los campos que puede tocar siguen siendo tres, sin credits");
+  //
+  // `avatar` SALIÓ de la lista al crear la tienda de personalización: ese campo
+  // pasó a guardar el avatar equipado, o sea un id que hay que haber comprado.
+  // Si el navegador pudiera escribirlo, equiparse el más caro sin pagarlo
+  // serían dos líneas en la consola.
+  ok(/hasOnly\(\['username',\s*'photoURL'\]\)/.test(reglas),
+     "los campos que puede tocar son sólo el nombre y la foto");
+
+  // Y los tres campos de lo equipado quedan del lado del servidor. Se
+  // comprueban por su ausencia de la lista: si alguien los agregara "para que
+  // el cliente pueda cambiarse el avatar sin llamar al servidor", la tienda
+  // pasaría a ser decorativa sin que nada fallara.
+  for (const campo of ["avatar", "insignia", "dorso"]) {
+    ok(!new RegExp(`hasOnly\\(\\[[^\\]]*'${campo}'`).test(reglas),
+       `el cliente no puede escribir \`${campo}\`: lo pone la tienda`);
+  }
 }
 
 // ══════════════════════ nadie lee el perfil ajeno (la parte que se degrada)

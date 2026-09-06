@@ -124,6 +124,26 @@ export const EsquemaAccion = z.object({
 export const EsquemaCompra = z.object({ paqueteId: z.string().min(1).max(64) });
 
 /**
+ * Comprar o equipar un artículo de personalización.
+ *
+ * Lo que NO está acá es lo que importa: no hay `precio`, ni `tipo`, ni `saldo`.
+ * Viaja un id y nada más. El precio lo lee el servidor del catálogo dentro de
+ * la misma transacción que cobra, y el tipo sale del propio artículo. Si el
+ * esquema aceptara un precio, aceptarlo sería el bug.
+ *
+ * El id se valida con la misma forma que exige `catalogo.js` para crearlos, así
+ * que una llamada con un id imposible se rechaza en la puerta y no llega a
+ * consultar Firestore.
+ */
+export const EsquemaItem = z.object({
+  itemId: z
+    .string()
+    .min(2)
+    .max(64)
+    .regex(/^[a-z0-9_-]+$/, "El id del artículo no tiene una forma válida."),
+});
+
+/**
  * Un reporte de un jugador sobre otro.
  *
  * `denunciante` NO está acá, y es lo importante: sale del token verificado en
