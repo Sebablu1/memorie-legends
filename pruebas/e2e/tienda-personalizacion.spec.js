@@ -41,6 +41,8 @@ const CATALOGO = [
   { id: "avatar-dragon", tipo: "avatar", nombre: "El Dragón", descripcion: "Se ve de lejos.", precio: 2500, imagen: "🐉", activo: true, orden: 30 },
   // Desactivado: no tiene que aparecer en la tienda aunque esté en la colección.
   { id: "avatar-oculto", tipo: "avatar", nombre: "Secreto", descripcion: "", precio: 10, imagen: "🕵️", activo: false, orden: 40 },
+  // De otro tipo: sólo tiene que verse en su propia pestaña.
+  { id: "insignia-corona", tipo: "insignia", nombre: "Corona de Laurel", descripcion: "La del que manda.", precio: 1800, imagen: "🏆", activo: true, orden: 10 },
 ];
 
 const firebaseFalso = (catalogo) => `
@@ -158,6 +160,48 @@ test("los precios que se ven son los del servidor", async ({ page }) => {
   await abrirTienda(page);
   await expect(ficha(page, "El Zorro")).toContainText("800");
   await expect(ficha(page, "El Rey")).toContainText(/gratis/i);
+});
+
+// =====================================================================
+// Las categorías
+// =====================================================================
+
+test("cada tipo vive en su pestaña, y no se mezclan", async ({ page }) => {
+  // La rejilla muestra UNA categoría por vez. Si se mezclaran, la tienda
+  // ofrecería una insignia entre los avatares y equiparla cambiaría otra cosa
+  // de la que el jugador creía.
+  await abrirTienda(page);
+
+  await expect(page.locator("#rejillaPersonalizacion")).not.toContainText("Corona de Laurel");
+
+  await page.locator('#pestanasPersonalizacion [data-categoria="insignia"]').click();
+
+  await expect(page.locator("#rejillaPersonalizacion")).toContainText("Corona de Laurel");
+  await expect(page.locator("#rejillaPersonalizacion")).not.toContainText("El Dragón");
+});
+
+test("las pestañas salen de la lista de categorías, no del HTML", async ({ page }) => {
+  // El contenedor viene vacío en `tienda.html` a propósito: agregar una
+  // categoría es agregar una línea en `personalizacion.js`. Un botón escrito a
+  // mano en el HTML lo pisaría el primer repintado.
+  await abrirTienda(page);
+
+  const pestanas = page.locator("#pestanasPersonalizacion button");
+  await expect(pestanas).toHaveCount(2);
+  await expect(pestanas.nth(0)).toContainText("Avatares");
+  await expect(pestanas.nth(1)).toContainText("Insignias");
+});
+
+test("comprar una insignia usa el mismo circuito que un avatar", async ({ page }) => {
+  await abrirTienda(page, { saldo: 5000 });
+  await page.locator('#pestanasPersonalizacion [data-categoria="insignia"]').click();
+
+  await ficha(page, "Corona de Laurel").locator("button").click();
+  await expect(ficha(page, "Corona de Laurel").locator("button")).toContainText(/equipar/i);
+
+  const compra = await page.evaluate(() =>
+    window.__llamadas.find(([n]) => n === "comprarItem"));
+  expect(compra[1], "viajó algo más que el id").toBe("insignia-corona");
 });
 
 // =====================================================================

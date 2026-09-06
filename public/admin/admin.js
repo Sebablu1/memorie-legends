@@ -57,6 +57,8 @@ const dom = {
   btnCancelarTodas: $("btnCancelarTodas"),
   aviso: $("aviso"),
   salas: $("salas"),
+  btnSembrarCatalogo: $("btnSembrarCatalogo"),
+  avisoCatalogo: $("avisoCatalogo"),
   btnRevisarNombres: $("btnRevisarNombres"),
   avisoNombres: $("avisoNombres"),
   listaNombres: $("listaNombres"),
@@ -78,6 +80,7 @@ const dom = {
 const listar = httpsCallable(funciones, "listarSalasAdmin");
 const cancelar = httpsCallable(funciones, "cancelarSalaAdmin");
 const cancelarTodas = httpsCallable(funciones, "cancelarSalasEnEsperaAdmin");
+const sembrarCatalogo = httpsCallable(funciones, "sembrarCatalogoAdmin");
 const revisarNombres = httpsCallable(funciones, "revisarNombresAdmin");
 const listarUsuarios = httpsCallable(funciones, "listarUsuariosAdmin");
 const eliminarUsuario = httpsCallable(funciones, "eliminarUsuarioAdmin");
@@ -410,6 +413,35 @@ dom.btnCancelarTodas.addEventListener("click", async () => {
  * Acá se escapa al pintarlo, que es donde corresponde —y es justamente el
  * arreglo que hizo falta en el juego—.
  */
+/**
+ * Llena el catálogo de la tienda con los artículos de arranque.
+ *
+ * El botón se apaga mientras trabaja: la siembra escribe documento por
+ * documento y tocarla dos veces lanzaría dos recorridos en paralelo. No haría
+ * daño —el servidor saltea lo que ya existe— pero el aviso terminaría diciendo
+ * cualquier cosa, porque cada corrida cuenta lo suyo.
+ */
+dom.btnSembrarCatalogo?.addEventListener("click", async () => {
+  dom.btnSembrarCatalogo.disabled = true;
+  decir(dom.avisoCatalogo, "Sembrando…");
+
+  try {
+    const { data } = await sembrarCatalogo();
+    decir(
+      dom.avisoCatalogo,
+      data.creados
+        ? `Listo: ${data.creados} artículo${data.creados === 1 ? "" : "s"} agregado${data.creados === 1 ? "" : "s"}` +
+          (data.yaEstaban ? `, ${data.yaEstaban} que ya estaban quedaron como estaban.` : ".")
+        : `El catálogo ya estaba completo: ${data.yaEstaban} artículos, ninguno tocado.`,
+      "bien",
+    );
+  } catch (error) {
+    decir(dom.avisoCatalogo, error?.message ?? "No se pudo sembrar el catálogo.", "mal");
+  } finally {
+    dom.btnSembrarCatalogo.disabled = false;
+  }
+});
+
 dom.btnRevisarNombres.addEventListener("click", async () => {
   dom.btnRevisarNombres.disabled = true;
   decir(dom.avisoNombres, "Revisando…");

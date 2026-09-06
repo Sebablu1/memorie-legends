@@ -27,7 +27,7 @@ import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/
 // Sólo nombres y etiquetas: el cerebro de la IA (`reglas/ia.js`, diez mil
 // caracteres) no hace falta acá y no se trae.
 import { armarRivales, NIVELES, limiteDelModo, MODOS_PARTIDA } from "./rivales.js";
-import { pintarAvatarCabecera } from "./avatar-cabecera.js";
+import { pintarAvatarCabecera, pintarInsignia } from "./equipado.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -98,6 +98,10 @@ if (sesion) {
   // explícita: alguien gastó Leyendas para verse así. Si no hay ninguno
   // equipado, o si el catálogo no responde, queda la foto de siempre.
   pintarAvatarCabecera({ equipado: perfil.equipado?.avatar, foto: usuario.photoURL });
+
+  // La insignia va junto al nombre, que es donde uno la muestra: se compra
+  // para que se vea, no para tenerla guardada.
+  pintarInsignia({ equipado: perfil.equipado?.insignia });
 
   mostrarSaldo(perfil.saldo);
   ofrecerDosPasos();

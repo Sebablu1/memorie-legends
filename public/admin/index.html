@@ -112,6 +112,30 @@
 
       <p class="aviso" id="aviso" role="status"></p>
 
+      <!-- Tienda de personalización.
+
+           Por ahora sólo la siembra: el catálogo de avatares, insignias y
+           dorsos vive en Firestore y una instalación nueva lo tiene vacío, así
+           que sin esto la tienda no tiene nada que mostrar y no hay forma de
+           probar una compra.
+
+           Editar precios y artículos desde acá viene después. Se adelantó
+           sólo el botón porque es lo que desbloquea todo lo demás. -->
+      <section>
+        <h2>Tienda</h2>
+        <p class="nota">
+          Llena el catálogo con los artículos de arranque. <b>No pisa lo que ya
+          está</b>: los precios que hayas cambiado se respetan, y sembrar dos
+          veces no revierte nada. Sólo agrega los que falten.
+        </p>
+        <div class="acciones">
+          <button class="btn sobrio" id="btnSembrarCatalogo" type="button">
+            Sembrar catálogo
+          </button>
+        </div>
+        <div class="aviso" id="avisoCatalogo"></div>
+      </section>
+
       <!-- Revisión de nombres. Existe porque el escapado tapa la SALIDA, pero
            lo que se guardó antes del arreglo sigue guardado tal cual. -->
       <section>

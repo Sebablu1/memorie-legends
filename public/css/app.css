@@ -207,6 +207,35 @@ body {
   user-select: none;
 }
 
+/* La insignia equipada, al lado del nombre.
+
+   Va en una ficha con filo de oro y no suelta sobre el fondo: el saludo es
+   un título con degradado dorado en el texto, y un emoji pegado ahí se lee
+   como parte del nombre. Con marco se entiende que es otra cosa. */
+.insignia-equipada {
+  display: inline-grid;
+  place-items: center;
+  vertical-align: middle;
+  width: 1.5em;
+  height: 1.5em;
+  margin-left: 0.35em;
+  border-radius: 50%;
+  font-size: 0.62em;
+  line-height: 1;
+  border: 1px solid rgba(212, 168, 67, 0.5);
+  background: radial-gradient(circle at 50% 40%, rgba(212, 168, 67, 0.2), var(--panel-alto));
+  /* El título tiene el color recortado sobre el texto; sin esto la insignia
+     heredaría el `-webkit-text-fill-color: transparent` y no se vería. */
+  -webkit-text-fill-color: initial;
+}
+
+.insignia-equipada img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+}
+
 /* ======================================================= contenido */
 
 main {
