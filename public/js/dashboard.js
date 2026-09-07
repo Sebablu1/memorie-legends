@@ -29,6 +29,7 @@ import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/
 import { armarRivales, NIVELES, limiteDelModo, MODOS_PARTIDA } from "./rivales.js";
 import { pintarAvatarCabecera, pintarInsignia } from "./equipado.js";
 import { montarLogros } from "./logros.js";
+import { montarCarteleraTorneos } from "./cartelera-torneos.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -126,6 +127,7 @@ if (sesion) {
   // por qué esperarlos. Se muestra sola cuando llega, y si no llega no se
   // muestra — pero nadie se queda sin poder entrar a jugar por eso.
   montarLogros();
+  montarCarteleraTorneos();
 
   arrancarSalas();
 }

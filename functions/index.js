@@ -888,9 +888,17 @@ export const iniciarTorneoAdmin = functions.https.onCall((data, context) =>
  * lo calcula el servidor con el pozo que el servidor guardó: si el monto
  * llegara del panel, un error de tipeo pagaría el pozo entero al primero.
  */
-export const finalizarTorneoAdmin = functions.https.onCall((data, context) => {
+export const finalizarTorneoAdmin = functions.https.onCall(async (data, context) => {
   const d = validar(EsquemaGanadores, data, errorHttp);
-  return torneos.finalizar(context, d.torneoId, d.ganadores);
+  const r = await torneos.finalizar(context, d.torneoId, d.ganadores);
+
+  // La insignia «Campeón» son cinco torneos ganados, y el quinto se acaba de
+  // sumar. Se revisa acá y fuera de la transacción por lo mismo de siempre:
+  // otorgar necesita LEER el contador recién escrito. Sin esto la insignia
+  // igual llegaría —al cerrar su próxima partida—, pero llegaría tarde y sin
+  // relación visible con lo que la ganó.
+  await insignias.otorgarInsignias(d.ganadores[0]);
+  return r;
 });
 
 export const cancelarTorneoAdmin = functions.https.onCall((data, context) => {

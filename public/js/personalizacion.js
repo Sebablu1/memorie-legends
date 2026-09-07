@@ -29,11 +29,14 @@
 import { db, collection, getDocs, query, orderBy } from "./firebase.js";
 import { escapar } from "./modulos/texto.js";
 import { mostrarSaldo } from "./sesion.js";
-import { comprarItem, equiparItem, misItems, ErrorDeServidor } from "./servidor.js";
+import { comprarItem, comprarPack, equiparItem, misItems, ErrorDeServidor } from "./servidor.js";
 import {
   TIPOS,
+  CAMPO_EQUIPADO,
   itemsDeTipo,
   imagenEsArchivo,
+  precioDePack,
+  MAXIMO_POR_PACK,
   COLECCION_CATALOGO,
 } from "./reglas/catalogo.js";
 
@@ -70,6 +73,17 @@ let tengo = new Set();
 let equipado = {};
 let saldo = 0;
 let categoriaActual = CATEGORIAS[0].tipo;
+
+/**
+ * Lo que el jugador está juntando para llevar de una.
+ *
+ * Vacío significa "modo normal": cada botón compra lo suyo. Con algo adentro,
+ * la tienda pasa a modo pack y los botones seleccionan en vez de comprar. Se
+ * modela con el propio conjunto y no con una bandera aparte porque una bandera
+ * y un conjunto pueden desincronizarse —"modo pack con nada seleccionado" es
+ * un estado que no significa nada y hay que dibujar igual.
+ */
+let enElPack = new Set();
 
 // ------------------------------------------------------------------ datos
 
@@ -118,6 +132,15 @@ function dibujarImagen(item) {
  */
 function dibujarBoton(item) {
   const puesto = equipado[item.tipo] === item.id;
+
+  // En modo pack, lo que no se tiene se agrega o se saca. Lo que ya es suyo
+  // sigue mostrando su estado: sacarle el botón de equipar mientras arma un
+  // pack sería castigarlo por estar comprando.
+  if (enElPack.size && !tengo.has(item.id) && !puesto) {
+    const adentro = enElPack.has(item.id);
+    return `<button class="accion ${adentro ? "" : "sobria"}" type="button"
+              data-pack="${escapar(item.id)}">${adentro ? "✓ En el pack" : "Agregar"}</button>`;
+  }
   if (puesto) {
     return `<button class="accion sobria" type="button" disabled>✓ Equipado</button>`;
   }
@@ -152,11 +175,55 @@ function dibujar() {
     ? items.map(dibujarItem).join("")
     : `<div class="vacio"><span class="icono">🎭</span>${escapar(categoria.vacio)}</div>`;
 
+  dibujarPack();
+
   for (const boton of document.querySelectorAll("#pestanasPersonalizacion [data-categoria]")) {
     const activa = boton.dataset.categoria === categoriaActual;
     boton.classList.toggle("activa", activa);
     boton.setAttribute("aria-selected", String(activa));
   }
+}
+
+/**
+ * La barra que dice cuánto sale el pack.
+ *
+ * El total se calcula con `precioDePack`, el MISMO módulo que usa el servidor
+ * para cobrar. Si se calculara acá aparte, el precio mostrado y el cobrado
+ * podrían diferir, y el que se equivoca siempre es el que se ve.
+ */
+function dibujarPack() {
+  const caja = $("resumenPack");
+  if (!caja) return;
+
+  if (!enElPack.size) {
+    caja.hidden = true;
+    return;
+  }
+
+  const elegidos = [...enElPack]
+    .map((id) => catalogo.find((i) => i.id === id))
+    .filter(Boolean);
+
+  const suma = elegidos.reduce((s, i) => s + Number(i.precio ?? 0), 0);
+  const total = precioDePack(suma, elegidos.length);
+  const ahorro = suma - total;
+  const alcanza = saldo >= total;
+
+  caja.hidden = false;
+  caja.innerHTML = `
+    <div class="cuenta-pack">
+      <b>${elegidos.length} de ${MAXIMO_POR_PACK}</b>
+      <span>${elegidos.map((i) => escapar(i.nombre)).join(", ")}</span>
+    </div>
+    <div class="total-pack">
+      ${ahorro ? `<s>${suma.toLocaleString("es-UY")}</s> ` : ""}
+      <b>${total.toLocaleString("es-UY")} Leyendas</b>
+      ${ahorro ? `<em>ahorrás ${ahorro.toLocaleString("es-UY")}</em>` : ""}
+    </div>
+    <button class="accion" type="button" id="btnLlevarPack" ${alcanza ? "" : "disabled"}>
+      ${alcanza ? "Llevar el pack" : "No alcanza"}
+    </button>
+    <button class="accion sobria" type="button" id="btnVaciarPack">Vaciar</button>`;
 }
 
 function avisar(texto, tipo = "info") {
@@ -203,6 +270,46 @@ async function comprar(itemId, boton) {
     }
     tengo.add(itemId);
     avisar("¡Comprado! Ya podés equiparlo.", "bien");
+    dibujar();
+  });
+}
+
+/** Agrega o saca del pack. Sin red: hasta que no se lleve, no pasa nada. */
+function alternarEnPack(itemId) {
+  if (enElPack.has(itemId)) enElPack.delete(itemId);
+  else if (enElPack.size >= MAXIMO_POR_PACK) {
+    avisar(`En un pack entran hasta ${MAXIMO_POR_PACK}. Sacá uno para agregar otro.`, "error");
+    return;
+  } else enElPack.add(itemId);
+  dibujar();
+}
+
+async function llevarPack(boton) {
+  const ids = [...enElPack];
+  await conBotonApagado(boton, async () => {
+    const r = await comprarPack(ids);
+
+    if (typeof r.saldo === "number") {
+      saldo = r.saldo;
+      mostrarSaldo(saldo);
+    }
+    // El servidor equipa el primero de cada tipo y devuelve qué CAMPO del
+    // perfil tocó. Se traduce campo → tipo con `CAMPO_EQUIPADO` en vez de
+    // asumir que se llaman igual: hoy coinciden, y el día que dejen de
+    // coincidir esto fallaría en silencio, mostrando "Equipar" sobre algo que
+    // el jugador ya tiene puesto.
+    for (const c of r.comprados) {
+      tengo.add(c.id);
+      if ((r.equipado ?? {})[CAMPO_EQUIPADO[c.tipo]] === c.id) equipado[c.tipo] = c.id;
+    }
+    enElPack = new Set();
+
+    avisar(
+      r.ahorro
+        ? `¡Listo! ${r.comprados.length} artículos por ${r.total.toLocaleString("es-UY")} Leyendas: ahorraste ${r.ahorro.toLocaleString("es-UY")}.`
+        : `¡Comprado! Ya podés equiparlo.`,
+      "bien",
+    );
     dibujar();
   });
 }
@@ -267,5 +374,34 @@ export async function montarPersonalizacion({ saldoInicial = 0 } = {}) {
     if (!boton) return;
     if (boton.dataset.comprar) comprar(boton.dataset.comprar, boton);
     else if (boton.dataset.equipar) equipar(boton.dataset.equipar, boton);
+    else if (boton.dataset.pack) alternarEnPack(boton.dataset.pack);
+  });
+
+  // El resumen del pack vive fuera de la rejilla —no se repinta con ella— así
+  // que lleva su propio escuchador delegado.
+  $("resumenPack")?.addEventListener("click", (evento) => {
+    if (evento.target.closest("#btnLlevarPack")) {
+      llevarPack(evento.target.closest("#btnLlevarPack"));
+    } else if (evento.target.closest("#btnVaciarPack")) {
+      enElPack = new Set();
+      dibujar();
+    }
+  });
+
+  $("btnArmarPack")?.addEventListener("click", () => {
+    if (enElPack.size) enElPack = new Set();
+    else {
+      // Se arranca con el primero que pueda comprar: un modo pack vacío no se
+      // distingue del modo normal y el botón parecería no hacer nada.
+      const primero = itemsDeTipo(catalogo, categoriaActual).find(
+        (i) => !tengo.has(i.id) && Number(i.precio ?? 0) > 0,
+      );
+      if (!primero) {
+        avisar("No queda nada para llevar en un pack en esta pestaña.", "error");
+        return;
+      }
+      enElPack.add(primero.id);
+    }
+    dibujar();
   });
 }

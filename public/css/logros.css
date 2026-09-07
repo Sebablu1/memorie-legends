@@ -109,6 +109,18 @@
 .logro .accion {
   width: 100%;
   margin-top: 2px;
+  /* El relleno lateral y el tamaño bajan respecto del botón común. En un
+     teléfono la tarjeta mide 132px y «Ponérmela» necesitaba 128 de texto: el
+     botón la recortaba a la mitad de la última sílaba. Con esto entra, y
+     entra también «Sacármela», que es la más larga. */
+  padding-left: 6px;
+  padding-right: 6px;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  /* Al achicar la letra el botón quedaba en 43px de alto. 44 es el objetivo
+     táctil por debajo del cual el dedo empieza a fallar, y no vale la pena
+     ahorrar un pixel en un botón que se toca. */
+  min-height: 44px;
 }
 
 /* La cinta de "En uso" se reusa de la tienda; el panel no carga esa hoja, así
@@ -141,4 +153,54 @@
   .logro {
     padding: 13px 9px 12px;
   }
+}
+
+/* ------------------------------------------------ cartelera de torneos
+ *
+ * Vive en esta hoja y no en una propia porque son quince reglas y las dos
+ * secciones aparecen juntas en el mismo panel. Una hoja más sería un pedido
+ * más en la carga de la página para eso.
+ */
+
+.fila-torneo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--borde-suave);
+}
+
+.fila-torneo + .fila-torneo {
+  margin-top: 8px;
+}
+
+.datos-torneo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* `min-width: 0` para que un nombre largo se corte en vez de empujar al
+     botón fuera de la fila. Sin esto, en un teléfono el botón se sale. */
+  min-width: 0;
+  flex: 1 1 200px;
+}
+
+.datos-torneo b {
+  color: var(--texto);
+  font-size: 0.95rem;
+}
+
+.datos-torneo span {
+  font-size: 0.78rem;
+  color: var(--texto-tenue);
+}
+
+.fila-torneo .accion {
+  flex: 0 0 auto;
+  /* 44px de alto mínimo: es el objetivo táctil por debajo del cual el dedo
+     falla, y este botón cobra Leyendas. */
+  min-height: 44px;
 }

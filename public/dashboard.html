@@ -285,6 +285,19 @@
         <p class="vacio-simple" id="salasVacias">Buscando salas…</p>
       </section>
 
+      <!-- Torneos abiertos. Sólo aparece si hay alguno: una sección que dice
+           "no hay torneos" ocupa el mismo lugar que uno de verdad y enseña a
+           no mirarla. Los crea el administrador a mano; no hay automáticos. -->
+      <section class="panel panel-torneos" id="carteleraTorneos" style="margin-top: 22px" hidden>
+        <h2>🏆 Torneos abiertos</h2>
+        <p class="nota-salas">
+          Se paga la entrada al anotarse. Si no se llega a cuatro jugadores, el
+          torneo se cancela y se devuelve todo.
+        </p>
+        <p class="aviso-tienda" id="avisoTorneosJugador" role="status" aria-live="polite"></p>
+        <div id="listaTorneosJugador"></div>
+      </section>
+
       <section class="rejilla" style="margin-top: 22px">
         <a class="tarjeta-accion ranking" href="ranking.html">
           <span class="icono">🏆</span>

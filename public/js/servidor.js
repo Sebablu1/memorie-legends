@@ -168,3 +168,20 @@ export const comprarPack = (itemIds) => llamar("comprarPack", { itemIds });
  * @returns {Promise<{estadisticas: object, tengo: string[], equipada: string|null}>}
  */
 export const misInsignias = () => llamar("misInsignias");
+
+/**
+ * Los torneos con inscripciones abiertas.
+ * @returns {Promise<{torneos: Array<{id: string, nombre: string, entrada: number, inscriptos: number}>}>}
+ */
+export const listarTorneos = () => llamar("listarTorneos");
+
+/**
+ * Se anota y paga la entrada.
+ *
+ * Viaja el id del torneo y nada más: cuánto cuesta lo lee el servidor del
+ * propio torneo, dentro de la transacción que cobra. Si el monto saliera de
+ * acá, la entrada de 20.000 costaría 5.
+ *
+ * @returns {Promise<{id: string, entrada: number, saldo: number, inscriptos: number}>}
+ */
+export const inscribirseATorneo = (torneoId) => llamar("inscribirseATorneo", { torneoId });

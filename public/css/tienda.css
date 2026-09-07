@@ -183,3 +183,96 @@
   .figura-item.glifo { font-size: 2.4rem; }
   .item-tienda { padding: 14px 10px 12px; }
 }
+
+/* ---------------------------------------------------------- packs
+ *
+ * Llevar dos o tres avatares de una descuenta 15% y 25%. La barra aparece sólo
+ * cuando hay algo seleccionado: vacía diría "0 artículos, 0 Leyendas", que
+ * ocupa el mismo lugar sin decir nada.
+ */
+
+.acciones-tienda {
+  display: flex;
+  justify-content: flex-end;
+  margin: 10px 0 4px;
+}
+
+.acciones-tienda .accion {
+  font-size: 0.76rem;
+  padding: 9px 14px;
+  min-height: 44px;
+}
+
+/* El `[hidden]` va explícito porque `display: flex` lo pisa: la regla del
+   navegador —`[hidden] { display: none }`— tiene la misma especificidad que
+   esta clase, y en un empate gana la hoja del autor. Sin esto, `hidden = true`
+   no esconde nada y la barra del pack queda visible y vacía. Esta hoja ya
+   tropezó con lo mismo siete veces en otros archivos. */
+.resumen-pack[hidden] {
+  display: none;
+}
+
+.resumen-pack {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 10px 0 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(212, 168, 67, 0.07);
+  border: 1px solid rgba(212, 168, 67, 0.35);
+}
+
+.cuenta-pack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* Que el nombre largo se corte en vez de empujar el total y los botones
+     fuera de la caja. */
+  min-width: 0;
+  flex: 1 1 180px;
+}
+
+.cuenta-pack b {
+  color: var(--oro, #d4a843);
+  font-size: 0.85rem;
+}
+
+.cuenta-pack span {
+  font-size: 0.76rem;
+  color: var(--texto-tenue);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.total-pack {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.total-pack s {
+  color: var(--texto-tenue);
+  font-size: 0.8rem;
+}
+
+.total-pack b {
+  color: var(--texto);
+  font-size: 1.02rem;
+}
+
+.total-pack em {
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #7bd88f;
+}
+
+.resumen-pack .accion {
+  flex: 0 0 auto;
+  min-height: 44px;
+  font-size: 0.76rem;
+}

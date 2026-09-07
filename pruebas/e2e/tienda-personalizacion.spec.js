@@ -116,10 +116,31 @@ const servidorFalso = (saldoInicial) => `
     tengo.push(itemId);
     return { itemId, tipo: "avatar", precio, saldo };
   }
+  export async function comprarPack(itemIds) {
+    window.__llamadas.push(["comprarPack", itemIds]);
+    await new Promise((r) => setTimeout(r, 120));
+    const precios = { "avatar-zorro": 800, "avatar-dragon": 2500, "avatar-rey": 0 };
+    const nuevos = itemIds.filter((id) => !tengo.includes(id));
+    const suma = nuevos.reduce((s, id) => s + (precios[id] ?? 0), 0);
+    const descuento = { 1: 0, 2: 0.15, 3: 0.25 }[nuevos.length] ?? 0;
+    const total = Math.floor(suma * (1 - descuento));
+    saldo -= total;
+    for (const id of nuevos) tengo.push(id);
+    return {
+      comprados: nuevos.map((id) => ({ id, tipo: "avatar", precio: precios[id] ?? 0 })),
+      yaTenia: itemIds.filter((id) => !nuevos.includes(id)),
+      total, sinDescuento: suma, descuento, ahorro: suma - total,
+      equipado: {}, saldo,
+    };
+  }
   export async function equiparItem(itemId) {
     window.__llamadas.push(["equiparItem", itemId]);
     return { itemId, tipo: "avatar", campo: "avatar" };
   }
+  export const desequiparItem = async (tipo) => ({ tipo, equipado: null });
+  export const misInsignias = async () => ({ estadisticas: {}, tengo: [], equipada: null });
+  export const listarTorneos = async () => ({ torneos: [] });
+  export const inscribirseATorneo = async () => ({});
   export const crearSala = async () => ({}); export const unirseASala = async () => ({});
   export const marcarListo = async () => ({}); export const iniciarPartida = async () => ({});
   export const salirDeSalaEnEspera = async () => ({}); export const abandonarPartida = async () => ({});
@@ -208,6 +229,74 @@ test("las insignias no se ofrecen en la tienda", async ({ page }) => {
   // se ofrezca, que es lo que ve el jugador.
   await expect(page.locator('#pestanasPersonalizacion [data-categoria="insignia"]')).toHaveCount(0);
   await expect(page.locator("#rejillaPersonalizacion")).not.toContainText("Corona de Laurel");
+});
+
+
+// =====================================================================
+// Packs: llevar dos o tres de una
+// =====================================================================
+
+test("el pack descuenta, y el total que se ve es el que se cobra", async ({ page }) => {
+  await abrirTienda(page, { saldo: 5000 });
+
+  await page.locator("#btnArmarPack").click();
+  await expect(page.locator("#resumenPack")).toBeVisible();
+
+  // El primero lo agrega solo: un modo pack vacío no se distingue del normal y
+  // el botón parecería no hacer nada.
+  await expect(page.locator("#resumenPack")).toContainText("1 de 3");
+
+  await ficha(page, "El Dragón").locator("button").click();
+
+  // 800 + 2500 = 3300, menos 15% = 2805. Escrito acá a mano a propósito: si se
+  // calculara con la misma función que usa la página, la prueba diría "la
+  // página coincide consigo misma".
+  await expect(page.locator("#resumenPack")).toContainText("2.805");
+  await expect(page.locator("#resumenPack")).toContainText("ahorrás 495");
+
+  await page.locator("#btnLlevarPack").click();
+  await expect(page.locator("#avisoPersonalizacion")).toContainText("ahorraste 495");
+
+  const llamada = await page.evaluate(() => window.__llamadas.find(([n]) => n === "comprarPack"));
+  expect(llamada[1].sort(), "viajaron los ids y nada más").toEqual(["avatar-dragon", "avatar-zorro"]);
+
+  // Y el saldo que se muestra es el que devolvió el servidor. Sin separador de
+  // miles porque el `sesion.js` de mentira no formatea; lo que importa acá es
+  // el número, no cómo lo escribe el módulo que esta prueba sustituye.
+  await expect(page.locator("#saldo")).toContainText("2195");
+});
+
+test("no entran más de tres en un pack", async ({ page }) => {
+  await abrirTienda(page, {
+    saldo: 50000,
+    catalogo: [
+      { id: "a1", tipo: "avatar", nombre: "Uno", descripcion: "", precio: 100, imagen: "1️⃣", activo: true, orden: 1 },
+      { id: "a2", tipo: "avatar", nombre: "Dos", descripcion: "", precio: 100, imagen: "2️⃣", activo: true, orden: 2 },
+      { id: "a3", tipo: "avatar", nombre: "Tres", descripcion: "", precio: 100, imagen: "3️⃣", activo: true, orden: 3 },
+      { id: "a4", tipo: "avatar", nombre: "Cuatro", descripcion: "", precio: 100, imagen: "4️⃣", activo: true, orden: 4 },
+    ],
+  });
+
+  await page.locator("#btnArmarPack").click();
+  for (const nombre of ["Dos", "Tres"]) await ficha(page, nombre).locator("button").click();
+  await expect(page.locator("#resumenPack")).toContainText("3 de 3");
+
+  await ficha(page, "Cuatro").locator("button").click();
+  await expect(page.locator("#avisoPersonalizacion")).toContainText("hasta 3");
+  await expect(page.locator("#resumenPack"), "y sigue habiendo tres").toContainText("3 de 3");
+});
+
+test("vaciar el pack devuelve la tienda a comprar de a uno", async ({ page }) => {
+  await abrirTienda(page, { saldo: 5000 });
+
+  await page.locator("#btnArmarPack").click();
+  await expect(page.locator("#resumenPack")).toBeVisible();
+
+  await page.locator("#btnVaciarPack").click();
+  await expect(page.locator("#resumenPack")).toBeHidden();
+
+  // Y los botones vuelven a comprar, no a seleccionar.
+  await expect(ficha(page, "El Zorro").locator("button")).toContainText(/comprar/i);
 });
 
 // =====================================================================

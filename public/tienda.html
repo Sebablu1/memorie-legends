@@ -89,6 +89,16 @@
 
         <div class="pestanas-tienda" id="pestanasPersonalizacion" role="tablist"></div>
 
+        <!-- Llevar de a varios sale más barato: 15% por dos, 25% por tres. El
+             descuento lo calcula y lo cobra el servidor sobre los artículos
+             NUEVOS; acá sólo se junta la selección. -->
+        <div class="acciones-tienda">
+          <button class="accion sobria" type="button" id="btnArmarPack">
+            Llevar varios (−15% por 2, −25% por 3)
+          </button>
+        </div>
+        <div class="resumen-pack" id="resumenPack" hidden></div>
+
         <!-- `role="status"` y `aria-live`: el resultado de una compra tiene que
              llegarle también a quien no ve la pantalla. -->
         <p class="aviso-tienda" id="avisoPersonalizacion" role="status" aria-live="polite"></p>
