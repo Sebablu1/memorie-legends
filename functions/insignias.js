@@ -37,14 +37,30 @@ import {
 export function crearInsignias({ db, usuarios = "users", items = "items", tienda, logger }) {
   const refPerfil = (uid) => db.collection(usuarios).doc(uid);
 
-  /** Las estadísticas del perfil, completadas con ceros donde falten. */
+  /**
+   * Las estadísticas del perfil, en el idioma que hablan las condiciones.
+   *
+   * Esto es un traductor, y hace falta porque el perfil tiene dos vocabularios
+   * y ninguno de los dos se puede tirar:
+   *
+   *   `gamesPlayed` y `wins` son de siempre. Los crea el registro, los muestra
+   *   el panel del jugador y los lee el de administración. Renombrarlos obliga
+   *   a migrar todos los perfiles que ya existen.
+   *
+   *   `partidasJugadas` y `partidasGanadas` son los nombres con los que
+   *   `reglas/insignias.js` y `reglas/ranking.js` escriben sus condiciones, y
+   *   son los que se leen bien al lado de «Ganar 50 partidas».
+   *
+   * La traducción vive acá, en el borde, y no en las reglas: las reglas puras
+   * no tienen por qué saber cómo se llamaba un campo en 2024.
+   */
   async function estadisticasDe(uid) {
     const snap = await refPerfil(uid).get();
     const d = snap.exists ? snap.data() : {};
     return {
       ...ESTADISTICAS_VACIAS,
-      partidasJugadas: Number(d.partidasJugadas ?? 0),
-      partidasGanadas: Number(d.partidasGanadas ?? 0),
+      partidasJugadas: Number(d.gamesPlayed ?? 0),
+      partidasGanadas: Number(d.wins ?? 0),
       torneosGanados: Number(d.torneosGanados ?? 0),
       mejorPuestoMensual:
         typeof d.mejorPuestoMensual === "number" ? d.mejorPuestoMensual : null,

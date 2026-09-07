@@ -195,6 +195,27 @@ service cloud.firestore {
       }
     }
 
+    // El guardián que impide puntuar dos veces la misma partida. Lo escribe el
+    // servidor dentro de la transacción que suma los puntos. NI LEER: guarda el
+    // ganador y el puntaje de cada uno, que es información de la mesa, y no le
+    // sirve a nadie desde el navegador.
+    match /partidasPuntuadas/{codigo} {
+      allow read, write: if false;
+    }
+
+    // La raya de victorias en curso. La escribe el servidor al puntuar una
+    // partida; se puede leer porque es el dato con el que se muestra "llevás 3
+    // seguidas", y no revela nada de ninguna mesa.
+    match /jugadores/{uid} {
+      allow read: if autenticado();
+      allow write: if false;
+
+      match /{documento=**} {
+        allow read: if autenticado();
+        allow write: if false;
+      }
+    }
+
     // Ranking de campeonato: lo escribe el servidor al finalizar un torneo.
     // Se lee porque es una tabla pública; escribirlo desde el navegador sería
     // escribirse los puntos que uno quiera.

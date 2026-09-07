@@ -165,7 +165,7 @@ export function crearCierre({
    * nada, así que puede ser lo primero que se llame acá sin romper la regla
    * de Firestore, siempre que quien invoque esto no haya escrito todavía.
    */
-  async function aplicar(tx, { codigo, refPartida, refSala, partida, plan, cerradaPor }) {
+  async function aplicar(tx, { codigo, refPartida, refSala, partida, sala, plan, cerradaPor }) {
     const resultados = plan.pagos.length
       ? await moverLeyendas.varias(
           tx,
@@ -216,10 +216,24 @@ export function crearCierre({
 
     // ---- las estadísticas de por vida ----
     //
-    // Acá y no en el navegador. `partidasJugadas` y `partidasGanadas` son lo
-    // que decide una insignia, así que si las escribiera el cliente, las
-    // insignias las decidiría el cliente. Es el mismo argumento que ya obligó
-    // a que el ganador lo determine el servidor y no llegue en la llamada.
+    // Acá y no en el navegador. Estos dos números deciden una insignia, así
+    // que si los escribiera el cliente, las insignias las decidiría el
+    // cliente. Es el mismo argumento que ya obligó a que el ganador lo
+    // determine el servidor y no llegue en la llamada.
+    //
+    // ─────────────────────────────────────────────────────────────────────
+    // POR QUÉ SE LLAMAN `gamesPlayed` Y `wins`, EN INGLÉS
+    // ─────────────────────────────────────────────────────────────────────
+    //
+    // Porque ya existían. Los crea el registro en cero, los lee el panel del
+    // jugador —«Partidas jugadas» y «Victorias»— y los lee el panel de
+    // administración. Lo único que les faltaba era quien los sumara.
+    //
+    // Escribir dos campos nuevos en castellano al lado dejaría dos contadores
+    // de lo mismo: uno que crece y otro que sigue en cero, que es justamente
+    // el que el jugador ve en pantalla. Renombrarlos obliga a migrar todos los
+    // perfiles que ya existen para no perderle la cuenta a nadie. Se suman los
+    // que hay, y `insignias.js` traduce los nombres en su borde.
     //
     // Se cuenta a los humanos que no abandonaron: la IA no tiene perfil, y
     // quien se fue a mitad de partida no jugó una partida entera. El ganador
@@ -231,17 +245,32 @@ export function crearCierre({
         tx.set(
           db.collection(usuarios).doc(jugador.id),
           {
-            partidasJugadas: incremento(1),
-            partidasGanadas: incremento(jugador.puestoPagado === 1 ? 1 : 0),
+            gamesPlayed: incremento(1),
+            wins: incremento(jugador.puestoPagado === 1 ? 1 : 0),
           },
           { merge: true },
         );
       }
     }
 
-    // `jugadores` sale para arriba porque quien llame tiene que revisar las
-    // insignias DESPUÉS de que esta transacción termine.
-    return { cierre, refPartida, jugadores: elegibles.map((j) => j.id) };
+    // Todo esto sale para arriba porque hay dos cosas que tienen que pasar
+    // DESPUÉS de que esta transacción termine, y las dos necesitan leer: las
+    // insignias leen los contadores recién escritos, y el ranking lee la fila
+    // previa de cada jugador en los tres períodos.
+    return {
+      cierre,
+      refPartida,
+      jugadores: elegibles.map((j) => j.id),
+      // Lo que hace falta para puntuar. `entrada` y no `pozo`: el multiplicador
+      // del ranking va por lo que apostó cada uno, no por lo que juntaron entre
+      // todos.
+      puntuable: {
+        codigo,
+        estado: partida.estado,
+        entrada: Number(sala?.entrada ?? 0),
+        abandonaron: plan.abandonaron ?? [],
+      },
+    };
   }
 
   // ------------------------------------------------------- la callable
@@ -266,7 +295,11 @@ export function crearCierre({
       const plan = planificar(datos);
       if (plan.yaEstaba) return { yaEstaba: true, ...(plan.cierre ?? {}) };
 
-      const { cierre, jugadores } = await aplicar(tx, { ...datos, plan, cerradaPor: uid });
+      const { cierre, jugadores, puntuable } = await aplicar(tx, {
+        ...datos,
+        plan,
+        cerradaPor: uid,
+      });
 
       // La partida queda marcada como cerrada, sin tocar su estado de juego:
       // sigue sirviendo para mostrar el resultado y para auditar.
@@ -277,7 +310,7 @@ export function crearCierre({
         version: datos.partida.version + 1,
       });
 
-      return { yaEstaba: false, jugadores, ...cierre };
+      return { yaEstaba: false, jugadores, puntuable, ...cierre };
     });
   }
 

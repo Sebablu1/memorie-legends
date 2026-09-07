@@ -63,8 +63,18 @@ function crearFirestore(inicial = {}) {
         if ([...leidas].some(([r, v]) => (docs.get(r)?.version ?? 0) !== v)) continue;
         for (const e of esc) {
           const p = docs.get(e.ruta);
+          const base = e.m ? { ...(p?.datos ?? {}) } : {};
+          // Los incrementos se resuelven contra lo que había, igual que
+          // `FieldValue.increment`. Sin esto, dos cierres seguidos dejarían el
+          // contador en 1 y la prueba de acumulación no probaría nada.
+          const escrito = {};
+          for (const [k, v] of Object.entries(structuredClone(e.datos))) {
+            escrito[k] = v && typeof v === "object" && typeof v.__inc === "number"
+              ? Number(base[k] ?? 0) + v.__inc
+              : v;
+          }
           docs.set(e.ruta, {
-            datos: e.m ? { ...(p?.datos ?? {}), ...structuredClone(e.datos) } : structuredClone(e.datos),
+            datos: e.m ? { ...base, ...escrito } : escrito,
             version: ++version,
           });
         }
@@ -141,6 +151,10 @@ function montar({ orden = CUATRO, abandonaron = [], pozo = POZO, entrada = ENTRA
   const { cerrarPartida } = crearCierre({
     db, salas: "rooms", partidas: "partidas", moverLeyendas,
     motivo: "premio_partida", marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
+    usuarios: "users",
+    // El mismo `FieldValue.increment` que en producción, de mentira. Se inyecta
+    // para poder montar el cierre sin un Firestore de verdad.
+    incremento: (n) => ({ __inc: n }),
   });
   return { db, cerrar: cerrarPartida, moverLeyendas };
 }
@@ -511,6 +525,54 @@ console.log("\n=== 10. Un cierre no lee después de escribir ===");
   })(sala(db).cierre, "cierre");
   ok(malos.length === 0, "el registro del cierre es JSON puro", malos);
   ok(sala(db).cierre.posiciones.length === 4, "y guarda las cuatro posiciones");
+}
+
+// ==================================================================== N
+
+console.log("\n=== Contadores de por vida: gamesPlayed y wins ===");
+{
+  /**
+   * Los dos números que deciden una insignia.
+   *
+   * Se escriben acá, en el servidor, y no en el navegador: si los escribiera el
+   * cliente, las insignias las decidiría el cliente. Y se llaman en inglés
+   * porque ya existían —los crea el registro y los muestra el panel del
+   * jugador—; escribir dos campos nuevos en castellano al lado dejaría un
+   * contador que crece y otro que el jugador ve en cero para siempre.
+   */
+  const { db, cerrar } = montar({ orden: ["ana", "beto", "caro", "dani"] });
+  await cerrar({ uid: "ana", codigo: CODIGO });
+
+  ok(db.leer("users/ana").gamesPlayed === 1, "el ganador suma una partida", db.leer("users/ana").gamesPlayed);
+  ok(db.leer("users/ana").wins === 1, "y una victoria", db.leer("users/ana").wins);
+
+  for (const uid of ["beto", "caro", "dani"]) {
+    ok(db.leer(`users/${uid}`).gamesPlayed === 1, `  ${uid} suma la partida`, db.leer(`users/${uid}`).gamesPlayed);
+    ok(db.leer(`users/${uid}`).wins === 0, `  y ninguna victoria`, db.leer(`users/${uid}`).wins);
+  }
+}
+
+{
+  // Quien abandonó no jugó una partida entera: ya quedó fuera del reparto del
+  // pozo, y tampoco suma acá.
+  const { db, cerrar } = montar({ orden: ["ana", "beto", "caro", "dani"], abandonaron: ["dani"] });
+  await cerrar({ uid: "ana", codigo: CODIGO });
+
+  ok(db.leer("users/ana").gamesPlayed === 1, "los que se quedaron suman");
+  ok(db.leer("users/dani").gamesPlayed === undefined, "y el que abandonó no", db.leer("users/dani").gamesPlayed);
+}
+
+{
+  // Dos partidas acumulan. Ésta es la que prueba que el incremento es un
+  // incremento y no una asignación disfrazada.
+  const { db, cerrar } = montar({ orden: ["ana", "beto", "caro", "dani"] });
+  await cerrar({ uid: "ana", codigo: CODIGO });
+  db.leer(`rooms/${CODIGO}`).estado = ESTADOS_SALA.JUGANDO;
+  delete db.leer(`rooms/${CODIGO}`).cierre;
+  await cerrar({ uid: "ana", codigo: CODIGO });
+
+  ok(db.leer("users/ana").gamesPlayed === 2, "dos cierres, dos partidas", db.leer("users/ana").gamesPlayed);
+  ok(db.leer("users/ana").wins === 2, "y dos victorias", db.leer("users/ana").wins);
 }
 
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);

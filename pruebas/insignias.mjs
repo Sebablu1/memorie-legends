@@ -275,14 +275,14 @@ function montar(perfil = {}) {
 }
 
 {
-  const { db, insignias } = montar({ partidasJugadas: 9, partidasGanadas: 4 });
+  const { db, insignias } = montar({ gamesPlayed: 9, wins: 4 });
   const otorgadas = await insignias.otorgarInsignias("ana");
   ok(otorgadas.length === 0, "con 9 partidas todavía no otorga nada", otorgadas);
   ok(!db._leer("users/ana/items/novato"), "y no anota nada");
 }
 
 {
-  const { db, insignias } = montar({ partidasJugadas: 10, partidasGanadas: 4 });
+  const { db, insignias } = montar({ gamesPlayed: 10, wins: 4 });
   const otorgadas = await insignias.otorgarInsignias("ana");
 
   ok(otorgadas.length === 1 && otorgadas[0] === "novato", "con 10 otorga novato", otorgadas);
@@ -297,7 +297,7 @@ function montar(perfil = {}) {
 }
 
 {
-  const { db, insignias } = montar({ partidasJugadas: 400, partidasGanadas: 250 });
+  const { db, insignias } = montar({ gamesPlayed: 400, wins: 250 });
   const otorgadas = await insignias.otorgarInsignias("ana");
 
   ok(otorgadas.length === 4, "un veterano recibe las cuatro de una", otorgadas);
@@ -308,7 +308,7 @@ function montar(perfil = {}) {
 }
 
 {
-  const { db, insignias } = montar({ partidasJugadas: 50, partidasGanadas: 20 });
+  const { db, insignias } = montar({ gamesPlayed: 50, wins: 20 });
 
   await insignias.registrarPuestoMensual("ana", 3);
   ok(db._leer("users/ana").mejorPuestoMensual === 3, "anota el puesto del mes");
@@ -321,7 +321,7 @@ function montar(perfil = {}) {
 
 {
   // Un catálogo vacío no puede tumbar el cierre de una partida que ya pagó.
-  const db = crearFirestore({ "users/ana": { partidasJugadas: 10 } });
+  const db = crearFirestore({ "users/ana": { gamesPlayed: 10 } });
   const tienda = crearTienda({
     db,
     moverLeyendas: async () => ({ aplicado: true, saldo: 0 }),
@@ -341,6 +341,38 @@ function montar(perfil = {}) {
   }
   ok(!reventó, "sin catálogo sembrado NO lanza");
   ok(otorgadas?.length === 0, "simplemente no otorga nada", otorgadas);
+}
+
+// =====================================================================
+console.log("\n=== 8. El perfil habla en inglés y las reglas en castellano ===");
+// =====================================================================
+
+{
+  /**
+   * El perfil guarda `gamesPlayed` y `wins`; las condiciones se escriben con
+   * `partidasJugadas` y `partidasGanadas`. `estadisticasDe` traduce.
+   *
+   * Esta prueba existe porque la traducción se puede romper en silencio: si
+   * alguien cambia el nombre de un lado, `estadisticasDe` devuelve ceros, las
+   * condiciones no se cumplen nunca y NADIE recibe una insignia. No falla
+   * nada, no hay excepción, no hay registro. Sólo dejan de otorgarse.
+   *
+   * Ya pasó una versión de esto: el cierre de partida escribía dos contadores
+   * nuevos en castellano mientras el panel del jugador seguía mostrando los de
+   * inglés, en cero.
+   */
+  const { insignias } = montar({ gamesPlayed: 42, wins: 17, torneosGanados: 3 });
+  const e = await insignias.estadisticasDe("ana");
+
+  ok(e.partidasJugadas === 42, "`gamesPlayed` llega como partidasJugadas", e.partidasJugadas);
+  ok(e.partidasGanadas === 17, "`wins` llega como partidasGanadas", e.partidasGanadas);
+  ok(e.torneosGanados === 3, "y los torneos, que ya estaban en castellano", e.torneosGanados);
+  ok(e.mejorPuestoMensual === null, "sin puesto, null y no cero");
+
+  // Un perfil recién creado tiene los dos campos en cero, no ausentes.
+  const nuevo = montar({ gamesPlayed: 0, wins: 0 });
+  const cero = await nuevo.insignias.estadisticasDe("ana");
+  ok(cero.partidasJugadas === 0 && cero.partidasGanadas === 0, "un perfil nuevo da ceros");
 }
 
 console.log(fallos ? `\n❌ ${fallos} fallos` : "\n✅ TODO OK");

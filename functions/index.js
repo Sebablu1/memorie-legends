@@ -52,6 +52,7 @@ import { crearLimiteDeRitmo } from "./limite-de-ritmo.js";
 import { crearTienda } from "./tienda.js";
 import { crearInsignias } from "./insignias.js";
 import { crearTorneos } from "./torneos.js";
+import { crearRankingDePartidas } from "./ranking.js";
 import { premioFisicoDe, umbralesValidos } from "./reglas/configuracion.js";
 import {
   validar,
@@ -818,6 +819,33 @@ const cierre = crearCierre({
 const insignias = crearInsignias({ db, usuarios: USUARIOS, tienda, logger });
 
 /**
+ * El ranking por puntos.
+ *
+ * Escribe desde el servidor. Lo hacía el navegador —o lo habría hecho, si
+ * alguien lo hubiera llamado— y su propio comentario ya advertía que eso no
+ * sirve para una tabla atada a un premio: con la consola abierta, cualquiera
+ * se escribía los puntos que quisiera.
+ */
+const rankingDePartidas = crearRankingDePartidas({ db, marcaDeTiempo, logger, zona: ZONA });
+
+/**
+ * Lo que pasa DESPUÉS de cerrar una partida, fuera de la transacción.
+ *
+ * Las dos cosas necesitan leer algo que el cierre acaba de escribir —los
+ * contadores, y la fila previa de cada jugador en las tres tablas— y Firestore
+ * no deja leer después de escribir. Las dos son idempotentes, así que si esto
+ * se corta a la mitad, reintentar termina el trabajo sin duplicarlo.
+ *
+ * Ninguna puede tumbar el cierre: los premios ya se pagaron y la sala ya se
+ * cerró. Un ranking sin escribir se arregla; una partida que no cierra, no.
+ */
+async function despuesDelCierre(r) {
+  if (!r || r.yaEstaba) return;
+  if (r.puntuable) await rankingDePartidas.registrarPartidaSinRomper(r.puntuable);
+  await insignias.otorgarAVarios(r.jugadores ?? []);
+}
+
+/**
  * Baraja con azar criptográfico, sin sesgo.
  *
  * Fisher-Yates y `randomInt`, no `sort(() => Math.random() - 0.5)`. Ese truco
@@ -966,11 +994,7 @@ export const inscribirseATorneo = functions.https.onCall(async (data, context) =
 export const cerrarPartida = functions.https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "cerrarPartida");
   const r = await cierre.cerrarPartida({ uid, codigo: data?.codigo });
-  // Fuera de la transacción, a propósito: revisar una insignia es LEER los
-  // contadores que el cierre acaba de escribir, y adentro no se puede leer
-  // después de escribir. Es idempotente, así que si esto falla, la próxima
-  // partida otorga lo que faltó.
-  if (!r.yaEstaba) await insignias.otorgarAVarios(r.jugadores ?? []);
+  await despuesDelCierre(r);
   return r;
 });
 
@@ -1053,13 +1077,9 @@ export const cerrarVentanaDescarte = functions.https.onCall(async (data, context
 export const avanzarPartida = functions.https.onCall(async (data, context) => {
   exigirSesion(context, "avanzarPartida");
   const r = await enRed.avanzarPartida({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
-  // Éste es el camino NORMAL de cierre —lo dispara el vencimiento del plazo,
-  // no un jugador—, así que las insignias tienen que revisarse acá también.
-  // Fuera de la transacción y por lo mismo de siempre: hay que leer contadores
-  // recién escritos.
-  if (r?.hizo === "cerrarPartida" && !r.yaEstaba) {
-    await insignias.otorgarAVarios(r.jugadores ?? []);
-  }
+  // Éste es el camino NORMAL de cierre: lo dispara el vencimiento del plazo, no
+  // un jugador. Tiene que hacer lo mismo que el cierre pedido a mano.
+  if (r?.hizo === "cerrarPartida") await despuesDelCierre(r);
   return r;
 });
 
