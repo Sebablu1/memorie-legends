@@ -134,3 +134,37 @@ export const equiparItem = (itemId) => llamar("equiparItem", { itemId });
  * @returns {Promise<{tengo: Array<{id: string, tipo: string}>, equipado: object}>}
  */
 export const misItems = () => llamar("misItems");
+
+/**
+ * Se saca lo que lleva puesto de un tipo.
+ *
+ * `equiparItem` no alcanza para esto: el perfil guarda UN id por tipo, así que
+ * ponerse otro pisa el anterior, pero "ninguno" no es un artículo que se pueda
+ * elegir. Quien quiere jugar sin insignia no tenía forma de decirlo.
+ *
+ * @returns {Promise<{tipo: string, campo: string, equipado: null}>}
+ */
+export const desequiparItem = (tipo) => llamar("desequiparItem", { tipo });
+
+/**
+ * De 2 a 3 avatares de una, con descuento por cantidad.
+ *
+ * Viajan sólo los ids. El descuento lo calcula el servidor y sólo sobre lo que
+ * el jugador todavía no tiene: si acá se mandara el total, meter en el pack
+ * algo ya comprado abarataría el resto.
+ *
+ * @returns {Promise<{comprados: Array, total: number, ahorro: number, saldo: number|null}>}
+ */
+export const comprarPack = (itemIds) => llamar("comprarPack", { itemIds });
+
+/**
+ * Las insignias: las que tiene, la que lleva puesta y sus estadísticas.
+ *
+ * Las estadísticas vienen del servidor y no se leen del perfil desde acá
+ * porque son las mismas con las que el servidor decide otorgar. Leerlas de dos
+ * fuentes distintas es cómo una barra de progreso llega al final sin que
+ * llegue la insignia.
+ *
+ * @returns {Promise<{estadisticas: object, tengo: string[], equipada: string|null}>}
+ */
+export const misInsignias = () => llamar("misInsignias");

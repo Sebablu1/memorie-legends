@@ -24,7 +24,7 @@ const ANCHOS = [430, 412, 393, 375, 360, 344, 320];
 const SESION_FALSA = `
   export const COLECCION="users"; export const CAMPO_SALDO="credits";
   export async function exigirSesion(){return{usuario:{uid:"u1",photoURL:null},
-    perfil:{uid:"u1",nombre:"Probador",saldo:500,partidas:0,victorias:0,ultimoBono:0}};}
+    perfil:{uid:"u1",nombre:"Probador",saldo:500,partidas:0,victorias:0}};}
   export function mostrarSaldo(){} export function conectarBotonSalir(){}
   export function formatearEspera(){return "listo";}`;
 

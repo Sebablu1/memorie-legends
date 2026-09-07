@@ -42,7 +42,11 @@ const CATALOGO = [
   // Desactivado: no tiene que aparecer en la tienda aunque esté en la colección.
   { id: "avatar-oculto", tipo: "avatar", nombre: "Secreto", descripcion: "", precio: 10, imagen: "🕵️", activo: false, orden: 40 },
   // De otro tipo: sólo tiene que verse en su propia pestaña.
+  // La insignia sigue en el catálogo de mentira A PROPÓSITO: la tienda tiene
+  // que ignorarla aunque el servidor se la mande, que es lo que pasa de
+  // verdad —el catálogo de Firestore las tiene, porque el perfil las muestra.
   { id: "insignia-corona", tipo: "insignia", nombre: "Corona de Laurel", descripcion: "La del que manda.", precio: 1800, imagen: "🏆", activo: true, orden: 10 },
+  { id: "dorso-prueba", tipo: "dorso", nombre: "Dorso de prueba", descripcion: "El de atrás.", precio: 80, imagen: "🂠", activo: true, orden: 10 },
 ];
 
 const firebaseFalso = (catalogo) => `
@@ -74,7 +78,7 @@ const sesionFalsa = (saldo) => `
   export const COLECCION = "users"; export const CAMPO_SALDO = "credits";
   export async function exigirSesion() {
     return { usuario: { uid: "u1", photoURL: null },
-             perfil: { uid: "u1", nombre: "Probador", saldo: ${saldo}, partidas: 0, victorias: 0, ultimoBono: 0 } };
+             perfil: { uid: "u1", nombre: "Probador", saldo: ${saldo}, partidas: 0, victorias: 0 } };
   }
   export async function leerPerfil() { return { saldo: ${saldo} }; }
   export function mostrarSaldo(n) {
@@ -168,15 +172,15 @@ test("los precios que se ven son los del servidor", async ({ page }) => {
 
 test("cada tipo vive en su pestaña, y no se mezclan", async ({ page }) => {
   // La rejilla muestra UNA categoría por vez. Si se mezclaran, la tienda
-  // ofrecería una insignia entre los avatares y equiparla cambiaría otra cosa
-  // de la que el jugador creía.
+  // ofrecería un dorso entre los avatares y equiparlo cambiaría otra cosa de
+  // la que el jugador creía.
   await abrirTienda(page);
 
-  await expect(page.locator("#rejillaPersonalizacion")).not.toContainText("Corona de Laurel");
+  await expect(page.locator("#rejillaPersonalizacion")).not.toContainText("Dorso de prueba");
 
-  await page.locator('#pestanasPersonalizacion [data-categoria="insignia"]').click();
+  await page.locator('#pestanasPersonalizacion [data-categoria="dorso"]').click();
 
-  await expect(page.locator("#rejillaPersonalizacion")).toContainText("Corona de Laurel");
+  await expect(page.locator("#rejillaPersonalizacion")).toContainText("Dorso de prueba");
   await expect(page.locator("#rejillaPersonalizacion")).not.toContainText("El Dragón");
 });
 
@@ -189,20 +193,21 @@ test("las pestañas salen de la lista de categorías, no del HTML", async ({ pag
   // Se comparan los NOMBRES y no la cantidad. Contar decía "son dos", y al
   // agregar los dorsos la prueba se puso en rojo sin que nada estuviera mal:
   // afirmaba un número, no una regla. Lo que hay que afirmar es cuáles son.
+  //
+  // Y que las insignias NO estén es la mitad importante de esta prueba: son
+  // logros, no mercadería. Si un día vuelven a aparecer acá, esto lo dice.
   const pestanas = page.locator("#pestanasPersonalizacion button");
-  await expect(pestanas).toHaveText(["Avatares", "Insignias", "Dorsos"]);
+  await expect(pestanas).toHaveText(["Avatares", "Dorsos"]);
 });
 
-test("comprar una insignia usa el mismo circuito que un avatar", async ({ page }) => {
-  await abrirTienda(page, { saldo: 5000 });
-  await page.locator('#pestanasPersonalizacion [data-categoria="insignia"]').click();
+test("las insignias no se ofrecen en la tienda", async ({ page }) => {
+  await abrirTienda(page, { saldo: 100000 });
 
-  await ficha(page, "Corona de Laurel").locator("button").click();
-  await expect(ficha(page, "Corona de Laurel").locator("button")).toContainText(/equipar/i);
-
-  const compra = await page.evaluate(() =>
-    window.__llamadas.find(([n]) => n === "comprarItem"));
-  expect(compra[1], "viajó algo más que el id").toBe("insignia-corona");
+  // Ni pestaña, ni ficha, ni con saldo de sobra. El servidor además rechaza la
+  // compra —ver `pruebas/tienda.mjs`, sección 17—; esto comprueba que tampoco
+  // se ofrezca, que es lo que ve el jugador.
+  await expect(page.locator('#pestanasPersonalizacion [data-categoria="insignia"]')).toHaveCount(0);
+  await expect(page.locator("#rejillaPersonalizacion")).not.toContainText("Corona de Laurel");
 });
 
 // =====================================================================

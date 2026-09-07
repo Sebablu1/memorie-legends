@@ -172,13 +172,23 @@ function montar({ saldo = 5000, catalogo = CATALOGO_INICIAL } = {}) {
 // Tres artículos del catálogo real, elegidos por su PRECIO y no por su nombre:
 // uno caro, uno intermedio y uno gratis. Si mañana cambian de precio desde el
 // panel, la semilla del código —que es la que monta estas pruebas— no cambia.
-const DRAGON = "el_dragon"; // 2500
-const ZORRO = "el_zorro"; // 800
+const DRAGON = "el_dragon"; // el más caro
+const ZORRO = "el_zorro"; // uno intermedio
 const REY = "predeterminado"; // 0
+
+/**
+ * El precio que dice la semilla.
+ *
+ * Se lee en vez de escribirse a mano. La semilla es lo que monta el catálogo
+ * de estas pruebas, así que comparar contra ella es exactamente lo que hay que
+ * comprobar —que se cobra lo del catálogo y no lo que mande el cliente— y de
+ * paso sobrevive a que mañana el dragón cueste otra cosa.
+ */
+const precioDe = (id) => CATALOGO_INICIAL.find((i) => i.id === id).precio;
 // Y una insignia barata: la sección 8 compra dos cosas con un solo saldo, así
 // que si acá entrara la insignia cara la prueba fallaría por falta de fondos y
 // diría "no se puede equipar" cuando el problema sería otro.
-const INSIGNIA = "estratega"; // 800
+const INSIGNIA = "estratega";
 
 // =====================================================================
 console.log("\n=== 1. Comprar cobra el precio del catálogo, no el que le manden ===");
@@ -188,12 +198,16 @@ console.log("\n=== 1. Comprar cobra el precio del catálogo, no el que le manden
   const { db, tienda } = montar({ saldo: 5000 });
   const r = await tienda.comprar("ana", DRAGON);
 
-  ok(r.precio === 2500, "cobra los 2500 que dice el catálogo", r.precio);
-  ok(db._leer("users/ana").credits === 2500, "el saldo baja de 5000 a 2500", db._leer("users/ana").credits);
+  ok(r.precio === precioDe(DRAGON), "cobra el precio que dice el catálogo", r.precio);
+  ok(
+    db._leer("users/ana").credits === 5000 - precioDe(DRAGON),
+    "y el saldo baja exactamente en eso",
+    db._leer("users/ana").credits,
+  );
   ok(Boolean(db._leer(`users/ana/items/${DRAGON}`)), "queda anotado que lo tiene");
   ok(db._leer(`users/ana/items/${DRAGON}`).tipo === TIPOS.AVATAR, "con su tipo");
   ok(
-    db._leer(`users/ana/items/${DRAGON}`).precioPagado === 2500,
+    db._leer(`users/ana/items/${DRAGON}`).precioPagado === precioDe(DRAGON),
     "y con lo que pagó, para poder auditarlo después",
   );
 
@@ -326,7 +340,8 @@ console.log("\n=== 8. Equipar de un tipo no toca los otros ===");
 {
   const { db, tienda } = montar({ saldo: 5000 });
   await tienda.comprar("ana", DRAGON);
-  await tienda.comprar("ana", INSIGNIA);
+  // La insignia no se compra: se otorga. Ver la sección 17.
+  await tienda.otorgar("ana", INSIGNIA);
   await tienda.equipar("ana", DRAGON);
   await tienda.equipar("ana", INSIGNIA);
 
@@ -521,14 +536,15 @@ console.log("\n=== 15. Todo el CRUD exige ser administrador ===");
     },
   });
 
-  // Se prueban las CUATRO. Una sola dejaría abierta la posibilidad de que a
-  // alguna se le haya olvidado la comprobación, que es exactamente el error
-  // que nadie nota hasta que lo usan.
+  // Se prueban TODAS. Una sola dejaría abierta la posibilidad de que a alguna
+  // se le haya olvidado la comprobación, que es exactamente el error que nadie
+  // nota hasta que lo usan.
   const operaciones = [
     ["listarCatalogo", () => tienda.listarCatalogo({})],
     ["guardarItem", () => tienda.guardarItem({}, NUEVO)],
     ["activarItem", () => tienda.activarItem({}, "x", false)],
     ["borrarItem", () => tienda.borrarItem({}, "x")],
+    ["apagarCatalogoViejo", () => tienda.apagarCatalogoViejo({})],
   ];
 
   for (const [nombre, fn] of operaciones) {
@@ -589,6 +605,206 @@ console.log("\n=== 16. La semilla es válida y sus imágenes existen ===");
     ok(cuantos > 0, `hay artículos de tipo ${tipo}`, cuantos);
   }
 }
+// =====================================================================
+console.log("\n=== 17. Las insignias NO se venden: se otorgan ===");
+// =====================================================================
+
+{
+  // Ésta es la comprobación que convierte la decisión en una regla. Sin ella,
+  // "las insignias son logros" es una opinión que vive en el frontend, y el
+  // frontend se saltea escribiendo una línea en la consola del navegador.
+  const { db, tienda } = montar({ saldo: 100000 });
+
+  const { error: e } = await capturar(() => tienda.comprar("ana", INSIGNIA));
+  ok(e?.codigo === "failed-precondition", "comprarla se rechaza aunque sobre el saldo", e?.codigo);
+  ok(/gana jugando/.test(e?.message ?? ""), "y el mensaje dice por qué", e?.message);
+  ok(!db._leer(`users/ana/items/${INSIGNIA}`), "no queda anotada");
+  ok(db._leer("users/ana").credits === 100000, "y no se cobró nada");
+
+  // Meterla dentro de un pack tampoco: la comprobación es por artículo, no
+  // por llamada.
+  const { error: e2 } = await capturar(() => tienda.comprarVarios("ana", [ZORRO, INSIGNIA]));
+  ok(e2?.codigo === "failed-precondition", "colarla en un pack tampoco funciona", e2?.codigo);
+  ok(!db._leer(`users/ana/items/${ZORRO}`), "y el pack entero no se aplica: o todo o nada");
+}
+
+{
+  const { db, tienda } = montar({ saldo: 0 });
+  const r = await tienda.otorgar("ana", INSIGNIA);
+
+  ok(r.nuevo === true, "otorgarla funciona sin una sola Leyenda");
+  ok(db._leer(`users/ana/items/${INSIGNIA}`).origen === "logro", "queda marcada como logro");
+  ok(db._leer(`users/ana/items/${INSIGNIA}`).precioPagado === 0, "y con precio pagado cero");
+
+  // Sin asiento en el libro mayor: no se movió saldo, así que no hay nada que
+  // asentar. Un asiento de cero sería una mentira auditable.
+  ok(!db._rutas().some((x) => x.startsWith("movimientos/")), "no toca el libro mayor");
+
+  const otra = await tienda.otorgar("ana", INSIGNIA);
+  ok(otra.nuevo === false, "otorgarla dos veces no la duplica");
+
+  await tienda.equipar("ana", INSIGNIA);
+  ok(db._leer("users/ana").insignia === INSIGNIA, "y una vez otorgada se puede equipar");
+}
+
+// =====================================================================
+console.log("\n=== 18. El pack descuenta por cantidad de artículos NUEVOS ===");
+// =====================================================================
+
+{
+  const { db, tienda } = montar({ saldo: 5000 });
+  const tres = [DRAGON, ZORRO, "mago"];
+  const suma = tres.reduce((s, id) => s + precioDe(id), 0);
+
+  const r = await tienda.comprarVarios("ana", tres);
+
+  ok(r.descuento === 0.25, "tres artículos descuentan 25%", r.descuento);
+  ok(r.sinDescuento === suma, "informa lo que costaban sueltos", r.sinDescuento);
+  ok(r.total === Math.floor(suma * 0.75), "y cobra el total con descuento", r.total);
+  ok(db._leer("users/ana").credits === 5000 - r.total, "el saldo baja en el total, no en la suma");
+  ok(r.comprados.length === 3, "los tres quedan anotados");
+  for (const id of tres) ok(Boolean(db._leer(`users/ana/items/${id}`)), `  ${id} es suyo`);
+
+  // Un solo asiento, no tres: el pack es UNA compra.
+  const asientos = db._rutas().filter((x) => x.startsWith("movimientos/"));
+  ok(asientos.length === 1, "deja un solo asiento en el libro mayor", asientos.length);
+}
+
+{
+  const { tienda } = montar({ saldo: 5000 });
+  const r = await tienda.comprarVarios("ana", [DRAGON, ZORRO]);
+  const suma = precioDe(DRAGON) + precioDe(ZORRO);
+  ok(r.descuento === 0.15, "dos descuentan 15%", r.descuento);
+  ok(r.total === Math.floor(suma * 0.85), "con su total", r.total);
+}
+
+{
+  const { tienda } = montar({ saldo: 5000 });
+  const r = await tienda.comprarVarios("ana", [DRAGON]);
+  ok(r.descuento === 0, "uno solo no descuenta nada", r.descuento);
+  ok(r.total === precioDe(DRAGON), "y paga el precio de lista", r.total);
+}
+
+{
+  // Lo que impide abaratar el pack metiendo algo ya comprado.
+  const { tienda } = montar({ saldo: 5000 });
+  await tienda.comprar("ana", ZORRO);
+
+  const r = await tienda.comprarVarios("ana", [ZORRO, DRAGON]);
+  ok(r.descuento === 0, "un repetido no cuenta para el descuento", r.descuento);
+  ok(r.total === precioDe(DRAGON), "se paga sólo lo nuevo, sin rebaja", r.total);
+  ok(r.yaTenia.length === 1 && r.yaTenia[0] === ZORRO, "y se avisa cuál ya tenía", r.yaTenia);
+}
+
+{
+  const { tienda } = montar({ saldo: 5000 });
+  const { error: e } = await capturar(() =>
+    tienda.comprarVarios("ana", [DRAGON, ZORRO, "mago", "orco"]));
+  ok(e?.codigo === "invalid-argument", "más de tres se rechaza", e?.codigo);
+
+  const { error: e2 } = await capturar(() => tienda.comprarVarios("ana", []));
+  ok(e2?.codigo === "invalid-argument", "y un pack vacío también", e2?.codigo);
+}
+
+{
+  // Sin saldo para el total, no se compra NADA. Media compra dejaría al
+  // jugador con un avatar cobrado y dos no, y ninguna forma de saber cuál.
+  const { db, tienda } = montar({ saldo: 200 });
+  const { error: e } = await capturar(() => tienda.comprarVarios("ana", [DRAGON, ZORRO]));
+
+  ok(e?.codigo === "failed-precondition", "sin saldo para el total se rechaza", e?.codigo);
+  ok(db._leer("users/ana").credits === 200, "el saldo queda intacto");
+  ok(!db._leer(`users/ana/items/${DRAGON}`), "y no queda ni uno de los dos");
+  ok(!db._leer(`users/ana/items/${ZORRO}`), "  (ni el otro)");
+}
+
+// =====================================================================
+console.log("\n=== 19. El primero de cada tipo se pone solo ===");
+// =====================================================================
+
+{
+  const { db, tienda } = montar({ saldo: 5000 });
+
+  await tienda.comprar("ana", ZORRO);
+  ok(db._leer("users/ana").avatar === ZORRO, "el primer avatar queda puesto sin pedirlo");
+
+  await tienda.comprar("ana", DRAGON);
+  ok(db._leer("users/ana").avatar === ZORRO, "el segundo NO pisa al que ya estaba");
+}
+
+{
+  // Un pack de dos tipos pone uno de cada uno, no dos del mismo.
+  const { db, tienda } = montar({ saldo: 5000 });
+  const r = await tienda.comprarVarios("ana", [ZORRO, DRAGON, "dorso_rojo"]);
+
+  ok(db._leer("users/ana").avatar === ZORRO, "se pone el primer avatar del pack");
+  ok(db._leer("users/ana").dorso === "dorso_rojo", "y el primer dorso");
+  ok(Object.keys(r.equipado).length === 2, "y nada más", r.equipado);
+}
+
+// =====================================================================
+console.log("\n=== 20. Desequipar deja el campo en null ===");
+// =====================================================================
+
+{
+  const { db, tienda } = montar({ saldo: 5000 });
+  await tienda.otorgar("ana", INSIGNIA);
+  await tienda.equipar("ana", INSIGNIA);
+  await tienda.comprar("ana", ZORRO);
+
+  const r = await tienda.desequipar("ana", "insignia");
+
+  ok(r.equipado === null, "avisa que quedó sin nada puesto");
+  ok(db._leer("users/ana").insignia === null, "y el perfil lo refleja");
+  ok(db._leer("users/ana").avatar === ZORRO, "sin tocar los otros tipos");
+  ok(Boolean(db._leer(`users/ana/items/${INSIGNIA}`)), "y sin quitarle lo que tiene");
+
+  const { error: e } = await capturar(() => tienda.desequipar("ana", "sombrero"));
+  ok(e?.codigo === "invalid-argument", "un tipo inventado se rechaza", e?.codigo);
+}
+
+// =====================================================================
+console.log("\n=== 21. Apagar el catálogo de demostración ===");
+// =====================================================================
+
+{
+  // El catálogo real MÁS los restos del de mentira, que es lo que hay en
+  // producción: sembrar no pisa lo que ya está, así que los viejos siguen ahí.
+  const viejos = [
+    { id: "avatar-dragon", tipo: "avatar", nombre: "Dragón viejo", precio: 100, imagen: "🐉", activo: true, orden: 1 },
+    { id: "insignia-corona", tipo: "insignia", nombre: "Corona vieja", precio: 100, imagen: "🏆", activo: true, orden: 2 },
+  ];
+  const { db, tienda } = montar({ catalogo: [...CATALOGO_INICIAL, ...viejos] });
+  const como = { auth: { uid: "admin" } };
+
+  // Primero mirar, sin tocar. Apagar diez artículos sin ver cuáles es la clase
+  // de botón que nadie se anima a tocar.
+  const ensayo = await tienda.apagarCatalogoViejo(como, { simular: true });
+  ok(ensayo.simulado === true, "simular avisa que no tocó nada");
+  ok(ensayo.candidatos.length === 2, "encuentra los dos de demostración", ensayo.candidatos.length);
+  ok(db._leer("catalogo/avatar-dragon").activo === true, "y efectivamente no los tocó");
+
+  const r = await tienda.apagarCatalogoViejo(como);
+  ok(r.apagados === 2, "apaga los dos", r.apagados);
+  ok(db._leer("catalogo/avatar-dragon").activo === false, "el avatar viejo queda apagado");
+  ok(db._leer("catalogo/insignia-corona").activo === false, "la insignia vieja también");
+
+  // Lo importante: NO se lleva puesto nada de lo bueno. Un criterio parecido y
+  // tentador —"todo lo que no termine en .webp"— apagaría los dorsos, que son
+  // PNG legítimos y están en uso.
+  ok(db._leer(`catalogo/${DRAGON}`).activo === true, "el dragón de verdad sigue encendido");
+  ok(db._leer("catalogo/dorso_azul").activo === true, "y los dorsos PNG también");
+  ok(db._leer("catalogo/dorso_rojo").activo === true, "  (los dos)");
+  ok(db._leer(`catalogo/${INSIGNIA}`).activo === true, "y las insignias de verdad");
+
+  // Apaga, no borra: si alguien alcanzó a comprar uno, el documento del
+  // catálogo es lo que le da nombre e imagen a lo que tiene.
+  ok(Boolean(db._leer("catalogo/avatar-dragon")), "no borra: el documento sigue ahí");
+
+  const otraVez = await tienda.apagarCatalogoViejo(como);
+  ok(otraVez.apagados === 0, "correrlo dos veces no hace nada la segunda", otraVez.apagados);
+}
+
 
 console.log(fallos ? `\n❌ ${fallos} fallos` : "\n✅ TODO OK");
 process.exit(fallos ? 1 : 0);

@@ -1,0 +1,144 @@
+/* La vitrina de logros del panel.
+ *
+ * Hoja aparte y no `tienda.css`: el panel no carga la tienda, y traerla entera
+ * para seis tarjetas serían 200 líneas de estilos de compra en una pantalla
+ * donde no se compra nada. Las clases se parecen porque las tarjetas se
+ * parecen, pero los estados son otros — acá no hay "no alcanza". */
+
+.rejilla-logros {
+  display: grid;
+  /* 160px es lo que mide una tarjeta con su condición en dos líneas sin que se
+     parta una palabra. `auto-fill` acomoda seis en una pantalla grande y dos
+     en un teléfono, sin puntos de corte escritos a mano. */
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.logro {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 16px 12px 14px;
+  text-align: center;
+  border-radius: 16px;
+  background: linear-gradient(165deg, var(--panel-alto), rgba(12, 12, 14, 0.92));
+  border: 1px solid var(--borde-suave);
+}
+
+/* Ganada: filo de oro. Puesta: además, brilla. Son dos estados distintos y
+   tienen que distinguirse de un vistazo — "la tengo" no es "la llevo". */
+.logro.ganado {
+  border-color: rgba(212, 168, 67, 0.4);
+}
+
+.logro.puesto {
+  border-color: rgba(212, 168, 67, 0.75);
+  box-shadow: 0 0 0 1px rgba(212, 168, 67, 0.25), 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+/* Las que faltan se apagan, pero NO se esconden ni se vuelven ilegibles: la
+   condición es justamente lo que hay que poder leer. Bajar la opacidad de la
+   tarjeta entera dejaría el texto en gris sobre gris, así que se apaga sólo la
+   figura. */
+.logro.pendiente .figura-logro {
+  filter: grayscale(1) brightness(0.55);
+  opacity: 0.75;
+}
+
+.figura-logro {
+  width: 76px;
+  height: 76px;
+  display: grid;
+  place-items: center;
+  object-fit: contain;
+  border-radius: 14px;
+  background: radial-gradient(circle at 50% 40%, rgba(212, 168, 67, 0.16), transparent 70%);
+}
+
+.figura-logro.glifo {
+  font-size: 2.6rem;
+  line-height: 1;
+}
+
+.logro h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--texto);
+}
+
+.condicion-logro {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--texto-tenue);
+  min-height: 2.2em;
+}
+
+/* La barra sólo aparece en las condiciones que se cuentan. Las de puesto de
+   ranking no la tienen, porque entre "puesto 40" y "puesto 6" no hay una
+   fracción que signifique algo: el puesto depende de los demás. */
+.barra-logro {
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+}
+
+.barra-logro i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #b98f2f, var(--oro, #d4a843));
+  transition: width 0.35s ease;
+}
+
+.estado-logro {
+  font-size: 0.72rem;
+  color: var(--texto-tenue);
+  min-height: 1.1em;
+}
+
+.logro.ganado .estado-logro {
+  color: var(--oro, #d4a843);
+  font-weight: 600;
+}
+
+.logro .accion {
+  width: 100%;
+  margin-top: 2px;
+}
+
+/* La cinta de "En uso" se reusa de la tienda; el panel no carga esa hoja, así
+   que se define acá también. Dos definiciones de la misma clase en hojas que
+   nunca se cargan juntas no chocan, y compartirla obligaría a una tercera hoja
+   para dos reglas. */
+.vitrina-logros .cinta-item {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #1a1200;
+  background: linear-gradient(180deg, #f0cd76, #c99a2e);
+}
+
+@media (max-width: 420px) {
+  .rejilla-logros {
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 10px;
+  }
+  .figura-logro {
+    width: 60px;
+    height: 60px;
+  }
+  .logro {
+    padding: 13px 9px 12px;
+  }
+}

@@ -38,9 +38,14 @@ import {
   TIPOS,
   CAMPO_EQUIPADO,
   esTipoValido,
+  esVendible,
   problemasDelItem,
   normalizarItem,
   ordenarItems,
+  precioDePack,
+  descuentoPorCantidad,
+  imagenEsArchivo,
+  MAXIMO_POR_PACK,
   CATALOGO_INICIAL,
 } from "./reglas/catalogo.js";
 
@@ -79,56 +84,148 @@ export function crearTienda({
    *     cobre. Son dos defensas contra dos cosas distintas: el jugador que
    *     toca dos veces y la red que reintenta sola.
    */
-  async function comprar(uid, itemId) {
+  /**
+   * Compra de 1 a 3 artículos en una sola transacción.
+   *
+   * Es la ÚNICA ruta de compra: `comprar` llama acá con una lista de uno.
+   * Tener dos funciones que cobran sería tener dos lugares donde puede
+   * fallar la comprobación de precio, y sólo uno de ellos se acordaría de
+   * arreglarse.
+   *
+   * El orden importa y no es negociable: PRIMERO todas las lecturas
+   * —catálogo, posesiones, perfil— y recién después las escrituras. Firestore
+   * rechaza lo contrario, y el Firestore de mentira de las pruebas también.
+   */
+  async function comprarVarios(uid, itemIds) {
+    const ids = [...new Set(itemIds.map((s) => String(s ?? "").trim()).filter(Boolean))];
+
+    if (!ids.length) throw error("invalid-argument", "No pediste ningún artículo.");
+    if (ids.length > MAXIMO_POR_PACK) {
+      throw error("invalid-argument", `No se pueden llevar más de ${MAXIMO_POR_PACK} de una vez.`);
+    }
+
     return db.runTransaction(async (tx) => {
-      const enCatalogo = await tx.get(refItemCatalogo(itemId));
-      if (!enCatalogo.exists) {
-        throw error("not-found", "Ese artículo no existe.");
+      // ---- lecturas ----
+      const enCatalogo = await Promise.all(ids.map((id) => tx.get(refItemCatalogo(id))));
+      const posesiones = await Promise.all(ids.map((id) => tx.get(refPosesion(uid, id))));
+      const perfil = await tx.get(refPerfil(uid));
+
+      const articulos = [];
+      for (let i = 0; i < ids.length; i++) {
+        const id = ids[i];
+        if (!enCatalogo[i].exists) throw error("not-found", "Ese artículo no existe.");
+
+        const item = enCatalogo[i].data();
+
+        // Las insignias son logros. No se venden ni con saldo de sobra: la
+        // comprobación está acá, en el servidor, porque esconder el botón en
+        // la tienda no impide la llamada.
+        if (!esVendible(item.tipo)) {
+          throw error("failed-precondition", "Ese artículo no está a la venta: se gana jugando.");
+        }
+
+        // Un artículo desactivado se deja de vender pero NO se le quita a
+        // quien ya lo compró: por eso se comprueba acá y no al equipar.
+        if (item.activo === false) {
+          throw error("failed-precondition", "Ese artículo no está a la venta.");
+        }
+
+        const precio = Number(item.precio);
+        if (!Number.isInteger(precio) || precio < 0) {
+          // El catálogo lo escribe el panel, que valida; esto es el cinturón
+          // por si alguna vez se escribe a mano desde la consola de Firebase.
+          throw error("failed-precondition", "Ese artículo tiene un precio inválido.");
+        }
+
+        articulos.push({ id, item, precio, yaLoTiene: posesiones[i].exists });
       }
 
-      const item = enCatalogo.data();
-
-      // Un artículo desactivado se deja de vender pero NO se le quita a quien
-      // ya lo compró: por eso se comprueba acá y no al equipar.
-      if (item.activo === false) {
-        throw error("failed-precondition", "Ese artículo no está a la venta.");
+      // El descuento se calcula sobre los NUEVOS. Si contara los repetidos,
+      // meter en el pack algo ya comprado abarataría el resto.
+      //
+      // Todo esto se arma en UN bucle con llaves y antes de cobrar. No es
+      // estilo: `pruebas/transacciones.mjs` audita que no haya bucles con
+      // movimientos de saldo adentro de una transacción, y una flecha sin
+      // llaves le impide delimitar dónde termina el bucle.
+      const nuevos = [];
+      const idsNuevos = [];
+      const yaTenia = [];
+      let sinDescuento = 0;
+      for (const a of articulos) {
+        if (a.yaLoTiene) {
+          yaTenia.push(a.id);
+          continue;
+        }
+        nuevos.push(a);
+        idsNuevos.push(a.id);
+        sinDescuento += a.precio;
       }
 
-      const precio = Number(item.precio);
-      if (!Number.isInteger(precio) || precio < 0) {
-        // El catálogo lo escribe el panel, que valida; esto es el cinturón por
-        // si alguna vez se escribe a mano desde la consola de Firebase.
-        throw error("failed-precondition", "Ese artículo tiene un precio inválido.");
-      }
+      if (!nuevos.length) throw error("already-exists", "Ya tenés ese artículo.");
 
-      const yaLoTiene = await tx.get(refPosesion(uid, itemId));
-      if (yaLoTiene.exists) {
-        throw error("already-exists", "Ya tenés ese artículo.");
-      }
+      const total = precioDePack(sinDescuento, nuevos.length);
+      const referencia = idsNuevos.join(",");
+      // Los ids ordenados: el mismo pack pedido dos veces por un reintento de
+      // red da la misma clave y cobra una sola vez, sin importar en qué orden
+      // los mandó el cliente.
+      const claveIdempotencia = `compra_${uid}_${[...idsNuevos].sort().join("_")}`;
 
+      // ---- escrituras ----
+      //
       // Los gratuitos no pasan por el libro mayor. Un asiento de cero Leyendas
       // es ruido en el historial de alguien que quiso ver qué era su avatar.
       let saldo = null;
-      if (precio > 0) {
+      if (total > 0) {
         const r = await moverLeyendas(tx, {
           uid,
-          delta: -precio,
+          delta: -total,
           motivo: motivoCompra,
-          referencia: itemId,
-          idempotencia: `compra_${uid}_${itemId}`,
+          referencia,
+          idempotencia: claveIdempotencia,
         });
         saldo = r.saldo;
       }
 
-      tx.set(refPosesion(uid, itemId), {
-        tipo: item.tipo,
-        nombre: item.nombre ?? itemId,
-        precioPagado: precio,
-        compradoEn: marcaDeTiempo(),
-      });
+      const datosPerfil = perfil.exists ? perfil.data() : {};
+      const aEquipar = {};
 
-      return { itemId, tipo: item.tipo, precio, saldo };
+      for (const a of nuevos) {
+        tx.set(refPosesion(uid, a.id), {
+          tipo: a.item.tipo,
+          nombre: a.item.nombre ?? a.id,
+          precioPagado: a.precio,
+          compradoEn: marcaDeTiempo(),
+        });
+
+        // El primero de cada tipo se pone solo. Comprar un avatar y que no
+        // pase nada visible es la queja obvia; a partir del segundo ya hay una
+        // elección que hacer, y elegir por el jugador sería pisarle la puesta.
+        const campo = CAMPO_EQUIPADO[a.item.tipo];
+        if (campo && !datosPerfil[campo] && !aEquipar[campo]) aEquipar[campo] = a.id;
+      }
+
+      if (Object.keys(aEquipar).length) tx.set(refPerfil(uid), aEquipar, { merge: true });
+
+      return {
+        comprados: nuevos.map((a) => ({ id: a.id, tipo: a.item.tipo, precio: a.precio })),
+        // Los que venían en el pedido y ya tenía. No es un error —el pack se
+        // compra igual— pero el cliente necesita poder decirlo.
+        yaTenia,
+        total,
+        sinDescuento,
+        descuento: descuentoPorCantidad(nuevos.length),
+        ahorro: sinDescuento - total,
+        equipado: aEquipar,
+        saldo,
+      };
     });
+  }
+
+  /** Comprar uno. Devuelve la forma de siempre, que es la que usa la tienda. */
+  async function comprar(uid, itemId) {
+    const r = await comprarVarios(uid, [itemId]);
+    const c = r.comprados[0];
+    return { itemId: c.id, tipo: c.tipo, precio: c.precio, saldo: r.saldo, equipado: r.equipado };
   }
 
   // ------------------------------------------------------------- equipar
@@ -159,6 +256,60 @@ export function crearTienda({
 
       return { itemId, tipo, campo: CAMPO_EQUIPADO[tipo] };
     });
+  }
+
+  /**
+   * Se saca lo que tiene puesto, dejando el campo en `null`.
+   *
+   * Hace falta porque equipar no puede deshacerse solo: el perfil guarda un id
+   * por tipo, así que ponerse otro pisa el anterior, pero no ponerse NINGUNO
+   * no tiene forma de expresarse cambiando de artículo. Quien quiere jugar sin
+   * insignia no tiene un "artículo sin insignia" que elegir.
+   *
+   * No comprueba posesión a propósito: sacarse algo que no se tiene no es un
+   * privilegio, y si el perfil quedó apuntando a un artículo borrado, esto es
+   * exactamente lo que lo destraba.
+   */
+  async function desequipar(uid, tipo) {
+    if (!esTipoValido(tipo)) {
+      throw error("invalid-argument", "Ese tipo de artículo no existe.");
+    }
+    await refPerfil(uid).set({ [CAMPO_EQUIPADO[tipo]]: null }, { merge: true });
+    return { tipo, campo: CAMPO_EQUIPADO[tipo], equipado: null };
+  }
+
+  // ------------------------------------------------------------- otorgar
+
+  /**
+   * Le da un artículo sin cobrarlo. Para logros, no para regalos.
+   *
+   * NO es una callable y no puede serlo: no hay ningún camino desde el
+   * navegador hasta acá. La llama el servidor cuando una insignia se gana, y
+   * por eso no toca `moverLeyendas` — no se mueve saldo, así que no hay nada
+   * que asentar en el libro mayor.
+   *
+   * Es idempotente por la misma razón que la compra: el id del documento es el
+   * id del artículo. Otorgar dos veces la misma insignia escribe el mismo
+   * documento, no dos.
+   */
+  async function otorgar(uid, itemId, { origen = "logro" } = {}) {
+    const enCatalogo = await refItemCatalogo(itemId).get();
+    if (!enCatalogo.exists) throw error("not-found", "Ese artículo no existe.");
+
+    const item = enCatalogo.data();
+    const ref = refPosesion(uid, itemId);
+    const yaLoTiene = await ref.get();
+    if (yaLoTiene.exists) return { itemId, tipo: item.tipo, nuevo: false };
+
+    await ref.set({
+      tipo: item.tipo,
+      nombre: item.nombre ?? itemId,
+      precioPagado: 0,
+      origen,
+      compradoEn: marcaDeTiempo(),
+    });
+
+    return { itemId, tipo: item.tipo, nuevo: true };
   }
 
   // ---------------------------------------------------------- lo que tengo
@@ -294,6 +445,66 @@ export function crearTienda({
   }
 
   /**
+   * Apaga los artículos del catálogo de demostración.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * QUÉ SON "LOS VIEJOS"
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Los que se sembraron cuando el catálogo era de mentira: `avatar-dragon`,
+   * `insignia-corona`, `dorso-azul` y compañía, con un EMOJI en el campo de
+   * imagen porque todavía no había dibujos. Siguen en Firestore porque sembrar
+   * no pisa lo que ya está —eso es a propósito, para no revertir un precio que
+   * el administrador cambió—, así que la tienda los muestra al lado de los de
+   * verdad, con un emoji donde va la figura.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * POR QUÉ SE RECONOCEN POR LA IMAGEN Y NO POR LA EXTENSIÓN
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Lo que los distingue es que su imagen NO ES UN ARCHIVO: es un emoji. Un
+   * criterio parecido y tentador —"todo lo que no termine en .webp"— apagaría
+   * también los dos dorsos, que son PNG legítimos y están en uso. La
+   * diferencia entre las dos reglas es invisible al leerlas y evidente al
+   * ejecutarlas.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * APAGA, NO BORRA
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Por lo mismo que `activarItem` existe: si alguien alcanzó a comprar uno,
+   * el documento del catálogo es lo que le da nombre e imagen a lo que tiene.
+   * Borrarlo lo dejaría con un id huérfano. Apagado, deja de venderse y sigue
+   * dibujándose.
+   */
+  async function apagarCatalogoViejo(context, { simular = false } = {}) {
+    await administradores.exigir(context);
+
+    const snap = await db.collection(catalogo).get();
+    const candidatos = [];
+    snap.forEach((doc) => {
+      const d = doc.data();
+      if (d.activo === false) return; // ya apagado: no hay nada que hacer
+      if (imagenEsArchivo(d.imagen)) return; // tiene dibujo de verdad
+      candidatos.push({ id: doc.id, nombre: d.nombre ?? doc.id, imagen: d.imagen ?? "" });
+    });
+
+    // `simular` existe para poder mirar antes de tocar. El panel lo usa para
+    // mostrar la lista y pedir confirmación: apagar diez artículos sin ver
+    // cuáles es la clase de botón que nadie se anima a tocar.
+    if (simular) return { apagados: 0, candidatos, simulado: true };
+
+    for (const c of candidatos) {
+      await refItemCatalogo(c.id).set(
+        { activo: false, actualizadoEn: marcaDeTiempo() },
+        { merge: true },
+      );
+    }
+
+    return { apagados: candidatos.length, candidatos, simulado: false };
+  }
+
+  /**
    * Borra un artículo, y sólo si nadie lo compró.
    *
    * Ésta es la única operación de la tienda que destruye algo, así que
@@ -336,12 +547,16 @@ export function crearTienda({
 
   return {
     comprar,
+    comprarVarios,
     equipar,
+    desequipar,
+    otorgar,
     misItems,
     sembrarCatalogo,
     listarCatalogo,
     guardarItem,
     activarItem,
+    apagarCatalogoViejo,
     borrarItem,
   };
 }

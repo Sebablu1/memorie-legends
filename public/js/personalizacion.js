@@ -47,9 +47,20 @@ const $ = (id) => document.getElementById(id);
  * propósito — son lo mismo con distinta forma, y separarlas en tres pantallas
  * obligaría a mantener tres copias del mismo circuito de compra.
  */
+/**
+ * Las pestañas de la tienda: lo que se VENDE.
+ *
+ * Las insignias no están, y no es un olvido. Son logros: se ganan jugando y
+ * las otorga el servidor. Viven en la vitrina del perfil, con la condición de
+ * cada una a la vista.
+ *
+ * Sacarlas de acá esconde el botón. Lo que impide comprarlas es
+ * `TIPOS_VENDIBLES` en `reglas/catalogo.js`, que el servidor comprueba dentro
+ * de la transacción: esta lista es la cara visible de aquella decisión, no la
+ * decisión.
+ */
 const CATEGORIAS = [
   { tipo: TIPOS.AVATAR, titulo: "Avatares", vacio: "Todavía no hay avatares a la venta." },
-  { tipo: TIPOS.INSIGNIA, titulo: "Insignias", vacio: "Todavía no hay insignias a la venta." },
   { tipo: TIPOS.DORSO, titulo: "Dorsos", vacio: "Todavía no hay dorsos a la venta." },
 ];
 

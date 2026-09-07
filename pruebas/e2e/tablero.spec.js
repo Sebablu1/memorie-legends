@@ -33,7 +33,7 @@ const SESION_FALSA = `
     return {
       usuario: { uid: "uid-de-prueba", photoURL: null },
       perfil: { uid: "uid-de-prueba", nombre: "Probador", saldo: 500,
-                partidas: 3, victorias: 1, ultimoBono: 0 },
+                partidas: 3, victorias: 1 },
     };
   }
   export function mostrarSaldo() {}

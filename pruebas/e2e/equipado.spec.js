@@ -61,7 +61,7 @@ const sesionFalsa = (equipado, foto = null) => `
   export async function exigirSesion() {
     return { usuario: { uid: "u1", photoURL: ${JSON.stringify(foto)} },
              perfil: { uid: "u1", nombre: "Seba", saldo: 500, partidas: 3, victorias: 1,
-                       ultimoBono: 0, equipado: ${JSON.stringify(equipado)} } };
+                        equipado: ${JSON.stringify(equipado)} } };
   }
   export async function leerPerfil() { return { saldo: 500 }; }
   export function mostrarSaldo() {} export function conectarBotonSalir() {}

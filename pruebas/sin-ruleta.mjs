@@ -147,16 +147,13 @@ console.log("\n=== 3. Lo que NO había que borrar sigue en pie ===");
 
 const economia = readFileSync(join(RAIZ, "public/js/reglas/economia.js"), "utf8");
 
-ok(economia.includes("BONO_DIARIO"), "el bono diario sigue existiendo");
 ok(economia.includes("LEYENDAS_POR_REFERIDO"), "el referido sigue existiendo");
 ok(economia.includes("LEYENDAS_REGISTRO"), "las Leyendas de registro siguen existiendo");
 ok(economia.includes("PAQUETES"), "los paquetes de compra siguen existiendo");
 ok(economia.includes("PREMIOS_RANKING"), "los premios del ranking siguen existiendo");
-ok(economia.includes("esperaBonoDiario"), "la espera del bono diario sigue calculándose");
 
 const servidor = readFileSync(join(RAIZ, "functions/index.js"), "utf8");
 
-ok(servidor.includes("reclamarBonoDiario"), "la función del bono diario sigue desplegada");
 ok(servidor.includes("acreditarReferido"), "la función del referido sigue desplegada");
 ok(servidor.includes("crearOrdenDeCompra"), "la compra de Leyendas sigue en el servidor");
 ok(servidor.includes("webhookPago"), "el webhook de pagos sigue en el servidor");

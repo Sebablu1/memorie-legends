@@ -36,9 +36,7 @@ import admin from "firebase-admin";
 import crypto from "node:crypto";
 
 import {
-  BONO_DIARIO,
   LEYENDAS_POR_REFERIDO,
-  esperaBonoDiario,
   premioPorPuesto,
   paquetePorId,
   leyendasDePaquete,
@@ -52,6 +50,9 @@ import { crearMotorEnRed } from "./partida-red.js";
 import { crearCierre } from "./cierre.js";
 import { crearLimiteDeRitmo } from "./limite-de-ritmo.js";
 import { crearTienda } from "./tienda.js";
+import { crearInsignias } from "./insignias.js";
+import { crearTorneos } from "./torneos.js";
+import { premioFisicoDe, umbralesValidos } from "./reglas/configuracion.js";
 import {
   validar,
   EsquemaDeSala,
@@ -61,6 +62,14 @@ import {
   EsquemaReferido,
   EsquemaReporte,
   EsquemaItem,
+  EsquemaPack,
+  EsquemaTipo,
+  EsquemaTorneo,
+  EsquemaIdTorneo,
+  EsquemaEditarTorneo,
+  EsquemaGanadores,
+  EsquemaCancelarTorneo,
+  EsquemaUmbrales,
   EsquemaItemAdmin,
   EsquemaActivarItem,
 } from "./esquemas.js";
@@ -183,34 +192,6 @@ const exigirSesion = (context, accion) => {
 // El perfil lo crea el propio cliente al registrarse, con las 100 Leyendas
 // de bienvenida, y las reglas de Firestore fijan ese valor exacto. No se
 // duplica acá para no tener dos caminos de creación.
-
-// ------------------------------------------------------------ bono diario
-
-export const reclamarBonoDiario = functions.https.onCall(async (_data, context) => {
-  const uid = exigirSesion(context, "reclamarBonoDiario");
-  await limite.exigirRitmoDePlata(uid, "reclamarBonoDiario");
-
-  return db.runTransaction(async (tx) => {
-    const snap = await tx.get(db.collection(USUARIOS).doc(uid));
-    const ultimo = snap.exists ? snap.data().ultimoBonoDiario : null;
-    const restante = esperaBonoDiario(ultimo?.toDate?.() ?? ultimo, Date.now());
-
-    if (restante > 0) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        `Todavía no: faltan ${Math.ceil(restante / 60000)} minutos.`,
-      );
-    }
-
-    const r = await moverLeyendas(tx, { uid, delta: BONO_DIARIO, motivo: MOTIVOS.BONO_DIARIO });
-    tx.set(
-      db.collection(USUARIOS).doc(uid),
-      { ultimoBonoDiario: admin.firestore.FieldValue.serverTimestamp() },
-      { merge: true },
-    );
-    return { leyendas: BONO_DIARIO, saldo: r.saldo };
-  });
-});
 
 // -------------------------------------------------------------- apuestas
 
@@ -602,6 +583,24 @@ export const comprarItem = functions.https.onCall(async (data, context) => {
 });
 
 /**
+ * Compra de 2 o 3 avatares de una, con descuento.
+ *
+ * Es la misma ruta que `comprarItem` —`comprarVarios`— y por eso el descuento
+ * no puede aplicarse a algo que no se está comprando: el precio de cada
+ * artículo sale del catálogo dentro de la misma transacción que cobra, y el
+ * descuento se calcula sobre los que el jugador todavía NO tiene. Meter en el
+ * pack algo ya comprado no abarata el resto.
+ *
+ * Mismo techo de plata que la compra simple: mueve Leyendas.
+ */
+export const comprarPack = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context, "comprarPack");
+  await limite.exigirRitmoDePlata(uid, "comprarPack");
+  const { itemIds } = validar(EsquemaPack, data, errorHttp);
+  return tienda.comprarVarios(uid, itemIds);
+});
+
+/**
  * Se pone algo que ya compró.
  *
  * No mueve saldo, así que va con el techo común. Lo que sí comprueba es que lo
@@ -611,6 +610,41 @@ export const equiparItem = functions.https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "equiparItem");
   const { itemId } = validar(EsquemaItem, data, errorHttp);
   return tienda.equipar(uid, itemId);
+});
+
+/**
+ * Se saca lo que tiene puesto de un tipo.
+ *
+ * Hace falta porque equipar no puede deshacerse solo: el perfil guarda un id
+ * por tipo, así que ponerse otro pisa el anterior, pero "ninguno" no es un
+ * artículo que se pueda elegir. Quien quiere jugar sin insignia no tenía forma
+ * de decirlo.
+ */
+export const desequiparItem = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context, "desequiparItem");
+  const { tipo } = validar(EsquemaTipo, data, errorHttp);
+  return tienda.desequipar(uid, tipo);
+});
+
+/**
+ * Las insignias: cuáles tiene, cuáles no y cuánto le falta para cada una.
+ *
+ * Las estadísticas viajan al cliente porque son SUYAS y porque el perfil las
+ * muestra. Que viajen no las vuelve escribibles: las reglas de Firestore no le
+ * permiten al cliente tocar `partidasGanadas`, y quien las escribe es el
+ * cierre de partida en el servidor.
+ */
+export const misInsignias = functions.https.onCall(async (_data, context) => {
+  const uid = exigirSesion(context, "misInsignias");
+  const [estadisticas, { tengo, equipado }] = await Promise.all([
+    insignias.estadisticasDe(uid),
+    tienda.misItems(uid),
+  ]);
+  return {
+    estadisticas,
+    tengo: tengo.filter((i) => i.tipo === "insignia").map((i) => i.id),
+    equipada: equipado.insignia ?? null,
+  };
 });
 
 /** Qué tiene comprado y qué tiene puesto, en un solo viaje. */
@@ -650,6 +684,13 @@ export const activarItemAdmin = functions.https.onCall((data, context) => {
 });
 
 /** Borra un artículo, y sólo si nadie lo compró. */
+/**
+ * Apaga los artículos del catálogo de demostración, los que tienen un emoji
+ * por imagen. Con `simular: true` sólo devuelve cuáles serían, sin tocar nada.
+ */
+export const apagarCatalogoViejoAdmin = functions.https.onCall((data, context) =>
+  tienda.apagarCatalogoViejo(context, { simular: data?.simular === true }));
+
 export const borrarItemAdmin = functions.https.onCall((data, context) =>
   tienda.borrarItem(context, validar(EsquemaItem, data, errorHttp).itemId));
 
@@ -762,6 +803,151 @@ const cierre = crearCierre({
   marcaDeTiempo,
   error: errorHttp,
   estados: ESTADOS_SALA,
+  usuarios: USUARIOS,
+  incremento: (n) => admin.firestore.FieldValue.increment(n),
+});
+
+/**
+ * Las insignias que se ganan jugando.
+ *
+ * Se monta sobre la tienda porque otorgar una insignia es exactamente lo
+ * mismo que ya hace una compra —anotar la posesión en
+ * `users/{uid}/items/{id}`— menos el cobro. Un segundo lugar donde anotar lo
+ * que un jugador tiene sería un segundo lugar donde puede desincronizarse.
+ */
+const insignias = crearInsignias({ db, usuarios: USUARIOS, tienda, logger });
+
+/**
+ * Baraja con azar criptográfico, sin sesgo.
+ *
+ * Fisher-Yates y `randomInt`, no `sort(() => Math.random() - 0.5)`. Ese truco
+ * es popular y está mal: no produce todas las permutaciones con la misma
+ * probabilidad, y con cuatro jugadores por mesa el sesgo es visible. Acá
+ * decide contra quién se juega una entrada pagada, así que tiene que ser
+ * parejo de verdad.
+ */
+function barajarConAzarSeguro(lista) {
+  const a = [...lista];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/**
+ * Torneos.
+ *
+ * El azar del reparto de mesas sale de `crypto`, no de `Math.random`: quién
+ * queda con quién decide contra quién se juega una entrada pagada, y un azar
+ * predecible es un azar que alguien puede aprovechar.
+ *
+ * La clave de semana la calcula el mismo `clavePeriodo` que usa el ranking:
+ * dos definiciones de "qué semana es hoy" terminan discrepando el lunes a las
+ * 00:00, que es exactamente cuando importa.
+ */
+const torneos = crearTorneos({
+  db,
+  moverLeyendas,
+  marcaDeTiempo,
+  error: errorHttp,
+  administradores,
+  motivoEntrada: MOTIVOS.TORNEO_ENTRADA,
+  motivoPremio: MOTIVOS.TORNEO_PREMIO,
+  motivoDevolucion: MOTIVOS.TORNEO_DEVOLUCION,
+  usuarios: USUARIOS,
+  incremento: (n) => admin.firestore.FieldValue.increment(n),
+  barajar: barajarConAzarSeguro,
+  claveDeSemana: () => clavePeriodo("semanal", new Date(), ZONA),
+  logger,
+});
+
+// ------------------------------------------------------ torneos: el panel
+
+export const crearTorneoAdmin = functions.https.onCall((data, context) =>
+  torneos.crear(context, validar(EsquemaTorneo, data, errorHttp)));
+
+export const editarTorneoAdmin = functions.https.onCall((data, context) => {
+  const d = validar(EsquemaEditarTorneo, data, errorHttp);
+  return torneos.editar(context, d.torneoId, d);
+});
+
+export const abrirInscripcionesAdmin = functions.https.onCall((data, context) =>
+  torneos.abrirInscripciones(context, validar(EsquemaIdTorneo, data, errorHttp).torneoId));
+
+export const cerrarInscripcionesAdmin = functions.https.onCall((data, context) =>
+  torneos.cerrarInscripciones(context, validar(EsquemaIdTorneo, data, errorHttp).torneoId));
+
+export const iniciarTorneoAdmin = functions.https.onCall((data, context) =>
+  torneos.iniciar(context, validar(EsquemaIdTorneo, data, errorHttp).torneoId));
+
+/**
+ * Cierra el torneo y paga.
+ *
+ * Viajan los UID de los ganadores en orden y NADA más. Cuánto cobra cada uno
+ * lo calcula el servidor con el pozo que el servidor guardó: si el monto
+ * llegara del panel, un error de tipeo pagaría el pozo entero al primero.
+ */
+export const finalizarTorneoAdmin = functions.https.onCall((data, context) => {
+  const d = validar(EsquemaGanadores, data, errorHttp);
+  return torneos.finalizar(context, d.torneoId, d.ganadores);
+});
+
+export const cancelarTorneoAdmin = functions.https.onCall((data, context) => {
+  const d = validar(EsquemaCancelarTorneo, data, errorHttp);
+  return torneos.cancelar(context, d.torneoId, { motivo: d.motivo });
+});
+
+export const detalleTorneoAdmin = functions.https.onCall((data, context) =>
+  torneos.detalle(context, validar(EsquemaIdTorneo, data, errorHttp).torneoId));
+
+/**
+ * Los umbrales de los premios físicos del ranking mensual.
+ *
+ * Se guardan en `configuracion/ranking` y sólo los lee el cierre de mes. Los
+ * de fábrica —20.000 para la remera, 19.000 para el llavero— viven en
+ * `reglas/configuracion.js`; esto los pisa sin tocar código.
+ *
+ * `umbralesValidos` ignora un umbral en cero o negativo y deja el de fábrica:
+ * es la clase de campo que se borra sin querer en un formulario, y un cero
+ * repartiría el premio a cualquiera.
+ */
+export const guardarUmbralesAdmin = functions.https.onCall(async (data, context) => {
+  await administradores.exigir(context);
+  const d = validar(EsquemaUmbrales, data, errorHttp);
+  await db.collection("configuracion").doc("ranking").set(
+    { remera: d.remera, llavero: d.llavero, actualizadoEn: marcaDeTiempo() },
+    { merge: true },
+  );
+  return { umbrales: umbralesValidos({ remera: d.remera, llavero: d.llavero }) };
+});
+
+/** Los umbrales vigentes, para que el panel muestre lo que hay. */
+export const leerUmbralesAdmin = functions.https.onCall(async (_data, context) => {
+  await administradores.exigir(context);
+  const snap = await db.collection("configuracion").doc("ranking").get();
+  return { umbrales: umbralesValidos(snap.data()) };
+});
+
+// --------------------------------------------------- torneos: el jugador
+
+/** Los torneos abiertos. No hace falta ser administrador para verlos. */
+export const listarTorneos = functions.https.onCall(async (_data, context) => {
+  exigirSesion(context, "listarTorneos");
+  return { torneos: await torneos.listar({ soloAbiertos: true }) };
+});
+
+/**
+ * Se anota y paga la entrada.
+ *
+ * Techo de plata: mueve Leyendas. Viaja el id del torneo y nada más — la
+ * entrada la lee el servidor del propio torneo, dentro de la transacción que
+ * cobra.
+ */
+export const inscribirseATorneo = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context, "inscribirseATorneo");
+  await limite.exigirRitmoDePlata(uid, "inscribirseATorneo");
+  return torneos.inscribir(uid, validar(EsquemaIdTorneo, data, errorHttp).torneoId);
 });
 
 /**
@@ -771,7 +957,13 @@ const cierre = crearCierre({
  */
 export const cerrarPartida = functions.https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "cerrarPartida");
-  return cierre.cerrarPartida({ uid, codigo: data?.codigo });
+  const r = await cierre.cerrarPartida({ uid, codigo: data?.codigo });
+  // Fuera de la transacción, a propósito: revisar una insignia es LEER los
+  // contadores que el cierre acaba de escribir, y adentro no se puede leer
+  // después de escribir. Es idempotente, así que si esto falla, la próxima
+  // partida otorga lo que faltó.
+  if (!r.yaEstaba) await insignias.otorgarAVarios(r.jugadores ?? []);
+  return r;
 });
 
 const enRed = crearMotorEnRed({
@@ -852,7 +1044,15 @@ export const cerrarVentanaDescarte = functions.https.onCall(async (data, context
  */
 export const avanzarPartida = functions.https.onCall(async (data, context) => {
   exigirSesion(context, "avanzarPartida");
-  return enRed.avanzarPartida({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
+  const r = await enRed.avanzarPartida({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
+  // Éste es el camino NORMAL de cierre —lo dispara el vencimiento del plazo,
+  // no un jugador—, así que las insignias tienen que revisarse acá también.
+  // Fuera de la transacción y por lo mismo de siempre: hay que leer contadores
+  // recién escritos.
+  if (r?.hizo === "cerrarPartida" && !r.yaEstaba) {
+    await insignias.otorgarAVarios(r.jugadores ?? []);
+  }
+  return r;
 });
 
 /** Cierra la fase de mirar. La decide el servidor con su reloj. */
@@ -998,6 +1198,49 @@ async function cerrarPeriodo(periodo, fechaDelPeriodoQueCierra) {
     premiados++;
   }
 
+  // ---- lo que sólo pasa al cerrar un mes ----
+  //
+  // Dos cosas que no son Leyendas: los premios FÍSICOS (remera y llavero) y la
+  // insignia de Leyenda, que se gana entrando al top 5. Van fuera del bucle de
+  // arriba —y fuera de sus transacciones— porque no mueven saldo: dejan
+  // constancia y otorgan, que son escrituras que se pueden repetir sin daño.
+  let fisicos = 0;
+  if (periodo === "mensual") {
+    const umbrales = umbralesValidos((await db.collection("configuracion").doc("ranking").get()).data());
+
+    for (let i = 0; i < tabla.docs.length; i++) {
+      const fila = tabla.docs[i];
+      const puesto = i + 1;
+
+      // El top 5 se lleva la insignia. Es lo único del ranking que queda para
+      // siempre: el puesto se pierde al mes siguiente, la insignia no.
+      if (puesto <= 5) {
+        await insignias.registrarPuestoMensual(fila.id, puesto);
+      }
+
+      const premio = premioFisicoDe(puesto, Number(fila.data().puntos ?? 0), umbrales);
+      if (!premio) continue;
+
+      // `premios` es una lista de constancias, no un saldo. Nadie la cobra
+      // desde acá: la mira un humano para saber qué mandar y a quién.
+      await db.collection(USUARIOS).doc(fila.id).set(
+        {
+          premios: admin.firestore.FieldValue.arrayUnion({
+            premio: premio.premio,
+            etiqueta: premio.etiqueta,
+            periodo: clave,
+            puesto,
+            puntos: premio.puntos,
+          }),
+        },
+        { merge: true },
+      );
+      await fila.ref.set({ premioFisico: premio.premio }, { merge: true });
+      fisicos++;
+      logger.info("Premio físico otorgado", { clave, uid: fila.id, puesto, premio: premio.premio });
+    }
+  }
+
   await refPeriodo.set(
     {
       tipo: periodo,
@@ -1005,6 +1248,7 @@ async function cerrarPeriodo(periodo, fechaDelPeriodoQueCierra) {
       cerrado: true,
       cerradoEn: admin.firestore.FieldValue.serverTimestamp(),
       premiados,
+      fisicos,
     },
     { merge: true },
   );

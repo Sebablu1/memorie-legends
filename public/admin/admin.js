@@ -35,6 +35,7 @@ import {
 // El catálogo de la tienda vive en su propio módulo: este archivo ya lleva
 // siete secciones, y el CRUD trae formulario, lista y estado propio.
 import { montarTiendaAdmin } from "./tienda-admin.js";
+import { montarTorneosAdmin } from "./torneos-admin.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -240,7 +241,10 @@ onAuthStateChanged(auth, (usuario) => {
 
   // El catálogo se engancha recién acá: sus cuatro llamadas exigen sesión de
   // administrador, así que montarlo antes sólo conseguiría cuatro rechazos.
-  if (esAdmin) montarTiendaAdmin();
+  if (esAdmin) {
+    montarTiendaAdmin();
+    montarTorneosAdmin();
+  }
 
   // Con sesión resuelta, la pantalla del código ya no va: o entró, o hay que
   // volver a empezar. Dejarla puesta muestra dos formularios a la vez.

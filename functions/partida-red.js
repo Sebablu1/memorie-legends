@@ -913,7 +913,7 @@ export function crearMotorEnRed({
         }
 
         // 3. ESCRIBIR: pagar y cerrar la sala.
-        const { cierre: registro } = await cierre.aplicar(tx, {
+        const { cierre: registro, jugadores } = await cierre.aplicar(tx, {
           ...datos,
           plan,
           // No lo pidió ningún jugador: lo disparó el vencimiento del plazo.
@@ -936,6 +936,11 @@ export function crearMotorEnRed({
           repartido: registro.repartido,
           sobrante: registro.sobrante,
           premios: registro.premios,
+          // Quiénes terminaron la partida. Quien llame a esto revisa después
+          // —fuera de la transacción— si alguno se ganó una insignia: eso
+          // necesita LEER los contadores que se acaban de escribir, y adentro
+          // Firestore no lo permite.
+          jugadores,
         };
       }
 

@@ -136,7 +136,18 @@
             Ver catálogo
           </button>
           <button class="btn sobrio" id="btnNuevoItem" type="button">Artículo nuevo</button>
+          <!-- Dos pasos a propósito: el primero MUESTRA cuáles, el segundo
+               apaga. Un botón que apaga diez artículos sin decir cuáles es un
+               botón que nadie se anima a tocar. -->
+          <button class="btn sobrio" id="btnVerViejos" type="button">
+            Buscar artículos de demostración
+          </button>
         </div>
+        <p class="nota" id="notaViejos" hidden>
+          Los del catálogo de demostración tienen un <b>emoji</b> donde va la
+          figura, en vez de una imagen. Apagarlos los saca de la tienda pero
+          <b>no</b> se los quita a quien los haya comprado.
+        </p>
         <div class="aviso" id="avisoCatalogo"></div>
 
         <!-- El formulario sirve para crear Y para editar: son la misma
@@ -279,6 +290,69 @@
       <section>
         <h2>Salas</h2>
         <div id="salas" class="lista"></div>
+      </section>
+
+      <!-- TORNEOS
+           Manuales: los crea el administrador y los mueve a mano paso por
+           paso. No hay torneos automáticos, y eso es a propósito — cada paso
+           hace algo irreversible con la plata de la gente. -->
+      <section>
+        <h2>Torneos</h2>
+        <p class="nota">
+          Un torneo va para adelante y no vuelve: <b>borrador → inscripciones →
+          completo → en curso → finalizado</b>. Se puede cancelar mientras nadie
+          esté jugando, y entonces se devuelven todas las entradas.
+          La entrada va de 5 a 20.000 Leyendas, de a 5.
+        </p>
+
+        <div class="campos-item">
+          <label class="ancho"><span>Nombre</span>
+            <input id="torneoNombre" type="text" maxlength="80" placeholder="Copa de Primavera" />
+          </label>
+          <label><span>Entrada (Leyendas)</span>
+            <input id="torneoEntrada" type="number" min="5" max="20000" step="5" value="100" />
+          </label>
+          <label><span>Máximo de jugadores</span>
+            <input id="torneoMaximo" type="number" min="4" step="1" value="10000" />
+          </label>
+          <label><span>Tipo</span>
+            <select id="torneoTipo">
+              <option value="especial">Especial</option>
+              <option value="semanal">Semanal</option>
+            </select>
+          </label>
+        </div>
+        <div class="acciones">
+          <button class="btn sobrio" id="btnCrearTorneo" type="button">Crear torneo</button>
+          <button class="btn sobrio" id="btnRefrescarTorneos" type="button">Ver torneos</button>
+        </div>
+        <div class="aviso" id="avisoTorneos"></div>
+        <div id="listaTorneos" class="lista"></div>
+      </section>
+
+      <!-- RANKING
+           Los umbrales de los premios FÍSICOS del cierre de mes. No son
+           Leyendas: el servidor sólo deja constancia de que corresponden. -->
+      <section>
+        <h2>Premios del ranking mensual</h2>
+        <p class="nota">
+          Al cerrar el mes, el <b>1.º</b> se lleva la remera si llegó a su
+          umbral de puntos, y el <b>2.º</b> el llavero. Son premios físicos:
+          quedan anotados en el perfil para que alguien los mande, no se pagan
+          en Leyendas.
+        </p>
+        <div class="campos-item">
+          <label><span>Remera (puesto 1)</span>
+            <input id="umbralRemera" type="number" min="1" step="1000" value="20000" />
+          </label>
+          <label><span>Llavero (puesto 2)</span>
+            <input id="umbralLlavero" type="number" min="1" step="1000" value="19000" />
+          </label>
+        </div>
+        <div class="acciones">
+          <button class="btn sobrio" id="btnGuardarUmbrales" type="button">Guardar umbrales</button>
+        </div>
+        <div class="aviso" id="avisoUmbrales"></div>
       </section>
 
       <section>

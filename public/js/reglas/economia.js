@@ -29,15 +29,21 @@
  * mintiendo, y la que mentía era justamente la que decía ser la oficial.
  */
 export const LEYENDAS_REGISTRO = 100;
-export const BONO_DIARIO = 10;
-export const HORAS_BONO_DIARIO = 24;
-export const LEYENDAS_POR_REFERIDO = 20;
+export const LEYENDAS_POR_REFERIDO = 25;
 
-export function esperaBonoDiario(ultimoBono, ahora = Date.now()) {
-  if (!ultimoBono) return 0;
-  const listo = new Date(ultimoBono).getTime() + HORAS_BONO_DIARIO * 3600_000;
-  return Math.max(0, listo - ahora);
-}
+/**
+ * Hubo un bono diario de 10 Leyendas cada 24 horas. Ya no.
+ *
+ * Estaba desplegado y era llamable, pero ningún botón lo llamaba: existía
+ * entero en el servidor y no existía en el juego. Se eliminó en vez de
+ * terminarlo, porque regalar saldo por entrar premia abrir la aplicación y no
+ * jugar, que es lo contrario de lo que mide todo el resto de la economía.
+ *
+ * `MOTIVOS.BONO_DIARIO` también se fue. Si alguien llegó a cobrarlo llamando a
+ * la función a mano, su asiento en el libro mayor conserva la cadena
+ * `"bono_diario"` y se sigue leyendo igual: los motivos se guardan como texto
+ * y nadie los valida contra esta lista al leer.
+ */
 
 // ------------------------------------------------------------- apuestas
 
@@ -165,13 +171,29 @@ export const precioPorLeyenda = (paquete) => paquete.precio / leyendasDePaquete(
 /** Motivos válidos de un movimiento de Leyendas, para auditar el libro mayor. */
 export const MOTIVOS = {
   REGISTRO: "registro",
-  BONO_DIARIO: "bono_diario",
   REFERIDO: "referido",
   APUESTA: "apuesta",
   // Sumidero de la casa: no va al pozo ni a otro jugador.
   PENALIZACION_ABANDONO: "penalizacion_abandono",
   PREMIO_PARTIDA: "premio_partida",
   PREMIO_RANKING: "premio_ranking",
+
+  /**
+   * Los tres movimientos de un torneo, separados a propósito.
+   *
+   * Podrían reusar `APUESTA` y `PREMIO_PARTIDA`, y sería un error: el libro
+   * mayor existe para poder preguntarle "¿en qué se fue el saldo?" y que la
+   * respuesta sirva. Con motivos compartidos, la entrada de un torneo y una
+   * apuesta de mesa serían indistinguibles, y una devolución de torneo
+   * parecería un premio.
+   *
+   * La devolución es su propio motivo y no un premio negativo porque va en la
+   * dirección contraria —acredita— y por un motivo distinto: al jugador no le
+   * fue bien, es que el torneo no se jugó.
+   */
+  TORNEO_ENTRADA: "torneo_entrada",
+  TORNEO_PREMIO: "torneo_premio",
+  TORNEO_DEVOLUCION: "torneo_devolucion",
   COMPRA: "compra",
 
   /**

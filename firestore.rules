@@ -195,6 +195,27 @@ service cloud.firestore {
       }
     }
 
+    // Ranking de campeonato: lo escribe el servidor al finalizar un torneo.
+    // Se lee porque es una tabla pública; escribirlo desde el navegador sería
+    // escribirse los puntos que uno quiera.
+    match /rankingCampeonato/{semana} {
+      allow read: if autenticado();
+      allow write: if false;
+
+      match /jugadores/{uid} {
+        allow read: if autenticado();
+        allow write: if false;
+      }
+    }
+
+    // Configuración que edita el panel (hoy, los umbrales de los premios
+    // físicos del ranking). NI LEER: no le sirve a nadie desde el navegador, y
+    // lo que no se expone no se filtra. El panel la lee por Cloud Function,
+    // que comprueba que quien pregunta sea administrador.
+    match /configuracion/{clave} {
+      allow read, write: if false;
+    }
+
     // Todo lo no contemplado queda cerrado.
     match /{documento=**} {
       allow read, write: if false;

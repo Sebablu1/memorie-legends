@@ -48,7 +48,6 @@ export async function leerPerfil(uid) {
     saldo: Number(datos[CAMPO_SALDO] ?? 0),
     partidas: Number(datos.gamesPlayed ?? 0),
     victorias: Number(datos.wins ?? 0),
-    ultimoBono: datos.lastDailyBonus ?? 0,
 
     /**
      * Lo que tiene puesto de la tienda: ids del catálogo, no imágenes.

@@ -44,6 +44,70 @@ export const TIPOS_VALIDOS = Object.values(TIPOS);
 export const esTipoValido = (tipo) => TIPOS_VALIDOS.includes(tipo);
 
 /**
+ * Qué se puede comprar con Leyendas.
+ *
+ * Las insignias NO. Son logros: se ganan jugando, y las otorga el servidor al
+ * cerrar una partida o un período de ranking (ver `reglas/insignias.js`).
+ *
+ * Esto es una lista y no un `precio: null` a propósito. El precio se edita
+ * desde el panel de administración, así que un precio es una defensa que un
+ * error de tipeo desarma; la lista no está en la base de datos y no se puede
+ * editar sin pasar por el código y por las pruebas. Y la comprobación vive en
+ * el servidor, donde el cliente no llega: esconder el botón de comprar no es
+ * impedir la compra.
+ */
+export const TIPOS_VENDIBLES = Object.freeze([TIPOS.AVATAR, TIPOS.DORSO]);
+
+export const esVendible = (tipo) => TIPOS_VENDIBLES.includes(tipo);
+
+/**
+ * Piso de precio para los avatares.
+ *
+ * No es una regla de la compra sino del CATÁLOGO: se comprueba al guardar,
+ * que es cuando alguien decide un precio. Comprobarlo al comprar dejaría
+ * artículos guardados pero imposibles de comprar, y el jugador vería un error
+ * por una decisión que no tomó él.
+ *
+ * El gratuito de arranque queda exento: es el que trae puesto quien recién
+ * llega. Y no se aplica a los dorsos, que arrancan más baratos a propósito.
+ */
+export const PRECIO_MINIMO_AVATAR = 100;
+export const AVATAR_INICIAL = "predeterminado";
+
+/**
+ * Cuánto se descuenta al llevar varios avatares de una.
+ *
+ * El descuento va por CANTIDAD DE ARTÍCULOS NUEVOS, no por lo que se gasta:
+ * si dos de los tres ya los tenía, paga uno y sin descuento. Si contara los
+ * tres, alcanzaría con meter en el pack algo ya comprado para abaratar lo
+ * demás.
+ */
+export const DESCUENTOS_PACK = Object.freeze({ 1: 0, 2: 0.15, 3: 0.25 });
+
+/** El máximo que entra en un pack. Más que esto es una lista de deseos. */
+export const MAXIMO_POR_PACK = 3;
+
+export const descuentoPorCantidad = (cantidad) => DESCUENTOS_PACK[cantidad] ?? 0;
+
+/**
+ * Lo que cuesta un pack, redondeado hacia abajo.
+ *
+ * Recibe la SUMA y la CANTIDAD, no la lista de precios. Podría recibir la
+ * lista y sumarla acá, pero entonces el servidor tendría que armar esa lista
+ * con un `.map` dentro de la transacción que cobra, y `pruebas/transacciones.mjs`
+ * marca —bien— cualquier bucle ahí adentro: es donde vivió un error real que
+ * pagaba una devolución por vuelta. Que la firma sea ésta le ahorra al llamador
+ * tener que elegir entre un bucle y una auditoría.
+ *
+ * Hacia abajo y no al más cercano: el redondeo lo paga la casa. Medio entero
+ * de diferencia no le cambia el negocio a nadie, y que el total mostrado sea
+ * siempre el que se cobra vale más que esa Leyenda.
+ */
+export function precioDePack(suma, cantidad) {
+  return Math.floor(Number(suma) * (1 - descuentoPorCantidad(cantidad)));
+}
+
+/**
  * En qué campo del perfil se guarda lo que el jugador tiene puesto.
  *
  * Uno por tipo, y por eso equipar es idempotente por naturaleza: el campo
@@ -109,6 +173,14 @@ export function problemasDelItem(item) {
   if (!Number.isInteger(precio)) problemas.push("El precio tiene que ser un número entero.");
   else if (precio < 0) problemas.push("El precio no puede ser negativo.");
   else if (precio > PRECIO_MAXIMO) problemas.push(`El precio no puede pasar de ${PRECIO_MAXIMO}.`);
+  else if (
+    item?.tipo === TIPOS.AVATAR &&
+    item?.id !== AVATAR_INICIAL &&
+    precio > 0 &&
+    precio < PRECIO_MINIMO_AVATAR
+  ) {
+    problemas.push(`Un avatar no puede costar menos de ${PRECIO_MINIMO_AVATAR} Leyendas.`);
+  }
 
   if (!texto(item?.imagen)) problemas.push("Falta la imagen.");
 
@@ -196,38 +268,40 @@ export const CATALOGO_INICIAL = [
   // `herramientas/recortar-fondo.mjs`; el PNG original se conserva al lado
   // como fuente sin pérdida.
   //
-  // Los precios son un punto de partida, escalonados por rareza. No hay que
-  // volver acá para cambiarlos: se editan desde el panel, que es la razón de
-  // que el catálogo viva en Firestore.
+  // Los precios van escalonados por rareza: 100 el común, 150 los poco
+  // comunes, 300 los raros, 450 los épicos y 600 el legendario. No hay que
+  // volver acá para cambiarlos —se editan desde el panel, que es la razón de
+  // que el catálogo viva en Firestore—; esto es la semilla, no la verdad.
   { id: "predeterminado", tipo: TIPOS.AVATAR, nombre: "Predeterminado", descripcion: "Con el que todos empiezan.", precio: 0, imagen: "/img/avatar/predeterminado.webp", activo: true, orden: 10, metadata: { rareza: "inicial" } },
-  { id: "el_as", tipo: TIPOS.AVATAR, nombre: "El As", descripcion: "Empezar de nuevo, siempre.", precio: 200, imagen: "/img/avatar/el_as.webp", activo: true, orden: 20, metadata: { rareza: "comun" } },
-  { id: "el_caballo", tipo: TIPOS.AVATAR, nombre: "El Caballo", descripcion: "Vale cero, y por eso vale tanto.", precio: 200, imagen: "/img/avatar/el_caballo.webp", activo: true, orden: 30, metadata: { rareza: "comun" } },
-  { id: "mago", tipo: TIPOS.AVATAR, nombre: "El Mago", descripcion: "Sabe lo que hay antes de darlo vuelta.", precio: 400, imagen: "/img/avatar/mago.webp", activo: true, orden: 40, metadata: { rareza: "comun" } },
-  { id: "pirata", tipo: TIPOS.AVATAR, nombre: "El Pirata", descripcion: "Toma lo que necesita y corta.", precio: 400, imagen: "/img/avatar/pirata.webp", activo: true, orden: 50, metadata: { rareza: "comun" } },
-  { id: "orco", tipo: TIPOS.AVATAR, nombre: "El Orco", descripcion: "No calcula: arrasa.", precio: 600, imagen: "/img/avatar/orco.webp", activo: true, orden: 60, metadata: { rareza: "raro" } },
-  { id: "caballera", tipo: TIPOS.AVATAR, nombre: "La Caballera", descripcion: "Aguanta hasta el último punto.", precio: 600, imagen: "/img/avatar/caballera.webp", activo: true, orden: 70, metadata: { rareza: "raro" } },
-  { id: "sacerdotisa", tipo: TIPOS.AVATAR, nombre: "La Sacerdotisa", descripcion: "Ve lo que los demás olvidaron.", precio: 800, imagen: "/img/avatar/sacerdotisa.webp", activo: true, orden: 80, metadata: { rareza: "raro" } },
-  { id: "el_zorro", tipo: TIPOS.AVATAR, nombre: "El Zorro", descripcion: "Corta justo antes de que lo corten.", precio: 800, imagen: "/img/avatar/el_zorro.webp", activo: true, orden: 90, metadata: { rareza: "raro" } },
-  { id: "asesino", tipo: TIPOS.AVATAR, nombre: "El Asesino", descripcion: "Nadie lo ve venir hasta el descarte.", precio: 1500, imagen: "/img/avatar/asesino.webp", activo: true, orden: 100, metadata: { rareza: "epico" } },
-  { id: "necromante", tipo: TIPOS.AVATAR, nombre: "El Necromante", descripcion: "Se acuerda de las cartas que ya se fueron.", precio: 1500, imagen: "/img/avatar/necromante.webp", activo: true, orden: 110, metadata: { rareza: "epico" } },
-  { id: "el_rey", tipo: TIPOS.AVATAR, nombre: "El Rey", descripcion: "La figura que corona la baraja.", precio: 2500, imagen: "/img/avatar/el_rey.webp", activo: true, orden: 120, metadata: { rareza: "legendario" } },
-  { id: "el_dragon", tipo: TIPOS.AVATAR, nombre: "El Dragón", descripcion: "Se ve desde la otra punta de la mesa.", precio: 2500, imagen: "/img/avatar/el_dragon.webp", activo: true, orden: 130, metadata: { rareza: "legendario" } },
+  { id: "el_as", tipo: TIPOS.AVATAR, nombre: "El As", descripcion: "Empezar de nuevo, siempre.", precio: 100, imagen: "/img/avatar/el_as.webp", activo: true, orden: 20, metadata: { rareza: "comun" } },
+  { id: "el_caballo", tipo: TIPOS.AVATAR, nombre: "El Caballo", descripcion: "Vale cero, y por eso vale tanto.", precio: 150, imagen: "/img/avatar/el_caballo.webp", activo: true, orden: 30, metadata: { rareza: "poco_comun" } },
+  { id: "mago", tipo: TIPOS.AVATAR, nombre: "El Mago", descripcion: "Sabe lo que hay antes de darlo vuelta.", precio: 300, imagen: "/img/avatar/mago.webp", activo: true, orden: 40, metadata: { rareza: "raro" } },
+  { id: "pirata", tipo: TIPOS.AVATAR, nombre: "El Pirata", descripcion: "Toma lo que necesita y corta.", precio: 300, imagen: "/img/avatar/pirata.webp", activo: true, orden: 50, metadata: { rareza: "raro" } },
+  { id: "orco", tipo: TIPOS.AVATAR, nombre: "El Orco", descripcion: "No calcula: arrasa.", precio: 150, imagen: "/img/avatar/orco.webp", activo: true, orden: 60, metadata: { rareza: "poco_comun" } },
+  { id: "caballera", tipo: TIPOS.AVATAR, nombre: "La Caballera", descripcion: "Aguanta hasta el último punto.", precio: 300, imagen: "/img/avatar/caballera.webp", activo: true, orden: 70, metadata: { rareza: "raro" } },
+  { id: "sacerdotisa", tipo: TIPOS.AVATAR, nombre: "La Sacerdotisa", descripcion: "Ve lo que los demás olvidaron.", precio: 300, imagen: "/img/avatar/sacerdotisa.webp", activo: true, orden: 80, metadata: { rareza: "raro" } },
+  { id: "el_zorro", tipo: TIPOS.AVATAR, nombre: "El Zorro", descripcion: "Corta justo antes de que lo corten.", precio: 150, imagen: "/img/avatar/el_zorro.webp", activo: true, orden: 90, metadata: { rareza: "poco_comun" } },
+  { id: "asesino", tipo: TIPOS.AVATAR, nombre: "El Asesino", descripcion: "Nadie lo ve venir hasta el descarte.", precio: 300, imagen: "/img/avatar/asesino.webp", activo: true, orden: 100, metadata: { rareza: "raro" } },
+  { id: "necromante", tipo: TIPOS.AVATAR, nombre: "El Necromante", descripcion: "Se acuerda de las cartas que ya se fueron.", precio: 450, imagen: "/img/avatar/necromante.webp", activo: true, orden: 110, metadata: { rareza: "epico" } },
+  { id: "el_rey", tipo: TIPOS.AVATAR, nombre: "El Rey", descripcion: "La figura que corona la baraja.", precio: 450, imagen: "/img/avatar/el_rey.webp", activo: true, orden: 120, metadata: { rareza: "epico" } },
+  { id: "el_dragon", tipo: TIPOS.AVATAR, nombre: "El Dragón", descripcion: "Se ve desde la otra punta de la mesa.", precio: 600, imagen: "/img/avatar/el_dragon.webp", activo: true, orden: 130, metadata: { rareza: "legendario" } },
 
   // ----------------------------------------------------------- insignias
   //
-  // Las seis dibujadas, en el orden en que se ganan. Los precios quedan como
-  // estaban hasta que se decida si se compran o se ganan jugando: apagarlas o
-  // regalarlas es un cambio de un campo desde el panel, no de este archivo.
+  // Las seis, en el orden en que se ganan. NO SE VENDEN: `TIPOS_VENDIBLES` no
+  // las incluye y el servidor rechaza comprarlas. El precio en cero no es lo
+  // que las protege —es sólo lo que hace que el campo no mienta—; la condición
+  // de cada una está en `reglas/insignias.js`.
   { id: "novato", tipo: TIPOS.INSIGNIA, nombre: "Novato", descripcion: "Por donde empieza todo el mundo.", precio: 0, imagen: "/img/insignias/novato.webp", activo: true, orden: 10, metadata: { rareza: "inicial" } },
-  { id: "aventurero", tipo: TIPOS.INSIGNIA, nombre: "Aventurero", descripcion: "Para quien ya se sentó en varias mesas.", precio: 400, imagen: "/img/insignias/aventurero.webp", activo: true, orden: 20, metadata: { rareza: "comun" } },
-  { id: "estratega", tipo: TIPOS.INSIGNIA, nombre: "Estratega", descripcion: "Gana pensando, no adivinando.", precio: 800, imagen: "/img/insignias/estratega.webp", activo: true, orden: 30, metadata: { rareza: "raro" } },
-  { id: "heroe", tipo: TIPOS.INSIGNIA, nombre: "Héroe", descripcion: "Remontó una que estaba perdida.", precio: 1500, imagen: "/img/insignias/heroe.webp", activo: true, orden: 40, metadata: { rareza: "epico" } },
-  { id: "campeon", tipo: TIPOS.INSIGNIA, nombre: "Campeón", descripcion: "Ganó un campeonato entero.", precio: 3000, imagen: "/img/insignias/campeon.webp", activo: true, orden: 50, metadata: { rareza: "epico" } },
-  { id: "leyenda", tipo: TIPOS.INSIGNIA, nombre: "Leyenda", descripcion: "La que le da el nombre al juego.", precio: 5000, imagen: "/img/insignias/leyenda.webp", activo: true, orden: 60, metadata: { rareza: "legendario" } },
+  { id: "aventurero", tipo: TIPOS.INSIGNIA, nombre: "Aventurero", descripcion: "Para quien ya se sentó en varias mesas.", precio: 0, imagen: "/img/insignias/aventurero.webp", activo: true, orden: 20, metadata: { rareza: "comun" } },
+  { id: "estratega", tipo: TIPOS.INSIGNIA, nombre: "Estratega", descripcion: "Gana pensando, no adivinando.", precio: 0, imagen: "/img/insignias/estratega.webp", activo: true, orden: 30, metadata: { rareza: "raro" } },
+  { id: "heroe", tipo: TIPOS.INSIGNIA, nombre: "Héroe", descripcion: "Remontó una que estaba perdida.", precio: 0, imagen: "/img/insignias/heroe.webp", activo: true, orden: 40, metadata: { rareza: "epico" } },
+  { id: "campeon", tipo: TIPOS.INSIGNIA, nombre: "Campeón", descripcion: "Ganó un campeonato entero.", precio: 0, imagen: "/img/insignias/campeon.webp", activo: true, orden: 50, metadata: { rareza: "epico" } },
+  { id: "leyenda", tipo: TIPOS.INSIGNIA, nombre: "Leyenda", descripcion: "La que le da el nombre al juego.", precio: 0, imagen: "/img/insignias/leyenda.webp", activo: true, orden: 60, metadata: { rareza: "legendario" } },
 
   // -------------------------------------------------------------- dorsos
   { id: "dorso_azul", tipo: TIPOS.DORSO, nombre: "Dorso Azul", descripcion: "El de siempre.", precio: 0, imagen: "/img/dorsos/dorso-azul.png", activo: true, orden: 10, metadata: { rareza: "inicial" } },
-  { id: "dorso_rojo", tipo: TIPOS.DORSO, nombre: "Dorso Rojo", descripcion: "El otro de siempre.", precio: 0, imagen: "/img/dorsos/dorso-rojo.png", activo: true, orden: 20, metadata: { rareza: "inicial" } },
+  { id: "dorso_rojo", tipo: TIPOS.DORSO, nombre: "Dorso Rojo", descripcion: "El otro de siempre.", precio: 80, imagen: "/img/dorsos/dorso-rojo.png", activo: true, orden: 20, metadata: { rareza: "inicial" } },
 ];
 
 /**

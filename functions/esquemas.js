@@ -135,12 +135,83 @@ export const EsquemaCompra = z.object({ paqueteId: z.string().min(1).max(64) });
  * que una llamada con un id imposible se rechaza en la puerta y no llega a
  * consultar Firestore.
  */
-export const EsquemaItem = z.object({
-  itemId: z
-    .string()
-    .min(2)
-    .max(64)
-    .regex(/^[a-z0-9_-]+$/, "El id del artículo no tiene una forma válida."),
+const idDeItem = z
+  .string()
+  .min(2)
+  .max(64)
+  .regex(/^[a-z0-9_-]+$/, "El id del artículo no tiene una forma válida.");
+
+export const EsquemaItem = z.object({ itemId: idDeItem });
+
+/**
+ * Un pack: de uno a tres artículos.
+ *
+ * El techo de tres está acá Y en `reglas/catalogo.js`. No es duplicación
+ * gratuita: éste rechaza el pedido antes de abrir una transacción, y aquél es
+ * el que vale, porque el esquema valida la FORMA de la llamada y el servidor
+ * valida la REGLA. Si alguien encontrara un camino a la tienda que no pase por
+ * este esquema, el límite seguiría estando.
+ */
+export const EsquemaPack = z.object({
+  itemIds: z.array(idDeItem).min(1).max(3),
+});
+
+/** El tipo de artículo, para sacarse lo que se tenga puesto. */
+export const EsquemaTipo = z.object({
+  tipo: z.enum(["avatar", "insignia", "dorso"]),
+});
+
+// -------------------------------------------------------------- torneos
+
+/**
+ * Un torneo entrando por el panel.
+ *
+ * La ENTRADA se valida acá sólo como número entero: el rango y el paso de 5
+ * los comprueba `problemasDeEntrada` en `reglas/configuracion.js`, que es
+ * donde vive esa decisión. Repetir el rango en los dos lugares es cómo se
+ * llega a que uno diga 20000 y el otro 10000, y a que nadie sepa cuál manda.
+ */
+export const EsquemaTorneo = z.object({
+  nombre: z.string().min(1).max(80),
+  tipo: z.enum(["especial", "semanal"]).optional().default("especial"),
+  entrada: z.coerce.number().int(),
+  maxJugadores: z.coerce.number().int().min(4).optional(),
+});
+
+/** El id de un torneo, que lo genera Firestore. */
+export const EsquemaIdTorneo = z.object({
+  torneoId: z.string().min(6).max(64).regex(/^[A-Za-z0-9_-]+$/),
+});
+
+/** Editar: el id más los campos. */
+export const EsquemaEditarTorneo = EsquemaIdTorneo.merge(EsquemaTorneo);
+
+/**
+ * Quiénes ganaron, en orden.
+ *
+ * Viajan los UID y NADA más: cuánto cobra cada uno lo calcula el servidor con
+ * el pozo que el servidor guardó. Si el monto viniera de acá, el panel podría
+ * pagar el pozo entero al primero, o más.
+ */
+export const EsquemaGanadores = EsquemaIdTorneo.extend({
+  ganadores: z.array(z.string().min(1).max(128)).min(1).max(4),
+});
+
+/**
+ * Los umbrales de los premios físicos del ranking mensual.
+ *
+ * Enteros positivos y con techo. El techo no es paranoia: un umbral de un
+ * millón no rompe nada, pero deja el premio inalcanzable sin que nadie se
+ * entere, y eso se parece demasiado a que el premio no exista.
+ */
+export const EsquemaUmbrales = z.object({
+  remera: z.coerce.number().int().min(1).max(10_000_000),
+  llavero: z.coerce.number().int().min(1).max(10_000_000),
+});
+
+/** Cancelar, con un motivo opcional que queda escrito. */
+export const EsquemaCancelarTorneo = EsquemaIdTorneo.extend({
+  motivo: z.string().max(300).optional().default(""),
 });
 
 /**

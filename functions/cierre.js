@@ -61,6 +61,20 @@ export function crearCierre({
   marcaDeTiempo,
   error,
   estados,
+  usuarios = "users",
+  /**
+   * Cómo sumar uno a un contador sin leerlo.
+   *
+   * Entra por parámetro —y no como `admin.firestore.FieldValue.increment`
+   * escrito acá— por lo mismo que el reloj: para que las pruebas puedan
+   * montar este módulo sin un Firestore de verdad. En producción lo provee
+   * `index.js`.
+   *
+   * Que NO haga falta leer es lo que permite contar dentro de la misma
+   * transacción que paga los premios: Firestore prohíbe leer después de
+   * escribir, y para cuando se cuenta ya se escribió.
+   */
+  incremento = null,
 }) {
   /**
    * Quiénes pueden cobrar, en orden.
@@ -200,7 +214,34 @@ export function crearCierre({
       terminadaEn: marcaDeTiempo(),
     });
 
-    return { cierre, refPartida };
+    // ---- las estadísticas de por vida ----
+    //
+    // Acá y no en el navegador. `partidasJugadas` y `partidasGanadas` son lo
+    // que decide una insignia, así que si las escribiera el cliente, las
+    // insignias las decidiría el cliente. Es el mismo argumento que ya obligó
+    // a que el ganador lo determine el servidor y no llegue en la llamada.
+    //
+    // Se cuenta a los humanos que no abandonaron: la IA no tiene perfil, y
+    // quien se fue a mitad de partida no jugó una partida entera. El ganador
+    // es la posición 1 entre los que quedaron, que es exactamente el criterio
+    // con el que se pagó el premio unas líneas más arriba.
+    const elegibles = elegiblesParaPremio(partida.estado, plan.abandonaron);
+    if (incremento) {
+      for (const jugador of elegibles) {
+        tx.set(
+          db.collection(usuarios).doc(jugador.id),
+          {
+            partidasJugadas: incremento(1),
+            partidasGanadas: incremento(jugador.puestoPagado === 1 ? 1 : 0),
+          },
+          { merge: true },
+        );
+      }
+    }
+
+    // `jugadores` sale para arriba porque quien llame tiene que revisar las
+    // insignias DESPUÉS de que esta transacción termine.
+    return { cierre, refPartida, jugadores: elegibles.map((j) => j.id) };
   }
 
   // ------------------------------------------------------- la callable
@@ -225,7 +266,7 @@ export function crearCierre({
       const plan = planificar(datos);
       if (plan.yaEstaba) return { yaEstaba: true, ...(plan.cierre ?? {}) };
 
-      const { cierre } = await aplicar(tx, { ...datos, plan, cerradaPor: uid });
+      const { cierre, jugadores } = await aplicar(tx, { ...datos, plan, cerradaPor: uid });
 
       // La partida queda marcada como cerrada, sin tocar su estado de juego:
       // sigue sirviendo para mostrar el resultado y para auditar.
@@ -236,7 +277,7 @@ export function crearCierre({
         version: datos.partida.version + 1,
       });
 
-      return { yaEstaba: false, ...cierre };
+      return { yaEstaba: false, jugadores, ...cierre };
     });
   }
 

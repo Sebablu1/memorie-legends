@@ -292,7 +292,8 @@ console.log("\n=== 4. Quién llama a moverLeyendas ===");
     "cierre.js",     // reparto del pozo 75/25
     "salida.js",     // devolución al salir de una sala que no empezó
     "admin.js",      // devolución al cancelar una sala desde el panel
-    "tienda.js",     // cobro de un avatar, una insignia o un dorso
+    "tienda.js",     // cobro de un avatar o un dorso
+    "torneos.js",    // entrada, premio y devolución de un torneo
   ]);
   const raros = llamadas.filter((c) => !CONOCIDOS.has(c.archivo));
   ok(raros.length === 0, "todas están en operaciones económicas conocidas", raros);

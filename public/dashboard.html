@@ -22,6 +22,7 @@
     <!-- Lo propio del tablero, en su hoja: app.css lo comparten varias
          páginas y crecía con cosas que sólo se usan acá. -->
     <link rel="stylesheet" href="css/tablero.css" />
+    <link rel="stylesheet" href="css/logros.css" />
     <link rel="stylesheet" href="css/pie.css" />
       <meta name="description" content="Elegí cómo jugar: entrenamiento gratis contra la IA, con uno a tres rivales y cuatro niveles, o una sala multijugador por Leyendas con tus amigos." />
     <!-- La tarjeta que se ve al compartir el enlace.
@@ -299,6 +300,17 @@
           <span class="pie-tarjeta">Ver paquetes →</span>
         </a>
 
+      </section>
+
+      <!-- La vitrina de logros. Las insignias NO se compran: las otorga el
+           servidor al terminar una partida o al cerrar un ranking, así que acá
+           no hay ningún botón de comprar — sólo el de ponerse la que ya se
+           ganó. La condición de cada una está a la vista, cumplida o no,
+           porque una insignia que no se sabe cómo se gana no motiva nada. -->
+      <section class="panel vitrina-logros" id="vitrinaLogros" style="margin-top: 22px" hidden>
+        <h2>Tus logros</h2>
+        <p class="aviso-tienda" id="avisoLogros" role="status" aria-live="polite"></p>
+        <div class="rejilla-logros" id="rejillaLogros"></div>
       </section>
 
       <section class="rejilla dos-columnas" style="margin-top: 22px">

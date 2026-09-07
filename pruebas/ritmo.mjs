@@ -146,10 +146,11 @@ console.log("\n=== Las de plata están apretadas ===");
   // nada estuviera mal. Con la lista, agregar una función que mueva Leyendas
   // obliga a escribirla acá — que es justo la revisión que se quiere forzar.
   const ESPERADAS = [
-    "reclamarBonoDiario",
     "acreditarReferido",
     "crearOrdenDeCompra",
     "comprarItem",
+    "comprarPack",
+    "inscribirseATorneo",
   ];
   const declaradas = Object.keys(LIMITES_DE_PLATA).sort();
   ok(
@@ -211,18 +212,18 @@ console.log("\n=== El contador de plata lee antes de escribir ===");
   let t = 7_000_000;
   const g = crearLimiteDeRitmo({ db: falsoDb, error, ahora: () => t });
 
-  for (let i = 0; i < LIMITES_DE_PLATA.reclamarBonoDiario; i++) {
-    await g.exigirRitmoDePlata("ana", "reclamarBonoDiario");
+  for (let i = 0; i < LIMITES_DE_PLATA.acreditarReferido; i++) {
+    await g.exigirRitmoDePlata("ana", "acreditarReferido");
   }
   ok(!leyoDespuesDeEscribir, "nunca lee después de escribir");
 
   let salto = null;
-  try { await g.exigirRitmoDePlata("ana", "reclamarBonoDiario"); } catch (e) { salto = e; }
+  try { await g.exigirRitmoDePlata("ana", "acreditarReferido"); } catch (e) { salto = e; }
   ok(salto?.codigo === "resource-exhausted", "y frena al pasarse del techo");
 
   t += 61_000;
   let paso = true;
-  try { await g.exigirRitmoDePlata("ana", "reclamarBonoDiario"); } catch { paso = false; }
+  try { await g.exigirRitmoDePlata("ana", "acreditarReferido"); } catch { paso = false; }
   ok(paso, "pasado el minuto vuelve a dejar pasar");
 }
 

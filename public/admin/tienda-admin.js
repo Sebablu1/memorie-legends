@@ -33,6 +33,7 @@ const listarCatalogo = httpsCallable(funciones, "listarCatalogoAdmin");
 const guardarItem = httpsCallable(funciones, "guardarItemAdmin");
 const activarItem = httpsCallable(funciones, "activarItemAdmin");
 const borrarItem = httpsCallable(funciones, "borrarItemAdmin");
+const apagarViejos = httpsCallable(funciones, "apagarCatalogoViejoAdmin");
 
 /** Escapa lo que venga de la base. Mismo criterio que `admin.js`. */
 const limpio = (t) =>
@@ -217,6 +218,59 @@ async function borrar(id) {
   }
 }
 
+// ------------------------------------- limpiar el catálogo de demostración
+
+/**
+ * Apaga los artículos que quedaron del catálogo de mentira, en dos pasos.
+ *
+ * El primer toque SIMULA: le pregunta al servidor cuáles apagaría y los nombra
+ * sin tocar nada. El segundo apaga. Es la misma llamada con una bandera
+ * distinta, así que la lista que se ve es exactamente la que se va a apagar —
+ * no una segunda consulta que podría contestar otra cosa.
+ *
+ * Dos pasos y no uno porque un botón que apaga diez artículos sin decir cuáles
+ * es un botón que nadie se anima a tocar.
+ */
+let viejosPorApagar = null;
+
+async function limpiarViejos() {
+  const boton = $("btnVerViejos");
+  boton.disabled = true;
+
+  try {
+    if (!viejosPorApagar) {
+      const { data } = await apagarViejos({ simular: true });
+      viejosPorApagar = data.candidatos ?? [];
+
+      if (!viejosPorApagar.length) {
+        decir($("avisoCatalogoLista"), "No quedan artículos de demostración.", "bien");
+        return;
+      }
+
+      $("notaViejos").hidden = false;
+      decir(
+        $("avisoCatalogoLista"),
+        `${viejosPorApagar.length} para apagar: ` +
+          viejosPorApagar.map((c) => `${c.nombre} (${c.imagen})`).join(", ") +
+          ". Tocá de nuevo para apagarlos.",
+      );
+      boton.textContent = `Apagar esos ${viejosPorApagar.length}`;
+      return;
+    }
+
+    const { data } = await apagarViejos();
+    decir($("avisoCatalogoLista"), `Listo: ${data.apagados} apagados.`, "bien");
+    viejosPorApagar = null;
+    boton.textContent = "Buscar artículos de demostración";
+    $("notaViejos").hidden = true;
+    await refrescar();
+  } catch (error) {
+    decir($("avisoCatalogoLista"), error?.message ?? "No se pudo.", "mal");
+  } finally {
+    boton.disabled = false;
+  }
+}
+
 // ------------------------------------------------------------- arranque
 
 /**
@@ -235,6 +289,7 @@ export function montarTiendaAdmin() {
   $("btnGuardarItem").addEventListener("click", guardar);
   $("btnNuevoItem").addEventListener("click", limpiarFormulario);
   $("btnRefrescarCatalogo").addEventListener("click", refrescar);
+  $("btnVerViejos")?.addEventListener("click", limpiarViejos);
 
   // Delegación: la lista se repinta entera en cada operación, así que
   // enganchar botón por botón dejaría escuchadores muertos en cada vuelta.

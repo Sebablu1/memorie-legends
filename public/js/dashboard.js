@@ -28,6 +28,7 @@ import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/
 // caracteres) no hace falta acá y no se trae.
 import { armarRivales, NIVELES, limiteDelModo, MODOS_PARTIDA } from "./rivales.js";
 import { pintarAvatarCabecera, pintarInsignia } from "./equipado.js";
+import { montarLogros } from "./logros.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -99,7 +100,7 @@ if (sesion) {
   // equipado, o si el catálogo no responde, queda la foto de siempre.
   pintarAvatarCabecera({ equipado: perfil.equipado?.avatar, foto: usuario.photoURL });
 
-  // La insignia va junto al nombre, que es donde uno la muestra: se compra
+  // La insignia va junto al nombre, que es donde uno la muestra: se gana
   // para que se vea, no para tenerla guardada.
   pintarInsignia({ equipado: perfil.equipado?.insignia });
 
@@ -120,6 +121,11 @@ if (sesion) {
   $("statSaldo").textContent = perfil.saldo.toLocaleString("es-UY");
   $("statPartidas").textContent = perfil.partidas;
   $("statVictorias").textContent = perfil.victorias;
+
+  // Sin `await`: la vitrina hace dos viajes al servidor y el panel no tiene
+  // por qué esperarlos. Se muestra sola cuando llega, y si no llega no se
+  // muestra — pero nadie se queda sin poder entrar a jugar por eso.
+  montarLogros();
 
   arrancarSalas();
 }
