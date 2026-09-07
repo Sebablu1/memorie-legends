@@ -85,10 +85,11 @@ const precioTexto = (n) => (n === 0 ? "Gratis" : `${n.toLocaleString("es-UY")} L
 /**
  * La imagen de un artículo.
  *
- * El catálogo de demostración usa emojis para no inventar veinte PNG que
- * después habría que reemplazar; cuando el panel permita subir imágenes, el
- * campo va a traer una ruta. `imagenEsArchivo` distingue las dos formas sin
- * que haya que migrar nada.
+ * Todos los artículos del catálogo apuntan hoy a un archivo. Pero el panel de
+ * administración deja escribir el campo a mano, y ahí lo más rápido para
+ * probar un artículo nuevo es pegar un emoji: `imagenEsArchivo` distingue las
+ * dos formas, porque un emoji dentro de un `src` no es una imagen rota, es una
+ * petición a una URL que no existe.
  */
 function dibujarImagen(item) {
   if (imagenEsArchivo(item.imagen)) {

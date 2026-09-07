@@ -25,7 +25,12 @@
 import { crearTienda } from "../functions/tienda.js";
 import { crearMoverLeyendas } from "../functions/leyendas.js";
 import { MOTIVOS } from "../public/js/reglas/economia.js";
-import { CATALOGO_INICIAL, CAMPO_EQUIPADO, TIPOS } from "../public/js/reglas/catalogo.js";
+import {
+  CATALOGO_INICIAL,
+  CAMPO_EQUIPADO,
+  TIPOS,
+  problemasDelItem,
+} from "../public/js/reglas/catalogo.js";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -54,7 +59,7 @@ const capturar = async (fn) => {
 /**
  * Firestore de mentira, con subcolecciones.
  *
- * La ruta de un documento es su clave: `users/ana/items/avatar-dragon`. Eso
+ * La ruta de un documento es su clave: `users/ana/items/el_dragon`. Eso
  * alcanza para lo único que hace falta —leer y escribir por id— y de paso hace
  * que las subcolecciones no necesiten una sola línea de código extra.
  *
@@ -164,9 +169,16 @@ function montar({ saldo = 5000, catalogo = CATALOGO_INICIAL } = {}) {
   return { db, tienda };
 }
 
-const DRAGON = "avatar-dragon"; // 2500
-const ZORRO = "avatar-zorro"; // 800
-const REY = "avatar-rey"; // 0
+// Tres artículos del catálogo real, elegidos por su PRECIO y no por su nombre:
+// uno caro, uno intermedio y uno gratis. Si mañana cambian de precio desde el
+// panel, la semilla del código —que es la que monta estas pruebas— no cambia.
+const DRAGON = "el_dragon"; // 2500
+const ZORRO = "el_zorro"; // 800
+const REY = "predeterminado"; // 0
+// Y una insignia barata: la sección 8 compra dos cosas con un solo saldo, así
+// que si acá entrara la insignia cara la prueba fallaría por falta de fondos y
+// diría "no se puede equipar" cuando el problema sería otro.
+const INSIGNIA = "estratega"; // 800
 
 // =====================================================================
 console.log("\n=== 1. Comprar cobra el precio del catálogo, no el que le manden ===");
@@ -314,13 +326,13 @@ console.log("\n=== 8. Equipar de un tipo no toca los otros ===");
 {
   const { db, tienda } = montar({ saldo: 5000 });
   await tienda.comprar("ana", DRAGON);
-  await tienda.comprar("ana", "insignia-corona");
+  await tienda.comprar("ana", INSIGNIA);
   await tienda.equipar("ana", DRAGON);
-  await tienda.equipar("ana", "insignia-corona");
+  await tienda.equipar("ana", INSIGNIA);
 
   const perfil = db._leer("users/ana");
   ok(perfil.avatar === DRAGON, "el avatar sigue puesto");
-  ok(perfil.insignia === "insignia-corona", "y la insignia también");
+  ok(perfil.insignia === INSIGNIA, "y la insignia también");
 }
 
 // =====================================================================
@@ -525,6 +537,57 @@ console.log("\n=== 15. Todo el CRUD exige ser administrador ===");
   }
 
   ok(db._leer("catalogo/x").nombre === "X", "y el catálogo quedó intacto");
+}
+
+// =====================================================================
+console.log("\n=== 16. La semilla es válida y sus imágenes existen ===");
+// =====================================================================
+
+/**
+ * Lo que se defiende: que el catálogo de arranque no apunte a archivos que no
+ * están.
+ *
+ * Es el error que no falla en ningún lado. La siembra escribe el documento sin
+ * chistar, el servidor cobra sin chistar, y lo único que pasa es que en la
+ * tienda hay un hueco donde iba una figura — y en la barra, un avatar que el
+ * jugador pagó y no se ve. Se descubre mirando, o no se descubre.
+ */
+{
+  const { readFileSync, existsSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const raiz = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+
+  const { imagenEsArchivo } = await import("../public/js/reglas/catalogo.js");
+
+  let invalidos = 0;
+  let faltantes = [];
+  const ids = new Set();
+  let repetidos = [];
+
+  for (const item of CATALOGO_INICIAL) {
+    if (problemasDelItem(item).length) invalidos++;
+    if (ids.has(item.id)) repetidos.push(item.id);
+    ids.add(item.id);
+    if (imagenEsArchivo(item.imagen) && !existsSync(join(raiz, "public", item.imagen))) {
+      faltantes.push(`${item.id} → ${item.imagen}`);
+    }
+  }
+
+  ok(invalidos === 0, "todos los artículos de la semilla son válidos", invalidos);
+  ok(repetidos.length === 0, "ningún id repetido", repetidos);
+  ok(faltantes.length === 0, "todas las imágenes existen en el disco", faltantes);
+
+  // Los ids viajan en URLs y en rutas de Firestore. Un acento ahí se convierte
+  // en `%C3%B3n` y se arrastra a cada comparación.
+  const conAcento = CATALOGO_INICIAL.filter((i) => !/^[a-z0-9_-]+$/.test(i.id)).map((i) => i.id);
+  ok(conAcento.length === 0, "ningún id tiene acentos ni mayúsculas", conAcento);
+
+  // Y algo tiene que haber de cada tipo: una tienda con una pestaña vacía es
+  // una pestaña que no debería existir.
+  for (const tipo of Object.values(TIPOS)) {
+    const cuantos = CATALOGO_INICIAL.filter((i) => i.tipo === tipo).length;
+    ok(cuantos > 0, `hay artículos de tipo ${tipo}`, cuantos);
+  }
 }
 
 console.log(fallos ? `\n❌ ${fallos} fallos` : "\n✅ TODO OK");

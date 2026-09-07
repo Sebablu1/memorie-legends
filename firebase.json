@@ -1,10 +1,13 @@
 {
   "hosting": {
     "public": "public",
+    "// ignore": "Los PNG de avatares e insignias son los ORIGINALES, antes de recortarles el fondo. Quedan en el repositorio como punto de partida por si algun dia hace falta otra calidad u otro tamano, pero nadie los pide: el catalogo apunta siempre al .webp. Son 3,8 MB que no tiene sentido subir. Ojo: vale SOLO para esas dos carpetas, porque los dorsos viven en img/dorsos y esos si se sirven en PNG.",
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "img/avatar/*.png",
+      "img/insignias/*.png"
     ],
     "headers": [
       {
