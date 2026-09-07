@@ -9,13 +9,14 @@ import {
   setDoc,
 } from "./firebase.js";
 
+// Un solo número para las dos formas de entrar, y el mismo que exige la regla
+// de Firestore. Antes cada archivo tenía el suyo escrito a mano.
+import { LEYENDAS_REGISTRO } from "./reglas/economia.js";
+
 const form = document.getElementById("registerForm");
 const mensaje = document.getElementById("mensaje");
 const boton = form.querySelector('button[type="submit"]');
 const botonGoogle = document.getElementById("googleBtn");
-
-/** Las Leyendas de bienvenida. Un solo número, para las dos formas de entrar. */
-const LEYENDAS_DE_REGALO = 100;
 
 const avisar = (texto, clase = "") => {
   mensaje.textContent = texto;
@@ -64,11 +65,11 @@ form.addEventListener("submit", async (e) => {
     const user = userCredential.user;
     console.log("✅ Usuario creado:", user.uid);
 
-    // 2. Guardar en Firestore con 100 CRÉDITOS GRATIS
+    // 2. Guardar en Firestore con las Leyendas de bienvenida.
     await setDoc(doc(db, "users", user.uid), {
       username: username,
       email: email,
-      credits: 100, // ✅ 100 CRÉDITOS GRATIS
+      credits: LEYENDAS_REGISTRO,
       gamesPlayed: 0,
       wins: 0,
       createdAt: new Date().toISOString(),
@@ -155,7 +156,7 @@ async function crearPerfilSiFalta(usuario) {
   await setDoc(ref, {
     username: nombre,
     email: correo,
-    credits: LEYENDAS_DE_REGALO,
+    credits: LEYENDAS_REGISTRO,
     gamesPlayed: 0,
     wins: 0,
     createdAt: new Date().toISOString(),
@@ -198,7 +199,7 @@ botonGoogle?.addEventListener("click", async () => {
 
     avisar(
       nueva
-        ? `🎉 ¡Cuenta creada! +${LEYENDAS_DE_REGALO} Leyendas de regalo`
+        ? `🎉 ¡Cuenta creada! +${LEYENDAS_REGISTRO} Leyendas de regalo`
         : "Ya tenías cuenta. Entrando…",
       "success",
     );

@@ -7,7 +7,28 @@
 
 // ------------------------------------------------------------- entradas
 
-export const LEYENDAS_REGISTRO = 50; // una sola vez, al crear la cuenta
+/**
+ * Las Leyendas de bienvenida. Una sola vez, al crear la cuenta.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ESTE NÚMERO ESTÁ ATADO A `firestore.rules`
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La regla `saldoDeBienvenidaValido()` exige que un perfil nuevo se cree con
+ * EXACTAMENTE este saldo. Es lo que impide que alguien se cree la cuenta con
+ * un millón: el perfil lo escribe el navegador, así que el único control
+ * posible es esa comparación.
+ *
+ * O sea que cambiar este número sin cambiar la regla no sube el regalo: deja
+ * a TODO el mundo sin poder registrarse, porque Firestore rechaza la creación
+ * del documento. Y al revés también. Por eso hay una prueba
+ * —`pruebas/leyendas-iniciales.mjs`— que compara los dos y falla si difieren.
+ *
+ * Decía 50 y nadie la usaba: `register.js` y `auth.js` tenían cada uno su
+ * propio 100 escrito a mano, y la regla pedía 100. Tres copias, una de ellas
+ * mintiendo, y la que mentía era justamente la que decía ser la oficial.
+ */
+export const LEYENDAS_REGISTRO = 100;
 export const BONO_DIARIO = 10;
 export const HORAS_BONO_DIARIO = 24;
 export const LEYENDAS_POR_REFERIDO = 20;

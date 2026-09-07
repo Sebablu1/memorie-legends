@@ -36,7 +36,6 @@ import admin from "firebase-admin";
 import crypto from "node:crypto";
 
 import {
-  LEYENDAS_REGISTRO,
   BONO_DIARIO,
   LEYENDAS_POR_REFERIDO,
   esperaBonoDiario,

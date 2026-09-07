@@ -18,6 +18,8 @@ import {
   terminarConCodigo,
 } from "./mfa.js";
 
+import { LEYENDAS_REGISTRO } from "./reglas/economia.js";
+
 // ==========================================================
 // EL VELO DE CARGA
 // ==========================================================
@@ -134,7 +136,7 @@ onAuthStateChanged(auth, async (usuario) => {
       await setDoc(doc(db, "users", usuario.uid), {
         username: nombre,
         email: correo,
-        credits: 100,
+        credits: LEYENDAS_REGISTRO,
         gamesPlayed: 0,
         wins: 0,
         createdAt: new Date().toISOString(),
