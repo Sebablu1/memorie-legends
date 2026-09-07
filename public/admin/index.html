@@ -132,8 +132,61 @@
           <button class="btn sobrio" id="btnSembrarCatalogo" type="button">
             Sembrar catálogo
           </button>
+          <button class="btn sobrio" id="btnRefrescarCatalogo" type="button">
+            Ver catálogo
+          </button>
+          <button class="btn sobrio" id="btnNuevoItem" type="button">Artículo nuevo</button>
         </div>
         <div class="aviso" id="avisoCatalogo"></div>
+
+        <!-- El formulario sirve para crear Y para editar: son la misma
+             operación, y se distinguen sólo en si el id ya existía. Al editar,
+             el id se bloquea — cambiarlo no sería editar sino crear otro y
+             dejar huérfana a la gente que compró el viejo. -->
+        <div class="campos-item">
+          <label>
+            <span>Id</span>
+            <input id="itemId" type="text" placeholder="avatar-lobo" autocomplete="off" />
+          </label>
+          <label>
+            <span>Tipo</span>
+            <select id="itemTipo"></select>
+          </label>
+          <label>
+            <span>Nombre</span>
+            <input id="itemNombre" type="text" placeholder="El Lobo" autocomplete="off" />
+          </label>
+          <label>
+            <span>Precio en Leyendas</span>
+            <input id="itemPrecio" type="number" min="0" step="1" value="0" />
+          </label>
+          <label class="ancho">
+            <span>Descripción</span>
+            <input id="itemDescripcion" type="text" placeholder="Caza solo." autocomplete="off" />
+          </label>
+          <label class="ancho">
+            <!-- Dos formas válidas, y conviene decirlo: el catálogo de arranque
+                 usa emojis para no depender de arte que todavía no existe. -->
+            <span>Imagen — una ruta (<code>/img/…</code>) o un emoji</span>
+            <input id="itemImagen" type="text" placeholder="🐺" autocomplete="off" />
+          </label>
+          <label>
+            <span>Orden</span>
+            <input id="itemOrden" type="number" step="1" value="0" />
+          </label>
+          <label class="casilla">
+            <input id="itemActivo" type="checkbox" checked />
+            <span>A la venta</span>
+          </label>
+        </div>
+
+        <div class="acciones">
+          <button class="btn" id="btnGuardarItem" type="button">Guardar artículo</button>
+        </div>
+        <div class="aviso" id="avisoItem"></div>
+
+        <div class="aviso" id="avisoCatalogoLista"></div>
+        <div class="lista" id="listaCatalogo"></div>
       </section>
 
       <!-- Revisión de nombres. Existe porque el escapado tapa la SALIDA, pero

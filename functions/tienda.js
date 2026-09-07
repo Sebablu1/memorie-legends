@@ -40,6 +40,7 @@ import {
   esTipoValido,
   problemasDelItem,
   normalizarItem,
+  ordenarItems,
   CATALOGO_INICIAL,
 } from "./reglas/catalogo.js";
 
@@ -223,5 +224,124 @@ export function crearTienda({
     return { creados, yaEstaban: yaEstan.size };
   }
 
-  return { comprar, equipar, misItems, sembrarCatalogo };
+  /**
+   * El catálogo entero, activos e inactivos, para el panel.
+   *
+   * El navegador del jugador lee la colección directamente —las reglas se lo
+   * permiten— pero ve todo, incluido lo desactivado, y filtra al dibujar. El
+   * administrador necesita justo lo contrario: verlo TODO, porque lo apagado
+   * es lo que va a querer volver a encender.
+   */
+  async function listarCatalogo(context) {
+    await administradores.exigir(context);
+    const snap = await db.collection(catalogo).get();
+    const items = [];
+    snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+    return { items: ordenarItems(items) };
+  }
+
+  /**
+   * Crea o reemplaza un artículo.
+   *
+   * Una sola operación para las dos cosas, y a propósito: "crear" y "editar"
+   * se distinguen sólo en si el id ya existía, y tener dos caminos obligaba a
+   * duplicar la validación entera. Lo que sí se distingue es el AVISO — quien
+   * cree estar creando y esté pisando algo tiene que enterarse.
+   *
+   * El precio se valida acá y nunca se toma de una compra: `comprar` lo lee de
+   * este mismo documento. Un precio negativo REGALARÍA Leyendas, porque el
+   * mismo `moverLeyendas` que cobra sabe sumar.
+   */
+  async function guardarItem(context, datos) {
+    await administradores.exigir(context);
+
+    const problemas = problemasDelItem(datos);
+    if (problemas.length) {
+      throw error("invalid-argument", problemas.join(" "));
+    }
+
+    const item = normalizarItem(datos);
+    const ref = refItemCatalogo(item.id);
+    const previo = await ref.get();
+
+    await ref.set(
+      previo.exists
+        ? { ...item, actualizadoEn: marcaDeTiempo() }
+        : { ...item, creadoEn: marcaDeTiempo() },
+      { merge: true },
+    );
+
+    return { id: item.id, creado: !previo.exists };
+  }
+
+  /**
+   * Enciende o apaga un artículo.
+   *
+   * Es lo que se usa en vez de borrar, y es la razón de que borrar casi nunca
+   * haga falta: un artículo apagado deja de venderse pero NO se le quita a
+   * quien ya lo compró. Sus cartas siguen dibujándose, su avatar sigue
+   * puesto. Borrarlo dejaría a esa gente con un id que no resuelve a nada.
+   */
+  async function activarItem(context, id, activo) {
+    await administradores.exigir(context);
+
+    const ref = refItemCatalogo(id);
+    const snap = await ref.get();
+    if (!snap.exists) throw error("not-found", "Ese artículo no existe.");
+
+    await ref.set({ activo: Boolean(activo), actualizadoEn: marcaDeTiempo() }, { merge: true });
+    return { id, activo: Boolean(activo) };
+  }
+
+  /**
+   * Borra un artículo, y sólo si nadie lo compró.
+   *
+   * Ésta es la única operación de la tienda que destruye algo, así que
+   * pregunta primero. Si alguien lo tiene, se niega y sugiere apagarlo: el
+   * documento del catálogo es lo que da nombre e imagen a lo que ese jugador
+   * compró, y sin él su avatar pasa a ser un id huérfano.
+   *
+   * La consulta recorre las subcolecciones `items` de TODOS los perfiles con
+   * un `collectionGroup` y filtra por id en memoria. Se podría filtrar en la
+   * consulta guardando el id como campo, pero eso pide un índice compuesto y
+   * una migración de los documentos que ya existen, para ahorrar en la única
+   * operación de la tienda que se usa una vez cada mucho. Es cara a propósito:
+   * se paga al borrar, y a cambio no se puede romper la compra de nadie sin
+   * enterarse.
+   */
+  async function borrarItem(context, id) {
+    await administradores.exigir(context);
+
+    const ref = refItemCatalogo(id);
+    const snap = await ref.get();
+    if (!snap.exists) throw error("not-found", "Ese artículo no existe.");
+
+    const comprados = await db.collectionGroup(items).get();
+    const dueños = [];
+    comprados.forEach((d) => {
+      if (d.id === id) dueños.push(d.id);
+    });
+
+    if (dueños.length) {
+      throw error(
+        "failed-precondition",
+        `No se puede borrar: ${dueños.length} jugador${dueños.length === 1 ? "" : "es"} ya lo ` +
+          "compró. Desactivalo en vez de borrarlo, así deja de venderse pero no se le quita a nadie.",
+      );
+    }
+
+    await ref.delete();
+    return { id, borrado: true };
+  }
+
+  return {
+    comprar,
+    equipar,
+    misItems,
+    sembrarCatalogo,
+    listarCatalogo,
+    guardarItem,
+    activarItem,
+    borrarItem,
+  };
 }

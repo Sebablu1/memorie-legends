@@ -144,6 +144,38 @@ export const EsquemaItem = z.object({
 });
 
 /**
+ * Un artículo entrando por el panel de administración.
+ *
+ * El esquema comprueba la FORMA —que los campos sean del tipo que dicen ser—
+ * y `problemasDelItem` comprueba las REGLAS: que el precio no sea negativo,
+ * que el tipo exista, que el id tenga la forma que se puede usar como id de
+ * documento. Están separados porque las reglas viven en `catalogo.js`, que se
+ * comparte con el navegador, y el esquema es cosa de la puerta del servidor.
+ *
+ * `precio` va con `coerce` porque llega de un `<input type="number">`, que
+ * manda cadenas. Sin eso, un precio perfectamente válido se rechazaría por no
+ * ser un número — y el administrador vería "los datos no son válidos" sin
+ * ninguna pista de qué corregir.
+ */
+export const EsquemaItemAdmin = z.object({
+  id: z.string().min(2).max(64),
+  tipo: z.string().min(1).max(32),
+  nombre: z.string().min(1).max(80),
+  descripcion: z.string().max(400).optional().default(""),
+  precio: z.coerce.number().int(),
+  imagen: z.string().min(1).max(500),
+  activo: z.coerce.boolean().optional().default(true),
+  orden: z.coerce.number().int().optional().default(0),
+  metadata: z.record(z.string(), z.unknown()).optional().default({}),
+});
+
+/** Encender o apagar un artículo. */
+export const EsquemaActivarItem = z.object({
+  itemId: z.string().min(2).max(64),
+  activo: z.coerce.boolean(),
+});
+
+/**
  * Un reporte de un jugador sobre otro.
  *
  * `denunciante` NO está acá, y es lo importante: sale del token verificado en

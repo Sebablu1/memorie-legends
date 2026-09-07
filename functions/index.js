@@ -62,6 +62,8 @@ import {
   EsquemaReferido,
   EsquemaReporte,
   EsquemaItem,
+  EsquemaItemAdmin,
+  EsquemaActivarItem,
 } from "./esquemas.js";
 import { crearSalirDeSalaEnEspera } from "./salida.js";
 import { crearAdmin } from "./admin.js";
@@ -628,6 +630,29 @@ export const misItems = functions.https.onCall(async (_data, context) => {
  */
 export const sembrarCatalogoAdmin = functions.https.onCall((_data, context) =>
   tienda.sembrarCatalogo(context));
+
+/** El catálogo entero, activos e inactivos: el panel necesita ver lo apagado. */
+export const listarCatalogoAdmin = functions.https.onCall((_data, context) =>
+  tienda.listarCatalogo(context));
+
+/**
+ * Crea o reemplaza un artículo.
+ *
+ * Una sola función para las dos cosas: "crear" y "editar" se distinguen sólo
+ * en si el id ya existía, y dos caminos obligarían a duplicar la validación.
+ */
+export const guardarItemAdmin = functions.https.onCall((data, context) =>
+  tienda.guardarItem(context, validar(EsquemaItemAdmin, data, errorHttp)));
+
+/** Enciende o apaga un artículo. Es lo que se usa en vez de borrar. */
+export const activarItemAdmin = functions.https.onCall((data, context) => {
+  const { itemId, activo } = validar(EsquemaActivarItem, data, errorHttp);
+  return tienda.activarItem(context, itemId, activo);
+});
+
+/** Borra un artículo, y sólo si nadie lo compró. */
+export const borrarItemAdmin = functions.https.onCall((data, context) =>
+  tienda.borrarItem(context, validar(EsquemaItem, data, errorHttp).itemId));
 
 export const listarSalasAdmin = functions.https.onCall((_data, context) =>
   panel.listarSalas(context));

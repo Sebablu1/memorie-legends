@@ -87,3 +87,56 @@ export function exigirSesionEnMesa() {
     });
   });
 }
+
+/**
+ * El dorso que el jugador compró y tiene puesto, ya como ruta de imagen.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ VIVE ACÁ Y NO EN `mesa.js`
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Por lo mismo que el guardia: la costura. `mesa.js` hoy no toca Firestore —va
+ * por el guardia y por `servidor.js`— y las cuarenta pruebas de la mesa
+ * sustituyen ESTE módulo. Poniendo la lectura en `mesa.js` habría que
+ * falsificarles `firebase.js` entero a todas, o dejar que la mesa intente leer
+ * una base a la que no tienen acceso en mitad de cada prueba.
+ *
+ * Acá, en cambio, las pruebas ya lo tienen sustituido: la función no existe en
+ * el módulo de mentira, `mesa.js` la llama igual, recibe `undefined` y la mesa
+ * se dibuja con los dorsos de siempre. Exactamente lo que tiene que pasar.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * NADA DE ESTO PUEDE IMPEDIR QUE SE JUEGUE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Dos lecturas de Firestore —el perfil y el artículo del catálogo— entre el
+ * jugador y su partida. Si cualquiera falla, o si el catálogo todavía no está
+ * sembrado, se devuelve `null` y la mesa usa el dorso de siempre. Un dorso es
+ * decoración: que no se pueda leer no puede ser motivo para no repartir.
+ *
+ * Por eso tampoco se hace `await` de esto antes de dibujar. `mesa.js` lo pide
+ * y sigue; cuando llega, redibuja.
+ */
+export async function dorsoEquipado(uid) {
+  if (!uid) return null;
+  try {
+    const { db, doc, getDoc } = await import("./firebase.js");
+    const { COLECCION_CATALOGO, imagenEsArchivo } = await import("./reglas/catalogo.js");
+
+    const perfil = await getDoc(doc(db, "users", uid));
+    const id = perfil.exists() ? perfil.data().dorso : null;
+    if (!id) return null;
+
+    const item = await getDoc(doc(db, COLECCION_CATALOGO, id));
+    if (!item.exists()) return null;
+
+    const imagen = item.data().imagen;
+    // Un dorso TIENE que ser un archivo: es el reverso de una carta, no un
+    // ícono junto a un nombre. Si alguien cargara un emoji como dorso desde el
+    // panel, se ignora en vez de dibujar una carta con una letra adentro.
+    return imagenEsArchivo(imagen) ? imagen : null;
+  } catch (error) {
+    console.warn("No se pudo leer el dorso equipado:", error);
+    return null;
+  }
+}

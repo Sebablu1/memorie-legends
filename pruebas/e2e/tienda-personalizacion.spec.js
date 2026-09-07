@@ -186,10 +186,11 @@ test("las pestañas salen de la lista de categorías, no del HTML", async ({ pag
   // mano en el HTML lo pisaría el primer repintado.
   await abrirTienda(page);
 
+  // Se comparan los NOMBRES y no la cantidad. Contar decía "son dos", y al
+  // agregar los dorsos la prueba se puso en rojo sin que nada estuviera mal:
+  // afirmaba un número, no una regla. Lo que hay que afirmar es cuáles son.
   const pestanas = page.locator("#pestanasPersonalizacion button");
-  await expect(pestanas).toHaveCount(2);
-  await expect(pestanas.nth(0)).toContainText("Avatares");
-  await expect(pestanas.nth(1)).toContainText("Insignias");
+  await expect(pestanas).toHaveText(["Avatares", "Insignias", "Dorsos"]);
 });
 
 test("comprar una insignia usa el mismo circuito que un avatar", async ({ page }) => {

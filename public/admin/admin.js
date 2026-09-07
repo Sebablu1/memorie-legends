@@ -32,6 +32,10 @@ import {
   terminarConCodigo,
 } from "../js/mfa.js";
 
+// El catálogo de la tienda vive en su propio módulo: este archivo ya lleva
+// siete secciones, y el CRUD trae formulario, lista y estado propio.
+import { montarTiendaAdmin } from "./tienda-admin.js";
+
 const $ = (id) => document.getElementById(id);
 
 const dom = {
@@ -233,6 +237,10 @@ onAuthStateChanged(auth, (usuario) => {
   dom.btnSalir.hidden = !usuario;
   dom.entrar.hidden = Boolean(esAdmin);
   dom.panel.hidden = !esAdmin;
+
+  // El catálogo se engancha recién acá: sus cuatro llamadas exigen sesión de
+  // administrador, así que montarlo antes sólo conseguiría cuatro rechazos.
+  if (esAdmin) montarTiendaAdmin();
 
   // Con sesión resuelta, la pantalla del código ya no va: o entró, o hay que
   // volver a empezar. Dejarla puesta muestra dos formularios a la vez.

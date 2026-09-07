@@ -28,7 +28,7 @@ import {
   MS_REAPERTURA,
 } from "./reglas/motor.js";
 
-import { dorsoDeAsiento } from "./reglas/baraja.js";
+
 import { crearTemporizadores, esperar } from "./modulos/temporizadores.js";
 import { crearInterfaz, escapar } from "./modulos/ui.js";
 import { mostrarCargando, ocultarCargando } from "./spinner.js";
@@ -40,6 +40,8 @@ import {
   estiloAbanico,
   asientoVacio,
   asientosParaMesa,
+  dorsoDe,
+  usarDorsoPropio,
 } from "./modulos/cartas.js";
 import { LIMITE_ELIMINACION, puntosMano } from "./reglas/puntaje.js";
 import * as IA from "./reglas/ia.js";
@@ -51,6 +53,12 @@ import { abandonarPartida, ErrorDeServidor } from "./servidor.js";
 import { sonidos, alternarSilencio } from "./sonidos.js";
 import { lanzarConfeti } from "./confeti.js";
 import { exigirSesionEnMesa } from "./guardia-sesion.js";
+// Espacio de nombres, y NO `import { dorsoEquipado }`. Las cuarenta pruebas de
+// la mesa sustituyen este módulo por uno que sólo exporta el guardia, y un
+// import con nombre que el módulo no provee no es `undefined`: es un error de
+// enlace de ESM que impide cargar la mesa entera. Con el espacio de nombres,
+// una exportación que falta es una propiedad que falta, y `?.()` la tolera.
+import * as Guardia from "./guardia-sesion.js";
 
 // ------------------------------------------------------------ la puerta
 
@@ -66,7 +74,43 @@ import { exigirSesionEnMesa } from "./guardia-sesion.js";
  * —el servidor rechaza cada llamada—, pero antes eso se descubría con un error
  * en mitad de la partida en vez de con una puerta al entrar.
  */
-await exigirSesionEnMesa();
+const miSesion = await exigirSesionEnMesa();
+
+/**
+ * El dorso comprado, pedido sin esperarlo.
+ *
+ * Son dos lecturas de Firestore —el perfil y el artículo del catálogo— y no
+ * hay una sola razón para que el jugador las espere mirando una pantalla en
+ * blanco: un dorso es decoración. Se pide, la mesa arranca, y cuando llega se
+ * aplica y se redibuja.
+ *
+ * `Guardia.dorsoEquipado` puede no existir: las pruebas de la mesa sustituyen este
+ * módulo por uno de dos funciones. Ahí `?.()` devuelve `undefined`, el `await`
+ * lo resuelve y la mesa se dibuja con los dorsos de siempre, que es justo lo
+ * que esas pruebas esperan ver.
+ */
+let miDorso = null;
+
+/**
+ * Le dice a la capa de dibujo qué asiento lleva el dorso comprado.
+ *
+ * Se llama dos veces, y la segunda es la que importa: en una partida por
+ * Leyendas el jugador local no es siempre el asiento cero —el servidor le dice
+ * cuál le tocó cuando llega la primera vista— así que hay que volver a fijarlo
+ * ahí. Sin eso, el dorso comprado aparecería en las cartas de otro.
+ */
+function aplicarDorsoPropio() {
+  if (miDorso) usarDorsoPropio({ asiento: YO, ruta: miDorso });
+}
+
+(async () => {
+  miDorso = (await Guardia.dorsoEquipado?.(miSesion?.uid)) ?? null;
+  if (!miDorso) return;
+  aplicarDorsoPropio();
+  // Si la mesa ya se dibujó, se repinta para que el dorso aparezca sin que el
+  // jugador tenga que esperar a la próxima jugada.
+  if (estado) dibujar();
+})();
 
 // ------------------------------------------------------------ referencias
 
@@ -449,7 +493,7 @@ function dibujarJugador(jugador, i) {
     <div class="jugador ${claseAsiento(i)} ${enTurno ? "en-turno" : ""} ${propio ? "propio" : ""} ${jugador.eliminado ? "eliminado" : ""}"
          data-jugador="${i}">
       <div class="cabecera-jugador">
-        <img class="ficha ${claseAsiento(i)}" src="${dorsoDeAsiento(i)}"
+        <img class="ficha ${claseAsiento(i)}" src="${dorsoDe(i)}"
              alt="Dorso de ${escapar(jugador.nombre)}" />
         <div class="datos">
           <div class="nombre">${escapar(jugador.nombre)} ${insignia}</div>
@@ -1847,7 +1891,7 @@ function manoParaElegir(i, { soloVacias = false } = {}) {
         <button class="carta jugable ${claseAsiento(i)}" data-objetivo="${i}" data-pos="${pos}" type="button">
           <span class="posicion">${pos}</span>
           <span class="lados">
-            <span class="dorso"><img src="${dorsoDeAsiento(i)}" alt="" /></span>
+            <span class="dorso"><img src="${dorsoDe(i)}" alt="" /></span>
             <span class="cara"></span>
           </span>
         </button>`;
@@ -2509,6 +2553,9 @@ function mostrarMiradas(vista) {
 function pintarVista(vista) {
   miVista = vista;
   YO = vista.yo;
+  // El asiento propio recién se sabe acá: hay que volver a fijar el dorso
+  // comprado o aparecería en las cartas de otro jugador.
+  aplicarDorsoPropio();
 
   // Si la fase dejó de ser la del poder —porque se resolvió, o porque a un
   // ausente se lo saltearon— la elección en curso ya no tiene sentido.

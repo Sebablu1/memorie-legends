@@ -83,13 +83,33 @@ function crearFirestore(inicial = {}) {
       const d = docs.get(ruta);
       return { exists: Boolean(d), id: ruta.split("/").pop(), data: () => (d ? { ...d } : undefined) };
     },
-    async set(datos) {
-      docs.set(ruta, { ...(docs.get(ruta) ?? {}), ...datos });
+    async set(datos, opciones) {
+      docs.set(ruta, opciones?.merge ? { ...(docs.get(ruta) ?? {}), ...datos } : datos);
+    },
+    async delete() {
+      docs.delete(ruta);
     },
   });
 
   return {
     collection: coleccion,
+
+    /**
+     * Todas las subcolecciones con un mismo nombre, en cualquier perfil.
+     *
+     * Es lo que usa `borrarItem` para preguntar "¿alguien compró esto?". Acá
+     * se resuelve mirando las rutas: cualquiera que TERMINE en `/items/algo`
+     * es una posesión, sin importar de quién.
+     */
+    collectionGroup: (nombre) => ({
+      async get() {
+        const filas = [...docs.entries()]
+          .filter(([r]) => r.includes(`/${nombre}/`))
+          .map(([r, d]) => ({ id: r.split("/").pop(), ref: { path: r }, data: () => ({ ...d }) }));
+        return { size: filas.length, forEach: (fn) => filas.forEach(fn) };
+      },
+    }),
+
     async runTransaction(cuerpo) {
       let escribio = false;
       const pendientes = [];
@@ -356,6 +376,155 @@ console.log("\n=== 10. La semilla del catálogo no pisa lo que ya está ===");
   const { error: e } = await capturar(() => tienda.sembrarCatalogo({}));
   ok(e?.codigo === "permission-denied", "sembrar exige ser administrador", e?.codigo);
   ok(db._rutas().length === 0, "y no escribe nada al rechazar");
+}
+
+// =====================================================================
+console.log("\n=== 11. El panel ve TODO el catálogo, apagados incluidos ===");
+// =====================================================================
+
+{
+  const conApagado = CATALOGO_INICIAL.map((i) =>
+    i.id === ZORRO ? { ...i, activo: false } : i,
+  );
+  const { tienda } = montar({ catalogo: conApagado });
+
+  const r = await tienda.listarCatalogo({ auth: { uid: "admin" } });
+
+  ok(r.items.length === CATALOGO_INICIAL.length, "devuelve todos", r.items.length);
+  ok(
+    r.items.some((i) => i.id === ZORRO && i.activo === false),
+    "incluye el desactivado: es justo el que se va a querer volver a encender",
+  );
+}
+
+// =====================================================================
+console.log("\n=== 12. Crear y editar son la misma operación ===");
+// =====================================================================
+
+const NUEVO = {
+  id: "avatar-lobo",
+  tipo: "avatar",
+  nombre: "El Lobo",
+  descripcion: "Caza solo.",
+  precio: 900,
+  imagen: "🐺",
+  activo: true,
+  orden: 45,
+};
+
+{
+  const { db, tienda } = montar();
+  const como = { auth: { uid: "admin" } };
+
+  const creado = await tienda.guardarItem(como, NUEVO);
+  ok(creado.creado === true, "la primera vez avisa que lo creó");
+  ok(db._leer("catalogo/avatar-lobo").precio === 900, "con su precio");
+
+  const editado = await tienda.guardarItem(como, { ...NUEVO, precio: 1200 });
+  ok(editado.creado === false, "la segunda avisa que lo pisó", editado);
+  ok(db._leer("catalogo/avatar-lobo").precio === 1200, "y el precio cambió");
+  ok(db._leer("catalogo/avatar-lobo").nombre === "El Lobo", "sin perder el resto");
+}
+
+{
+  // El precio es lo único que mueve dinero, así que es lo más estricto: uno
+  // negativo REGALARÍA Leyendas, porque el mismo `moverLeyendas` que cobra
+  // sabe sumar.
+  const { db, tienda } = montar();
+  const { error: e } = await capturar(() =>
+    tienda.guardarItem({ auth: { uid: "admin" } }, { ...NUEVO, precio: -500 }));
+
+  ok(e?.codigo === "invalid-argument", "un precio negativo se rechaza", e?.codigo);
+  ok(!db._leer("catalogo/avatar-lobo"), "y no se guarda nada");
+}
+
+{
+  const { tienda } = montar();
+  const { error: e } = await capturar(() =>
+    tienda.guardarItem({ auth: { uid: "admin" } }, { ...NUEVO, tipo: "sombrero" }));
+  ok(e?.codigo === "invalid-argument", "un tipo inventado se rechaza", e?.mensaje);
+}
+
+// =====================================================================
+console.log("\n=== 13. Apagar no le quita nada a quien ya compró ===");
+// =====================================================================
+
+{
+  const { db, tienda } = montar({ saldo: 5000 });
+  const como = { auth: { uid: "admin" } };
+
+  await tienda.comprar("ana", ZORRO);
+  await tienda.equipar("ana", ZORRO);
+  await tienda.activarItem(como, ZORRO, false);
+
+  ok(db._leer(`catalogo/${ZORRO}`).activo === false, "queda fuera de la venta");
+  ok(Boolean(db._leer(`users/ana/items/${ZORRO}`)), "pero Ana lo sigue teniendo");
+  ok(db._leer("users/ana").avatar === ZORRO, "y lo sigue llevando puesto");
+
+  // Y no se puede volver a comprar mientras esté apagado.
+  const { error: e } = await capturar(() => tienda.comprar("beto", ZORRO));
+  ok(e?.codigo === "failed-precondition", "nadie más puede comprarlo", e?.codigo);
+}
+
+// =====================================================================
+console.log("\n=== 14. Borrar sólo lo que nadie compró ===");
+// =====================================================================
+
+{
+  const { db, tienda } = montar({ saldo: 5000 });
+  const como = { auth: { uid: "admin" } };
+
+  await tienda.comprar("ana", ZORRO);
+  const { error: e } = await capturar(() => tienda.borrarItem(como, ZORRO));
+
+  ok(e?.codigo === "failed-precondition", "se niega si alguien lo tiene", e?.codigo);
+  ok(/desactivalo/i.test(e?.message ?? ""), "y dice qué hacer en su lugar", e?.message);
+  ok(Boolean(db._leer(`catalogo/${ZORRO}`)), "el artículo sigue ahí");
+}
+
+{
+  const { db, tienda } = montar();
+  const r = await tienda.borrarItem({ auth: { uid: "admin" } }, DRAGON);
+
+  ok(r.borrado === true, "lo que nadie compró sí se borra");
+  ok(!db._leer(`catalogo/${DRAGON}`), "y desaparece del catálogo");
+}
+
+// =====================================================================
+console.log("\n=== 15. Todo el CRUD exige ser administrador ===");
+// =====================================================================
+
+{
+  const db = crearFirestore({ "catalogo/x": { tipo: "avatar", nombre: "X", precio: 0, imagen: "x", activo: true } });
+  const tienda = crearTienda({
+    db,
+    moverLeyendas: async () => ({ aplicado: true, saldo: 0 }),
+    marcaDeTiempo: () => "T",
+    error,
+    motivoCompra: MOTIVOS.COMPRA_PERSONALIZACION,
+    administradores: {
+      exigir: async () => {
+        throw error("permission-denied", "No sos administrador.");
+      },
+    },
+  });
+
+  // Se prueban las CUATRO. Una sola dejaría abierta la posibilidad de que a
+  // alguna se le haya olvidado la comprobación, que es exactamente el error
+  // que nadie nota hasta que lo usan.
+  const operaciones = [
+    ["listarCatalogo", () => tienda.listarCatalogo({})],
+    ["guardarItem", () => tienda.guardarItem({}, NUEVO)],
+    ["activarItem", () => tienda.activarItem({}, "x", false)],
+    ["borrarItem", () => tienda.borrarItem({}, "x")],
+  ];
+
+  for (const [nombre, fn] of operaciones) {
+    const { error: e } = await capturar(fn);
+    ok(e?.codigo === "permission-denied", `${nombre} exige administrador`, e?.codigo);
+  }
+
+  ok(db._leer("catalogo/x").nombre === "X", "y el catálogo quedó intacto");
 }
 
 console.log(fallos ? `\n❌ ${fallos} fallos` : "\n✅ TODO OK");

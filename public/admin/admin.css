@@ -322,6 +322,90 @@ select {
   font-weight: 600;
 }
 
+/* Un artículo apagado sigue en la lista —es el que se va a querer volver a
+   encender— pero se ve que no está a la venta sin tener que leer la etiqueta. */
+.fila.apagada {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+/* ------------------------------------------- el formulario del catálogo */
+
+.campos-item {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px 16px;
+  margin: 16px 0;
+}
+
+.campos-item label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--texto-tenue);
+}
+
+/* La descripción y la imagen ocupan la fila entera: son las dos que llevan
+   texto largo, y en una columna angosta no se ve lo que uno escribió. */
+.campos-item label.ancho {
+  grid-column: 1 / -1;
+}
+
+.campos-item label.casilla {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  align-self: end;
+  padding-bottom: 10px;
+}
+
+/* La casilla no es un campo de texto: no tiene que estirarse a lo ancho de su
+   columna ni empujar su etiqueta a dos renglones. */
+.campos-item label.casilla input {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  flex: none;
+  accent-color: var(--oro);
+}
+
+.campos-item label.casilla span {
+  white-space: nowrap;
+}
+
+.campos-item input[type="text"],
+.campos-item input[type="number"],
+.campos-item select {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--borde-suave);
+  background: var(--panel);
+  color: var(--texto);
+  font-size: 0.9rem;
+  /* Alto de dedo: el panel también se abre desde el teléfono. */
+  min-height: 42px;
+}
+
+.campos-item input:focus-visible,
+.campos-item select:focus-visible {
+  outline: 2px solid var(--oro);
+  outline-offset: 1px;
+}
+
+/* Al editar, el id se bloquea: cambiarlo no sería editar sino crear otro
+   artículo y dejar huérfana a la gente que compró el viejo. */
+.campos-item input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.campos-item code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.74rem;
+  color: var(--oro-claro);
+}
+
 /* Un nombre sospechoso se muestra como texto dentro de un `code`: se lee que
    es un dato y no parte de la interfaz. El escapado lo hace el JS. */
 .fila .campo code {

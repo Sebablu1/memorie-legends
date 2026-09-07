@@ -15,6 +15,52 @@
 import { dorsoDeAsiento } from "../reglas/baraja.js";
 
 /**
+ * El dorso comprado, que sólo se aplica a las cartas de uno.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ NO VA EN `reglas/baraja.js`
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque ahí vive `dorsoDeAsiento`, y ese archivo es un módulo PURO que
+ * `copiar-reglas.js` lleva al servidor. Meterle una ruta que sale de Firestore
+ * sería empujar una decisión de vista —y una lectura de base— dentro del
+ * motor. La regla sigue siendo la misma de siempre: cada asiento tiene su
+ * dorso. Lo que se agrega es una excepción de dibujo, y las excepciones de
+ * dibujo viven en la capa que dibuja.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ SÓLO EL PROPIO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Los dos dorsos alternados no son decoración: son lo que distingue de quién
+ * es cada mano en la mesa. Si los cuatro eligieran el suyo, cuatro jugadores
+ * podrían terminar con el mismo y la mesa dejaría de leerse. Cambiando sólo el
+ * propio, esa distinción se conserva entera — y el jugador ve lo que compró
+ * justo donde mira todo el tiempo, que son sus cartas.
+ *
+ * Arranca vacío: sin nada comprado, o si la lectura falla, la mesa se dibuja
+ * exactamente como antes.
+ */
+let dorsoPropio = { asiento: null, ruta: null };
+
+/**
+ * Fija qué asiento usa qué dorso.
+ *
+ * Se pasa el ASIENTO y no un booleano porque en una partida por Leyendas el
+ * jugador local no siempre es el cero: el servidor le dice cuál le tocó, y
+ * `mesa.js` vuelve a llamar acá cuando lo sabe.
+ */
+export function usarDorsoPropio({ asiento = null, ruta = null } = {}) {
+  dorsoPropio = { asiento, ruta };
+}
+
+/** El dorso que le toca a un asiento, con la excepción del propio. */
+export function dorsoDe(asiento) {
+  if (dorsoPropio.ruta && asiento === dorsoPropio.asiento) return dorsoPropio.ruta;
+  return dorsoDeAsiento(asiento);
+}
+
+/**
  * Con sólo dos dorsos, el 3º y el 4º jugador repiten imagen. Lo que los
  * distingue es el color del aro que rodea sus cartas y su ficha.
  */
@@ -48,7 +94,7 @@ export function dibujarCarta(
   if (!carta) {
     return `<div class="hueco vacio" style="${estilo}"></div>`;
   }
-  const dorso = dorsoDeAsiento(asiento);
+  const dorso = dorsoDe(asiento);
 
   // El servidor manda las cartas ajenas como un marcador sin palo, número ni
   // imagen. No es que no se dibuje la cara: es que la cara NO VIAJÓ. Dibujar
