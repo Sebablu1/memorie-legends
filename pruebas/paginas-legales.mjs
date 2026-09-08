@@ -161,39 +161,55 @@ console.log("\n=== 4. El dato que falta no se publica camuflado ===");
 
 {
   /**
-   * `[COMPLETAR ANTES DE PUBLICAR]` en el responsable del tratamiento.
+   * El responsable del tratamiento todavía no está identificado.
    *
-   * Mientras esté, tiene que estar dentro de un `.aviso`: un bloque con borde
-   * y fondo propio que nadie puede confundir con el texto de la política. Un
-   * marcador suelto entre párrafos se publica sin que nadie lo vea, y la Ley
-   * 18.331 exige justamente ese dato.
+   * La Ley 18.331 exige su nombre o razón social y su domicilio, y la página
+   * está publicada sin ellos. Eso es una decisión tomada, no un descuido — pero
+   * tiene que verse: un hueco silencioso en una política de privacidad es
+   * indistinguible de una política que dice tener algo que no tiene.
+   *
+   * El marcador vive en un comentario del HTML y el aviso en la página. Las dos
+   * cosas van juntas o no van: si alguien completa los datos y se olvida de
+   * sacar el aviso, la página va a decir que la identificación está en trámite
+   * cuando ya no lo está, y esto lo canta.
    */
-  const marcador = "[COMPLETAR ANTES DE PUBLICAR]";
-  const presente = html.privacidad.includes(marcador);
+  const marcador = "MARCADOR: RESPONSABLE SIN COMPLETAR";
+  const avisoEnTramite = /Identificación en trámite/.test(html.privacidad);
+  const pendiente = html.privacidad.includes(marcador);
 
-  if (!presente) {
-    ok(true, "el responsable del tratamiento ya está completo");
-  } else {
-    // Se recorta el bloque del aviso y se comprueba que el marcador esté
-    // adentro. Buscar sólo que las dos cosas aparezcan en la página no
-    // alcanzaría: podrían estar en secciones distintas.
+  ok(
+    pendiente === avisoEnTramite,
+    pendiente
+      ? "el hueco del responsable está marcado Y avisado en la página"
+      : "el responsable está completo, y el aviso de trámite ya no está",
+    { marcador: pendiente, aviso: avisoEnTramite },
+  );
+
+  if (pendiente) {
+    // El aviso tiene que estar en un bloque destacado, no suelto entre
+    // párrafos: un párrafo más en una página de treinta secciones no lo lee
+    // nadie.
     const i = html.privacidad.indexOf('<div class="aviso">');
     const j = html.privacidad.indexOf("</div>", i);
-    const dentroDelAviso = i !== -1 && html.privacidad.slice(i, j).includes(marcador);
-
-    ok(dentroDelAviso, "el marcador pendiente está dentro de un aviso visible, no suelto");
     ok(
-      /Pendiente de completar antes de publicar/.test(html.privacidad),
-      "y el aviso explica que falta completarlo",
+      i !== -1 && html.privacidad.slice(i, j).includes("Identificación en trámite"),
+      "y el aviso está en un bloque destacado, no perdido en un párrafo",
     );
 
-    // Y en ningún otro lado.
-    const cuantos = html.privacidad.split(marcador).length - 1;
-    ok(cuantos === 2, "aparece sólo en ese bloque (nombre y domicilio)", cuantos);
+    // Y le dice al usuario adónde ir mientras tanto. Sin eso, el hueco lo deja
+    // sin saber a quién reclamar, que es justo lo que la ley quiere evitar.
+    ok(
+      /consulta o ejercicio de derechos/.test(html.privacidad),
+      "y dice por dónde ejercer derechos mientras tanto",
+    );
+  }
 
-    for (const p of ["terminos", "seguridad"]) {
-      ok(!html[p].includes(marcador), `${p}: no arrastra ningún marcador pendiente`);
-    }
+  // El marcador de desarrollo original no puede quedar en ninguna página.
+  for (const p of PAGINAS) {
+    ok(
+      !html[p].includes("[COMPLETAR ANTES DE PUBLICAR]"),
+      `${p}: no quedó ningún marcador de desarrollo a la vista`,
+    );
   }
 }
 
