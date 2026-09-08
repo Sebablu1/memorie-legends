@@ -999,8 +999,35 @@ body.con-menu-abierto {
   .saldo small { display: none; }
 }
 
+/* El nombre de la marca NO se esconde en pantallas angostas.
+ *
+ * Estuvo escondido a 360px o menos, que es el ancho declarado de casi todos
+ * los Android: la mitad de los teléfonos veía el escudo sin el nombre al lado.
+ * La regla existía por miedo a que no entrara, y medido no era cierto —
+ * «Memorie Legends» ocupa 121px y en la cabecera más cargada, la que lleva el
+ * saldo, quedan 166px libres a 360 y 126 a 320.
+ *
+ * A 320 el margen es de cinco píxeles, así que ahí sí se achica un punto la
+ * letra: no para que entre, sino para que siga entrando el día que alguien
+ * junte un saldo de seis cifras.
+ */
 @media (max-width: 360px) {
-  .barra .marca span { display: none; }
+  .barra .marca span { font-size: 0.92rem; }
+}
+
+/* El último recurso, para que un saldo enorme no rompa la barra.
+ *
+ * Sin esto, un número más largo de lo previsto empuja el nombre fuera de la
+ * pantalla y aparece la barra horizontal. Con esto, el nombre se recorta con
+ * puntos suspensivos y la barra aguanta: perder la última letra del nombre es
+ * mucho menos grave que una página que se mueve de costado. */
+.barra .marca {
+  min-width: 0;
+}
+
+.barra .marca span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* El hamburguesa de una barra SIN menú —la portada— sólo aparece cuando el

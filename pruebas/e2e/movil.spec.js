@@ -28,6 +28,52 @@ const SESION_FALSA = `
   export function mostrarSaldo(){} export function conectarBotonSalir(){}
   export function formatearEspera(){return "listo";}`;
 
+test("el nombre de la marca se ve en la cabecera, en todo ancho de teléfono", async ({ page }) => {
+  /**
+   * Estuvo escondido y nadie se enteró.
+   *
+   * Había una regla `@media (max-width: 360px) { .barra .marca span { display:
+   * none } }`. 360px es el ancho declarado de casi todos los Android, así que
+   * medio parque de teléfonos veía el escudo solo, sin «Memorie Legends» al
+   * lado. No fallaba nada: simplemente faltaba una palabra.
+   *
+   * Se prueba sobre la portada porque es la única cabecera que se puede abrir
+   * sin sesión, y en el ancho MÁS ANGOSTO que se usa además de los comunes. El
+   * texto ocupa 121px; hasta con un saldo de seis cifras sobra lugar.
+   */
+  await page.goto("/index.html");
+
+  for (const ancho of ANCHOS) {
+    await page.setViewportSize({ width: ancho, height: 780 });
+    await page.waitForTimeout(80);
+
+    const medida = await page.evaluate(() => {
+      const marca = document.querySelector(".barra .marca span");
+      if (!marca) return { falta: true };
+      const c = getComputedStyle(marca);
+      const caja = marca.getBoundingClientRect();
+      return {
+        display: c.display,
+        visibilidad: c.visibility,
+        ancho: Math.round(caja.width),
+        texto: marca.textContent.trim(),
+        // Que el nombre esté DENTRO de la pantalla, no empujado afuera por el
+        // resto de la barra.
+        dentro: caja.left >= -1 && caja.right <= document.documentElement.clientWidth + 1,
+        desborda: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      };
+    });
+
+    expect(medida.falta, `a ${ancho}px no existe el nombre en la cabecera`).toBeFalsy();
+    expect(medida.display, `a ${ancho}px el nombre está en display:none`).not.toBe("none");
+    expect(medida.visibilidad, `a ${ancho}px el nombre está oculto`).not.toBe("hidden");
+    expect(medida.ancho, `a ${ancho}px el nombre mide cero`).toBeGreaterThan(40);
+    expect(medida.texto, `a ${ancho}px el texto no es el de la marca`).toBe("Memorie Legends");
+    expect(medida.dentro, `a ${ancho}px el nombre queda fuera de la pantalla`).toBe(true);
+    expect(medida.desborda, `a ${ancho}px la página se mueve de costado`).toBe(false);
+  }
+});
+
 test("admin: el botón Salir no se sale de la cabecera", async ({ page }) => {
   await page.goto("/admin/index.html");
 
