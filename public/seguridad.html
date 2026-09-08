@@ -12,17 +12,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/tema.css" />
     <link rel="stylesheet" href="css/legal.css">
-    <!-- La tarjeta que se ve al compartir el enlace.
-
-         La imagen va con URL ABSOLUTA y en JPG a propósito. Una ruta relativa
-         no la encuentra ningún lector de enlaces —no navegan la página, sólo
-         leen estas etiquetas— y WhatsApp no muestra WebP, que es el formato
-         del resto del sitio. Pesa 75 KB: por encima de unos pocos cientos, la
-         miniatura deja de aparecer en varios clientes.
-
-         1200x630 es la proporción que piden las tarjetas grandes. Declarar
-         `width` y `height` evita que el primer visitante vea el enlace sin
-         imagen mientras el servicio la mide por su cuenta. -->
     <link rel="canonical" href="https://memorie-legends.web.app/seguridad.html" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Memorie Legends" />
@@ -57,96 +46,183 @@
     <main>
         <div class="legal-container">
             <h1>🛡️ Seguridad en Memorie Legends</h1>
-            <p class="actualizado">Última actualización: 28 de agosto de 2026</p>
+            <p class="actualizado">Última actualización: 8 de septiembre de 2026</p>
 
-            <p>Esta página describe las medidas de seguridad que <strong>están implementadas hoy</strong>. Al final listamos las que todavía no lo están, para que sepas exactamente con qué contás y con qué no.</p>
+            <p>La seguridad de Memorie Legends es fundamental para proteger las cuentas, las partidas, las Leyendas, las operaciones de compra y los datos personales de nuestros usuarios.</p>
 
-            <h2>🔐 Autenticación y Acceso</h2>
+            <p>Esta página describe las medidas de seguridad actualmente implementadas y las limitaciones que debemos reconocer de forma transparente.</p>
+
+            <h2>1. Autenticación y acceso</h2>
+            <p>Memorie Legends utiliza <strong>Firebase Authentication</strong> para gestionar el acceso de los usuarios. Actualmente pueden utilizarse:</p>
             <ul>
-                <li>Usamos <strong>Firebase Authentication</strong>, con inicio de sesión mediante Google o correo y contraseña.</li>
-                <li><strong>No almacenamos tu contraseña.</strong> La gestiona Firebase, que guarda únicamente un hash y nunca el texto original. Nuestro equipo no puede verla.</li>
-                <li>Podés restablecer tu contraseña por correo en cualquier momento desde la pantalla de inicio de sesión.</li>
-                <li>Todo el sitio se sirve exclusivamente por <strong>HTTPS</strong>.</li>
+                <li>Google.</li>
+                <li>Correo electrónico y contraseña.</li>
             </ul>
+            <p>Las contraseñas no son almacenadas por Memorie Legends en texto plano. Cuando el usuario utiliza autenticación mediante correo y contraseña, la gestión de las credenciales corresponde al sistema de autenticación utilizado.</p>
+            <p>Todo el sitio se sirve mediante <strong>HTTPS</strong>, protegiendo las comunicaciones entre el navegador y los servicios compatibles.</p>
 
-            <h2>💰 Protección de tus Leyendas</h2>
-            <p>Tu saldo nunca se calcula ni se modifica en tu navegador. Todas las operaciones con Leyendas ocurren en nuestros servidores:</p>
-            <ul>
-                <li>Las reglas de Firestore impiden que un jugador escriba su propio saldo, su puntaje de ranking o el resultado de una partida. Desde el navegador esos datos son <strong>sólo de lectura</strong>.</li>
-                <li>Cada movimiento de Leyendas queda asentado en un <strong>libro mayor</strong>: se registran el saldo anterior, el nuevo, el motivo y la referencia. El saldo y su asiento se escriben en la misma transacción, así nunca hay uno sin el otro.</li>
-                <li>Cada operación lleva una <strong>clave de idempotencia</strong>. Si una petición se repite por un problema de red, no se acredita ni se cobra dos veces.</li>
-                <li>Podés consultar tu propio historial de movimientos, pero no el de otros jugadores.</li>
-            </ul>
-
-            <h2>💳 Pagos y Transacciones</h2>
-            <ul>
-                <li>Las compras de Leyendas se procesan a través de <strong>Xsolla y Mercado Pago</strong>, en sus propias páginas de pago.</li>
-                <li><strong>Nunca vemos ni almacenamos datos de tarjetas.</strong> Esa información no pasa por nuestros servidores en ningún momento.</li>
-                <li>El importe se toma siempre del catálogo del servidor, nunca de lo que envía el navegador: no es posible alterar el precio de un paquete.</li>
-                <li>Las Leyendas se acreditan únicamente cuando el proveedor confirma el pago mediante un aviso firmado criptográficamente. <strong>Sin firma válida no se acredita nada.</strong></li>
-                <li>La acreditación es idempotente por transacción: si el proveedor reintenta el aviso, no se duplican las Leyendas.</li>
-            </ul>
-
-            <h2>📊 Datos de Juego</h2>
-            <ul>
-                <li>Las partidas y las cuentas se almacenan en <strong>Firestore</strong>, con reglas de acceso que limitan qué puede leer y escribir cada jugador.</li>
-                <li>Las operaciones concurrentes usan <strong>transacciones</strong>, de modo que dos acciones simultáneas no puedan corromper el estado de una partida.</li>
-                <li>Una partida cerrada no se puede volver a cerrar: los puntos y los premios se entregan una sola vez.</li>
-            </ul>
-
-            <h2>🚫 Trampas y Uso Indebido</h2>
-            <p>Está prohibido el uso de bots, scripts automatizados o cualquier método para obtener ventaja injusta, según nuestros <a href="/terminos.html">Términos y Condiciones</a>. Las cuentas que incumplan pueden ser suspendidas.</p>
-            <p>Si detectás a alguien haciendo trampa, tenés un botón de <strong>reportar</strong> al lado de cada jugador en la sala de espera. Elegís el motivo, agregás lo que quieras contar, y llega a nuestra bandeja. También podés escribirnos a <strong>soporte@memorie-legends.com</strong>.</p>
-
-            <h2>🚩 Reportes y Moderación</h2>
-            <p>Cualquier jugador puede reportar a otro desde la sala de espera. Cómo funciona, en concreto:</p>
-            <ul>
-                <li><strong>Es anónimo para la otra parte:</strong> a quien reportás no se le dice quién lo reportó. Los reportes no se pueden leer desde el navegador de nadie; sólo los ve el equipo.</li>
-                <li><strong>Lo lee una persona.</strong> No hay nada automático que suspenda cuentas: marcar un reporte como revisado no le hace absolutamente nada a la cuenta reportada. Cualquier medida sobre una cuenta la toma alguien del equipo, a mano.</li>
-                <li><strong>Se puede reportar a la misma persona una vez cada 24 horas.</strong> Es para que la herramienta no se use como forma de hostigar a alguien.</li>
-            </ul>
-
-            <h2>🔐 Verificación en Dos Pasos</h2>
-            <p>Ya podés activarla desde <strong>Tu cuenta</strong>. Con los dos pasos puestos, entrar necesita tu contraseña <em>y además</em> un código de seis dígitos que genera una aplicación en tu teléfono: Google Authenticator, Authy, 1Password o cualquier otra que sirva. La activás escaneando un código QR.</p>
-            <p>Es <strong>opcional</strong>, y la recomendamos si tenés Leyendas guardadas. Tres cosas que conviene saber antes:</p>
-            <ul>
-                <li><strong>El código no viaja por ningún lado.</strong> Lo calcula tu teléfono a partir de una clave que sólo tienen él y nuestro servidor. No hay mensajes que interceptar ni número de teléfono que robar con un cambio de SIM.</li>
-                <li><strong>Guardá la clave que te mostramos</strong> en un lugar seguro que no sea ese mismo teléfono. Es lo que te permite volver a configurarlo si cambiás de aparato.</li>
-                <li><strong>Si perdés el teléfono y no guardaste la clave</strong>, no vas a poder entrar por tu cuenta: escribinos y lo resolvemos a mano.</li>
-            </ul>
-
-            <h2>🚧 En Proceso de Activación</h2>
+            <h2>2. Protección de cuentas</h2>
+            <p>Los usuarios son responsables de utilizar contraseñas seguras, no reutilizar contraseñas importantes, no compartir credenciales, cerrar sesión en equipos compartidos e informar accesos sospechosos.</p>
             <div class="aviso">
-                <p>Una medida más está construida y la estamos encendiendo por etapas. Te contamos en qué punto está, porque «en proceso» no es lo mismo que «protegiéndote hoy»:</p>
-                <ul>
-                    <li><strong>Verificación de origen de las peticiones (App Check):</strong> desde ahora tu navegador acompaña cada pedido al servidor con una prueba de que sale de la aplicación real y no de un script. <em>Todavía estamos midiendo</em>: el servidor registra esa prueba pero aún no rechaza a quien no la trae. Lo hacemos así para no dejar afuera a nadie que tenga la página abierta desde antes del cambio.</li>
-                </ul>
+                <p><strong>Memorie Legends nunca solicitará la contraseña de un usuario mediante correo electrónico o chat.</strong></p>
             </div>
 
-            <h2>🧭 Lo que Todavía No Tenemos</h2>
-            <div class="aviso">
-                <p>Preferimos decirlo claro antes que dar una falsa sensación de seguridad. Estas funciones <strong>no existen</strong>:</p>
-                <ul>
-                    <li><strong>Detección automática de fraude:</strong> no hay un sistema que bloquee cuentas solo. Las revisiones son manuales, y preferimos que lo sean: un sistema automático con la señal que tenemos hoy se equivocaría seguido, y equivocarse acá significa dejar a alguien sin su saldo.</li>
-                    <li><strong>Equipo de moderación permanente:</strong> las denuncias las atiende el equipo de desarrollo, sin un turno dedicado.</li>
-                </ul>
-                <p>Cuando incorporemos estas medidas, actualizaremos esta página y avisaremos a los jugadores.</p>
-            </div>
+            <h2>3. Verificación en dos pasos</h2>
+            <p>Memorie Legends dispone de <strong>verificación en dos pasos (2FA)</strong> para cuentas compatibles. La verificación puede realizarse mediante códigos temporales generados por aplicaciones de autenticación compatibles.</p>
+            <p>El segundo factor ayuda a proteger la cuenta incluso cuando una contraseña ha sido comprometida.</p>
+            <p>La activación es opcional, pero recomendamos utilizarla especialmente cuando una cuenta mantiene Leyendas.</p>
 
-            <h2>🔎 Reportar una Vulnerabilidad</h2>
-            <p>Si encontrás un fallo de seguridad, escribinos a <strong>soporte@memorie-legends.com</strong> con el asunto <em>«Seguridad»</em> antes de divulgarlo públicamente. Describí cómo reproducirlo y te responderemos a la brevedad. Agradecemos los reportes responsables.</p>
-
-            <h2>✅ Qué Podés Hacer Vos</h2>
+            <h2>4. Protección de las Leyendas</h2>
+            <p>El saldo de Leyendas no debe depender de información enviada libremente por el navegador. Las operaciones críticas se procesan mediante controles del lado servidor, y las reglas de acceso de Firestore restringen las operaciones que un jugador puede realizar directamente.</p>
+            <p>El usuario no debería poder modificar directamente desde su navegador:</p>
             <ul>
-                <li>Usá una contraseña larga y distinta de la de otros sitios, o iniciá sesión con Google.</li>
-                <li>No compartas tu cuenta ni tus credenciales con nadie. Nunca te vamos a pedir la contraseña por correo ni por chat.</li>
-                <li>Cerrá sesión si usás un equipo compartido.</li>
-                <li>Verificá que la dirección del sitio sea la oficial antes de iniciar sesión o pagar.</li>
+                <li>Su propio saldo.</li>
+                <li>Su puntuación de ranking.</li>
+                <li>Resultados protegidos.</li>
+                <li>Datos internos de otras cuentas.</li>
             </ul>
 
+            <h2>5. Libro mayor de movimientos</h2>
+            <p>Las operaciones relevantes de Leyendas pueden registrarse mediante un historial de movimientos. Cuando corresponda, se registran elementos como el saldo anterior, el nuevo saldo, el motivo y la referencia de la operación.</p>
+            <p>Las operaciones críticas utilizan mecanismos transaccionales destinados a mantener consistencia entre el saldo y el registro correspondiente.</p>
+
+            <h2>6. Idempotencia</h2>
+            <p>Determinadas operaciones utilizan identificadores de idempotencia. Esto significa que si una petición válida se repite debido a problemas de red, el sistema puede reconocer que la operación ya fue procesada y evitar una segunda acreditación.</p>
+            <p>Esta medida es particularmente importante en compras, acreditaciones, recompensas y operaciones de Leyendas.</p>
+
+            <h2>7. Seguridad de los pagos</h2>
+            <div class="aviso">
+                <p><strong>La compra de Leyendas con dinero todavía no está habilitada.</strong> Los paquetes se muestran en la tienda, pero el botón de compra está desactivado y no hay ninguna integración de pago operativa. Las secciones 7 a 9 describen cómo funcionará el proceso cuando se habilite, y esta página se actualizará ese día.</p>
+            </div>
+            <p>Los pagos se procesarán mediante proveedores externos. Los proveedores previstos son <strong>Xsolla</strong> y <strong>Mercado Pago</strong>.</p>
+            <p>Los datos completos de tarjetas no se almacenan en los servidores de Memorie Legends.</p>
+            <p>Cuando un proveedor confirme una compra mediante el mecanismo de integración correspondiente, Memorie Legends procesará la acreditación de las Leyendas. Las operaciones de pago se verificarán mediante los mecanismos de autenticidad disponibles en la integración utilizada.</p>
+
+            <h2>8. Protección contra manipulación de precios</h2>
+            <p>Los precios de los paquetes deben ser determinados por la configuración del servidor. El navegador no debe ser la fuente de autoridad para establecer el precio final de una compra.</p>
+            <p>Esto reduce el riesgo de que un usuario intente alterar manualmente el importe enviado desde el navegador.</p>
+
+            <h2>9. Confirmación de pagos</h2>
+            <p>Las Leyendas adquiridas se acreditarán únicamente después de recibir una confirmación válida del proveedor correspondiente.</p>
+            <p>Las notificaciones de pago deberán cumplir los mecanismos de autenticación y validación establecidos por la integración. Las notificaciones repetidas de una misma transacción no deben generar acreditaciones duplicadas.</p>
+
+            <h2>10. Seguridad de las partidas</h2>
+            <p>Las partidas y los datos relacionados se almacenan en infraestructura protegida. Las reglas de acceso restringen qué información puede consultar o modificar cada usuario.</p>
+            <p>Las operaciones concurrentes pueden utilizar transacciones para evitar inconsistencias cuando varias acciones ocurren simultáneamente.</p>
+            <p>Una partida cerrada no debe poder cerrarse nuevamente de forma legítima para volver a entregar puntos o recompensas.</p>
+
+            <h2>11. Firestore y control de acceso</h2>
+            <p>Memorie Legends utiliza Firestore para determinados datos del juego. Las reglas de seguridad de Firestore ayudan a limitar la lectura, la escritura, la modificación y el acceso a información privada.</p>
+            <p>El objetivo es que cada usuario pueda acceder únicamente a la información necesaria para utilizar el servicio.</p>
+
+            <h2>12. Datos personales</h2>
+            <p>Los datos personales se tratan de acuerdo con <a href="/privacidad.html">la Política de Privacidad</a>.</p>
+            <p>Las medidas de seguridad buscan proteger estos datos frente a acceso, alteración, pérdida o utilización no autorizada.</p>
+
+            <h2>13. Detección de trampas</h2>
+            <p>Memorie Legends prohíbe bots, scripts automatizados, manipulación de partidas, manipulación de saldos, explotación de vulnerabilidades y cualquier método destinado a obtener ventajas injustas.</p>
+            <p>Los comportamientos sospechosos pueden ser investigados.</p>
+
+            <h2>14. Reportes de jugadores</h2>
+            <p>Los usuarios pueden reportar jugadores desde las funcionalidades disponibles en el juego. Los reportes pueden incluir el motivo, la descripción y la información proporcionada voluntariamente por el denunciante.</p>
+            <p>El reporte no revela necesariamente al denunciado la identidad del usuario que lo realizó.</p>
+
+            <h2>15. Moderación</h2>
+            <p>Actualmente los reportes son revisados por personas del equipo.</p>
+            <p><strong>No existe un sistema que suspenda automáticamente una cuenta simplemente porque otro jugador la haya reportado.</strong> Las medidas sobre una cuenta podrán ser adoptadas después de una revisión.</p>
+            <p>Esto reduce el riesgo de que una denuncia aislada produzca automáticamente la pérdida injustificada de acceso o saldo.</p>
+
+            <h2>16. Límites de los reportes</h2>
+            <p>Para evitar abusos de la herramienta de reportes pueden existir límites técnicos sobre la frecuencia con la que un usuario puede reportar a otro.</p>
+            <p>Estos límites podrán modificarse para prevenir spam, hostigamiento, manipulación de reportes y abuso de herramientas de moderación.</p>
+
+            <h2>17. App Check y verificación de origen</h2>
+            <div class="aviso">
+                <p><strong>App Check está integrado pero todavía no bloquea solicitudes.</strong> Se encuentra en fase de activación progresiva para no afectar a usuarios legítimos, así que hoy no debe considerarse una protección activa.</p>
+            </div>
+            <p>Memorie Legends puede utilizar <strong>Firebase App Check</strong> u otros mecanismos destinados a verificar que determinadas solicitudes procedan de una aplicación o entorno legítimo.</p>
+            <p>La activación de estos mecanismos podrá realizarse progresivamente para evitar afectar a usuarios legítimos durante cambios de infraestructura.</p>
+            <p>Cuando una medida se encuentre en fase de activación y todavía no bloquee solicitudes inválidas, no deberá interpretarse como una protección completamente activa.</p>
+
+            <h2>18. Respaldos y continuidad</h2>
+            <p>Las medidas de infraestructura pueden incluir mecanismos de respaldo y recuperación destinados a reducir el impacto de fallas, errores, pérdida de información e incidentes técnicos.</p>
+            <p>La disponibilidad de los respaldos no constituye una garantía absoluta de recuperación de cualquier dato ante cualquier circunstancia.</p>
+
+            <h2>19. Incidentes de seguridad</h2>
+            <p>Cuando se detecte un incidente, Memorie Legends podrá:</p>
+            <ol>
+                <li>Investigar el incidente.</li>
+                <li>Contenerlo.</li>
+                <li>Proteger los sistemas afectados.</li>
+                <li>Evaluar su alcance.</li>
+                <li>Restaurar servicios.</li>
+                <li>Documentar lo sucedido.</li>
+                <li>Adoptar medidas correctivas.</li>
+                <li>Realizar las comunicaciones legalmente exigibles.</li>
+            </ol>
+            <p>Los incidentes relacionados con datos personales se gestionarán también conforme a <a href="/privacidad.html">la Política de Privacidad</a> y a la legislación aplicable. El Decreto N.º 64/020 establece obligaciones específicas para las vulneraciones de seguridad que afecten datos personales.</p>
+
+            <h2>20. Reporte responsable de vulnerabilidades</h2>
+            <p>Si encontrás una vulnerabilidad de seguridad, pedimos que la informes antes de hacerla pública.</p>
             <div class="contacto">
-                <p><strong>📧 Contacto:</strong> soporte@memorie-legends.com</p>
-                <p><strong>📍 Jurisdicción:</strong> República Oriental del Uruguay</p>
+                <p><strong>📧 Enviar a:</strong> <a href="mailto:soporte@memorie-legends.com?subject=Seguridad%20%E2%80%94%20Vulnerabilidad">soporte@memorie-legends.com</a></p>
+                <p><strong>Asunto recomendado:</strong> Seguridad — Vulnerabilidad</p>
+            </div>
+            <p>Incluí, cuando sea posible, una descripción, los pasos para reproducirla, el impacto observado, capturas o evidencia no sensible e información técnica relevante.</p>
+            <p><strong>No intentes acceder, modificar o eliminar datos pertenecientes a otros usuarios.</strong></p>
+
+            <h2>21. Qué no hacer al encontrar una vulnerabilidad</h2>
+            <p>Está prohibido utilizar una vulnerabilidad para robar Leyendas, modificar saldos, acceder a cuentas, obtener información privada, interrumpir el servicio, eliminar datos u obtener ventajas competitivas.</p>
+            <p>El reporte responsable permite corregir vulnerabilidades sin perjudicar a otros usuarios.</p>
+
+            <h2>22. Lo que Memorie Legends no garantiza</h2>
+            <p>Ningún sistema conectado a Internet es completamente invulnerable. Por ello, Memorie Legends no puede garantizar que:</p>
+            <ul>
+                <li>Nunca exista un incidente.</li>
+                <li>Ningún tercero intente atacar la plataforma.</li>
+                <li>Ningún dispositivo del usuario sea comprometido.</li>
+                <li>Todos los servicios externos estén disponibles permanentemente.</li>
+            </ul>
+            <p>Lo que sí hacemos es mantener medidas razonables de prevención, detección y respuesta.</p>
+
+            <h2>23. Funciones de seguridad en desarrollo</h2>
+            <p>Las medidas de seguridad pueden evolucionar. Algunas tecnologías pueden encontrarse en desarrollo, prueba, activación progresiva o evaluación.</p>
+            <p>Una funcionalidad marcada como «en desarrollo» no debe interpretarse como una protección completamente activa.</p>
+
+            <h2>24. Detección automática de fraude</h2>
+            <p>Actualmente no se debe interpretar que Memorie Legends cuenta con un sistema completamente automatizado capaz de detectar y bloquear todos los fraudes.</p>
+            <p>Las revisiones pueden requerir intervención humana. Esta información se actualizará cuando se incorporen mecanismos adicionales.</p>
+
+            <h2>25. Equipo de moderación</h2>
+            <p>La moderación actualmente puede ser realizada por el equipo responsable del desarrollo y funcionamiento de Memorie Legends.</p>
+            <p>No se garantiza la existencia de un equipo de moderación permanente disponible las 24 horas.</p>
+
+            <h2>26. Seguridad del usuario</h2>
+            <p>Para proteger tu cuenta:</p>
+            <ul>
+                <li>Utilizá una contraseña larga y exclusiva.</li>
+                <li>Activá 2FA cuando esté disponible.</li>
+                <li>No compartas tus credenciales.</li>
+                <li>No introduzcas tu contraseña en sitios desconocidos.</li>
+                <li>Cerrá sesión en equipos compartidos.</li>
+                <li>Verificá que estés utilizando el sitio oficial.</li>
+                <li>No compartas códigos de autenticación.</li>
+                <li>Reportá cualquier actividad sospechosa.</li>
+            </ul>
+
+            <h2>27. Seguridad y compras</h2>
+            <p>Antes de pagar, verificá que estés utilizando el sitio oficial: <a href="https://memorie-legends.web.app/">memorie-legends.web.app</a></p>
+            <p>Nunca entregues tu contraseña, códigos 2FA o credenciales a otra persona para completar una compra. Memorie Legends nunca necesitará conocer tu contraseña para procesar una compra.</p>
+
+            <h2>28. Actualización de esta página</h2>
+            <p>Las medidas de seguridad cambiarán a medida que evolucione Memorie Legends. Esta página será actualizada cuando se incorporen nuevas medidas, se retire una medida, cambie la arquitectura, cambien los proveedores o se implemente una función de seguridad previamente anunciada como futura.</p>
+            <p>La versión vigente estará disponible en <a href="https://memorie-legends.web.app/seguridad.html">memorie-legends.web.app/seguridad.html</a>.</p>
+
+            <h2>29. Contacto</h2>
+            <div class="contacto">
+                <p><strong>📧 Vulnerabilidades, incidentes o problemas de seguridad:</strong> <a href="mailto:soporte@memorie-legends.com">soporte@memorie-legends.com</a></p>
+                <p><strong>🔒 Datos personales:</strong> <a href="/privacidad.html">Política de Privacidad</a></p>
+                <p><strong>📜 Condiciones de utilización:</strong> <a href="/terminos.html">Términos y Condiciones</a></p>
             </div>
         </div>
     </main>
