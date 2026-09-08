@@ -29,7 +29,14 @@
 import { db, collection, getDocs, query, orderBy } from "./firebase.js";
 import { escapar } from "./modulos/texto.js";
 import { mostrarSaldo } from "./sesion.js";
-import { comprarItem, comprarPack, equiparItem, misItems, ErrorDeServidor } from "./servidor.js";
+import {
+  comprarItem,
+  comprarPack,
+  equiparItem,
+  desequiparItem,
+  misItems,
+  ErrorDeServidor,
+} from "./servidor.js";
 import {
   TIPOS,
   CAMPO_EQUIPADO,
@@ -141,8 +148,13 @@ function dibujarBoton(item) {
     return `<button class="accion ${adentro ? "" : "sobria"}" type="button"
               data-pack="${escapar(item.id)}">${adentro ? "✓ En el pack" : "Agregar"}</button>`;
   }
+  // Lo que se lleva puesto ofrece sacárselo. Antes era un botón apagado que
+  // decía «✓ Equipado» y no hacía nada: el jugador podía cambiar de avatar
+  // pero no quedarse sin ninguno, porque «ninguno» no es un artículo que se
+  // pueda elegir de la rejilla.
   if (puesto) {
-    return `<button class="accion sobria" type="button" disabled>✓ Equipado</button>`;
+    return `<button class="accion sobria" type="button"
+              data-sacar="${escapar(item.tipo)}">Desequipar</button>`;
   }
   if (tengo.has(item.id)) {
     return `<button class="accion" type="button" data-equipar="${escapar(item.id)}">Equipar</button>`;
@@ -323,6 +335,15 @@ async function equipar(itemId, boton) {
   });
 }
 
+async function desequipar(tipo, boton) {
+  await conBotonApagado(boton, async () => {
+    await desequiparItem(tipo);
+    equipado[tipo] = null;
+    avisar("Listo, te lo sacaste.", "bien");
+    dibujar();
+  });
+}
+
 // ------------------------------------------------------------------ arranque
 
 /**
@@ -374,6 +395,7 @@ export async function montarPersonalizacion({ saldoInicial = 0 } = {}) {
     if (!boton) return;
     if (boton.dataset.comprar) comprar(boton.dataset.comprar, boton);
     else if (boton.dataset.equipar) equipar(boton.dataset.equipar, boton);
+    else if (boton.dataset.sacar) desequipar(boton.dataset.sacar, boton);
     else if (boton.dataset.pack) alternarEnPack(boton.dataset.pack);
   });
 

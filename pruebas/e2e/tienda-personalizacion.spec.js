@@ -137,7 +137,10 @@ const servidorFalso = (saldoInicial) => `
     window.__llamadas.push(["equiparItem", itemId]);
     return { itemId, tipo: "avatar", campo: "avatar" };
   }
-  export const desequiparItem = async (tipo) => ({ tipo, equipado: null });
+  export async function desequiparItem(tipo) {
+    window.__llamadas.push(["desequiparItem", tipo]);
+    return { tipo, campo: tipo, equipado: null };
+  }
   export const misInsignias = async () => ({ estadisticas: {}, tengo: [], equipada: null });
   export const listarTorneos = async () => ({ torneos: [] });
   export const inscribirseATorneo = async () => ({});
@@ -314,17 +317,37 @@ test("sin saldo suficiente, el botón lo dice y no se puede tocar", async ({ pag
   await expect(dragon).toContainText(/no alcanza/i);
 });
 
-test("comprar deja el artículo en «Equipar», y equiparlo en «Equipado»", async ({
+test("comprar, equipar y sacárselo: el botón recorre los tres estados", async ({
   page,
 }) => {
+  /**
+   * El tercer estado faltaba.
+   *
+   * Antes, lo que se llevaba puesto mostraba un botón APAGADO que decía
+   * «✓ Equipado». O sea: se podía cambiar de avatar, pero no quedarse sin
+   * ninguno, porque «ninguno» no es un artículo que se pueda elegir de la
+   * rejilla. El jugador que se probaba uno quedaba con uno puesto para
+   * siempre.
+   */
   await abrirTienda(page, { saldo: 5000 });
+  const boton = ficha(page, "El Zorro").locator("button");
 
-  await ficha(page, "El Zorro").locator("button").click();
-  await expect(ficha(page, "El Zorro").locator("button")).toContainText(/equipar/i);
+  await boton.click();
+  await expect(boton, "comprado: ahora se puede equipar").toContainText(/^equipar$/i);
 
-  await ficha(page, "El Zorro").locator("button").click();
-  await expect(ficha(page, "El Zorro").locator("button")).toContainText(/equipado/i);
-  await expect(ficha(page, "El Zorro").locator("button")).toBeDisabled();
+  await boton.click();
+  await expect(boton, "equipado: ahora se puede sacar").toContainText(/desequipar/i);
+  await expect(boton, "y el botón tiene que funcionar, no estar apagado").toBeEnabled();
+
+  await boton.click();
+  await expect(boton, "sacado: vuelve a poder equiparse").toContainText(/^equipar$/i);
+
+  // Y al servidor viajó el TIPO, no el id: el perfil guarda un id por tipo, y
+  // desequipar es poner ese campo en null.
+  const llamada = await page.evaluate(() =>
+    window.__llamadas.find(([n]) => n === "desequiparItem"));
+  expect(llamada, "no se llamó a desequiparItem").toBeTruthy();
+  expect(llamada[1], "viajó el id en vez del tipo").toBe("avatar");
 });
 
 // =====================================================================

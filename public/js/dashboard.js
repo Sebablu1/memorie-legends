@@ -29,6 +29,7 @@ import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/
 import { armarRivales, NIVELES, limiteDelModo, MODOS_PARTIDA } from "./rivales.js";
 import { pintarAvatarCabecera, pintarInsignia } from "./equipado.js";
 import { montarLogros } from "./logros.js";
+import { montarInventario } from "./inventario.js";
 import { montarCarteleraTorneos } from "./cartelera-torneos.js";
 
 const $ = (id) => document.getElementById(id);
@@ -126,6 +127,9 @@ if (sesion) {
   // Sin `await`: la vitrina hace dos viajes al servidor y el panel no tiene
   // por qué esperarlos. Se muestra sola cuando llega, y si no llega no se
   // muestra — pero nadie se queda sin poder entrar a jugar por eso.
+  // La foto de Google viaja para que, al sacarse el avatar, la cabecera
+  // vuelva a mostrarla sin recargar la página.
+  montarInventario({ foto: usuario.photoURL });
   montarLogros();
   montarCarteleraTorneos();
 

@@ -315,6 +315,20 @@
 
       </section>
 
+      <!-- Mi inventario: avatares y dorsos comprados, con equipar y sacar.
+           Sólo aparece si el jugador tiene algo; una sección que dice «no
+           tenés nada» ocupa el mismo lugar que una con cosas.
+
+           Las insignias NO están acá a propósito: viven en la vitrina de
+           logros de abajo, que además muestra las que faltan y cuánto falta
+           para cada una. Dos listas de lo mismo en la misma página no le
+           sirven a nadie. -->
+      <section class="panel mi-inventario" id="miInventario" style="margin-top: 22px" hidden>
+        <h2>🎒 Mi inventario</h2>
+        <p class="aviso-tienda" id="avisoInventario" role="status" aria-live="polite"></p>
+        <div id="rejillaInventario"></div>
+      </section>
+
       <!-- La vitrina de logros. Las insignias NO se compran: las otorga el
            servidor al terminar una partida o al cerrar un ranking, así que acá
            no hay ningún botón de comprar — sólo el de ponerse la que ya se

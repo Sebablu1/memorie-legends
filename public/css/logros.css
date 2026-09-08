@@ -204,3 +204,129 @@
      falla, y este botón cobra Leyendas. */
   min-height: 44px;
 }
+
+/* ---------------------------------------------------------- mi inventario
+ *
+ * Vive en esta hoja y no en una propia porque comparte página con la vitrina
+ * de logros y con la cartelera de torneos: una hoja más sería un pedido más en
+ * la carga del panel para tres bloques que siempre aparecen juntos.
+ */
+
+.grupo-inv + .grupo-inv {
+  margin-top: 22px;
+}
+
+.titulo-grupo {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: var(--texto-tenue);
+  margin-bottom: 10px;
+}
+
+.rejilla-inv {
+  display: grid;
+  /* 150px es lo que mide una tarjeta con el nombre, la rareza y el botón sin
+     que se parta una palabra. `auto-fill` acomoda seis en una pantalla grande
+     y dos en un teléfono, sin puntos de corte escritos a mano. */
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.item-inv {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 10px 12px;
+  text-align: center;
+  border-radius: 14px;
+  background: linear-gradient(165deg, var(--panel-alto), rgba(12, 12, 14, 0.92));
+  border: 1px solid var(--borde-suave);
+}
+
+/* Lo que se lleva puesto brilla. Es la diferencia que hay que ver de un
+   vistazo en una rejilla de doce cosas iguales. */
+.item-inv.puesto {
+  border-color: rgba(212, 168, 67, 0.7);
+  box-shadow: 0 0 0 1px rgba(212, 168, 67, 0.22);
+}
+
+.figura-inv {
+  width: 68px;
+  height: 68px;
+  display: grid;
+  place-items: center;
+  object-fit: contain;
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 40%, rgba(212, 168, 67, 0.16), transparent 70%);
+}
+
+.figura-inv.glifo {
+  font-size: 2.3rem;
+  line-height: 1;
+}
+
+.item-inv h3 {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--texto);
+}
+
+/* La rareza lleva su color por atributo `style`, desde el JS: viene del
+   catálogo, que se edita desde el panel, y una clase por rareza obligaría a
+   tocar esta hoja cada vez que se invente una. */
+.rareza {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid;
+}
+
+.desc-inv {
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: var(--texto-tenue);
+}
+
+.estado-inv {
+  font-size: 0.72rem;
+  color: var(--texto-tenue);
+}
+
+.item-inv.puesto .estado-inv {
+  color: var(--oro, #d4a843);
+  font-weight: 600;
+}
+
+.item-inv .accion {
+  width: 100%;
+  margin-top: 2px;
+  /* Mismo tratamiento que los botones de la vitrina: el relleno lateral y el
+     tamaño bajan para que «Desequipar» entre en una tarjeta de teléfono. */
+  padding-left: 6px;
+  padding-right: 6px;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  min-height: 44px;
+}
+
+.vacio-inv {
+  font-size: 0.82rem;
+  color: var(--texto-tenue);
+  padding: 8px 0;
+}
+
+@media (max-width: 420px) {
+  .rejilla-inv {
+    grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+    gap: 10px;
+  }
+  .figura-inv {
+    width: 56px;
+    height: 56px;
+  }
+}
