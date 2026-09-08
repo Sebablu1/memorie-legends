@@ -44,6 +44,7 @@ import {
   armarMesas,
   pozoDe,
   repartirPozo,
+  puestosQueCobran,
   puntosDeTorneo,
   problemasDelTorneo,
 } from "./reglas/torneos.js";
@@ -337,14 +338,42 @@ export function crearTorneos({
     if (!lista.length) throw error("invalid-argument", "Falta decir quién ganó.");
 
     // Que estén inscriptos. Sin esto, el panel podría pagarle a cualquiera.
-    const anotados = new Set((await inscriptosDe(id)).map((a) => a.uid));
+    const inscriptosDelTorneo = await inscriptosDe(id);
+    const anotados = new Set(inscriptosDelTorneo.map((a) => a.uid));
     for (const uid of lista) {
       if (!anotados.has(uid)) {
         throw error("invalid-argument", "Alguno de los ganadores no jugó este torneo.");
       }
     }
 
-    const { pagos, repartido, comisionCasa } = repartirPozo(Number(torneo.pozo ?? 0), lista);
+    /**
+     * Cuánta gente jugó de verdad.
+     *
+     * Es lo que decide el TRAMO de reparto, y no se puede deducir de cuántos
+     * nombres cargó el administrador: si carga tres en un torneo de veinte, el
+     * tercero cobra el 20% que le toca a un torneo de veinte, no el 20% que le
+     * tocaría a uno de doce.
+     *
+     * Se cuentan los que se sentaron a una mesa, no los inscriptos: a los que
+     * sobraron al armar las mesas se les devolvió la entrada y su plata no
+     * está en el fondo.
+     */
+    const jugaron = (torneo.mesas ?? []).flatMap((m) => m.jugadores ?? []);
+    const cuantosJugaron = jugaron.length || inscriptosDelTorneo.length;
+
+    const puestosPagados = puestosQueCobran(cuantosJugaron);
+    if (lista.length > puestosPagados) {
+      throw error(
+        "invalid-argument",
+        `Con ${cuantosJugaron} jugadores cobran ${puestosPagados} puestos, y se cargaron ${lista.length}.`,
+      );
+    }
+
+    const { pagos, repartido, comisionCasa } = repartirPozo(
+      Number(torneo.pozo ?? 0),
+      lista,
+      cuantosJugaron,
+    );
 
     // De a una transacción, igual que las devoluciones.
     const pagados = [];
@@ -361,10 +390,11 @@ export function crearTorneos({
       pagados.push({ ...pago, pagado: r.aplicado });
     }
 
-    // Puntos de campeonato y, para el campeón, una victoria de torneo más:
-    // cinco de ésas son la insignia «Campeón».
+    // Puntos de campeonato para TODOS los que jugaron —los que no entraron en
+    // puesto pagado suman los de participación— y, para el campeón, una
+    // victoria de torneo más: cinco de ésas son la insignia «Campeón».
     const semana = claveDeSemana();
-    for (const p of puntosDeTorneo(lista)) {
+    for (const p of puntosDeTorneo(lista, jugaron.length ? jugaron : [...anotados])) {
       await db
         .collection(rankingCampeonato)
         .doc(semana)
@@ -388,6 +418,8 @@ export function crearTorneos({
       {
         estado: ESTADOS.FINALIZADO,
         ganadores: lista,
+        jugaron: cuantosJugaron,
+        puestosPagados,
         premios: pagados,
         repartido,
         comisionCasa,
@@ -398,7 +430,18 @@ export function crearTorneos({
     );
 
     logger?.info?.("Torneo finalizado", { id, repartido, comisionCasa, ganadores: lista });
-    return { id, estado: ESTADOS.FINALIZADO, premios: pagados, repartido, comisionCasa };
+    return {
+      id,
+      estado: ESTADOS.FINALIZADO,
+      premios: pagados,
+      repartido,
+      comisionCasa,
+      // Sale para arriba porque el panel lo muestra: «12 jugadores, 3 puestos
+      // pagados» es lo que deja comprobar de un vistazo que se repartió por el
+      // tramo que correspondía.
+      jugaron: cuantosJugaron,
+      puestosPagados,
+    };
   }
 
   // -------------------------------------------------------- cancelar

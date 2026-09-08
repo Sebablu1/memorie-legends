@@ -114,48 +114,115 @@ export const pozoDe = (entrada, cuantosJuegan) =>
   Math.max(0, Math.trunc(entrada) * Math.max(0, Math.trunc(cuantosJuegan)));
 
 /**
- * Qué porción del pozo se lleva cada puesto.
+ * Cuántos puestos cobran y qué porcentaje, según cuánta gente jugó.
  *
- * Suman 0.90: el 10% se lo queda la casa, igual que en las partidas de mesa.
- * Está escrito como fracciones y no como cantidades porque el pozo depende de
- * la entrada, que la elige el administrador torneo por torneo.
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR TRAMOS, Y NO UN REPARTO FIJO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Un torneo de 4 y uno de 50 no se pueden repartir igual. Con un reparto fijo
+ * de dos puestos, en el de 50 hay 48 personas que pagaron la entrada y no
+ * tenían ninguna chance de recuperar nada: el fondo lo juntan todos y se lo
+ * llevan dos. Cuantos más entran, más lejos se reparte.
+ *
+ * Está publicado en `/reglamento-torneos.html`, con estas mismas tablas y con
+ * ejemplos. `pruebas/torneos.mjs` comprueba que la página y esta constante
+ * digan lo mismo: un reglamento que promete un porcentaje distinto del que se
+ * paga es peor que no tener reglamento.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * CADA TRAMO SUMA 100%: LA CASA NO SE QUEDA CON NADA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * A diferencia de la mesa de Leyendas, donde la casa retiene un 10%, acá se
+ * reparte el fondo entero. Lo único que queda sin repartir es el resto del
+ * redondeo hacia abajo —a lo sumo unas pocas Leyendas— y queda sin repartir
+ * porque redondear hacia arriba pagaría MÁS de lo que entró, que es imprimir
+ * Leyendas.
  */
-export const REPARTO = Object.freeze([
-  { puesto: 1, parte: 0.6 },
-  { puesto: 2, parte: 0.3 },
+export const TRAMOS_DE_REPARTO = Object.freeze([
+  { desde: 4, hasta: 11, porcentajes: [60, 40] },
+  { desde: 12, hasta: 19, porcentajes: [50, 30, 20] },
+  { desde: 20, hasta: 29, porcentajes: [40, 25, 20, 15] },
+  { desde: 30, hasta: 49, porcentajes: [35, 25, 20, 12, 8] },
+  { desde: 50, hasta: Infinity, porcentajes: [25, 18, 14, 10, 8, 5, 5, 5, 5, 5] },
 ]);
 
-/** Puntos de campeonato por puesto, que alimentan el ranking semanal. */
-export const PUNTOS_CAMPEONATO = Object.freeze({ 1: 100, 2: 60, 3: 30, 4: 10 });
+/** El tramo que le toca a un torneo por su cantidad de jugadores. */
+export function tramoDeReparto(jugadores) {
+  const n = Math.trunc(jugadores);
+  return TRAMOS_DE_REPARTO.find((t) => n >= t.desde && n <= t.hasta) ?? null;
+}
+
+/** Cuántos puestos cobran con esa cantidad de jugadores. */
+export const puestosQueCobran = (jugadores) => tramoDeReparto(jugadores)?.porcentajes.length ?? 0;
 
 /**
- * Reparte el pozo entre los ganadores.
+ * Puntos de campeonato por puesto.
  *
- * Redondea cada pago HACIA ABAJO y le deja el resto a la casa. Redondear hacia
- * arriba podría pagar más de lo que entró —dos redondeos de 0,6 sobre un pozo
- * chico— y eso es imprimir Leyendas: el pozo tiene que cerrar exactamente, y
- * lo comprueba `pruebas/torneos.mjs`.
+ * `PARTICIPACION` es para el quinto en adelante: todo el que jugó suma algo.
+ * Sin eso, en un torneo de 50 personas hay 46 que compiten por nada, y el
+ * ranking de campeonato terminaría midiendo cuántos torneos ganaste en vez de
+ * cuánto jugaste y cómo te fue.
  */
-export function repartirPozo(pozo, ganadores, reparto = REPARTO) {
+export const PUNTOS_CAMPEONATO = Object.freeze({ 1: 100, 2: 50, 3: 25, 4: 10 });
+export const PUNTOS_PARTICIPACION = 5;
+
+export const puntosPorPuesto = (puesto) =>
+  PUNTOS_CAMPEONATO[puesto] ?? (puesto >= 1 ? PUNTOS_PARTICIPACION : 0);
+
+/**
+ * Reparte el fondo entre los que entraron en puesto pagado.
+ *
+ * El porcentaje sale del TRAMO, así que hay que decirle cuánta gente jugó. No
+ * se deduce de la cantidad de ganadores que se pasen: si el administrador
+ * carga tres nombres en un torneo de 20, el tercero cobra el 20% que le toca
+ * a un torneo de 20, no el que le tocaría a uno de 12.
+ *
+ * Redondea cada pago HACIA ABAJO. Redondear hacia arriba podría pagar más de
+ * lo que entró —diez redondeos sobre un fondo chico— y eso es imprimir
+ * Leyendas: el fondo tiene que cerrar exactamente, y lo comprueba
+ * `pruebas/torneos.mjs` con seis entradas y cuatro tamaños de torneo.
+ */
+export function repartirPozo(pozo, ganadores, jugadores = ganadores.length) {
   const total = Math.max(0, Math.trunc(pozo));
+  const tramo = tramoDeReparto(jugadores);
   const pagos = [];
 
-  for (const tramo of reparto) {
-    const uid = ganadores[tramo.puesto - 1];
-    if (!uid) continue;
-    const monto = Math.floor(total * tramo.parte);
-    if (monto > 0) pagos.push({ uid, puesto: tramo.puesto, monto });
+  if (tramo) {
+    for (let i = 0; i < tramo.porcentajes.length; i++) {
+      const uid = ganadores[i];
+      if (!uid) continue;
+      const monto = Math.floor((total * tramo.porcentajes[i]) / 100);
+      if (monto > 0) pagos.push({ uid, puesto: i + 1, monto });
+    }
   }
 
   const repartido = pagos.reduce((s, p) => s + p.monto, 0);
   return { pagos, repartido, comisionCasa: total - repartido };
 }
 
-/** Los puntos de campeonato de cada uno, por su puesto final. */
-export function puntosDeTorneo(ganadores) {
-  return ganadores
-    .map((uid, i) => ({ uid, puesto: i + 1, puntos: PUNTOS_CAMPEONATO[i + 1] ?? 0 }))
-    .filter((p) => p.uid && p.puntos > 0);
+/**
+ * Los puntos de campeonato de cada uno.
+ *
+ * `ordenFinal` son los que entraron en puesto pagado, en orden. `todos` son
+ * TODOS los inscriptos que jugaron: los que no están en el orden final suman
+ * los puntos de participación, que es lo que hace que un torneo grande le
+ * sirva a algo a quien no salió entre los primeros.
+ */
+export function puntosDeTorneo(ordenFinal, todos = ordenFinal) {
+  const colocados = new Set(ordenFinal.filter(Boolean));
+  const puntos = ordenFinal
+    .map((uid, i) => ({ uid, puesto: i + 1, puntos: puntosPorPuesto(i + 1) }))
+    .filter((p) => p.uid);
+
+  for (const uid of todos) {
+    if (uid && !colocados.has(uid)) {
+      puntos.push({ uid, puesto: null, puntos: PUNTOS_PARTICIPACION });
+    }
+  }
+
+  return puntos.filter((p) => p.puntos > 0);
 }
 
 // ---------------------------------------------------------- validación

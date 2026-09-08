@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Cómo funcionan los torneos de Memorie Legends: qué Leyendas sirven para entrar, cómo se arma el fondo, cuántos puestos cobran y cuántos puntos de campeonato da cada posición.">
+    <meta name="theme-color" content="#0a0a0a">
+    <title>Reglamento de Torneos - Memorie Legends</title>
+    <link rel="icon" href="img/favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/tema.css" />
+    <link rel="stylesheet" href="css/legal.css">
+    <link rel="canonical" href="https://memorie-legends.web.app/reglamento-torneos.html" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Memorie Legends" />
+    <meta property="og:locale" content="es_AR" />
+    <meta property="og:url" content="https://memorie-legends.web.app/reglamento-torneos.html" />
+    <meta property="og:title" content="Reglamento de torneos — Memorie Legends" />
+    <meta property="og:description" content="Cómo funcionan los torneos de Memorie Legends: qué Leyendas sirven para entrar, cómo se arma el fondo, cuántos puestos cobran y cuántos puntos de campeonato da cada posición." />
+    <meta property="og:image" content="https://memorie-legends.web.app/img/compartir.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Logo de Memorie Legends sobre fondo oscuro" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Reglamento de torneos — Memorie Legends" />
+    <meta name="twitter:description" content="Cómo funcionan los torneos de Memorie Legends: qué Leyendas sirven para entrar, cómo se arma el fondo, cuántos puestos cobran y cuántos puntos de campeonato da cada posición." />
+    <meta name="twitter:image" content="https://memorie-legends.web.app/img/compartir.jpg" />
+
+    <!-- Las tablas de reparto son anchas y el documento se lee mucho en
+         teléfono. `overflow-x: auto` las deja desplazarse SOLAS, dentro de su
+         caja, en vez de estirar la página entera: sin esto, un torneo de diez
+         puestos obliga a mover toda la pantalla de costado para leer un
+         párrafo. -->
+    <style>
+      .tabla-reglamento {
+        overflow-x: auto;
+        margin: 18px 0;
+        border: 1px solid var(--borde-suave, rgba(255, 255, 255, 0.12));
+        border-radius: 10px;
+      }
+      .tabla-reglamento table {
+        width: 100%;
+        min-width: 420px;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+      }
+      .tabla-reglamento th,
+      .tabla-reglamento td {
+        padding: 10px 14px;
+        text-align: left;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      }
+      .tabla-reglamento th {
+        color: var(--oro);
+        font-weight: 600;
+        background: rgba(212, 168, 67, 0.07);
+        white-space: nowrap;
+      }
+      .tabla-reglamento td {
+        color: var(--texto-suave);
+      }
+      .tabla-reglamento tr:last-child td {
+        border-bottom: none;
+      }
+      .tabla-reglamento .num {
+        text-align: right;
+        white-space: nowrap;
+      }
+      /* La fórmula, para que se distinga del párrafo que la explica. */
+      .formula {
+        display: block;
+        margin: 16px 0;
+        padding: 14px 18px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.04);
+        border-left: 3px solid var(--oro);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.88rem;
+        line-height: 1.7;
+        color: var(--texto);
+        overflow-x: auto;
+      }
+      .ejemplo {
+        margin: 16px 0;
+        padding: 14px 18px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .ejemplo h3 {
+        margin-top: 0;
+      }
+      .ejemplo ul {
+        margin-bottom: 0;
+      }
+      .prohibido {
+        list-style: none;
+        padding-left: 0;
+      }
+      .prohibido li {
+        padding-left: 26px;
+        position: relative;
+      }
+      .prohibido li::before {
+        content: "✕";
+        position: absolute;
+        left: 4px;
+        color: #ff6b5a;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+<body>
+
+    <header>
+        <div class="header-content">
+            <a href="/dashboard.html" class="logo"><img src="img/memorie-legends2.webp" alt="Memorie Legends" class="logo-img"><span class="logo-text">Memorie Legends</span></a>
+            <nav>
+                <a href="/">Inicio</a>
+                <a href="/lobby.html">Lobby</a>
+                <a href="/login.html">Jugar</a>
+                <a href="/como-se-juega.html">Cómo se juega</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="legal-container">
+            <h1>🏆 Reglamento de Torneos y Campeonato</h1>
+            <p class="actualizado">Última actualización: 8 de septiembre de 2026 · Vigente para usuarios de la República Oriental del Uruguay</p>
+
+            <p>Este reglamento explica cómo funcionan los torneos de Memorie Legends: quién puede entrar, con qué Leyendas, cómo se arma el fondo, cuántos puestos cobran y cuántos puntos de campeonato reparte cada posición.</p>
+
+            <p>Forma parte de los <a href="/terminos.html">Términos y Condiciones</a> y se lee junto con ellos.</p>
+
+            <h2>1. Naturaleza de los torneos</h2>
+            <p>Los torneos de Memorie Legends son competencias de <strong>habilidad</strong>: memoria, estrategia y toma de decisiones. El resultado depende del desempeño del jugador conforme a las reglas del juego.</p>
+            <p><strong>No son juegos de azar ni apuestas.</strong> No hay premios en dinero, no hay conversión a dinero y no hay ninguna modalidad en la que el resultado dependa del azar.</p>
+
+            <h2>2. Participación</h2>
+            <p>La participación en un torneo es <strong>voluntaria</strong>. Nadie queda inscripto sin haberlo pedido.</p>
+            <p>Para participar, el jugador paga una <strong>entrada en Leyendas</strong>. Esa entrada se descuenta de su saldo en el momento de inscribirse y pasa a formar parte del fondo del torneo.</p>
+            <p>La edad mínima para utilizar Memorie Legends es de <strong>13 años</strong>, según los <a href="/terminos.html">Términos y Condiciones</a>. Los menores de 18 años deberán contar con la autorización correspondiente cuando sea exigible.</p>
+
+            <h2>3. Qué Leyendas sirven para entrar</h2>
+            <p>Sólo se pueden usar Leyendas <strong>gratuitas</strong> (las 100 que recibe toda cuenta nueva al registrarse) o <strong>ganadas</strong> jugando.</p>
+
+            <div class="tabla-reglamento">
+              <table>
+                <thead>
+                  <tr><th>Origen de las Leyendas</th><th>Torneos</th><th>Campeonato</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Gratuitas (100 al registrarse)</td><td>Sí</td><td>Sí</td></tr>
+                  <tr><td>Ganadas jugando (premios)</td><td>Sí</td><td>Sí</td></tr>
+                  <tr><td>Compradas con dinero real</td><td><strong>No</strong></td><td><strong>No</strong></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="aviso">
+                <p><strong>Hoy no existe ninguna Leyenda comprada.</strong> La compra de Leyendas con dinero todavía no está habilitada —el botón de compra está desactivado y no hay ninguna integración de pago operativa—, así que todas las Leyendas en circulación son gratuitas o ganadas jugando.</p>
+                <p>Antes de habilitar las compras, el sistema separará las Leyendas por origen para que esta regla se aplique sola. Hasta entonces, se cumple porque no hay nada que separar.</p>
+            </div>
+
+            <h2>4. Fondo del torneo</h2>
+            <p>El fondo se arma con las entradas de quienes efectivamente juegan:</p>
+            <span class="formula">FONDO = JUGADORES × ENTRADA EN LEYENDAS</span>
+            <p>Si al armar las mesas queda gente afuera —las mesas son de cuatro—, a esa gente se le <strong>devuelve la entrada</strong> y su aporte no cuenta para el fondo. Un torneo de 10 inscriptos juega con 8 y devuelve 2 entradas.</p>
+            <p>Ejemplos:</p>
+            <ul>
+                <li>12 jugadores × 10 Leyendas = <strong>120 Leyendas</strong> de fondo.</li>
+                <li>12 jugadores × 25 Leyendas = <strong>300 Leyendas</strong> de fondo.</li>
+                <li>20 jugadores × 10 Leyendas = <strong>200 Leyendas</strong> de fondo.</li>
+            </ul>
+
+            <h2>5. Reparto de premios</h2>
+            <p>Cuantos más jugadores entran, entre más puestos se reparte. Un torneo de 4 y uno de 50 no se pueden repartir igual: con un reparto fijo de dos puestos, en el de 50 habría 48 personas que pagaron la entrada sin ninguna chance de recuperar nada.</p>
+
+            <div class="tabla-reglamento">
+              <table>
+                <thead>
+                  <tr><th>Jugadores</th><th class="num">Puestos</th><th>Reparto del fondo</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>4 a 11</td><td class="num">2</td><td>1.º 60% · 2.º 40%</td></tr>
+                  <tr><td>12 a 19</td><td class="num">3</td><td>1.º 50% · 2.º 30% · 3.º 20%</td></tr>
+                  <tr><td>20 a 29</td><td class="num">4</td><td>1.º 40% · 2.º 25% · 3.º 20% · 4.º 15%</td></tr>
+                  <tr><td>30 a 49</td><td class="num">5</td><td>1.º 35% · 2.º 25% · 3.º 20% · 4.º 12% · 5.º 8%</td></tr>
+                  <tr><td>50 o más</td><td class="num">10</td><td>1.º 25% · 2.º 18% · 3.º 14% · 4.º 10% · 5.º 8% · 6.º a 10.º 5% cada uno</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <p><strong>Cada tramo suma 100%: el fondo se reparte entero.</strong> Memorie Legends no retiene ninguna comisión sobre los torneos. Lo único que puede quedar sin repartir es el resto del redondeo hacia abajo —nunca más de nueve Leyendas—, y queda sin repartir porque redondear hacia arriba pagaría más de lo que entró.</p>
+
+            <h2>6. Ejemplos de premios</h2>
+
+            <div class="ejemplo">
+              <h3>12 jugadores, entrada de 10 Leyendas</h3>
+              <p>Fondo: 12 × 10 = <strong>120 Leyendas</strong>. Tramo de 12 a 19: cobran 3 puestos.</p>
+              <ul>
+                <li>1.º — 60 Leyendas (50%)</li>
+                <li>2.º — 36 Leyendas (30%)</li>
+                <li>3.º — 24 Leyendas (20%)</li>
+              </ul>
+            </div>
+
+            <div class="ejemplo">
+              <h3>12 jugadores, entrada de 25 Leyendas</h3>
+              <p>Fondo: 12 × 25 = <strong>300 Leyendas</strong>. Mismo tramo, mismos porcentajes.</p>
+              <ul>
+                <li>1.º — 150 Leyendas (50%)</li>
+                <li>2.º — 90 Leyendas (30%)</li>
+                <li>3.º — 60 Leyendas (20%)</li>
+              </ul>
+            </div>
+
+            <div class="ejemplo">
+              <h3>20 jugadores, entrada de 10 Leyendas</h3>
+              <p>Fondo: 20 × 10 = <strong>200 Leyendas</strong>. Tramo de 20 a 29: cobran 4 puestos.</p>
+              <ul>
+                <li>1.º — 80 Leyendas (40%)</li>
+                <li>2.º — 50 Leyendas (25%)</li>
+                <li>3.º — 40 Leyendas (20%)</li>
+                <li>4.º — 30 Leyendas (15%)</li>
+              </ul>
+            </div>
+
+            <div class="ejemplo">
+              <h3>50 jugadores, entrada de 10 Leyendas</h3>
+              <p>Fondo: 50 × 10 = <strong>500 Leyendas</strong>. Tramo de 50 o más: cobran 10 puestos.</p>
+              <ul>
+                <li>1.º — 125 Leyendas (25%)</li>
+                <li>2.º — 90 Leyendas (18%)</li>
+                <li>3.º — 70 Leyendas (14%)</li>
+                <li>4.º — 50 Leyendas (10%)</li>
+                <li>5.º — 40 Leyendas (8%)</li>
+                <li>6.º a 10.º — 25 Leyendas cada uno (5%)</li>
+              </ul>
+            </div>
+
+            <h2>7. Puntos de campeonato</h2>
+            <p>Además de las Leyendas, cada torneo reparte <strong>Puntos de Campeonato</strong>, que alimentan la tabla del campeonato y no son moneda: no se gastan ni se convierten en nada.</p>
+
+            <div class="tabla-reglamento">
+              <table>
+                <thead>
+                  <tr><th>Posición</th><th class="num">Puntos</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>1.º</td><td class="num">100</td></tr>
+                  <tr><td>2.º</td><td class="num">50</td></tr>
+                  <tr><td>3.º</td><td class="num">25</td></tr>
+                  <tr><td>4.º</td><td class="num">10</td></tr>
+                  <tr><td>5.º en adelante</td><td class="num">5</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <p><strong>Todo el que juega suma puntos.</strong> Los cinco puntos del quinto en adelante son por haber participado: sin ellos, en un torneo de 50 habría 46 personas compitiendo por nada, y la tabla del campeonato mediría cuántos torneos ganaste en vez de cuánto jugaste y cómo te fue.</p>
+
+            <h2>8. Valor de la entrada</h2>
+            <p>El valor de la entrada lo fija el administrador para cada torneo, y puede ir de <strong>5 a 20.000 Leyendas</strong>, siempre en múltiplos de 5.</p>
+            <p>Entradas posibles, entre otras: 5, 10, 15, 20, 25, 50, 100, 200, 500, 1.000, 5.000, 10.000, 20.000.</p>
+            <p>La entrada de un torneo se puede corregir sólo mientras esté en borrador. Una vez abiertas las inscripciones ya hay gente que pagó, y cambiarla la dejaría habiendo pagado otra cosa.</p>
+
+            <h2>9. Mínimo de jugadores y cancelación</h2>
+            <p>Un torneo necesita al menos <strong>4 jugadores</strong>. Si al cerrar las inscripciones no se llegó a ese mínimo, el torneo se cancela y <strong>se devuelve la entrada a todos los inscriptos</strong>.</p>
+            <p>Un torneo también puede cancelarse antes de empezar, y en ese caso también se devuelve todo. Una vez que las mesas están jugando ya no se cancela: devolver la entrada a esa altura sería devolvérsela por igual a quien ya ganó y a quien ya perdió.</p>
+
+            <h2>10. Fórmula general</h2>
+            <span class="formula">PREMIO DE UN PUESTO = (JUGADORES × ENTRADA) × PORCENTAJE DEL PUESTO</span>
+            <p>Donde el porcentaje sale de la tabla de la sección 5, según cuántos jugadores hayan jugado el torneo. El resultado se redondea hacia abajo.</p>
+
+            <h2>11. Prohibiciones</h2>
+            <ul class="prohibido">
+                <li>No se pueden usar Leyendas compradas con dinero para entrar a torneos.</li>
+                <li>No hay <em>cash-out</em>: las Leyendas no se convierten en dinero real.</li>
+                <li>No hay transferencia de Leyendas entre jugadores.</li>
+                <li>No hay premios monetarios de ninguna clase.</li>
+                <li>No se permiten bots, scripts automatizados ni manipulación de partidas.</li>
+            </ul>
+            <p>El uso de trampas, bots o cualquier método destinado a obtener una ventaja injusta puede motivar medidas sobre la cuenta, conforme a los <a href="/terminos.html">Términos y Condiciones</a>.</p>
+
+            <h2>12. Contacto</h2>
+            <div class="contacto">
+                <p><strong>📧 Consultas sobre torneos o este reglamento:</strong> <a href="mailto:soporte@memorie-legends.com">soporte@memorie-legends.com</a></p>
+                <p><strong>🌐 Sitio:</strong> <a href="https://memorie-legends.web.app/">memorie-legends.web.app</a></p>
+                <p><strong>📜 Términos:</strong> <a href="/terminos.html">Términos y Condiciones</a> · <strong>🔒 Privacidad:</strong> <a href="/privacidad.html">Política de Privacidad</a> · <strong>🛡️ Seguridad:</strong> <a href="/seguridad.html">Seguridad</a></p>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="/como-se-juega.html">📜 Cómo se Juega</a>
+                <a href="/quienes-somos.html">🧠 Quiénes Somos</a>
+                <a href="/reglamento-torneos.html">🏆 Reglamento de Torneos</a>
+                <a href="/terminos.html">📜 Términos y Condiciones</a>
+                <a href="/privacidad.html">🔒 Políticas de Privacidad</a>
+                <a href="/seguridad.html">🛡️ Seguridad</a>
+            </div>
+            <p>© 2026 Memorie Legends. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+</body>
+</html>

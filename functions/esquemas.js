@@ -194,7 +194,11 @@ export const EsquemaEditarTorneo = EsquemaIdTorneo.merge(EsquemaTorneo);
  * pagar el pozo entero al primero, o más.
  */
 export const EsquemaGanadores = EsquemaIdTorneo.extend({
-  ganadores: z.array(z.string().min(1).max(128)).min(1).max(4),
+  // Hasta diez: es lo que paga el tramo de 50 jugadores o más. Cuántos cobran
+  // DE VERDAD lo decide el servidor con la cantidad de gente que jugó —ver
+  // `puestosQueCobran`—; este techo sólo evita que llegue una lista absurda
+  // antes de abrir ninguna transacción.
+  ganadores: z.array(z.string().min(1).max(128)).min(1).max(10),
 });
 
 /**

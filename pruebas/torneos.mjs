@@ -39,6 +39,7 @@ import {
   armarMesas,
   repartirPozo,
   pozoDe,
+  puestosQueCobran,
   puntosDeTorneo,
 } from "../public/js/reglas/torneos.js";
 
@@ -197,34 +198,118 @@ console.log("\n=== 1. Las reglas puras: mesas, pozo y reparto ===");
 }
 
 {
-  // El pozo TIENE que cerrar. Ésta es la comprobación que impide imprimir
-  // Leyendas: se prueba con muchos pozos, incluidos los que no dividen bien.
+  // El fondo TIENE que cerrar. Ésta es la comprobación que impide imprimir
+  // Leyendas: se prueba con seis entradas y con un torneo de cada tramo,
+  // incluidos los fondos que no dividen bien.
   let cierranTodos = true;
   const malos = [];
   for (const entrada of [5, 7, 13, 100, 333, 20000]) {
-    for (const jugadores of [4, 8, 12, 40]) {
+    for (const jugadores of [4, 12, 20, 30, 50, 137]) {
       const pozo = pozoDe(entrada, jugadores);
-      const r = repartirPozo(pozo, ["a", "b"]);
-      if (r.repartido + r.comisionCasa !== pozo || r.comisionCasa < 0) {
+      const nombres = Array.from({ length: 10 }, (_, i) => `j${i}`);
+      const r = repartirPozo(pozo, nombres, jugadores);
+      if (r.repartido + r.comisionCasa !== pozo || r.comisionCasa < 0 || r.repartido > pozo) {
         cierranTodos = false;
         malos.push({ entrada, jugadores, pozo, ...r });
       }
     }
   }
-  ok(cierranTodos, "el pozo cierra exacto en todos los casos probados", malos.slice(0, 3));
+  ok(cierranTodos, "el fondo cierra exacto en todos los casos probados", malos.slice(0, 3));
 
-  const r = repartirPozo(1000, ["a", "b"]);
-  ok(r.pagos[0].monto === 600, "el primero se lleva el 60%", r.pagos[0]?.monto);
-  ok(r.pagos[1].monto === 300, "el segundo el 30%", r.pagos[1]?.monto);
-  ok(r.comisionCasa === 100, "y la casa el 10%", r.comisionCasa);
+  // Lo que queda sin repartir es SÓLO el resto del redondeo. Cada tramo suma
+  // 100%, así que la casa no se queda con una comisión: con diez puestos, el
+  // resto no puede pasar de nueve Leyendas.
+  let restoMaximo = 0;
+  for (const jugadores of [4, 12, 20, 30, 50]) {
+    for (const entrada of [5, 7, 13, 333]) {
+      const nombres = Array.from({ length: 10 }, (_, i) => `j${i}`);
+      const r = repartirPozo(pozoDe(entrada, jugadores), nombres, jugadores);
+      restoMaximo = Math.max(restoMaximo, r.comisionCasa);
+    }
+  }
+  ok(restoMaximo < 10, "y ese resto nunca pasa de nueve Leyendas", restoMaximo);
+}
 
-  // Un solo ganador NO se lleva el tramo del segundo.
-  const uno = repartirPozo(1000, ["a"]);
-  ok(uno.repartido === 600, "con un solo ganador se paga sólo su tramo", uno.repartido);
-  ok(uno.comisionCasa === 400, "el resto queda sin repartir, no se regala", uno.comisionCasa);
+{
+  /**
+   * Los cuatro ejemplos que están publicados en el reglamento.
+   *
+   * Escritos a mano y con los números exactos. Si el reparto cambia, esto
+   * falla nombrando el ejemplo que dejó de ser cierto, y ese ejemplo está
+   * impreso en una página que los jugadores leen antes de pagar la entrada.
+   */
+  const CASOS = [
+    { jugadores: 12, entrada: 10, esperado: [60, 36, 24] },
+    { jugadores: 12, entrada: 25, esperado: [150, 90, 60] },
+    { jugadores: 20, entrada: 10, esperado: [80, 50, 40, 30] },
+    { jugadores: 50, entrada: 10, esperado: [125, 90, 70, 50, 40, 25, 25, 25, 25, 25] },
+  ];
 
-  ok(puntosDeTorneo(["a", "b", "c", "d"]).length === 4, "los cuatro puestos suman puntos");
-  ok(puntosDeTorneo([]).length === 0, "y sin ganadores no hay puntos");
+  for (const { jugadores, entrada, esperado } of CASOS) {
+    const fondo = pozoDe(entrada, jugadores);
+    const nombres = Array.from({ length: esperado.length }, (_, i) => `j${i}`);
+    const r = repartirPozo(fondo, nombres, jugadores);
+    const montos = r.pagos.map((p) => p.monto);
+
+    ok(
+      JSON.stringify(montos) === JSON.stringify(esperado),
+      `${jugadores} jugadores x ${entrada} = ${fondo} paga [${esperado.join(", ")}]`,
+      montos,
+    );
+    ok(r.repartido === fondo, `  y reparte el fondo entero (${fondo})`, r.repartido);
+  }
+}
+
+{
+  // Cuántos puestos cobran, tramo por tramo.
+  const ESPERADO = { 4: 2, 11: 2, 12: 3, 19: 3, 20: 4, 29: 4, 30: 5, 49: 5, 50: 10, 500: 10 };
+  for (const [jugadores, puestos] of Object.entries(ESPERADO)) {
+    ok(
+      puestosQueCobran(Number(jugadores)) === puestos,
+      `con ${jugadores} jugadores cobran ${puestos} puestos`,
+      puestosQueCobran(Number(jugadores)),
+    );
+  }
+
+  // Por debajo del mínimo no hay torneo, así que no hay reparto.
+  ok(puestosQueCobran(3) === 0, "con tres no cobra nadie: no es un torneo");
+  ok(repartirPozo(1000, ["a", "b"], 3).pagos.length === 0, "y no se reparte nada");
+}
+
+{
+  // Cargar más ganadores de los que cobran no paga de más: sobran, y punto.
+  const r = repartirPozo(120, ["a", "b", "c", "d", "e"], 12);
+  ok(r.pagos.length === 3, "en un torneo de 12 cobran tres, no cinco", r.pagos.length);
+  ok(r.repartido === 120, "y se reparte el fondo entero igual", r.repartido);
+
+  // Y cargar menos no le regala el resto a nadie.
+  const menos = repartirPozo(120, ["a"], 12);
+  ok(menos.repartido === 60, "con un solo nombre se paga sólo su puesto", menos.repartido);
+  ok(menos.comisionCasa === 60, "el resto queda sin repartir, no se le da al primero", menos.comisionCasa);
+}
+
+{
+  // Puntos de campeonato: los cuatro primeros por puesto, y el resto por jugar.
+  const orden = ["a", "b", "c", "d"];
+  const todos = ["a", "b", "c", "d", "e", "f"];
+  const puntos = puntosDeTorneo(orden, todos);
+  const de = (uid) => puntos.find((p) => p.uid === uid)?.puntos;
+
+  ok(de("a") === 100, "el campeón suma 100", de("a"));
+  ok(de("b") === 50, "el segundo 50", de("b"));
+  ok(de("c") === 25, "el tercero 25", de("c"));
+  ok(de("d") === 10, "el cuarto 10", de("d"));
+  ok(de("e") === 5 && de("f") === 5, "y del quinto para abajo, 5 por haber jugado", {
+    e: de("e"),
+    f: de("f"),
+  });
+  ok(puntos.length === 6, "nadie que jugó se queda sin puntos", puntos.length);
+
+  // Nadie cuenta dos veces, ni siquiera si aparece en las dos listas.
+  const repetido = puntosDeTorneo(["a"], ["a", "b"]);
+  ok(repetido.filter((p) => p.uid === "a").length === 1, "el campeón no suma también participación");
+
+  ok(puntosDeTorneo([], []).length === 0, "y sin nadie no hay puntos");
 }
 
 // =====================================================================
@@ -434,10 +519,16 @@ console.log("\n=== 8. Finalizar paga desde el pozo del servidor ===");
 
   const r = await torneos.finalizar(ADMIN, id, ["j1", "j2"]);
 
-  ok(r.repartido === 720, "reparte el 90% del pozo de 800", r.repartido);
-  ok(r.comisionCasa === 80, "y la casa se queda con el 10%", r.comisionCasa);
+  // Ocho jugadores caen en el tramo de 4 a 11: dos puestos, 60 y 40, y el
+  // fondo entero. La casa no retiene nada en los torneos.
+  ok(r.repartido === 800, "reparte el fondo entero de 800", r.repartido);
+  ok(r.comisionCasa === 0, "y la casa no se queda con nada", r.comisionCasa);
   ok(db._leer("users/j1").credits === antes1 + 480, "el campeón cobra el 60%");
-  ok(db._leer("users/j2").credits === antes2 + 240, "el segundo el 30%");
+  ok(db._leer("users/j2").credits === antes2 + 320, "el segundo el 40%");
+  ok(r.jugaron === 8 && r.puestosPagados === 2, "y queda anotado cuántos jugaron", {
+    jugaron: r.jugaron,
+    puestos: r.puestosPagados,
+  });
 
   ok(db._leer(`torneos/${id}`).estado === ESTADOS.FINALIZADO, "el torneo queda finalizado");
   ok(

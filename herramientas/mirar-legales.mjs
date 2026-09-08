@@ -20,7 +20,7 @@ import { join } from "node:path";
 const RAIZ = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const SALIDA = process.argv[2] ?? RAIZ;
 
-const PAGINAS = ["terminos", "privacidad", "seguridad"];
+const PAGINAS = ["terminos", "privacidad", "seguridad", "reglamento-torneos"];
 const ANCHOS = [
   { nombre: "pc", ancho: 1200, alto: 900 },
   { nombre: "movil", ancho: 380, alto: 800 },
@@ -53,8 +53,22 @@ for (const p of PAGINAS) {
       const raiz = document.documentElement;
       // Qué elemento se sale, si alguno. Saber el ancho no alcanza: hay que
       // poder nombrar al culpable.
+      // Sólo cuenta como culpable lo que se sale SIN que ningún antepasado
+      // lo contenga. Una tabla ancha dentro de un `overflow-x: auto` es más
+      // ancha que la pantalla y no desborda la página: se desplaza sola dentro
+      // de su caja, que es justo lo que se quiere. Sin este filtro, la
+      // herramienta señalaba las tablas del reglamento como si fueran el
+      // problema.
+      const contenido = (el) => {
+        for (let p = el.parentElement; p; p = p.parentElement) {
+          const desborde = getComputedStyle(p).overflowX;
+          if (desborde === "auto" || desborde === "scroll" || desborde === "hidden") return true;
+        }
+        return false;
+      };
+
       const culpables = [...document.querySelectorAll("body *")]
-        .filter((el) => el.getBoundingClientRect().right > raiz.clientWidth + 1)
+        .filter((el) => el.getBoundingClientRect().right > raiz.clientWidth + 1 && !contenido(el))
         .slice(0, 3)
         .map((el) => `${el.tagName.toLowerCase()}.${el.className || "(sin clase)"}`);
 

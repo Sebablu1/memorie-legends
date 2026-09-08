@@ -30,6 +30,19 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import {
+  TRAMOS_DE_REPARTO,
+  PUNTOS_CAMPEONATO,
+  PUNTOS_PARTICIPACION,
+  puestosQueCobran,
+  repartirPozo,
+} from "../public/js/reglas/torneos.js";
+import {
+  ENTRADA_MINIMA,
+  ENTRADA_MAXIMA,
+  PASO_DE_ENTRADA,
+  MINIMO_PARA_TORNEO,
+} from "../public/js/reglas/configuracion.js";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -43,7 +56,7 @@ const ok = (c, m, x) => {
 const RAIZ = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const leer = (relativo) => readFileSync(join(RAIZ, relativo), "utf8");
 
-const PAGINAS = ["terminos", "privacidad", "seguridad"];
+const PAGINAS = ["terminos", "privacidad", "seguridad", "reglamento-torneos"];
 const html = Object.fromEntries(PAGINAS.map((p) => [p, leer(`public/${p}.html`)]));
 
 // =====================================================================
@@ -210,17 +223,35 @@ console.log("\n=== 5. Las promesas que el juego no puede cumplir ===");
       .replace(/\s+/g, " ");
 
   const prohibidas = [
-    [/\bpodés? (canjear|cambiar) (tus )?Leyendas por dinero/i, "canjear Leyendas por dinero"],
-    [/(?<!no )(?<!no promete )premios? en (dinero|efectivo)(?! por participar)/i, "premios en dinero"],
-    [/(?<!no )(?<!no pueden )transferirse? Leyendas? (a|entre) (otro jugador|usuarios)/i,
+    [/\b(canjear|cambiar) (tus )?Leyendas por dinero/gi, "canjear Leyendas por dinero"],
+    [/premios? (en (dinero|efectivo)|monetarios?)/gi, "premios en dinero"],
+    [/transferir(se)? Leyendas? (a|entre) (otro jugador|otros? usuarios?|jugadores)/gi,
      "transferir Leyendas entre jugadores"],
   ];
+
+  /**
+   * ¿La frase viene negada?
+   *
+   * Se miran los 45 caracteres anteriores en vez de usar una anticipación
+   * negativa pegada a la frase. Los textos niegan de muchas formas —«no hay
+   * premios en dinero», «no promete premios en dinero», «no pueden canjearse»,
+   * «prohibido»— y cada forma mete una cantidad distinta de palabras en el
+   * medio. Una anticipación pegada acierta con una y falla con las otras tres,
+   * que es exactamente lo que pasó con «No hay premios en dinero».
+   */
+  const NEGACIONES = /\b(no|sin|nunca|prohibid[ao]s?|jamás)\b/i;
+  const vieneNegada = (texto, indice) =>
+    NEGACIONES.test(texto.slice(Math.max(0, indice - 45), indice));
 
   for (const p of PAGINAS) {
     const texto = soloTexto(html[p]);
     for (const [re, que] of prohibidas) {
-      const m = texto.match(re);
-      ok(!m, `${p}: no promete ${que}`, m?.[0]);
+      re.lastIndex = 0;
+      const afirmativas = [...texto.matchAll(re)]
+        .filter((m) => !vieneNegada(texto, m.index))
+        .map((m) => texto.slice(Math.max(0, m.index - 45), m.index + m[0].length));
+
+      ok(afirmativas.length === 0, `${p}: no promete ${que}`, afirmativas.slice(0, 2));
     }
   }
 
@@ -252,6 +283,124 @@ console.log("\n=== 6. La fecha de actualización es la misma en las tres ===");
     "y es la misma: se revisaron juntas, así que se fechan juntas",
     fechas,
   );
+}
+
+// =====================================================================
+console.log("\n=== 7. El reglamento de torneos dice lo que el motor paga ===");
+// =====================================================================
+
+{
+  /**
+   * La comprobación más importante de este archivo.
+   *
+   * El reglamento publica una tabla de porcentajes y cuatro ejemplos con
+   * números exactos. El jugador la lee ANTES de pagar la entrada, así que si
+   * la página dice 50% y el servidor paga 60%, la página es una promesa
+   * incumplida y no un error de tipeo.
+   *
+   * Las dos cosas se comparan de verdad: se saca la tabla del HTML y se
+   * enfrenta contra `TRAMOS_DE_REPARTO`. Buscar sólo que los números aparezcan
+   * en algún lado de la página no alcanzaría — aparecen muchos números.
+   */
+  const pagina = leer("public/reglamento-torneos.html");
+
+  for (const tramo of TRAMOS_DE_REPARTO) {
+    const hasta = tramo.hasta === Infinity ? "o más" : `a ${tramo.hasta}`;
+    const fila = new RegExp(
+      `<td>${tramo.desde} ${hasta}</td>\s*<td class="num">${tramo.porcentajes.length}</td>`,
+    );
+    ok(
+      fila.test(pagina),
+      `la tabla publica el tramo de ${tramo.desde} ${hasta} con ${tramo.porcentajes.length} puestos`,
+    );
+
+    // Y cada porcentaje, en orden, en esa misma fila.
+    const i = pagina.search(fila);
+    const finDeFila = pagina.indexOf("</tr>", i);
+    const textoFila = i === -1 ? "" : pagina.slice(i, finDeFila);
+    const publicados = [...textoFila.matchAll(/(\d+)%/g)].map((m) => Number(m[1]));
+    const esperados = [...new Set(tramo.porcentajes)];
+
+    ok(
+      esperados.every((p) => publicados.includes(p)),
+      `  y sus porcentajes (${tramo.porcentajes.join("/")})`,
+      publicados,
+    );
+  }
+}
+
+{
+  // Los cuatro ejemplos, calculados con el motor y buscados en la página.
+  const pagina = leer("public/reglamento-torneos.html");
+  const CASOS = [
+    { jugadores: 12, entrada: 10 },
+    { jugadores: 12, entrada: 25 },
+    { jugadores: 20, entrada: 10 },
+    { jugadores: 50, entrada: 10 },
+  ];
+
+  for (const { jugadores, entrada } of CASOS) {
+    const fondo = jugadores * entrada;
+    const nombres = Array.from({ length: puestosQueCobran(jugadores) }, (_, i) => `j${i}`);
+    const { pagos } = repartirPozo(fondo, nombres, jugadores);
+
+    ok(
+      pagina.includes(`${jugadores} × ${entrada} = <strong>${fondo} Leyendas</strong>`),
+      `el ejemplo de ${jugadores} jugadores x ${entrada} publica un fondo de ${fondo}`,
+    );
+
+    const faltan = pagos.filter((p) => !pagina.includes(`${p.monto} Leyendas`));
+    ok(faltan.length === 0, `  y los ${pagos.length} premios que calcula el motor`, faltan);
+  }
+}
+
+{
+  // Los puntos de campeonato.
+  const pagina = leer("public/reglamento-torneos.html");
+  for (const [puesto, puntos] of Object.entries(PUNTOS_CAMPEONATO)) {
+    const orden = ["1.º", "2.º", "3.º", "4.º"][Number(puesto) - 1];
+    ok(
+      new RegExp(`<td>${orden}</td>\s*<td class="num">${puntos}</td>`).test(pagina),
+      `el ${orden} suma ${puntos} puntos de campeonato`,
+    );
+  }
+  ok(
+    new RegExp(`<td>5.º en adelante</td>\s*<td class="num">${PUNTOS_PARTICIPACION}</td>`).test(pagina),
+    `y del quinto para abajo, ${PUNTOS_PARTICIPACION}`,
+  );
+}
+
+{
+  // El rango de la entrada y el mínimo de jugadores, que viven en
+  // `configuracion.js`.
+  const pagina = leer("public/reglamento-torneos.html");
+  ok(
+    pagina.includes(`${ENTRADA_MINIMA} a ${ENTRADA_MAXIMA.toLocaleString("es-UY")} Leyendas`),
+    `publica el rango de entrada (${ENTRADA_MINIMA} a ${ENTRADA_MAXIMA})`,
+  );
+  ok(
+    pagina.includes(`múltiplos de ${PASO_DE_ENTRADA}`),
+    `y el paso de ${PASO_DE_ENTRADA}`,
+  );
+  ok(
+    new RegExp(`al menos <strong>${MINIMO_PARA_TORNEO} jugadores</strong>`).test(pagina),
+    `y el mínimo de ${MINIMO_PARA_TORNEO} jugadores`,
+  );
+}
+
+{
+  // La casa no retiene comisión en los torneos, y la página lo dice.
+  const pagina = leer("public/reglamento-torneos.html");
+  const suman100 = TRAMOS_DE_REPARTO.every(
+    (t) => t.porcentajes.reduce((a, b) => a + b, 0) === 100,
+  );
+  ok(suman100, "todos los tramos suman 100% en el código");
+  if (suman100) {
+    ok(
+      /el fondo se reparte entero/i.test(pagina) && /no retiene ninguna comisión/i.test(pagina),
+      "y la página dice que la casa no retiene nada",
+    );
+  }
 }
 
 console.log(fallos ? `\n❌ ${fallos} fallos` : "\n✅ TODO OK");
