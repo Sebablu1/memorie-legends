@@ -60,17 +60,41 @@ export const nivelDeApuesta = (apuesta) =>
 /**
  * Multiplicador de puntos de ranking y experiencia según lo apostado.
  *
- * ⚠️ La especificación lo llama `puntos_ranking` con valores 1/2/4/8. Se
- * interpreta como MULTIPLICADOR (apostar 200 vale 8 veces más que apostar 10),
- * porque como suma fija 8 puntos sobre los 100 del primer puesto sería
- * irrelevante y no premiaría nada. Si la intención era sumar, alcanza con
- * usar `bonos.puntos` como sumando en vez de factor.
+ * ─────────────────────────────────────────────────────────────────────────
+ * ESTÁN LAS NUEVE ENTRADAS, Y ESO NO ES DECORATIVO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `bonoDeApuesta` devuelve multiplicador 1 para lo que no encuentre acá. Antes
+ * la tabla tenía cuatro filas —10, 50, 100 y 200— y las otras cinco entradas
+ * válidas de sala caían a ese 1 por omisión. Entre ellas la de 500, que es la
+ * apuesta MÁS ALTA del juego: arriesgar 500 Leyendas sumaba para el ranking lo
+ * mismo que arriesgar 5, y la cuarta parte que arriesgar 100.
+ *
+ * Nadie lo notaba porque no fallaba nada: el ranking se llenaba igual, con los
+ * números al revés. Ahora la tabla cubre `ENTRADAS` entera, y
+ * `pruebas/ranking-servidor.mjs` comprueba que las dos listas no vuelvan a
+ * separarse.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA `exp` ES EL MONTO APOSTADO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Se acumula en la fila del ranking y hoy no la lee nadie: ni la tabla ni el
+ * perfil la muestran. Como había que darle un valor a las cinco entradas
+ * nuevas, se usa el criterio más simple de explicar —apostaste 200, ganaste
+ * 200 de experiencia— en vez de inventar una escala que nadie va a poder
+ * justificar después. Los valores viejos (10/30/60/120) no los defendía nada.
  */
 export const BONOS_APUESTA = {
+  5: { multiplicador: 1, exp: 5 },
   10: { multiplicador: 1, exp: 10 },
-  50: { multiplicador: 2, exp: 30 },
-  100: { multiplicador: 4, exp: 60 },
-  200: { multiplicador: 8, exp: 120 },
+  15: { multiplicador: 1, exp: 15 },
+  20: { multiplicador: 1, exp: 20 },
+  25: { multiplicador: 1, exp: 25 },
+  50: { multiplicador: 1, exp: 50 },
+  100: { multiplicador: 2, exp: 100 },
+  200: { multiplicador: 3, exp: 200 },
+  500: { multiplicador: 4, exp: 500 },
 };
 
 export const bonoDeApuesta = (apuesta) =>

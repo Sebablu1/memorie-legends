@@ -38,7 +38,7 @@ import {
   RAYA_MINIMA,
   ZONA_POR_DEFECTO,
 } from "../public/js/reglas/ranking.js";
-import { BONOS_APUESTA } from "../public/js/reglas/economia.js";
+import { BONOS_APUESTA, bonoDeApuesta } from "../public/js/reglas/economia.js";
 import { ENTRADAS } from "../public/js/reglas/salas.js";
 import { premioFisicoDe, umbralesValidos } from "../public/js/reglas/configuracion.js";
 
@@ -345,9 +345,9 @@ console.log("\n=== 7. Apostar más multiplica lo ganado ===");
   // Misma partida, dos entradas distintas. El multiplicador es la única
   // diferencia, así que el total tiene que crecer con la apuesta.
   //
-  // 10 y 100 y no 10 y 500: 500 es una entrada VÁLIDA de sala que no está en
-  // `BONOS_APUESTA` y cae al multiplicador 1. Ver la sección 9, que documenta
-  // ese agujero en vez de esconderlo eligiendo números que lo esquiven.
+  // 10 (×1) contra 100 (×2). La sección 9 recorre la tabla entera; acá alcanza
+  // con dos entradas para comprobar que el multiplicador llega hasta el total
+  // que se escribe en la fila del ranking.
   const baja = montar();
   const rBaja = await baja.ranking.registrarPartida({
     codigo: "B",
@@ -418,53 +418,85 @@ console.log("\n=== 8. Un fallo del ranking NO puede tumbar el cierre ===");
 }
 
 // =====================================================================
-console.log("\n=== 9. Las entradas sin multiplicador, a la vista ===");
+console.log("\n=== 9. Toda entrada de sala tiene su multiplicador ===");
 // =====================================================================
 
 {
   /**
-   * Esto NO comprueba que algo esté bien. Deja constancia de que algo está mal.
+   * Las dos listas tienen que cubrirse.
    *
-   * Una sala se puede abrir con nueve entradas —5, 10, 15, 20, 25, 50, 100,
-   * 200 y 500— pero `BONOS_APUESTA` sólo define multiplicador para cuatro:
-   * 10, 50, 100 y 200. Las otras cinco caen al multiplicador 1 y a 0 de
-   * experiencia.
+   * `bonoDeApuesta` devuelve multiplicador 1 para lo que no encuentre en
+   * `BONOS_APUESTA`. Eso convierte cualquier hueco en algo invisible: no falla
+   * nada, el ranking se llena igual, y la entrada que falta simplemente vale
+   * menos de lo que debería.
    *
-   * Y entre esas cinco está la 500, que es la apuesta MÁS ALTA del juego. Hoy
-   * quien arriesga 500 Leyendas suma para el ranking mensual lo mismo que
-   * quien arriesga 5, y la cuarta parte de quien arriesga 100. El incentivo
-   * está dado vuelta justo en el extremo donde más plata hay en juego.
+   * Y así estuvo. La tabla tenía cuatro filas y `ENTRADAS` nueve, con la de 500
+   * —la apuesta más alta del juego— entre las que faltaban: arriesgar 500
+   * sumaba lo mismo que arriesgar 5, y la cuarta parte que arriesgar 100.
    *
-   * No se arregla acá porque cambiar la tabla cambia la economía del ranking,
-   * que reparte una remera, y esa es una decisión de producto. Esta prueba
-   * fija el comportamiento ACTUAL: el día que se decida, va a fallar, y va a
-   * fallar diciendo exactamente qué cambió.
+   * Esta prueba compara las dos listas, no una lista contra un número escrito a
+   * mano: si mañana se agrega una entrada de sala y nadie se acuerda de la
+   * tabla, falla acá y nombra la que falta.
    */
   const sinMultiplicador = ENTRADAS.filter((e) => !(e in BONOS_APUESTA));
+  ok(sinMultiplicador.length === 0, "ninguna entrada de sala se quedó sin multiplicador", sinMultiplicador);
 
-  ok(
-    JSON.stringify(sinMultiplicador) === JSON.stringify([5, 15, 20, 25, 500]),
-    "cinco de las nueve entradas no tienen multiplicador propio",
-    sinMultiplicador,
-  );
+  const sinSala = Object.keys(BONOS_APUESTA)
+    .map(Number)
+    .filter((e) => !ENTRADAS.includes(e));
+  ok(sinSala.length === 0, "y no sobra ningún multiplicador sin sala", sinSala);
+}
 
+{
+  // La tabla acordada, escrita a mano. No se deriva del módulo: derivarla
+  // diría "la tabla es la que dice el archivo", que es una tautología.
+  const ACORDADA = { 5: 1, 10: 1, 15: 1, 20: 1, 25: 1, 50: 1, 100: 2, 200: 3, 500: 4 };
+
+  for (const [entrada, esperado] of Object.entries(ACORDADA)) {
+    const { multiplicador } = bonoDeApuesta(Number(entrada));
+    ok(multiplicador === esperado, `apostar ${entrada} multiplica ×${esperado}`, multiplicador);
+  }
+
+  // Y que nunca baje al subir la apuesta, que es el error que hubo: el
+  // incentivo dado vuelta en el extremo donde más plata hay en juego.
+  let previo = 0;
+  let siempreCrece = true;
+  const bajones = [];
+  for (const entrada of [...ENTRADAS].sort((a, b) => a - b)) {
+    const { multiplicador } = bonoDeApuesta(entrada);
+    if (multiplicador < previo) {
+      siempreCrece = false;
+      bajones.push({ entrada, multiplicador, previo });
+    }
+    previo = multiplicador;
+  }
+  ok(siempreCrece, "el multiplicador nunca baja al subir la apuesta", bajones);
+}
+
+{
+  // Y el circuito entero: la misma partida con la apuesta más alta tiene que
+  // pagar más puntos que con la más baja.
   const quinientos = montar();
   const rQuinientos = await quinientos.ranking.registrarPartida({
     codigo: "Q",
     estado: estadoFinal({ jugadores: CUATRO, ganadorId: "ana" }),
     entrada: 500,
   });
-  const cien = montar();
-  const rCien = await cien.ranking.registrarPartida({
-    codigo: "C",
+  const cinco = montar();
+  const rCinco = await cinco.ranking.registrarPartida({
+    codigo: "P",
     estado: estadoFinal({ jugadores: CUATRO, ganadorId: "ana" }),
-    entrada: 100,
+    entrada: 5,
   });
 
-  const q = rQuinientos.find((x) => x.jugadorId === "ana").total;
-  const c = rCien.find((x) => x.jugadorId === "ana").total;
+  const q = rQuinientos.find((x) => x.jugadorId === "ana");
+  const p = rCinco.find((x) => x.jugadorId === "ana");
 
-  ok(q < c, "hoy apostar 500 da MENOS puntos que apostar 100", { con500: q, con100: c });
+  ok(q.total === p.total * 4, "apostar 500 paga cuatro veces lo de apostar 5", {
+    con500: q.total,
+    con5: p.total,
+  });
+  ok(q.exp === 500 && p.exp === 5, "y la experiencia es el monto apostado", { q: q.exp, p: p.exp });
 }
 
 // =====================================================================
