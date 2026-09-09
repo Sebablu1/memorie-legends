@@ -93,6 +93,7 @@ const miSesion = await exigirSesionEnMesa();
  */
 let miDorso = null;
 let miRetrato = null;
+let miPano = null;
 
 /**
  * Le dice a la capa de dibujo qué asiento lleva el dorso comprado.
@@ -114,6 +115,28 @@ function aplicarDorsoPropio() {
   const equipo = (await Guardia.equipadoEnMesa?.(miSesion?.uid)) ?? null;
   miDorso = equipo?.dorso ?? null;
   miRetrato = equipo?.retrato ?? null;
+  miPano = equipo?.pano ?? null;
+
+  /**
+   * El paño comprado se pone con una variable, no repintando nada.
+   *
+   * Es una capa de fondo que ya está declarada en `.mesa` y que hasta acá
+   * valía `none`. Escribir la variable la enciende: no hay que redibujar la
+   * mesa ni esperar a la próxima jugada, y si el jugador no compró ninguno
+   * esta línea no corre y el paño sigue siendo el de siempre.
+   *
+   * `esRutaDelSitio` y no `imagenEsArchivo`: esto termina dentro de un
+   * `url()` de CSS, que es lo mismo que un `src` — una URL de otro dominio
+   * haría que el navegador le pida la imagen a ese servidor cada vez que
+   * alguien se sienta a jugar.
+   */
+  if (esRutaDelSitio(miPano)) {
+    document.querySelector(".mesa")?.style.setProperty(
+      "--pano",
+      `url("${miPano}") center / 100% 100% no-repeat`,
+    );
+  }
+
   if (!miDorso && !miRetrato) return;
   aplicarDorsoPropio();
   // Si la mesa ya se dibujó, se repinta para que lo comprado aparezca sin que
@@ -576,7 +599,7 @@ function dibujarJugador(jugador, i) {
           </div>
         </div>
       </div>
-      <div class="mano">${manoHTML}</div>
+      <div class="mano" style="--escala:${geometria.escala}">${manoHTML}</div>
     </div>`;
 }
 

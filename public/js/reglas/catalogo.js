@@ -37,6 +37,16 @@ export const TIPOS = {
   AVATAR: "avatar",
   INSIGNIA: "insignia",
   DORSO: "dorso",
+
+  /**
+   * El paño de la mesa: la superficie sobre la que se juega.
+   *
+   * No es el fondo de la PANTALLA —la sala de piedra con las antorchas se
+   * queda como está— sino el óvalo donde caen las cartas. Es lo que en una
+   * mesa de verdad sería el tapete, y lo que más se mira durante una
+   * partida entera.
+   */
+  FONDO: "fondo",
 };
 
 export const TIPOS_VALIDOS = Object.values(TIPOS);
@@ -56,7 +66,7 @@ export const esTipoValido = (tipo) => TIPOS_VALIDOS.includes(tipo);
  * el servidor, donde el cliente no llega: esconder el botón de comprar no es
  * impedir la compra.
  */
-export const TIPOS_VENDIBLES = Object.freeze([TIPOS.AVATAR, TIPOS.DORSO]);
+export const TIPOS_VENDIBLES = Object.freeze([TIPOS.AVATAR, TIPOS.DORSO, TIPOS.FONDO]);
 
 export const esVendible = (tipo) => TIPOS_VENDIBLES.includes(tipo);
 
@@ -125,6 +135,12 @@ export const CAMPO_EQUIPADO = {
   [TIPOS.AVATAR]: "avatar",
   [TIPOS.INSIGNIA]: "insignia",
   [TIPOS.DORSO]: "dorso",
+
+  // `fondo` nace cerrado al navegador sin tocar `firestore.rules`: la regla
+  // del perfil es una lista blanca —`hasOnly(['username', 'photoURL'])`— así
+  // que todo campo que no esté nombrado ahí ya está prohibido. Es la ventaja
+  // de haberla escrito como lista de lo permitido y no de lo negado.
+  [TIPOS.FONDO]: "fondo",
 };
 
 /** Subcolección donde se anota qué compró cada jugador. */
@@ -336,6 +352,22 @@ export const CATALOGO_INICIAL = [
   // -------------------------------------------------------------- dorsos
   { id: "dorso_azul", tipo: TIPOS.DORSO, nombre: "Dorso Azul", descripcion: "El de siempre.", precio: 0, imagen: "/img/dorsos/dorso-azul.png", activo: true, orden: 10, metadata: { rareza: "inicial" } },
   { id: "dorso_rojo", tipo: TIPOS.DORSO, nombre: "Dorso Rojo", descripcion: "El otro de siempre.", precio: 80, imagen: "/img/dorsos/dorso-rojo.png", activo: true, orden: 20, metadata: { rareza: "inicial" } },
+
+  // ------------------------------------------------------ paños de mesa
+  //
+  // Los cuatro son SVG generados: un degradado radial y una capa de ruido,
+  // mil bytes cada uno. No hacía falta arte nuevo y tampoco convenía —una
+  // foto de fieltro que se vea bien pesa cientos de kilobytes y se descarga
+  // justo cuando el jugador espera el reparto—.
+  //
+  // El de piedra va gratis y es el que la mesa ya usa sin comprar nada:
+  // equiparlo no cambia nada de lo que se ve. Está en el catálogo para que
+  // quien se probó otro pueda volver, que es exactamente lo que faltaba
+  // cuando los avatares no se podían desequipar.
+  { id: "pano_piedra", tipo: TIPOS.FONDO, nombre: "Salón de Piedra", descripcion: "La mesa de siempre, fría y sobria.", precio: 0, imagen: "/img/mesa/panos/piedra.svg", activo: true, orden: 10, metadata: { rareza: "inicial" } },
+  { id: "pano_fieltro", tipo: TIPOS.FONDO, nombre: "Fieltro Verde", descripcion: "El paño de casino de toda la vida.", precio: 200, imagen: "/img/mesa/panos/fieltro.svg", activo: true, orden: 20, metadata: { rareza: "poco_comun" } },
+  { id: "pano_madera", tipo: TIPOS.FONDO, nombre: "Roble de Taberna", descripcion: "Una tabla lustrada por mil partidas.", precio: 300, imagen: "/img/mesa/panos/madera.svg", activo: true, orden: 30, metadata: { rareza: "raro" } },
+  { id: "pano_carmesi", tipo: TIPOS.FONDO, nombre: "Terciopelo Carmesí", descripcion: "Para las mesas donde se juega en serio.", precio: 400, imagen: "/img/mesa/panos/carmesi.svg", activo: true, orden: 40, metadata: { rareza: "epico" } },
 ];
 
 /**

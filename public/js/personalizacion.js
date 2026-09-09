@@ -72,6 +72,7 @@ const $ = (id) => document.getElementById(id);
 const CATEGORIAS = [
   { tipo: TIPOS.AVATAR, titulo: "Avatares", vacio: "Todavía no hay avatares a la venta." },
   { tipo: TIPOS.DORSO, titulo: "Dorsos", vacio: "Todavía no hay dorsos a la venta." },
+  { tipo: TIPOS.FONDO, titulo: "Paños de mesa", vacio: "Todavía no hay paños a la venta." },
 ];
 
 /** Estado de la pantalla. Se guarda para no volver a pedir todo en cada clic. */

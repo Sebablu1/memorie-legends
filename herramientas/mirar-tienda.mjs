@@ -23,7 +23,7 @@ import {
   CATALOGO_INICIAL,
   itemsDeTipo,
   imagenEsArchivo,
-  TIPOS,
+  TIPOS_VALIDOS,
 } from "../public/js/reglas/catalogo.js";
 
 const RAIZ = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
@@ -54,6 +54,22 @@ const tarjeta = (item, i) => `
     ${boton(item, i)}
   </article>`;
 
+/**
+ * Cómo se llama cada tipo en la foto.
+ *
+ * Las secciones se recorren desde `TIPOS_VALIDOS` y no se escriben a mano:
+ * estaban listadas y al aparecer los paños de mesa la foto siguió mostrando
+ * tres categorías sobre un catálogo de cuatro. Una herramienta para MIRAR
+ * que esconde una cuarta parte de lo que hay no sirve para lo único que
+ * hace.
+ */
+const TITULOS = {
+  avatar: "Avatares",
+  insignia: "Insignias",
+  dorso: "Dorsos",
+  fondo: "Paños de mesa",
+};
+
 const seccion = (titulo, tipo) => `
   <section class="panel" style="margin-bottom: 28px">
     <h2>${titulo}</h2>
@@ -70,9 +86,7 @@ const html = `<!doctype html><html lang="es"><head><meta charset="utf-8">
 <style>${hojas}</style>
 <style>body { padding: 24px; } h2 { margin-bottom: 14px; }</style>
 </head><body>
-${seccion("Avatares", TIPOS.AVATAR)}
-${seccion("Insignias", TIPOS.INSIGNIA)}
-${seccion("Dorsos", TIPOS.DORSO)}
+${TIPOS_VALIDOS.map((t) => seccion(TITULOS[t] ?? t, t)).join("")}
 </body></html>`;
 
 const navegador = await chromium.launch();

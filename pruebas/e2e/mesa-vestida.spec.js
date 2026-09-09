@@ -31,6 +31,38 @@
 
 import { test, expect } from "@playwright/test";
 import { abrirMesa, misCartas, elegirCartaParaMirar, esperarMiTurno } from "./mesa.js";
+import { geometriaAbanico } from "../../public/js/modulos/cartas.js";
+
+/**
+ * Pone en cada mano la escala que el juego le pondría con `n` cartas, y
+ * clona hasta llegar a esa cantidad.
+ *
+ * Se clona en el DOM en vez de jugar hasta recibir tres castigos: lo que se
+ * mide es el CSS que acomoda la mano, y eso depende de cuántas cartas hay, no
+ * de cómo llegaron. Jugar hasta siete llevaría minutos y dependería del azar.
+ *
+ * La escala sale de `geometriaAbanico`, que es la MISMA función que usa
+ * `dibujarJugador`. Escribir un número acá probaría el CSS contra un valor
+ * inventado.
+ */
+async function conCartas(page, n) {
+  await page.evaluate(
+    ({ n, propio, rival }) => {
+      for (const mano of document.querySelectorAll(".jugador .mano")) {
+        const esMia = mano.closest(".jugador").classList.contains("propio");
+        mano.style.setProperty("--escala", esMia ? propio : rival);
+        const base = [...mano.children];
+        while (mano.children.length > 4) mano.lastElementChild.remove();
+        for (let i = 4; i < n; i++) mano.append(base[i % base.length].cloneNode(true));
+      }
+    },
+    {
+      n,
+      propio: geometriaAbanico(n, true).escala,
+      rival: geometriaAbanico(n, false).escala,
+    },
+  );
+}
 
 const RETRATOS = ".jugador .retrato";
 
@@ -151,100 +183,148 @@ test("cuando no le toca a nadie no queda ningún aro encendido", async ({ page }
 // El marco del asiento
 // =====================================================================
 
-test("el marco se dibuja en dos capas detrás del contenido", async ({ page }) => {
-  // El filo dorado y el relleno oscuro son dos seudoelementos con `z-index`
-  // negativo. Si el contexto de apilamiento se pierde —basta que alguien saque
-  // `isolation: isolate`— las dos capas se van detrás del paño y el asiento
-  // desaparece: quedan el nombre y las cartas flotando sobre la mesa.
+test("el asiento no dibuja ninguna caja alrededor del jugador", async ({ page }) => {
+  // El asiento tuvo un marco: filo dorado, relleno oscuro y esquinas
+  // cortadas. Con cuatro de esos sobre un paño que ya tiene su textura, la
+  // mesa era todo bordes y el ojo no sabía dónde pararse.
+  //
+  // Ahora el asiento es lo que importa —la cara, el nombre y las cartas—
+  // apoyado directamente sobre el paño. Lo que se defiende es que no vuelva
+  // a aparecer una caja: ni borde, ni relleno, ni recorte.
   await abrirMesa(page);
 
-  const m = await page.locator('.jugador[data-jugador="0"]').evaluate((el) => {
-    const filo = getComputedStyle(el, "::before");
+  const m = await page.locator('.jugador[data-jugador="1"]').evaluate((el) => {
+    const propio = getComputedStyle(el);
     const relleno = getComputedStyle(el, "::after");
     return {
-      aisla: getComputedStyle(el).isolation,
-      filoFondo: filo.backgroundImage,
-      filoCapa: filo.zIndex,
-      filoCorte: filo.clipPath,
+      borde: propio.borderTopWidth,
+      recorte: propio.clipPath,
+      fondo: propio.backgroundImage,
       rellenoFondo: relleno.backgroundImage,
-      rellenoCapa: relleno.zIndex,
+      rellenoContenido: relleno.content,
     };
   });
 
-  expect(m.aisla, "se perdió el contexto de apilamiento").toBe("isolate");
-  expect(m.filoFondo, "el filo dorado desapareció").toContain("gradient");
-  expect(m.rellenoFondo, "el relleno oscuro desapareció").toContain("gradient");
-  expect(m.filoCorte, "el marco perdió las esquinas cortadas").toContain("polygon");
-
-  // El orden importa: el filo detrás del relleno, y los dos detrás de todo.
-  expect(Number(m.filoCapa), "el filo se puso delante del relleno").toBeLessThan(
-    Number(m.rellenoCapa),
-  );
-  expect(Number(m.rellenoCapa), "el relleno tapa el contenido").toBeLessThan(0);
+  expect(m.borde, "volvió el borde del asiento").toBe("0px");
+  expect(m.recorte, "volvieron las esquinas cortadas").toBe("none");
+  expect(m.fondo, "volvió el fondo del asiento").toBe("none");
+  expect(m.rellenoFondo, "volvió el relleno oscuro").toBe("none");
 });
 
-test("el asiento en turno se distingue del que no lo está", async ({ page }) => {
+test("al que le toca se lo distingue por un halo, no por un contorno", async ({
+  page,
+}) => {
+  // Sin caja hay que decir de otra manera a quién le toca. Un contorno
+  // volvería a ser una caja, así que es un resplandor difuso detrás del
+  // asiento: dice QUIÉN. El aro alrededor del retrato dice CUÁNTO le queda.
   await abrirMesa(page);
   await elegirCartaParaMirar(page);
   await esperarMiTurno(page);
 
-  const filo = (jugador) =>
+  const halo = (jugador) =>
     page
       .locator(`.jugador[data-jugador="${jugador}"]`)
-      .evaluate((el) => getComputedStyle(el, "::before").backgroundImage);
+      .evaluate((el) => Number(getComputedStyle(el, "::before").opacity));
 
-  expect(
-    await filo(0),
-    "el asiento en turno no cambió de color",
-  ).not.toBe(await filo(1));
+  expect(await halo(0), "el asiento en turno no se enciende").toBe(1);
+  expect(await halo(1), "un asiento que no juega también está encendido").toBe(0);
+
+  // Y sigue siendo un resplandor y no un borde.
+  const borde = await page
+    .locator('.jugador[data-jugador="0"]')
+    .evaluate((el) => getComputedStyle(el, "::before").borderTopWidth);
+  expect(borde, "el halo se volvió un contorno").toBe("0px");
 });
-
-test("el marco no recorta las cartas: lo que se asoma se sigue viendo", async ({
+test("la mano entra en su asiento: ni tapa las pilas ni se sale del paño", async ({
   page,
 }) => {
-  // Ésta nació en rojo y encontró algo de verdad.
+  // Los castigos suman cartas. Los asientos laterales tienen media mesa menos
+  // el centro, y una mano de siete que no entre tapa el mazo y la muestra:
+  // las dos cosas que hay que mirar para saber si se puede descartar.
   //
-  // El marco se recortaba con `clip-path` en el propio asiento, y `clip-path`
-  // corta TAMBIÉN lo que hay adentro. Las cartas de los extremos del abanico
-  // van giradas y se asoman unos píxeles del relleno —siempre lo hicieron— y
-  // esos píxeles dejaron de dibujarse. A ojo no se ve: la esquina cortada de
-  // una carta girada parece parte del diseño.
-  //
-  // Por eso el recorte vive ahora en las capas del fondo y el asiento no
-  // recorta nada.
+  // Se mide contra las CARTAS de las pilas y no contra la caja del centro. La
+  // caja incluye los rótulos y su aire, y una esquina de carta girada la roza
+  // por cinco píxeles sin tapar absolutamente nada. Lo que no se puede tapar
+  // son las cartas.
   await abrirMesa(page);
 
+  for (const cuantas of [4, 5, 7, 10]) {
+    await conCartas(page, cuantas);
+
+    const m = await page.evaluate(() => {
+      const pilas = [...document.querySelectorAll(".pila .carta, .pila .hueco")]
+        .map((c) => c.getBoundingClientRect());
+      const paño = document.querySelector(".mesa").getBoundingClientRect();
+
+      let tapa = 0;
+      let sale = 0;
+      for (const c of document.querySelectorAll(".mano > .carta, .mano > .hueco")) {
+        const b = c.getBoundingClientRect();
+        for (const p of pilas) {
+          const x = Math.min(b.right, p.right) - Math.max(b.left, p.left);
+          const y = Math.min(b.bottom, p.bottom) - Math.max(b.top, p.top);
+          if (x > 0 && y > 0) tapa = Math.max(tapa, Math.min(x, y));
+        }
+        sale = Math.max(sale, paño.left - b.left, b.right - paño.right);
+      }
+      return { tapa: Math.round(tapa), sale: Math.round(sale) };
+    });
+
+    expect(m.tapa, `con ${cuantas} cartas la mano tapa las pilas ${m.tapa}px`).toBeLessThanOrEqual(0);
+    expect(m.sale, `con ${cuantas} cartas la mano se sale del paño ${m.sale}px`).toBeLessThanOrEqual(0);
+  }
+});
+test("con más de cuatro cartas encogen, no se apilan", async ({ page }) => {
+  // La otra mitad de lo mismo: que entren no puede lograrse escondiéndolas.
+  //
+  // Éste no es un juego de cartas cualquiera, es de MEMORIA: cada carta es una
+  // posición que hay que recordar y tocar, y lleva su número escrito en la
+  // esquina. Una carta metida debajo de la de al lado esconde justamente eso.
+  // Antes se solapaban a partir de la quinta, y con ocho —dos castigos— media
+  // mano quedaba debajo de la otra media.
+  await abrirMesa(page);
+
+  const anchoDeUna = () =>
+    page
+      .locator('.jugador[data-jugador="0"] .mano > .carta')
+      .first()
+      .evaluate((c) => c.getBoundingClientRect().width);
+
+  const conCuatro = await anchoDeUna();
+  await conCartas(page, 7);
+  const conSiete = await anchoDeUna();
+
+  expect(
+    conSiete,
+    `las cartas no encogieron: ${Math.round(conCuatro)} -> ${Math.round(conSiete)}`,
+  ).toBeLessThan(conCuatro);
+
+  // Y siguen sin montarse.
+  //
+  // Esto se mide en el MARGEN y no comparando las cajas de dos cartas vecinas.
+  // El abanico las gira hasta trece grados, y la caja de una carta girada es
+  // veinticuatro píxeles más ancha que la carta: dos vecinas que no se tocan
+  // tienen las cajas superpuestas. Medir ahí acusaba de apilado a un abanico
+  // perfectamente abierto.
+  //
+  // Lo que apilaba era un margen NEGATIVO —`margin-inline: calc(var(--solape)
+  // / -2)`, que crecía con cada carta de más—. Mientras el margen no sea
+  // negativo y haya `gap`, el flex garantiza que las cajas de disposición no
+  // se solapen: no hay forma de que una carta quede debajo de otra.
   const m = await page.evaluate(() => {
-    const asiento = document.querySelector('.jugador[data-jugador="0"]');
-    const marco = asiento.getBoundingClientRect();
-    let sobra = 0;
-    for (const c of asiento.querySelectorAll(".carta")) {
-      const r = c.getBoundingClientRect();
-      sobra = Math.max(
-        sobra,
-        marco.left - r.left,
-        r.right - marco.right,
-        marco.top - r.top,
-        r.bottom - marco.bottom,
-      );
-    }
-    const suyo = getComputedStyle(asiento);
+    const carta = document.querySelector('.jugador[data-jugador="0"] .mano > .carta');
+    const suyo = getComputedStyle(carta);
+    const mano = getComputedStyle(carta.closest(".mano"));
     return {
-      sobra: Math.round(sobra),
-      recorta: suyo.clipPath,
-      desborda: suyo.overflow,
+      izquierda: parseFloat(suyo.marginLeft),
+      derecha: parseFloat(suyo.marginRight),
+      hueco: parseFloat(mano.columnGap) || 0,
     };
   });
 
-  // Si el abanico dejara de asomarse, lo de abajo no probaría nada: se podría
-  // volver a poner el recorte en el asiento sin que esto se ponga en rojo.
-  expect(m.sobra, "el abanico dejó de asomarse del asiento").toBeGreaterThan(0);
-
-  expect(
-    m.recorta,
-    `el asiento volvió a recortar: se pierden ${m.sobra}px de carta`,
-  ).toBe("none");
-  expect(m.desborda, "el asiento volvió a esconder lo que se asoma").toBe("visible");
+  expect(m.izquierda, `margen izquierdo ${m.izquierda}px: las cartas se montan`).toBeGreaterThanOrEqual(0);
+  expect(m.derecha, `margen derecho ${m.derecha}px: las cartas se montan`).toBeGreaterThanOrEqual(0);
+  expect(m.hueco, "las cartas quedaron pegadas, sin aire entre ellas").toBeGreaterThan(0);
 });
 // =====================================================================
 // Los puntos y la botonera

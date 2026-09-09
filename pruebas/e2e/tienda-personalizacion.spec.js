@@ -221,7 +221,7 @@ test("las pestañas salen de la lista de categorías, no del HTML", async ({ pag
   // Y que las insignias NO estén es la mitad importante de esta prueba: son
   // logros, no mercadería. Si un día vuelven a aparecer acá, esto lo dice.
   const pestanas = page.locator("#pestanasPersonalizacion button");
-  await expect(pestanas).toHaveText(["Avatares", "Dorsos"]);
+  await expect(pestanas).toHaveText(["Avatares", "Dorsos", "Paños de mesa"]);
 });
 
 test("las insignias no se ofrecen en la tienda", async ({ page }) => {

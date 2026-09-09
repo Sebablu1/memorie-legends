@@ -128,25 +128,46 @@ export function dibujarCarta(
 }
 
 /**
- * Reparte las cartas en abanico. Cuanto más cartas hay (los castigos
- * las suman) más se cierra el ángulo y más se solapan, para que la mano
- * siga entrando en el asiento sin achicar las cartas.
+ * Reparte las cartas en abanico.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * CON MÁS DE CUATRO, LAS CARTAS ENCOGEN — NO SE MONTAN
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Antes se solapaban: a partir de la quinta, cada carta se metía debajo de
+ * la anterior para que el asiento no se ensanchara. El asiento no se
+ * ensanchaba, y la mano dejaba de servir.
+ *
+ * Este no es un juego de cartas cualquiera: es de MEMORIA. Cada carta es una
+ * posición que hay que recordar y tocar, lleva su número escrito en la
+ * esquina, y una carta tapada por la de al lado esconde justamente eso. Con
+ * ocho cartas —dos castigos— la mitad de la mano quedaba debajo de la otra
+ * mitad.
+ *
+ * Así que ahora la mano conserva su ANCHO encogiendo las cartas. Ocho cartas
+ * al 62% ocupan un 24% más que cuatro al 100%, no el doble, y las ocho se
+ * ven enteras. El tope está en 0.62 porque más abajo la figura de la carta
+ * deja de reconocerse, y una carta que no se distingue no se puede recordar.
+ *
+ * `4.6` y no `4`: con `4` la quinta carta encogería todo a 0.8 de golpe, y
+ * el salto se ve. Con 4.6 la mano de cinco casi no cambia —0.92— que es lo
+ * que uno espera al recibir UNA carta de castigo.
  */
+export const ESCALA_MINIMA = 0.62;
+const HOLGURA = 4.6;
+
 export function geometriaAbanico(cantidad, propio) {
-  if (cantidad <= 1) return { anguloTotal: 0, arco: 0, solape: 0 };
+  if (cantidad <= 1) return { anguloTotal: 0, arco: 0, solape: 0, escala: 1 };
 
   const anguloTotal = Math.min(propio ? 26 : 18, cantidad * (propio ? 5.5 : 4));
   const arco = propio ? 3.2 : 2.2;
-  // A partir de 5 cartas se montan unas sobre otras, cada vez más, para que
-  // el asiento no siga ensanchándose cuando los castigos suman cartas.
-  // Los asientos laterales tienen menos lugar antes de tocar el centro de la
-  // mesa, así que sus cartas se montan más rápido que las propias.
-  const solape =
-    cantidad <= 4
-      ? 0
-      : Math.min(propio ? 46 : 40, (cantidad - 4) * (propio ? 11 : 14));
 
-  return { anguloTotal, arco, solape };
+  return {
+    anguloTotal,
+    arco,
+    solape: 0,
+    escala: Math.max(ESCALA_MINIMA, Math.min(1, HOLGURA / cantidad)),
+  };
 }
 
 export function estiloAbanico(indice, cantidad, { anguloTotal, arco, solape }) {

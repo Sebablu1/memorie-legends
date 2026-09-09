@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="none" width="1200" height="800">
+  <!--
+    Roble de taberna: vetas largas, como una tabla lustrada.
+
+    `preserveAspectRatio="none"` a propósito: esto no es un dibujo, es una
+    superficie. Se estira al óvalo de la mesa sin que se note, porque no hay
+    ninguna forma reconocible que se pueda deformar.
+  -->
+  <defs>
+    <radialGradient id="luz-madera" cx="50%" cy="44%" r="72%">
+      <stop offset="0%" stop-color="#8a6236" />
+      <stop offset="44%" stop-color="#5a3d1e" />
+      <stop offset="100%" stop-color="#26170a" />
+    </radialGradient>
+    <filter id="grano-madera" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.006 0.9" numOctaves="4" seed="11" stitchTiles="stitch" />
+      <feColorMatrix type="saturate" values="0" />
+    </filter>
+  </defs>
+  <rect width="1200" height="800" fill="url(#luz-madera)" />
+  <rect width="1200" height="800" filter="url(#grano-madera)" opacity="0.3" style="mix-blend-mode:overlay" />
+</svg>

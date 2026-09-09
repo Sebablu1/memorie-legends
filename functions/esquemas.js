@@ -33,6 +33,7 @@
 import { z } from "zod";
 import { esCodigoValido, LARGO_CODIGO } from "./reglas/salas.js";
 import { TAM_MANO } from "./reglas/baraja.js";
+import { TIPOS_VALIDOS } from "./reglas/catalogo.js";
 import { ACCIONES } from "./partida-red.js";
 import { MOTIVOS, LARGO_COMENTARIO } from "./reportes.js";
 
@@ -157,8 +158,17 @@ export const EsquemaPack = z.object({
 });
 
 /** El tipo de artículo, para sacarse lo que se tenga puesto. */
+/**
+ * El tipo, para listar el catálogo por categoría en el panel.
+ *
+ * Los valores salen de `TIPOS_VALIDOS` y no se escriben acá. Estaban a mano
+ * —`z.enum(["avatar", "insignia", "dorso"])`— y al agregar los paños de
+ * mesa quedó una lista de tres contra un catálogo de cuatro: el panel los
+ * ofrecía en el desplegable, que sí se arma solo, y el servidor rechazaba
+ * la consulta. Un tipo nuevo no puede exigir acordarse de dos lugares.
+ */
 export const EsquemaTipo = z.object({
-  tipo: z.enum(["avatar", "insignia", "dorso"]),
+  tipo: z.enum(TIPOS_VALIDOS),
 });
 
 // -------------------------------------------------------------- torneos

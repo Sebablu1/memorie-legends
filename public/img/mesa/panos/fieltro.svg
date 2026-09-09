@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="none" width="1200" height="800">
+  <!--
+    Fieltro verde: el paño de casino de toda la vida, con la trama del tejido.
+
+    `preserveAspectRatio="none"` a propósito: esto no es un dibujo, es una
+    superficie. Se estira al óvalo de la mesa sin que se note, porque no hay
+    ninguna forma reconocible que se pueda deformar.
+  -->
+  <defs>
+    <radialGradient id="luz-fieltro" cx="50%" cy="44%" r="72%">
+      <stop offset="0%" stop-color="#2f7a52" />
+      <stop offset="44%" stop-color="#1a5133" />
+      <stop offset="100%" stop-color="#0b2b1a" />
+    </radialGradient>
+    <filter id="grano-fieltro" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" seed="11" stitchTiles="stitch" />
+      <feColorMatrix type="saturate" values="0" />
+    </filter>
+  </defs>
+  <rect width="1200" height="800" fill="url(#luz-fieltro)" />
+  <rect width="1200" height="800" filter="url(#grano-fieltro)" opacity="0.22" style="mix-blend-mode:overlay" />
+</svg>
