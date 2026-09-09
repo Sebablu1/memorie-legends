@@ -156,17 +156,31 @@
         </div>
       </div>
 
+      <!-- Cada botón lleva un dibujo y su palabra.
+
+           El dibujo no reemplaza al texto: es lo que se reconoce sin leer
+           cuando quedan dos segundos, y el texto es lo que se puede
+           nombrar. Un botón que sólo es un ícono no tiene nombre
+           accesible, y `accesibilidad.spec.js` lo comprueba.
+
+           Los SVG van en línea y no como archivos: son cuatro trazos, se
+           pintan con `currentColor` —así el ícono cambia de color con el
+           botón, incluso apagado— y no cuestan cuatro pedidos más justo
+           en la carga de la mesa. -->
       <div class="acciones">
-        <button id="btnLevantar" class="accion" disabled>Levantar</button>
-        <button id="btnTirar" class="accion sobria" disabled>Tirar</button>
-        <button id="btnCortar" class="accion corte" disabled>Cortar</button>
-        <button id="btnPasar" class="accion sobria" disabled>Pasar</button>
+        <button id="btnLevantar" class="accion levanta" disabled><svg class="icono-accion" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 12S5.4 5.8 12 5.8 22.2 12 22.2 12 18.6 18.2 12 18.2 1.8 12 1.8 12Z"/><circle cx="12" cy="12" r="3.1"/></svg><span>Levantar</span></button>
+        <button id="btnTirar" class="accion tira" disabled><svg class="icono-accion" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="4.6" width="9.6" height="14" rx="1.8"/><rect x="10.4" y="6.2" width="9.6" height="14" rx="1.8" transform="rotate(13 15.2 13.2)"/></svg><span>Tirar</span></button>
+        <button id="btnCortar" class="accion corte" disabled><svg class="icono-accion" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.4" cy="17.8" r="2.5"/><circle cx="6.4" cy="6.2" r="2.5"/><path d="M20 4.4 8.6 16.2M20 19.6 8.6 7.8"/></svg><span>Cortar</span></button>
+        <button id="btnPasar" class="accion pasa" disabled><svg class="icono-accion" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="currentColor" stroke="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3.6 6.3a.7.7 0 0 1 1.1-.6l7 5.7a.7.7 0 0 1 0 1.2l-7 5.7a.7.7 0 0 1-1.1-.6V6.3Zm8.6 0a.7.7 0 0 1 1.1-.6l7 5.7a.7.7 0 0 1 0 1.2l-7 5.7a.7.7 0 0 1-1.1-.6V6.3Z"/></svg><span>Pasar</span></button>
       </div>
 
       <aside class="lateral">
         <section class="tarjeta">
-          <h2>Ronda</h2>
+          <h2>Ronda <span id="rondaLateral">-</span></h2>
           <div id="marcador"></div>
+          <!-- Quién cortó, con todas las letras. La tijera de la fila lo dice
+               sólo para quien ya sabe qué significa la tijera. -->
+          <p class="quien-corto" id="quienCorto" hidden></p>
         </section>
       </aside>
     </div>

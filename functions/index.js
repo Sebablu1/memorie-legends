@@ -54,6 +54,7 @@ import { crearInsignias } from "./insignias.js";
 import { crearTorneos } from "./torneos.js";
 import { crearRankingDePartidas } from "./ranking.js";
 import { premioFisicoDe, umbralesValidos } from "./reglas/configuracion.js";
+import { COLECCION_CATALOGO, esRutaDelSitio } from "./reglas/catalogo.js";
 import {
   validar,
   EsquemaDeSala,
@@ -204,6 +205,53 @@ const SALAS = "rooms";
 const azarCodigo = () => crypto.randomInt(0, 2 ** 32) / 2 ** 32;
 
 /**
+ * Con qué nombre y con qué cara entra alguien a una sala.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ SE GUARDA LA RUTA Y NO EL ID DEL AVATAR
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque el que tiene que dibujar es el navegador de los OTROS TRES, y con
+ * un id tendría que ir al catálogo a buscar la imagen de cada rival: tres
+ * lecturas más por jugador y por partida, doce en una mesa de cuatro, para
+ * un dato que no cambia durante la partida.
+ *
+ * Y sobre todo porque `mesa.js` no toca Firestore. Todo lo que sabe le llega
+ * por el guardia o por la vista, y ésa es la costura que permite que las
+ * cuarenta pruebas de la mesa corran sin una base detrás. Resolver ids allá
+ * la rompería.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Y POR QUÉ SE MIRA LA RUTA ANTES DE GUARDARLA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Ver `esRutaDelSitio`. En resumen: esto es lo único del perfil de alguien
+ * que se le muestra a otros tres, y una URL de otro dominio en el catálogo
+ * convertiría cada partida en cuatro visitas a ese servidor.
+ *
+ * Nada de esto puede impedir que se juegue: si el perfil no está, si el
+ * avatar no está en el catálogo o si la lectura falla, se devuelve `null` y
+ * la mesa usa las caras de la casa. Un retrato es decoración.
+ */
+async function identidadEnSala(uid) {
+  const perfil = await db.collection(USUARIOS).doc(uid).get();
+  if (!perfil.exists) return { nombre: "Jugador", retrato: null };
+
+  const datos = perfil.data();
+  const nombre = datos.username ?? "Jugador";
+  if (!datos.avatar) return { nombre, retrato: null };
+
+  try {
+    const item = await db.collection(COLECCION_CATALOGO).doc(datos.avatar).get();
+    const imagen = item.exists ? item.data().imagen : null;
+    return { nombre, retrato: esRutaDelSitio(imagen) ? imagen : null };
+  } catch (error) {
+    logger.warn("No se pudo leer el avatar para la sala", { uid, error: error.message });
+    return { nombre, retrato: null };
+  }
+}
+
+/**
  * Crea una sala por Leyendas y cobra la entrada al creador.
  *
  * El código es el ID del documento: así la unicidad la garantiza Firestore
@@ -223,8 +271,10 @@ export const crearSala = functions.https.onCall(async (data, context) => {
     );
   }
 
-  const perfil = await db.collection(USUARIOS).doc(uid).get();
-  const nombreJugador = perfil.exists ? (perfil.data().username ?? "Jugador") : "Jugador";
+  // Fuera de la transacción a propósito: son dos lecturas y adentro sólo se
+  // puede leer antes de escribir. Además, el nombre y la cara de uno mismo no
+  // son datos que puedan cambiar entre esta línea y el `runTransaction`.
+  const { nombre: nombreJugador, retrato } = await identidadEnSala(uid);
 
   // Hasta cinco intentos por si un código ya estaba tomado.
   for (let intento = 0; intento < 5; intento++) {
@@ -253,8 +303,15 @@ export const crearSala = functions.https.onCall(async (data, context) => {
           entrada,
           creador: uid,
           creadorNombre: nombreJugador,
+          // Las tres listas son paralelas: el asiento de cada quien es su
+          // posición en las tres. Van juntas acá, en `unirseASala` y en
+          // `salida.js`, y `pruebas/retratos-en-red.mjs` audita que sigan
+          // yendo juntas. Una sala vieja sin retratos no rompe nada —los
+          // huecos caen a la cara de la casa— pero una con dos nombres y un
+          // retrato le pone a alguien la cara de otro.
           jugadores: [uid],
           jugadoresNombres: [nombreJugador],
+          jugadoresRetratos: [retrato],
           maxJugadores: MAX_JUGADORES,
           estado: ESTADOS_SALA.ESPERANDO,
           listos: [],
@@ -290,8 +347,7 @@ export const unirseASala = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("invalid-argument", "Código inválido.");
   }
 
-  const perfil = await db.collection(USUARIOS).doc(uid).get();
-  const nombreJugador = perfil.exists ? (perfil.data().username ?? "Jugador") : "Jugador";
+  const { nombre: nombreJugador, retrato } = await identidadEnSala(uid);
 
   return db.runTransaction(async (tx) => {
     const refSala = db.collection(SALAS).doc(codigo);
@@ -318,9 +374,20 @@ export const unirseASala = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError("already-exists", "Ya pagaste la entrada a esta sala.");
     }
 
+    // La lista de retratos se rellena hasta donde haga falta antes de sumar
+    // el propio.
+    //
+    // Una sala creada antes de que esto existiera tiene jugadores y no tiene
+    // retratos; empujando el nuevo sobre una lista vacía, la cara del recién
+    // llegado terminaría en el asiento del primer jugador. Los huecos van con
+    // `null`, que es lo que la mesa entiende como «usá la cara de la casa».
+    const retratos = [...(sala.jugadoresRetratos ?? [])];
+    while (retratos.length < (sala.jugadores ?? []).length) retratos.push(null);
+
     tx.update(refSala, {
       jugadores: [...(sala.jugadores ?? []), uid],
       jugadoresNombres: [...(sala.jugadoresNombres ?? []), nombreJugador],
+      jugadoresRetratos: [...retratos, retrato],
       pozo: Number(sala.entrada) * ((sala.jugadores ?? []).length + 1),
     });
 
@@ -424,6 +491,7 @@ export const iniciarPartida = functions.https.onCall(async (data, context) => {
       codigo,
       jugadores,
       nombres: sala.jugadoresNombres ?? [],
+      retratos: sala.jugadoresRetratos ?? [],
     });
 
     tx.update(refSala, {

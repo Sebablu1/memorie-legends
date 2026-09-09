@@ -89,7 +89,11 @@ export function exigirSesionEnMesa() {
 }
 
 /**
- * El dorso que el jugador compró y tiene puesto, ya como ruta de imagen.
+ * Lo que el jugador compró y tiene puesto, ya como rutas de imagen.
+ *
+ * Devuelve el dorso Y el retrato en una sola llamada, y no dos funciones
+ * hermanas, porque los dos salen del MISMO documento de perfil: separadas, la
+ * mesa leería ese documento dos veces por partida para sacarle dos campos.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * POR QUÉ VIVE ACÁ Y NO EN `mesa.js`
@@ -117,26 +121,38 @@ export function exigirSesionEnMesa() {
  * Por eso tampoco se hace `await` de esto antes de dibujar. `mesa.js` lo pide
  * y sigue; cuando llega, redibuja.
  */
-export async function dorsoEquipado(uid) {
-  if (!uid) return null;
+export async function equipadoEnMesa(uid) {
+  const vacio = { dorso: null, retrato: null };
+  if (!uid) return vacio;
   try {
     const { db, doc, getDoc } = await import("./firebase.js");
     const { COLECCION_CATALOGO, imagenEsArchivo } = await import("./reglas/catalogo.js");
 
     const perfil = await getDoc(doc(db, "users", uid));
-    const id = perfil.exists() ? perfil.data().dorso : null;
-    if (!id) return null;
+    if (!perfil.exists()) return vacio;
 
-    const item = await getDoc(doc(db, COLECCION_CATALOGO, id));
-    if (!item.exists()) return null;
+    /**
+     * La ruta de un artículo, o null.
+     *
+     * Los dos TIENEN que ser archivos: uno es el reverso de una carta y el
+     * otro un retrato dentro de un aro. Si alguien cargara un emoji desde el
+     * panel, se ignora en vez de dibujar una carta con una letra adentro.
+     */
+    const ruta = async (id) => {
+      if (!id) return null;
+      const item = await getDoc(doc(db, COLECCION_CATALOGO, id));
+      if (!item.exists()) return null;
+      const imagen = item.data().imagen;
+      return imagenEsArchivo(imagen) ? imagen : null;
+    };
 
-    const imagen = item.data().imagen;
-    // Un dorso TIENE que ser un archivo: es el reverso de una carta, no un
-    // ícono junto a un nombre. Si alguien cargara un emoji como dorso desde el
-    // panel, se ignora en vez de dibujar una carta con una letra adentro.
-    return imagenEsArchivo(imagen) ? imagen : null;
+    const [dorso, retrato] = await Promise.all([
+      ruta(perfil.data().dorso),
+      ruta(perfil.data().avatar),
+    ]);
+    return { dorso, retrato };
   } catch (error) {
-    console.warn("No se pudo leer el dorso equipado:", error);
-    return null;
+    console.warn("No se pudo leer lo equipado:", error);
+    return vacio;
   }
 }

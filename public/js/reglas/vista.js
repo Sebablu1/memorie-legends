@@ -143,6 +143,11 @@ export function vistaDe(estado, indiceQuienMira) {
     jugadores: estado.jugadores.map((jugador, indice) => ({
       id: jugador.id,
       nombre: jugador.nombre,
+      // La cara viaja igual que el nombre y por lo mismo: los cuatro
+      // navegadores tienen que poder dibujar la mesa entera. No es un dato
+      // reservado —quién es cada uno se ve en la mesa— así que no hay nada
+      // que redactar acá.
+      retrato: jugador.retrato ?? null,
       puntos: jugador.puntos,
       puntosRonda: jugador.puntosRonda,
       eliminado: jugador.eliminado,

@@ -99,12 +99,28 @@ export function crearSalirDeSalaEnEspera({
           devolucionesHechas: devueltos,
         });
       } else {
+        /**
+         * Salen las tres listas a la vez, o ninguna.
+         *
+         * `jugadores`, `jugadoresNombres` y `jugadoresRetratos` son paralelas:
+         * el asiento de cada quien es su posición en las tres. Sacando al que
+         * se va de dos de ellas y no de la tercera, todos los que estaban
+         * detrás quedan con la cara del de adelante — y la mesa se ve
+         * perfecta, con cuatro jugadores y cuatro caras que no son las suyas.
+         *
+         * Es la falla más fea de las que puede tener esto, porque no rompe
+         * nada visible. La cuida `pruebas/retratos-en-red.mjs`, que audita
+         * este archivo y el de las salas.
+         */
         const indice = jugadores.indexOf(uid);
         const nombres = [...(sala.jugadoresNombres ?? [])];
+        const retratos = [...(sala.jugadoresRetratos ?? [])];
         nombres.splice(indice, 1);
+        retratos.splice(indice, 1);
         tx.update(refSala, {
           jugadores: jugadores.filter((j) => j !== uid),
           jugadoresNombres: nombres,
+          jugadoresRetratos: retratos,
           // Si se va, deja de contar como listo.
           listos: (sala.listos ?? []).filter((j) => j !== uid),
           pozo: entrada * (jugadores.length - 1),

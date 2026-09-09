@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000" role="img" aria-label="">
+  <!--
+    La rosa de los vientos del paño.
+
+    Va como archivo y no como un montón de gradientes en el CSS porque es
+    GEOMETRÍA: ocho puntas, cuatro anillos y treinta y dos marcas, cada una en
+    su ángulo exacto. Eso en `conic-gradient` sale aproximado y se nota en la
+    diagonal, que es justo donde el ojo la mide.
+
+    Sin colores propios: todo hereda `currentColor`, así el paño decide el tono
+    desde el CSS y no hay que abrir este archivo para cambiar el oro.
+  -->
+  <g fill="none" stroke="currentColor" stroke-linejoin="round">
+    <!-- Los anillos, de afuera hacia adentro. -->
+    <circle cx="500" cy="500" r="486" stroke-width="2" opacity="0.55" />
+    <circle cx="500" cy="500" r="470" stroke-width="1" opacity="0.35" />
+    <circle cx="500" cy="500" r="372" stroke-width="1" opacity="0.28" />
+    <circle cx="500" cy="500" r="286" stroke-width="1.5" opacity="0.4" />
+    <circle cx="500" cy="500" r="118" stroke-width="1" opacity="0.3" />
+    <circle cx="500" cy="500" r="96" stroke-width="2" opacity="0.5" />
+
+    <!-- Las treinta y dos marcas del anillo exterior: una cada 11.25°. -->
+    <g stroke-width="1.5" opacity="0.45">
+      <path d="M500 470 v18" transform="rotate(0 500 500)" />
+      <path d="M500 470 v18" transform="rotate(11.25 500 500)" />
+      <path d="M500 470 v18" transform="rotate(22.5 500 500)" />
+      <path d="M500 470 v18" transform="rotate(33.75 500 500)" />
+      <path d="M500 470 v18" transform="rotate(45 500 500)" />
+      <path d="M500 470 v18" transform="rotate(56.25 500 500)" />
+      <path d="M500 470 v18" transform="rotate(67.5 500 500)" />
+      <path d="M500 470 v18" transform="rotate(78.75 500 500)" />
+      <path d="M500 470 v18" transform="rotate(90 500 500)" />
+      <path d="M500 470 v18" transform="rotate(101.25 500 500)" />
+      <path d="M500 470 v18" transform="rotate(112.5 500 500)" />
+      <path d="M500 470 v18" transform="rotate(123.75 500 500)" />
+      <path d="M500 470 v18" transform="rotate(135 500 500)" />
+      <path d="M500 470 v18" transform="rotate(146.25 500 500)" />
+      <path d="M500 470 v18" transform="rotate(157.5 500 500)" />
+      <path d="M500 470 v18" transform="rotate(168.75 500 500)" />
+      <path d="M500 470 v18" transform="rotate(180 500 500)" />
+      <path d="M500 470 v18" transform="rotate(191.25 500 500)" />
+      <path d="M500 470 v18" transform="rotate(202.5 500 500)" />
+      <path d="M500 470 v18" transform="rotate(213.75 500 500)" />
+      <path d="M500 470 v18" transform="rotate(225 500 500)" />
+      <path d="M500 470 v18" transform="rotate(236.25 500 500)" />
+      <path d="M500 470 v18" transform="rotate(247.5 500 500)" />
+      <path d="M500 470 v18" transform="rotate(258.75 500 500)" />
+      <path d="M500 470 v18" transform="rotate(270 500 500)" />
+      <path d="M500 470 v18" transform="rotate(281.25 500 500)" />
+      <path d="M500 470 v18" transform="rotate(292.5 500 500)" />
+      <path d="M500 470 v18" transform="rotate(303.75 500 500)" />
+      <path d="M500 470 v18" transform="rotate(315 500 500)" />
+      <path d="M500 470 v18" transform="rotate(326.25 500 500)" />
+      <path d="M500 470 v18" transform="rotate(337.5 500 500)" />
+      <path d="M500 470 v18" transform="rotate(348.75 500 500)" />
+    </g>
+
+    <!--
+      La estrella de ocho puntas.
+
+      Tres radios y no dos: las cuatro puntas cardinales llegan a 440, las
+      diagonales a 280 y los valles se cierran a 70. Con un solo radio exterior
+      queda un copo de nieve; con dos, una brújula.
+    -->
+    <path stroke-width="1.5" opacity="0.5"
+      d="M940 500 L564.7 526.8 L698 698 L526.8 564.7 L500 940 L473.2 564.7
+         L302 698 L435.3 526.8 L60 500 L435.3 473.2 L302 302 L473.2 435.3
+         L500 60 L526.8 435.3 L698 302 L564.7 473.2 Z" />
+
+    <!-- Las cuatro puntas cardinales, sombreadas por mitades: es lo que le da
+         volumen a una brújula dibujada con líneas. -->
+    <g stroke="none" fill="currentColor">
+      <path opacity="0.16" d="M940 500 L564.7 473.2 L500 500 L564.7 526.8 Z" />
+      <path opacity="0.16" d="M500 940 L473.2 564.7 L500 500 L526.8 564.7 Z" />
+      <path opacity="0.16" d="M60 500 L435.3 526.8 L500 500 L435.3 473.2 Z" />
+      <path opacity="0.16" d="M500 60 L526.8 435.3 L500 500 L473.2 435.3 Z" />
+    </g>
+
+    <!-- El corazón: un rombo chico que da el centro exacto de la mesa. -->
+    <path stroke-width="1.5" opacity="0.45" d="M500 452 L548 500 L500 548 L452 500 Z" />
+  </g>
+</svg>

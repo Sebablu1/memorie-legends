@@ -243,6 +243,40 @@ export const itemPorId = (items, id) => items.find((i) => i.id === id) ?? null;
  * lo que empieza con `/` o con `http` es un archivo, el resto se dibuja como
  * texto.
  */
+/**
+ * ¿La imagen es un archivo DE ESTE SITIO?
+ *
+ * Más estricta que `imagenEsArchivo`, y por un motivo concreto: hay un
+ * lugar donde la ruta de una imagen deja de ser cosa de quien la mira y
+ * pasa a mostrársele a OTRA gente —el retrato de cada jugador en la mesa de
+ * una partida por Leyendas, que viaja a los otros tres—.
+ *
+ * `imagenEsArchivo` acepta `http`, y ahí eso deja de ser inocente: un
+ * artículo del catálogo con una URL de otro dominio haría que los cuatro
+ * navegadores de la mesa le pidan una imagen a ese servidor, contándole
+ * cuatro direcciones IP y cuándo se está jugando. No hace falta que nadie
+ * sea malicioso para que pase: alcanza con pegar una URL en el panel.
+ *
+ * Un artículo así se sigue viendo perfectamente en la tienda y en el
+ * inventario de su dueño. Lo único que no hace es viajar a la mesa: ahí cae
+ * al retrato de la casa.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LAS DOS BARRAS NO SON UNA RUTA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `//ejemplo.com/cara.png` empieza con `/` y no es una ruta de este sitio:
+ * es una URL de protocolo relativo, y el navegador la resuelve contra otro
+ * dominio exactamente igual que si dijera `https://`. Comprobar sólo la
+ * primera barra dejaba pasar justo el caso que esta función viene a cerrar.
+ *
+ * Se cerró porque lo encontró `pruebas/retratos-en-red.mjs`, que lo probaba
+ * a propósito. No es una hipótesis rebuscada: es la forma más corta de
+ * escribir un dominio ajeno.
+ */
+export const esRutaDelSitio = (imagen) =>
+  typeof imagen === "string" && imagen.startsWith("/") && !imagen.startsWith("//");
+
 export const imagenEsArchivo = (imagen) =>
   typeof imagen === "string" && (imagen.startsWith("/") || imagen.startsWith("http"));
 

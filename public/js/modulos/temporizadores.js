@@ -71,6 +71,44 @@ export function crearTemporizadores({ dom, msTurno }) {
 
   // --------------------------------------------- el reloj del turno
 
+  /**
+   * El aro de la cuenta atrás, alrededor del retrato de quien tiene el turno.
+   *
+   * Lo pinta ESTE reloj y no un temporizador propio, por lo mismo que se
+   * explica más abajo en `iniciarRelojTurno`: el número del cartel y el aro
+   * del asiento son la misma cuenta, y dos relojes para lo mismo terminan
+   * discrepando en cuanto uno se cancela y el otro no.
+   *
+   * El nodo se busca en cada tick a propósito. La mesa se redibuja entera en
+   * cada jugada, así que una referencia guardada apuntaría a un elemento que
+   * ya no está en la página y el aro se quedaría quieto en el retrato de
+   * nadie.
+   */
+  function pintarAro(indice, fraccion, segundos) {
+    for (const viejo of document.querySelectorAll(".retrato.contando")) {
+      if (viejo.dataset.asiento !== String(indice)) apagarAro(viejo);
+    }
+
+    const aro = document.querySelector(`.retrato[data-asiento="${indice}"]`);
+    if (!aro) return;
+    aro.classList.add("contando");
+    aro.classList.toggle("apurado", segundos <= 2);
+    aro.style.setProperty("--vuelta", `${Math.max(0, Math.min(1, fraccion)) * 360}deg`);
+    const numero = aro.querySelector(".cuenta-asiento");
+    if (numero) numero.textContent = `${segundos}s`;
+  }
+
+  function apagarAro(aro) {
+    aro.classList.remove("contando", "apurado");
+    aro.style.removeProperty("--vuelta");
+    const numero = aro.querySelector(".cuenta-asiento");
+    if (numero) numero.textContent = "";
+  }
+
+  const apagarTodosLosAros = () => {
+    for (const aro of document.querySelectorAll(".retrato.contando")) apagarAro(aro);
+  };
+
   function pintarReloj() {
     const caja = dom.reloj;
     if (!caja) return;
@@ -78,6 +116,7 @@ export function crearTemporizadores({ dom, msTurno }) {
     if (!relojTurno) {
       caja.hidden = true;
       dom.anuncio?.classList.remove("apurado");
+      apagarTodosLosAros();
       return;
     }
 
@@ -97,12 +136,15 @@ export function crearTemporizadores({ dom, msTurno }) {
     const apurado = segundos <= 2;
     caja.classList.toggle("apurado", apurado);
     dom.anuncio?.classList.toggle("apurado", apurado);
+
+    pintarAro(relojTurno.indice, restante / relojTurno.ms, segundos);
   }
 
   function cancelarRelojTurno() {
     if (relojTurno?.intervalo) clearInterval(relojTurno.intervalo);
     relojTurno = null;
     if (dom.reloj) dom.reloj.hidden = true;
+    apagarTodosLosAros();
     // Sin esto el cartel se queda rojo después de que el reloj se fue.
     dom.anuncio?.classList.remove("apurado");
   }

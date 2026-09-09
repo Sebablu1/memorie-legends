@@ -211,6 +211,18 @@ export function crearMotorEnRed({
         ...vista,
         version: partida.version,
         ventana: resumenDeVentana(partida.ventana),
+
+        // El plazo, para que el jugador VEA lo que le queda.
+        //
+        // Lo decide el servidor y lo sigue decidiendo el servidor: esto no
+        // le da al navegador ninguna autoridad sobre el tiempo, le da la
+        // cuenta que ya estaba corriendo sin que nadie se la mostrara. En
+        // entrenamiento esa cuenta se ve desde siempre; en una partida por
+        // Leyendas el jugador se quedaba pensando y lo pasaban sin aviso.
+        //
+        // No lleva cartas —fase, marca, vencimiento y qué hacer— así que no
+        // hay nada que redactar. `filtracionesEn` ya corrió sobre `vista`.
+        plazo: partida.plazo ?? null,
         ausentes: partida.ausentes ?? [],
         abandonaron: partida.abandonaron ?? [],
         actualizado: marcaDeTiempo(),
@@ -475,14 +487,21 @@ export function crearMotorEnRed({
    * partida podría quedar iniciada sin documento maestro —o al revés— y no
    * habría forma de saber cuál de las dos cosas pasó.
    */
-  async function repartirEn(tx, { codigo, jugadores, nombres }) {
+  async function repartirEn(tx, { codigo, jugadores, nombres, retratos }) {
     const snap = await tx.get(refPartida(codigo));
     // Idempotente: repartir dos veces la misma partida no la reinicia.
     if (snap.exists) return { codigo, yaExistia: true, version: snap.data().version };
 
+    // El retrato se fija ACÁ y no se vuelve a mirar.
+    //
+    // Queda dentro del estado de la partida, igual que el nombre, así que si
+    // alguien se cambia el avatar a mitad de la mesa los demás siguen viendo
+    // la cara con la que se sentó. Es lo que corresponde: una partida en
+    // curso no puede cambiar de aspecto debajo de quien la está mirando.
     const configuracion = jugadores.map((uid, i) => ({
       id: uid,
       nombre: nombres?.[i] ?? `Jugador ${i + 1}`,
+      retrato: retratos?.[i] ?? null,
       esIA: false,
     }));
 

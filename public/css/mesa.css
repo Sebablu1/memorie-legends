@@ -8,9 +8,30 @@
   --noche-2: #101010;
   --noche-3: #16161a;
 
-  --fieltro-claro: #24614a;
-  --fieltro: #1a472a;
-  --fieltro-hondo: #0d2b1a;
+  /* El paño dejó de ser verde.
+
+     Era fieltro de casino y la mesa ahora es una sala de piedra: sobre
+     verde, el oro de los marcos y el azul de los dorsos se pelean con el
+     fondo en vez de despegarse de él. Los nombres de las variables se
+     quedan —los usa media hoja— pero lo que guardan es el azul de la
+     piedra pulida. */
+  --fieltro-claro: #24304a;
+  --fieltro: #161f33;
+  --fieltro-hondo: #0a1020;
+
+  /* Las antorchas del salón. Un solo tono cálido, en tres intensidades. */
+  --antorcha: rgba(255, 168, 76, 0.5);
+  --antorcha-tenue: rgba(255, 148, 60, 0.16);
+
+  /* El verde del turno: el aro que cuenta y el filo del asiento activo. */
+  --turno: #43d17f;
+  --turno-hondo: rgba(67, 209, 127, 0.35);
+
+  /* El corte de los marcos: cuánto se le come a cada esquina.
+     Vive acá porque lo comparten el asiento, la botonera y las tarjetas del
+     costado, y si cada uno eligiera el suyo la mesa dejaría de leerse como
+     una sola pieza. */
+  --corte: 13px;
 
   --madera-clara: #8a6432;
   --madera: #4a2f16;
@@ -56,10 +77,29 @@ body {
   height: 100dvh;
   padding: 10px;
   overflow: hidden;
+
+  /* La sala donde está la mesa.
+
+     Cinco capas, de arriba hacia abajo: el grano de la piedra, las dos
+     antorchas de los costados, el halo del techo, la penumbra del suelo y
+     el degradado de la pared.
+
+     Está hecho con degradados y un mosaico de ruido de un kilobyte, y no
+     con una ilustración, por una razón práctica: una foto de sala de piedra
+     que se vea bien pesa entre 300 KB y un mega, y se carga JUSTO cuando el
+     jugador está esperando que se reparta. Esto pesa nada y no se descarga.
+
+     Si algún día hay una ilustración, entra como una capa más arriba de
+     todo esto y no hay que tocar ninguna otra regla: ver `--sala` abajo. */
   background:
-    radial-gradient(ellipse 90% 60% at 50% 8%, rgba(212, 168, 67, 0.07), transparent 70%),
-    radial-gradient(ellipse 70% 70% at 50% 55%, rgba(18, 97, 63, 0.16), transparent 72%),
-    linear-gradient(165deg, var(--noche-2) 0%, var(--noche-1) 60%, #03050a 100%);
+    var(--sala, none),
+    url("/img/mesa/piedra.svg") 0 0 / 320px 320px repeat,
+    radial-gradient(ellipse 26% 62% at 0% 42%, var(--antorcha-tenue), transparent 70%),
+    radial-gradient(ellipse 26% 62% at 100% 42%, var(--antorcha-tenue), transparent 70%),
+    radial-gradient(ellipse 90% 46% at 50% 0%, rgba(212, 168, 67, 0.1), transparent 72%),
+    radial-gradient(ellipse 80% 55% at 50% 100%, rgba(0, 0, 0, 0.6), transparent 70%),
+    linear-gradient(178deg, #131721 0%, #0a0d15 55%, #05070c 100%);
+  background-blend-mode: normal, soft-light, screen, screen, screen, normal, normal;
   background-attachment: fixed;
 }
 
@@ -70,7 +110,42 @@ body::after {
   inset: 0;
   pointer-events: none;
   z-index: 1;
-  background: radial-gradient(ellipse at center, transparent 52%, rgba(0, 0, 0, 0.55) 100%);
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.62) 100%);
+}
+
+/* Las dos antorchas.
+
+   Son luz, no objetos: no se dibuja el hierro ni la llama, sólo lo que
+   iluminan. Un fuego dibujado con degradados se ve como un fuego dibujado
+   con degradados; su resplandor sobre una pared, en cambio, se ve como un
+   resplandor.
+
+   El parpadeo es lento y de poca amplitud —seis segundos, entre 0.72 y 1—
+   porque esto está DETRÁS de una mesa donde alguien tiene que acordarse de
+   una carta. Un fondo que late rápido compite con el juego.
+
+   Y respeta `prefers-reduced-motion`: quien pidió menos movimiento ve las
+   antorchas quietas y encendidas, no apagadas. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(circle 190px at 3% 26%, var(--antorcha), transparent 68%),
+    radial-gradient(circle 190px at 97% 26%, var(--antorcha), transparent 68%);
+  opacity: 0.5;
+  animation: fuego 6s ease-in-out infinite alternate;
+}
+
+@keyframes fuego {
+  0% { opacity: 0.38; }
+  100% { opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before { animation: none; opacity: 0.48; }
 }
 
 .escena {
@@ -117,11 +192,27 @@ body::after {
   box-shadow: 0 0 18px rgba(212, 168, 67, 0.2);
 }
 
+/* La marca, en serif como en el resto del sitio.
+
+   La mesa era la única pantalla con el nombre en palo seco: todos los
+   títulos del proyecto van en Playfair Display y ésta se quedó en la
+   tipografía del cuerpo. No se notaba porque nadie tiene las dos pantallas
+   al lado.
+
+   Y va con la familia de respaldo, no con Playfair: `mesa.html` es la única
+   página que NO enlaza Google Fonts, y no es un olvido —es la pantalla donde
+   el jugador está esperando que se reparta, y una fuente que descargar antes
+   de dibujar el título no vale lo que cuesta—. `Playfair respaldo` está
+   declarada en `tema.css` como Georgia con las métricas corregidas para
+   parecerse a Playfair, sale de la máquina y no pide nada a la red.
+
+   Las mayúsculas se quedan: el logo del costado también las usa. */
 .cabecera h1 {
-  font-size: 1.05rem;
-  letter-spacing: 2px;
+  font-family: "Playfair respaldo", Georgia, "Times New Roman", serif;
+  font-size: 1.14rem;
+  letter-spacing: 1.6px;
   text-transform: uppercase;
-  font-weight: 800;
+  font-weight: 700;
   background: linear-gradient(180deg, var(--oro-claro) 10%, var(--oro) 55%, var(--oro-hondo) 100%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -209,14 +300,14 @@ body::after {
   justify-content: space-between;
   padding: 6px 0;
 
-  /* El borde hace de baranda de madera; el relleno, de fieltro. */
+  /* El borde hace de baranda de madera; el relleno, de piedra pulida. */
   border: 14px solid transparent;
   background:
     radial-gradient(
         ellipse 74% 66% at 50% 44%,
         var(--fieltro-claro) 0%,
-        var(--fieltro) 42%,
-        #153c25 72%,
+        var(--fieltro) 44%,
+        #101728 74%,
         var(--fieltro-hondo) 100%
       )
       padding-box,
@@ -230,36 +321,48 @@ body::after {
       )
       border-box;
   box-shadow:
-    0 40px 90px rgba(0, 0, 0, 0.65),
-    0 0 0 1px rgba(212, 168, 67, 0.45),
-    inset 0 0 0 2px rgba(212, 168, 67, 0.22),
+    0 40px 90px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(212, 168, 67, 0.5),
+    inset 0 0 0 2px rgba(212, 168, 67, 0.26),
+    inset 0 0 70px rgba(0, 0, 0, 0.5),
     inset 0 22px 60px rgba(0, 0, 0, 0.45);
 }
 
-/* Marca de agua sobre el fieltro. */
+/* La rosa de los vientos grabada en el paño.
+
+   Va con `mask-image` y no con un `<img>` de fondo por una razón concreta:
+   dentro de un `url()` de CSS, el `currentColor` del SVG no hereda nada —el
+   archivo se resuelve contra sí mismo y sale negro—. Usándolo de máscara,
+   el dibujo aporta la FORMA y el color lo pone esta regla, así que el oro
+   del grabado se cambia acá y no abriendo el SVG.
+
+   `contain` y no `cover`: la brújula tiene que entrar entera. Con `cover`,
+   en una ventana ancha se le cortan el norte y el sur y queda una figura
+   que no se reconoce. */
 .mesa::before {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background:
-    url("/img/claude-inspiration/logo2.png") center 46% / 30% auto no-repeat;
-  opacity: 0.07;
-  filter: grayscale(0.3);
   pointer-events: none;
+  opacity: 0.62;
+  background:
+    radial-gradient(circle at 50% 46%, var(--oro-claro) 0%, var(--oro) 42%, var(--oro-hondo) 100%);
+  -webkit-mask: url("/img/mesa/rosa-viento.svg") center 46% / contain no-repeat;
+  mask: url("/img/mesa/rosa-viento.svg") center 46% / contain no-repeat;
 }
 
-/* Trama sutil del paño. */
+/* La veta de la piedra. Ruido estirado, casi invisible: su trabajo es que la
+   superficie no se lea como un degradado plano. */
 .mesa::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  opacity: 0.35;
-  background-image:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.018) 0 2px, transparent 2px 4px),
-    repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.03) 0 2px, transparent 2px 4px);
+  opacity: 0.16;
+  mix-blend-mode: overlay;
+  background: url("/img/mesa/vetas.svg") 0 0 / 600px 600px repeat;
 }
 
 /* ---- asientos alrededor del óvalo ---- */
@@ -294,40 +397,108 @@ body::after {
 
 /* =================================================== jugador */
 
+/* El marco del asiento: esquinas cortadas y filo dorado.
+
+   ─────────────────────────────────────────────────────────────────────────
+   POR QUÉ EL FILO ES UN FONDO Y NO UN BORDE
+   ─────────────────────────────────────────────────────────────────────────
+
+   Porque clip-path corta TODO lo que hay dentro de la caja, el borde
+   incluido. Con un borde de un píxel las esquinas quedaban con el bisel
+   abierto: la línea dorada recorría los cuatro lados y se interrumpía justo
+   en las ocho diagonales, que es donde el marco tiene que verse.
+
+   Así que el dorado es el FONDO del elemento, el relleno oscuro es un
+   ::after metido dos píxeles para adentro, y los dos se recortan con la
+   misma silueta. Lo que asoma entre uno y otro son esos dos píxeles: un filo
+   continuo, diagonales incluidas.
+
+   `isolation: isolate` es lo que hace que funcione. Sin un contexto de
+   apilamiento propio, el z-index negativo del relleno se va detrás del paño
+   y el asiento aparece dorado y macizo.
+
+   ─────────────────────────────────────────────────────────────────────────
+   Y POR QUÉ EL RESPLANDOR DEL TURNO ES UN FILTRO
+   ─────────────────────────────────────────────────────────────────────────
+
+   Por lo mismo: clip-path también recorta las sombras. Un box-shadow verde
+   alrededor del asiento en turno no se veía en absoluto. drop-shadow se
+   aplica DESPUÉS del recorte y sigue la silueta biselada, que además es lo
+   que uno querría dibujar a mano.
+
+   Se fue con eso el aro que latía. No es una pérdida: ahora quien tiene el
+   turno lleva un aro que cuenta hacia atrás alrededor de su retrato, que es
+   movimiento con información adentro. Dos cosas latiendo por el mismo motivo
+   son una de más.
+
+   ─────────────────────────────────────────────────────────────────────────
+   Y POR QUÉ EL RECORTE VIVE EN LOS DOS SEUDOELEMENTOS Y NO EN EL ASIENTO
+   ─────────────────────────────────────────────────────────────────────────
+
+   Porque recortando el asiento se recorta TAMBIÉN lo que tiene adentro, y
+   adentro están las cartas. Las de los extremos del abanico van giradas y
+   se asoman siete píxeles del relleno; con el recorte puesto en `.jugador`
+   esos siete píxeles no se veían. Y una carta cortada no es un defecto
+   estético: es una carta a la que le falta una esquina para tocar.
+
+   Así que el marco entero —filo y relleno— es un par de capas de fondo con
+   `z-index` negativo, y el recorte se aplica a esas capas. El contenido no
+   se recorta nunca y el abanico vuelve a asomarse como asomaba antes.
+
+   Lo encontró `mesa-vestida.spec.js`, que mide cada carta contra la caja de
+   su asiento. A ojo no se veía: siete píxeles de una esquina girada parecen
+   parte del diseño. */
 .jugador {
   position: relative;
-  padding: 6px 14px 8px;
-  border-radius: 16px;
+  isolation: isolate;
+  padding: 8px 16px 10px;
   text-align: center;
-  background: linear-gradient(180deg, rgba(10, 16, 24, 0.86), rgba(6, 10, 16, 0.9));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
-  transition: border-color 0.3s, box-shadow 0.3s, opacity 0.3s, transform 0.3s;
+  transition: opacity 0.3s, transform 0.3s;
 }
 
-.jugador.en-turno {
-  border-color: rgba(212, 168, 67, 0.75);
-  box-shadow:
-    0 0 0 1px rgba(212, 168, 67, 0.4),
-    0 0 34px rgba(212, 168, 67, 0.35),
-    0 14px 32px rgba(0, 0, 0, 0.55);
-  transform: translateY(-3px);
-}
-
-/* Halo que late mientras es tu turno. */
-.jugador.en-turno::before {
+/* El filo dorado. */
+.jugador::before {
   content: "";
   position: absolute;
-  inset: -6px;
-  border-radius: 22px;
-  border: 1px solid rgba(212, 168, 67, 0.35);
-  animation: latir 2.4s ease-in-out infinite;
-  pointer-events: none;
+  inset: 0;
+  z-index: -2;
+  background: linear-gradient(165deg, var(--oro-claro) 0%, var(--oro-hondo) 45%, #4a3a14 100%);
+  clip-path: polygon(
+    var(--corte) 0%, calc(100% - var(--corte)) 0%,
+    100% var(--corte), 100% calc(100% - var(--corte)),
+    calc(100% - var(--corte)) 100%, var(--corte) 100%,
+    0% calc(100% - var(--corte)), 0% var(--corte)
+  );
+
+  /* La sombra va acá y no en el asiento: `drop-shadow` sigue la silueta de
+     lo que filtra, y filtrando el asiento entero seguiría también el
+     contorno de las cartas, que ya tienen la suya. */
+  filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.55));
+  transition: filter 0.3s;
 }
 
-@keyframes latir {
-  0%, 100% { opacity: 0.25; transform: scale(1); }
-  50%      { opacity: 0.7;  transform: scale(1.015); }
+/* El relleno oscuro, dos píxeles adentro del filo. */
+.jugador::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  z-index: -1;
+  background: linear-gradient(180deg, rgba(28, 41, 66, 0.95), rgba(12, 19, 33, 0.97));
+  clip-path: polygon(
+    var(--corte) 0%, calc(100% - var(--corte)) 0%,
+    100% var(--corte), 100% calc(100% - var(--corte)),
+    calc(100% - var(--corte)) 100%, var(--corte) 100%,
+    0% calc(100% - var(--corte)), 0% var(--corte)
+  );
+}
+
+.jugador.en-turno { transform: translateY(-3px); }
+
+.jugador.en-turno::before {
+  background: linear-gradient(165deg, #8ef0b6 0%, var(--turno) 45%, #1d7a48 100%);
+  filter:
+    drop-shadow(0 0 14px var(--turno-hondo))
+    drop-shadow(0 12px 24px rgba(0, 0, 0, 0.6));
 }
 
 .jugador.eliminado {
@@ -339,19 +510,133 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
+  gap: 11px;
   margin-bottom: 8px;
 }
 
-.jugador .ficha {
-  width: 26px;
-  height: 39px;
-  border-radius: 4px;
-  object-fit: cover;
-  border: 2px solid var(--color-asiento, rgba(212, 168, 67, 0.45));
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5), 0 0 10px -3px var(--color-asiento, transparent);
+/* ------------------------------------------------------- el retrato
+
+   Un círculo con dos aros superpuestos: el de abajo es el marco dorado, que
+   está siempre; el de arriba es la cuenta atrás, que sólo se dibuja mientras
+   a ese asiento le toca.
+
+   El de arriba es un conic-gradient cuyo ángulo escribe temporizadores.js en
+   --vuelta, tick a tick, con el MISMO reloj que pinta el número del cartel.
+   En reposo --aro-vivo es transparente, así que la capa existe y no se ve: no
+   hay que agregar ni sacar reglas al empezar el turno, sólo cambiar una
+   variable. */
+.jugador .retrato {
+  --retrato: 62px;
+  --aro: 3px;
+  --aro-vivo: transparent;
+  --vuelta: 0deg;
+  position: relative;
   flex-shrink: 0;
+  width: var(--retrato);
+  height: var(--retrato);
+  border-radius: 50%;
+  background:
+    conic-gradient(from -90deg, var(--aro-vivo) 0deg var(--vuelta), transparent var(--vuelta) 360deg),
+    linear-gradient(180deg, var(--oro-claro), var(--oro) 55%, var(--oro-hondo));
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 4px 10px rgba(0, 0, 0, 0.5);
 }
+
+/* La ventana redonda por donde se ve la cara.
+
+   ─────────────────────────────────────────────────────────────────────────
+   POR QUÉ HAY UN ENVOLTORIO Y NO SÓLO LA IMAGEN
+   ─────────────────────────────────────────────────────────────────────────
+
+   Porque el aro dorado es el FONDO de `.retrato`, y un `overflow: hidden`
+   ahí recorta contra la caja de relleno, que es la misma donde está pintado
+   el aro: la cara terminaría tapándolo. Este envoltorio se mete `--aro`
+   píxeles para adentro y recorta ahí, así que el aro queda por fuera del
+   recorte y se ve entero.
+
+   ─────────────────────────────────────────────────────────────────────────
+   Y POR QUÉ LA IMAGEN VA AL DOBLE Y CORRIDA HACIA ARRIBA
+   ─────────────────────────────────────────────────────────────────────────
+
+   Porque los trece avatares no son caras: son MEDALLONES. Cada PNG trae la
+   figura dentro de su propio aro dorado y con una cinta con el nombre
+   debajo, sobre fondo transparente. Metido entero en un círculo de sesenta
+   píxeles se ve un aro dentro de otro aro y una cinta ilegible, y la cara
+   queda ocupando un tercio del espacio.
+
+   Al doble y corrida, lo que queda a la vista es la ventana de 200x200
+   centrada en (200, 175) del original de 400x400: la cara, sin el aro de la
+   ilustración —que reemplaza el de acá— y sin la cinta, que repetiría el
+   nombre que ya está escrito al lado.
+
+   Los números salen de la plantilla que comparten los trece. Es la única
+   atadura entre esta hoja y el arte, y por eso está escrita: un avatar nuevo
+   con otra composición hay que componerlo igual, o cambiar esto. */
+.jugador .retrato .cara {
+  position: absolute;
+  inset: var(--aro);
+  border-radius: 50%;
+  overflow: hidden;
+  background: #0b0f18;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+.jugador .retrato .cara img {
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  left: -50%;
+  top: -37.5%;
+  object-fit: contain;
+  display: block;
+}
+
+/* El aro del color del asiento, por fuera del dorado.
+
+   Es lo que reemplaza a la miniatura del dorso que había antes al lado del
+   nombre. Sin ella habría que adivinar de quién es cada mano, y eso el
+   retrato solo no lo dice: dos jugadores pueden tener la misma cara en
+   partidas distintas, el color del asiento no. */
+.jugador .retrato::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1px solid var(--color-asiento, rgba(212, 168, 67, 0.5));
+  box-shadow: 0 0 10px -2px var(--color-asiento, transparent);
+}
+
+.jugador .retrato.contando { --aro-vivo: var(--turno); }
+.jugador .retrato.apurado { --aro-vivo: #ff5a45; }
+
+/* Los segundos que quedan, colgados del retrato.
+
+   Va con aria-hidden: el texto cambia ocho veces por segundo y un lector de
+   pantalla que lo anunciara no dejaría oír otra cosa. Lo que sí se anuncia es
+   el cambio de fase, y eso lo dice la pista.
+
+   Vacío no ocupa lugar: sin contenido, el relleno y el fondo seguirían
+   dibujando una pastilla diminuta, así que se esconde cuando no hay número. */
+.jugador .cuenta-asiento {
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3px;
+  color: #05210f;
+  background: var(--turno);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+}
+
+.jugador .cuenta-asiento:empty { display: none; }
+.jugador .retrato.apurado .cuenta-asiento { background: #ff5a45; color: #2a0803; }
+
+/* --------------------------------------------------- nombre y puntos */
 
 .jugador .datos {
   text-align: left;
@@ -360,7 +645,7 @@ body::after {
 
 .jugador .nombre {
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   letter-spacing: 0.4px;
   display: flex;
   align-items: center;
@@ -379,28 +664,44 @@ body::after {
 }
 
 .jugador .insignia {
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   text-transform: uppercase;
   letter-spacing: 1px;
   padding: 2px 7px;
   border-radius: 999px;
-  background: rgba(212, 168, 67, 0.12);
-  border: 1px solid rgba(212, 168, 67, 0.28);
+  background: rgba(212, 168, 67, 0.14);
+  border: 1px solid rgba(212, 168, 67, 0.32);
   color: var(--oro-claro);
 }
 
+/* Dos renglones y no uno.
+
+   Ronda es lo que se anotó en la ronda anterior y Total lo acumulado en la
+   partida. Puestos en la misma línea con un punto en el medio —que es como
+   estaba— se leen como un solo número partido; en dos renglones alineados a
+   la izquierda se leen como lo que son, dos cuentas distintas.
+
+   tabular-nums para que al pasar de 9 a 10 el renglón de abajo no se corra. */
 .jugador .puntos {
-  font-size: 0.74rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 2px;
+  font-size: 0.68rem;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
   color: var(--texto-tenue);
-  letter-spacing: 0.3px;
   white-space: nowrap;
 }
 
 .jugador .puntos b {
-  color: var(--oro-claro);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-variant-numeric: tabular-nums;
+  margin-left: 3px;
 }
+
+.jugador .puntos .parcial b { color: #7fc4ff; }
+.jugador .puntos .acumulado b { color: var(--oro-claro); }
 
 /* Tu asiento juega con cartas más grandes. */
 /* Tus cartas son las que tocás bajo presión de reloj: se dimensionan aparte
@@ -408,11 +709,11 @@ body::after {
 .jugador.propio {
   --carta-alto: clamp(88px, 16.8dvh, 172px);
   --carta-ancho: calc(var(--carta-alto) * 0.667);
-  padding: 8px 18px 10px;
+  padding: 10px 20px 12px;
 }
 
-.jugador.propio .nombre { font-size: 1rem; }
-
+.jugador.propio .nombre { font-size: 1.05rem; }
+.jugador.propio .retrato { --retrato: 74px; }
 /* ====================================================== mano */
 
 .mano {
@@ -888,8 +1189,8 @@ body::after {
      botonera crece 58px justo en `turno`, que es la fase donde más falta
      hace. */
   flex-wrap: nowrap;
-  gap: 10px;
-  padding: 12px 16px;
+  gap: 9px;
+  padding: 11px 14px;
   border-radius: 14px;
   background: linear-gradient(180deg, rgba(28, 38, 54, 0.8), rgba(9, 13, 20, 0.88));
   border: 1px solid var(--vidrio-borde);
@@ -899,7 +1200,18 @@ body::after {
 button.accion {
   position: relative;
   flex: none;
-  padding: 12px 20px;
+
+  /* El dibujo arriba y la palabra abajo.
+
+     Uno al lado del otro, los cuatro botones sumaban 88px más de ancho y la
+     botonera se pasaba del 80% del paño que exige entrenamiento-ux.spec.js.
+     Apilados entran en el mismo ancho de antes, y de paso el ícono queda
+     más grande: es lo que se reconoce sin leer cuando quedan dos segundos. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 16px 7px;
 
   /* El filo dorado, que antes no estaba: es lo que emparenta estos botones con
      el marco de las cartas y con las cajas del tablero. Va con `border` y no
@@ -958,6 +1270,20 @@ button.accion:disabled {
   cursor: not-allowed;
 }
 
+/* El dibujo del botón.
+
+   Hereda el color del texto —los SVG van con `currentColor`— así que no hay
+   una regla de color por botón: el ícono del que corta es del color del que
+   corta, y cuando el botón se apaga el dibujo se apaga con él. Ésa es toda
+   la razón por la que son SVG en línea y no cuatro PNG. */
+.icono-accion {
+  width: 22px;
+  height: 22px;
+  display: block;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+}
+
 /* Barrido de brillo en los botones habilitados. */
 button.accion:not(:disabled)::after {
   content: "";
@@ -984,34 +1310,92 @@ button.accion:disabled::after {
   100%    { left: 130%; }
 }
 
-/* Cortar: rojo vivo, y que se vea desde la otra punta de la mesa.
+/* Un color por jugada, y no cuatro botones dorados.
 
-   Va con clase propia y no con `.peligro`, aunque los dos sean rojos. Son dos
-   rojos distintos a propósito: `.peligro` es el rojo apagado de lo que uno
-   lamenta —lo usa "Abandonar", en el modal de salir— y éste es el rojo
-   encendido de la jugada que decide la ronda. Si fueran el mismo, el botón
-   que uno quiere apretar y el que no querría apretar nunca se verían igual.
+   ─────────────────────────────────────────────────────────────────────────
+   POR QUÉ CADA UNO TIENE EL SUYO
+   ─────────────────────────────────────────────────────────────────────────
 
-   El halo de afuera es lo que lo despega del negro de la caja: sin él, un
-   rojo vivo sobre fondo oscuro se apaga solo. */
+   Porque estos cuatro se aprietan contra reloj. Leer cuatro etiquetas
+   iguales y elegir una lleva más que reconocer un color, y en la ventana de
+   reflejos eso es la diferencia entre jugar y no llegar.
+
+   Azul para levantar (mirar, tomar), rojo para tirar (soltar, deshacerse),
+   violeta para cortar (la decisión que termina la ronda) y verde para pasar
+   (seguir, no hacer nada). Los cuatro con el mismo relieve y el mismo filo
+   dorado: lo que cambia es el color, no la jerarquía.
+
+   ─────────────────────────────────────────────────────────────────────────
+   CORTAR ERA ROJO Y AHORA ES VIOLETA
+   ─────────────────────────────────────────────────────────────────────────
+
+   Era rojo por una razón buena —que se viera desde la otra punta de la
+   mesa— y esa razón sigue valiendo. Lo que cambió es que ahora TIRAR
+   también necesita un color, y el rojo le corresponde antes: tirar es la
+   jugada de deshacerse de algo, y el rojo es el color de eso en cualquier
+   interfaz.
+
+   El violeta conserva lo que importaba: no se parece a ninguno de los otros
+   tres, lleva halo propio para despegarse del negro de la caja, y sigue
+   siendo el único que no se confunde de un vistazo.
+
+   `.peligro` —el rojo apagado de "Abandonar", en el modal de salir— se
+   queda como estaba, y ahora se distingue todavía mejor: es el único rojo
+   sin brillo de la pantalla. */
+button.accion.levanta {
+  color: #fff;
+  border-color: rgba(150, 205, 255, 0.7);
+  background: linear-gradient(180deg, #6cb6f5 0%, #2a72c9 42%, #16457e 100%);
+  box-shadow:
+    0 6px 0 #0d2c53,
+    0 14px 26px rgba(0, 0, 0, 0.45),
+    0 0 26px rgba(42, 114, 201, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.28);
+}
+
+button.accion.tira {
+  color: #fff;
+  border-color: rgba(255, 180, 168, 0.7);
+  background: linear-gradient(180deg, #f0705a 0%, #cc2b1c 42%, #86160c 100%);
+  box-shadow:
+    0 6px 0 #550c05,
+    0 14px 26px rgba(0, 0, 0, 0.45),
+    0 0 26px rgba(204, 43, 28, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.28);
+}
+
 button.accion.corte {
   color: #fff;
-  border-color: rgba(255, 190, 180, 0.75);
-  background: linear-gradient(180deg, #ff8a72 0%, #ff3020 42%, #c1160a 100%);
+  border-color: rgba(216, 176, 255, 0.75);
+  background: linear-gradient(180deg, #b98af0 0%, #7c3fd0 42%, #4a1e88 100%);
   box-shadow:
-    0 6px 0 #7d0f04,
+    0 6px 0 #2e1156,
     0 14px 26px rgba(0, 0, 0, 0.45),
-    0 0 34px rgba(255, 48, 32, 0.6),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 0 34px rgba(124, 63, 208, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.28);
+}
+
+button.accion.pasa {
+  color: #fff;
+  border-color: rgba(160, 240, 190, 0.7);
+  background: linear-gradient(180deg, #5fd694 0%, #22a35f 42%, #106035 100%);
+  box-shadow:
+    0 6px 0 #093c21,
+    0 14px 26px rgba(0, 0, 0, 0.45),
+    0 0 26px rgba(34, 163, 95, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
     inset 0 -3px 8px rgba(0, 0, 0, 0.28);
 }
 
 button.accion.corte:hover:not(:disabled) {
   box-shadow:
-    0 9px 0 #7d0f04,
+    0 9px 0 #2e1156,
     0 20px 34px rgba(0, 0, 0, 0.5),
-    0 0 44px rgba(255, 48, 32, 0.75),
-    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 0 44px rgba(124, 63, 208, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
     inset 0 -3px 8px rgba(0, 0, 0, 0.28);
 }
 
@@ -1080,13 +1464,27 @@ button.accion.sobria:hover:not(:disabled) {
   min-height: 0;
 }
 
+/* La misma esquina cortada que los asientos y por el mismo motivo: si el
+   marcador tuviera esquinas redondas y los asientos biseladas, la pantalla
+   se leería como dos interfaces pegadas.
+
+   Acá el filo alcanza con un `border` porque el corte es más chico que el
+   radio del bisel del asiento y la interrupción de la línea en la diagonal
+   no se ve. Donde sí se veía —el marco del asiento, que es grande y está en
+   el centro de la mirada— se resuelve con el fondo dorado. */
 .tarjeta {
+  --corte: 10px;
   background: var(--vidrio);
-  border: 1px solid var(--vidrio-borde);
-  border-radius: 14px;
+  border: 1px solid rgba(212, 168, 67, 0.28);
   padding: 12px 14px;
   backdrop-filter: blur(8px);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  clip-path: polygon(
+    var(--corte) 0%, calc(100% - var(--corte)) 0%,
+    100% var(--corte), 100% calc(100% - var(--corte)),
+    calc(100% - var(--corte)) 100%, var(--corte) 100%,
+    0% calc(100% - var(--corte)), 0% var(--corte)
+  );
+  filter: drop-shadow(0 12px 26px rgba(0, 0, 0, 0.45));
 }
 
 .tarjeta h2 {
@@ -1099,24 +1497,52 @@ button.accion.sobria:hover:not(:disabled) {
   border-bottom: 1px solid rgba(212, 168, 67, 0.18);
 }
 
-/* Sólo nombre y puntos de la ronda. Nada de barras ni de historial: es un
-   dato de consulta, no compite con el paño. */
+/* Cara, nombre y puntos. Nada de barras ni de historial: es un dato de
+   consulta, no compite con el paño.
+
+   La cara la agrega el mismo `retratoDe` que dibuja el asiento, así que la
+   fila y el asiento no pueden discrepar: es una función, no dos listas.
+   Sirve para lo que el nombre solo no alcanza —encontrar en la tabla al que
+   uno está mirando en la mesa— sobre todo cuando dos nombres empiezan
+   igual. */
 .marcador-fila {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
-  padding: 4px 0;
+  padding: 5px 0;
   font-size: 0.84rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .marcador-fila:last-child { border-bottom: none; }
 
+.retrato-mini {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #0b0f18;
+  border: 1px solid var(--color-asiento, rgba(212, 168, 67, 0.45));
+  box-shadow: 0 0 8px -3px var(--color-asiento, transparent);
+}
+
 .marcador-fila span {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* La tijera de quien cortó. `font-style: normal` porque va en un `<i>`, que
+   es lo que corresponde a una marca sin voz propia, y en itálica un símbolo
+   se ve torcido. */
+.marcador-fila .tijera {
+  flex-shrink: 0;
+  font-style: normal;
+  font-size: 0.8rem;
+  color: var(--oro-claro);
 }
 
 .marcador-fila b {
@@ -1127,8 +1553,32 @@ button.accion.sobria:hover:not(:disabled) {
 
 .marcador-fila.fuera {
   color: var(--texto-tenue);
-  text-decoration: line-through;
 }
+
+/* Tachado sólo el nombre, no la fila entera.
+
+   Con la línea encima de todo, el retrato quedaba cruzado por una raya y los
+   puntos del eliminado —que siguen contando para el orden final— se leían
+   como si fueran mentira. */
+.marcador-fila.fuera span { text-decoration: line-through; }
+.marcador-fila.fuera .retrato-mini { filter: grayscale(1); opacity: 0.5; }
+
+/* Quién cortó, con todas las letras. */
+.quien-corto {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(212, 168, 67, 0.18);
+  font-size: 0.72rem;
+  letter-spacing: 0.3px;
+  color: var(--texto-tenue);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quien-corto[hidden] { display: none; }
+.quien-corto i { font-style: normal; color: var(--oro-claro); }
+.quien-corto b { color: var(--texto); font-weight: 700; }
 
 /* Panel deslizante del registro. Cerrado no ocupa nada del paño; abierto se
    apoya encima con su propio scroll y no mueve una sola carta. */
@@ -1636,7 +2086,9 @@ button.accion.con-poder {
   .jugador { padding: 5px 6px 6px; }
   .jugador .nombre { font-size: 0.72rem; }
   .jugador .puntos { font-size: 0.62rem; }
-  .jugador .ficha { width: 20px; height: 20px; }
+  .jugador .retrato { --retrato: 38px; --aro: 2px; }
+  .jugador.propio .retrato { --retrato: 44px; }
+  .jugador .cuenta-asiento { top: -6px; font-size: 0.54rem; padding: 0 5px; }
   .mano { gap: 3px; padding-top: 4px; }
 
   /* El ancho no lo fija la mano llena sino la de cinco o seis: con pocas
@@ -1830,7 +2282,9 @@ button.accion.con-poder {
   .jugador { padding: 1px 5px 2px; }
   .jugador .nombre { font-size: 0.68rem; }
   .jugador .puntos { font-size: 0.56rem; }
-  .jugador .ficha { width: 18px; height: 18px; }
+  .jugador .retrato { --retrato: 30px; --aro: 2px; }
+  .jugador.propio .retrato { --retrato: 34px; }
+  .jugador .cuenta-asiento { top: -5px; font-size: 0.5rem; padding: 0 4px; }
   .mano { gap: 2px; padding-top: 2px; }
   .mesa { gap: 1px; border-width: 4px; }
   .centro { gap: 8px; }
@@ -1870,6 +2324,59 @@ button.accion.con-poder {
  * en una fila hasta bien abajo, y el alto táctil de 44 px no se toca.
  *
  * Por debajo de 355 px ni así entran, y ahí sí van dos y dos. */
+/* ============================================================
+   CUANDO NO SOBRA ALTO: TODO VUELVE A UNA LÍNEA
+   ============================================================
+
+   Dos adornos de este rediseño cuestan alto, y en una pantalla baja el alto
+   es lo único que no hay:
+
+     - los puntos en dos renglones (Ronda arriba, Total abajo);
+     - el dibujo del botón encima de su palabra.
+
+   Sumaban unos cincuenta píxeles en cada punta. A 320x568 eso empujaba la
+   mano 102 píxeles por debajo del paño, encima del cartel y de los botones;
+   con el teléfono acostado, 41. Lo encontraron dos pruebas de
+   `entrenamiento-ux.spec.js` que ya estaban escritas justamente para esto.
+
+   Acá los dos vuelven a una sola línea. No se pierde información —siguen
+   los dos números y sigue el dibujo con su palabra— se pierde el respiro,
+   que es lo que sobra en una pantalla grande y no existe en una chica.
+
+   La condición es «angosto O bajo», con coma. Los dos casos son el mismo
+   problema por caminos distintos: el teléfono de pie es angosto, y el
+   teléfono acostado —740 de ancho, 360 de alto— no es angosto en absoluto
+   pero tiene todavía menos alto. Una regla atada sólo al ancho deja el
+   segundo sin arreglar, que es exactamente el error que ya se cometió una
+   vez en este archivo y está contado en la prueba. */
+@media (max-width: 560px), (max-height: 620px) {
+  .jugador .puntos {
+    flex-direction: row;
+    gap: 9px;
+  }
+
+  button.accion {
+    flex-direction: row;
+    gap: 7px;
+    padding: 9px 13px;
+  }
+
+  .icono-accion {
+    width: 17px;
+    height: 17px;
+  }
+}
+
+/* Más abajo todavía: el dibujo se queda solo con lo que cabe. */
+@media (max-height: 480px) {
+  .jugador .retrato { --retrato: 30px; --aro: 2px; }
+  .jugador.propio .retrato { --retrato: 34px; }
+  .jugador .puntos { gap: 7px; font-size: 0.58rem; }
+  .jugador .puntos b { font-size: 0.72rem; }
+  button.accion { padding: 7px 11px; }
+  .icono-accion { width: 15px; height: 15px; }
+}
+
 @media (max-width: 420px) {
   .acciones { padding: 8px 6px; gap: 5px; }
   button.accion { padding: 11px 7px; font-size: 0.66rem; letter-spacing: 0.4px; }
@@ -1959,22 +2466,30 @@ button.accion.con-poder {
 .botonera-pendiente a { text-decoration: none; }
 
 
-/* Lugares libres cuando la mesa es de dos o tres jugadores. */
-.jugador.vacante {
-  opacity: 0.35;
-  border-style: dashed;
-  border-color: rgba(255, 255, 255, 0.14);
-  box-shadow: none;
+/* Lugares libres cuando la mesa es de dos o tres jugadores.
+
+   El filo va gris y no dorado. El `border-style: dashed` de antes ya no
+   podía funcionar: el marco del asiento dejó de ser un `border` y pasó a ser
+   una capa de fondo recortada, y un estilo de borde sobre un borde de ancho
+   cero no dibuja nada. Un filo apagado al 35% dice lo mismo que decía la
+   línea de puntos —acá no hay nadie— sin fingir un borde que no existe. */
+.jugador.vacante { opacity: 0.35; }
+
+.jugador.vacante::before {
+  background: rgba(255, 255, 255, 0.16);
+  filter: none;
 }
 
 .jugador.vacante .nombre { color: var(--texto-tenue); }
 .jugador.vacante .nombre::before { display: none; }
 
+/* Y el hueco del retrato es redondo, como el retrato que reemplaza. Era
+   rectangular porque en su momento reemplazaba a la miniatura de un dorso. */
 .ficha-vacante {
-  width: 26px;
-  height: 39px;
+  width: 42px;
+  height: 42px;
   flex-shrink: 0;
-  border-radius: 4px;
+  border-radius: 50%;
   border: 2px dashed rgba(255, 255, 255, 0.2);
 }
 

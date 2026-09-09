@@ -43,6 +43,8 @@ import {
   dorsoDe,
   usarDorsoPropio,
 } from "./modulos/cartas.js";
+import { retratoDe, usarRetratoPropio, RETRATO_INICIAL } from "./modulos/retratos.js";
+import { esRutaDelSitio } from "./reglas/catalogo.js";
 import { LIMITE_ELIMINACION, puntosMano } from "./reglas/puntaje.js";
 import * as IA from "./reglas/ia.js";
 import { MODOS, costoDeAbandonar } from "./reglas/salas.js";
@@ -53,7 +55,7 @@ import { abandonarPartida, ErrorDeServidor } from "./servidor.js";
 import { sonidos, alternarSilencio } from "./sonidos.js";
 import { lanzarConfeti } from "./confeti.js";
 import { exigirSesionEnMesa } from "./guardia-sesion.js";
-// Espacio de nombres, y NO `import { dorsoEquipado }`. Las cuarenta pruebas de
+// Espacio de nombres, y NO `import { equipadoEnMesa }`. Las cuarenta pruebas de
 // la mesa sustituyen este módulo por uno que sólo exporta el guardia, y un
 // import con nombre que el módulo no provee no es `undefined`: es un error de
 // enlace de ESM que impide cargar la mesa entera. Con el espacio de nombres,
@@ -77,19 +79,20 @@ import * as Guardia from "./guardia-sesion.js";
 const miSesion = await exigirSesionEnMesa();
 
 /**
- * El dorso comprado, pedido sin esperarlo.
+ * El dorso y el retrato comprados, pedidos sin esperarlos.
  *
- * Son dos lecturas de Firestore —el perfil y el artículo del catálogo— y no
+ * Son tres lecturas de Firestore —el perfil, y el artículo de cada uno— y no
  * hay una sola razón para que el jugador las espere mirando una pantalla en
- * blanco: un dorso es decoración. Se pide, la mesa arranca, y cuando llega se
- * aplica y se redibuja.
+ * blanco: las dos cosas son decoración. Se piden, la mesa arranca, y cuando
+ * llegan se aplican y se redibuja.
  *
- * `Guardia.dorsoEquipado` puede no existir: las pruebas de la mesa sustituyen este
- * módulo por uno de dos funciones. Ahí `?.()` devuelve `undefined`, el `await`
- * lo resuelve y la mesa se dibuja con los dorsos de siempre, que es justo lo
- * que esas pruebas esperan ver.
+ * `Guardia.equipadoEnMesa` puede no existir: las pruebas de la mesa sustituyen
+ * este módulo por uno de una sola función. Ahí `?.()` devuelve `undefined`, el
+ * `await` lo resuelve y la mesa se dibuja con los dorsos y las caras de
+ * siempre, que es justo lo que esas pruebas esperan ver.
  */
 let miDorso = null;
+let miRetrato = null;
 
 /**
  * Le dice a la capa de dibujo qué asiento lleva el dorso comprado.
@@ -101,14 +104,20 @@ let miDorso = null;
  */
 function aplicarDorsoPropio() {
   if (miDorso) usarDorsoPropio({ asiento: YO, ruta: miDorso });
+  // El retrato se fija SIEMPRE, tenga o no un avatar comprado: retratoDe
+  // necesita saber cuál es el asiento propio para no darle a un rival la
+  // misma cara que lleva puesta el jugador local.
+  usarRetratoPropio({ asiento: YO, ruta: miRetrato ?? RETRATO_INICIAL });
 }
 
 (async () => {
-  miDorso = (await Guardia.dorsoEquipado?.(miSesion?.uid)) ?? null;
-  if (!miDorso) return;
+  const equipo = (await Guardia.equipadoEnMesa?.(miSesion?.uid)) ?? null;
+  miDorso = equipo?.dorso ?? null;
+  miRetrato = equipo?.retrato ?? null;
+  if (!miDorso && !miRetrato) return;
   aplicarDorsoPropio();
-  // Si la mesa ya se dibujó, se repinta para que el dorso aparezca sin que el
-  // jugador tenga que esperar a la próxima jugada.
+  // Si la mesa ya se dibujó, se repinta para que lo comprado aparezca sin que
+  // el jugador tenga que esperar a la próxima jugada.
   if (estado) dibujar();
 })();
 
@@ -138,6 +147,17 @@ const dom = {
   anuncio: $("anuncio"),
   btnLevantar: $("btnLevantar"),
   btnTirar: $("btnTirar"),
+
+  /**
+   * El renglón de texto de Tirar, y no el botón entero.
+   *
+   * El botón cambia de palabra cuando la carta levantada trae poder, y eso
+   * se escribía con `btnTirar.textContent = ...`, que reemplaza TODO lo que
+   * hay adentro. Desde que el botón lleva un dibujo, el primer redibujado
+   * de la mesa se lo llevaba puesto: quedaba el único de los cuatro sin
+   * ícono, y sin ningún error de por medio.
+   */
+  btnTirarTexto: document.querySelector("#btnTirar span"),
   btnCortar: $("btnCortar"),
   btnPasar: $("btnPasar"),
   marcador: $("marcador"),
@@ -148,6 +168,8 @@ const dom = {
   reloj: $("relojTurno"),
   relojNumero: $("relojNumero"),
   relojRelleno: $("relojRelleno"),
+  rondaLateral: $("rondaLateral"),
+  corto: $("quienCorto"),
   confeti: $("confeti"),
   btnSonido: $("btnSonido"),
   btnAbandonar: $("btnAbandonar"),
@@ -241,6 +263,19 @@ const jugadoresConfig = [
  * los jugadores lo fijó él al repartir, y este navegador no elige su lugar.
  */
 let YO = 0;
+
+// El asiento propio se fija ya mismo, sin esperar a Firestore.
+//
+// Lo comprado puede tardar o no llegar nunca; cuál es la silla del jugador
+// local se sabe desde el principio, y `retratoDe` lo necesita para no darle a
+// un rival la misma cara. Sin esta llamada, una mesa sin nada comprado —que
+// es la de la enorme mayoría— repartía la cara de la casa en el asiento
+// propio.
+//
+// Y va DESPUÉS de `YO`, no junto a la lectura de Firestore que está más
+// arriba: allá `YO` todavía está en su zona muerta y leerla es un
+// ReferenceError que impide cargar la mesa entera.
+aplicarDorsoPropio();
 
 /**
  * Cómo corre esta mesa.
@@ -459,6 +494,28 @@ const revelaciones = new Map();
  */
 const FASES_CON_TURNO = new Set(["turno", "levantada", "postLevantada", "poder"]);
 
+/**
+ * La cara de un asiento.
+ *
+ * En una partida por Leyendas el retrato VIAJA EN LA VISTA: es el avatar que
+ * cada quien tenía puesto al sentarse, fijado por el servidor al repartir.
+ * En entrenamiento no viene ninguno —los rivales son IA y no tienen perfil—
+ * y se usa la cara de la casa que le toca a esa silla.
+ *
+ * El de la vista gana también para uno mismo, aunque `retratoDe` sepa cuál
+ * es el avatar comprado. Si no, alguien que se cambia el avatar a mitad de
+ * la partida se vería distinto de como lo ven los otros tres, y la mesa
+ * dejaría de ser una sola cosa mirada desde cuatro lugares.
+ *
+ * La ruta se vuelve a mirar acá aunque el servidor ya la haya mirado antes
+ * de guardarla. No es desconfianza del servidor: es que este valor termina
+ * dentro de un `src`, y lo que entra en un `src` se comprueba donde se
+ * escribe, no donde se originó. Una ruta que no sea de este sitio cae a la
+ * cara de la casa en vez de pedirle una imagen a un dominio ajeno.
+ */
+const caraDe = (jugador, i) =>
+  esRutaDelSitio(jugador?.retrato) ? jugador.retrato : retratoDe(i);
+
 function dibujarJugador(jugador, i) {
   const enTurno =
     FASES_CON_TURNO.has(estado.fase) &&
@@ -489,15 +546,34 @@ function dibujarJugador(jugador, i) {
     ? `<span class="insignia">${IA.DIFICULTADES[jugador.dificultad]?.etiqueta ?? "IA"}</span>`
     : "";
 
+  /**
+   * "Ronda" es lo que se anotó en la ronda ANTERIOR, no un marcador en vivo.
+   *
+   * No es una limitación que convenga arreglar: es el juego. Lo que uno
+   * sumaría si la ronda terminara ahora es la cuenta de las cartas que tiene
+   * en la mano, y esas cartas están tapadas —para los rivales y también para
+   * uno mismo, que es de lo que se trata—. Un número que dijera Ronda 32
+   * mientras se juega estaría revelando las cuatro cartas de golpe.
+   *
+   * Por eso el motor pone puntosRonda recién al resolver el corte, y por eso
+   * ese campo sí viaja a todos en la vista: cuando existe, ya es público.
+   * Arranca en cero en cada reparto.
+   */
+
   return `
     <div class="jugador ${claseAsiento(i)} ${enTurno ? "en-turno" : ""} ${propio ? "propio" : ""} ${jugador.eliminado ? "eliminado" : ""}"
          data-jugador="${i}">
       <div class="cabecera-jugador">
-        <img class="ficha ${claseAsiento(i)}" src="${dorsoDe(i)}"
-             alt="Dorso de ${escapar(jugador.nombre)}" />
+        <span class="retrato ${claseAsiento(i)}" data-asiento="${i}">
+          <span class="cara"><img src="${escapar(caraDe(jugador, i))}" alt="" /></span>
+          <b class="cuenta-asiento" aria-hidden="true"></b>
+        </span>
         <div class="datos">
           <div class="nombre">${escapar(jugador.nombre)} ${insignia}</div>
-          <div class="puntos"><b>${jugador.puntos}</b> pts · ${jugador.mano.filter(Boolean).length} cartas</div>
+          <div class="puntos">
+            <span class="parcial">Ronda <b>${jugador.puntosRonda ?? 0}</b></span>
+            <span class="acumulado">Total <b>${jugador.puntos}</b></span>
+          </div>
         </div>
       </div>
       <div class="mano">${manoHTML}</div>
@@ -506,14 +582,32 @@ function dibujarJugador(jugador, i) {
 
 /** Puntos de la ronda y nada más: es un dato de consulta al costado del paño. */
 function dibujarMarcador() {
+  if (dom.rondaLateral) dom.rondaLateral.textContent = estado.ronda || "-";
+
   dom.marcador.innerHTML = estado.jugadores
     .map(
-      (j) => `
+      (j, i) => `
         <div class="marcador-fila ${j.eliminado ? "fuera" : ""}">
-          <span>${escapar(j.nombre)}</span><b>${j.puntos}</b>
+          <img class="retrato-mini ${claseAsiento(i)}" src="${escapar(caraDe(j, i))}" alt="" />
+          <span>${escapar(j.nombre)}</span>
+          ${i === estado.indiceCortador ? '<i class="tijera" title="Cortó la ronda">✂</i>' : ""}
+          <b>${j.puntos}</b>
         </div>`,
     )
     .join("");
+
+  // Quién cortó, escrito con todas las letras debajo de la tabla.
+  //
+  // La tijera de la fila lo dice, pero sólo si uno sabe qué significa la
+  // tijera. Este pie es la primera vez que alguien lo aprende, y desaparece
+  // mientras nadie cortó en vez de quedarse ocupando el lugar en blanco.
+  if (dom.corto) {
+    const quien = estado.jugadores[estado.indiceCortador]?.nombre;
+    dom.corto.hidden = !quien;
+    dom.corto.innerHTML = quien
+      ? `<i aria-hidden="true">✂</i> Cortó <b>${escapar(quien)}</b>`
+      : "";
+  }
 }
 
 function dibujarRegistro() {
@@ -536,10 +630,33 @@ function dibujar() {
   // docena de clases que después hay que acordarse de limpiar.
   if (dom.anuncio) dom.anuncio.dataset.fase = estado.fase ?? "";
 
+  /**
+   * Uno siempre se sienta abajo.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * POR QUÉ LOS ASIENTOS SE ROTAN
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * `asientosParaMesa` devuelve los lugares en orden de juego empezando por
+   * abajo, y esto los asignaba por índice de jugador. En entrenamiento
+   * funcionaba de casualidad: ahí uno es siempre el jugador 0, así que el 0
+   * caía abajo.
+   *
+   * En una partida por Leyendas el asiento lo reparte el servidor, y al
+   * tercero en entrar le tocaba `arriba`: jugaba la partida entera mirando
+   * sus propias cartas del otro lado de la mesa, con las de un rival
+   * adelante. Y como su mano se dibujaba en el asiento chico, sus cartas
+   * —las únicas que toca contra reloj— eran las más chicas de la pantalla.
+   *
+   * Rotando por `YO`, cada uno se ve abajo y ve a los demás en el mismo
+   * orden de juego que tienen sentados. En entrenamiento `YO` es 0 y la
+   * cuenta da exactamente lo de antes.
+   */
   const orden = asientosParaMesa(estado.jugadores.length);
+  const lugares = orden.length;
   Object.values(dom.asientos).forEach((el) => (el.innerHTML = ""));
   estado.jugadores.forEach((jugador, i) => {
-    const asiento = orden[i] ?? "arriba";
+    const asiento = orden[(i - YO + lugares) % lugares] ?? "arriba";
     dom.asientos[asiento].innerHTML += dibujarJugador(jugador, i);
   });
 
@@ -563,20 +680,40 @@ function dibujar() {
    * estado ni las reglas: cuando abre la ventana de descarte —que es cuando la
    * muestra importa— ya está dada vuelta para todos.
    *
-   * Sólo en entrenamiento. En red el ritmo lo marca el servidor y la vista
-   * llega hecha; retenerla acá desincronizaría lo que se ve de lo que vale.
+   * EN LOS DOS MODOS. Estaba puesto sólo en entrenamiento, con el argumento
+   * de que en red el ritmo lo marca el servidor y retener la muestra acá
+   * desincronizaría lo que se ve de lo que vale. No se sostiene: la fase
+   * sale de la vista que manda el servidor, igual que todo lo demás que se
+   * dibuja, y esto no toca el estado —lo dice el párrafo de arriba—.
+   *
+   * Lo que sí hacía era darle al que juega por Leyendas dos segundos de
+   * ventaja sobre el que entrena: veía con qué carta iba a tener que
+   * comparar mientras todavía estaba memorizando la suya. Dos modos que
+   * comparten motor no pueden repartir información distinta.
    */
   const muestra = estado.descarte[0];
-  const muestraTapada = !enRed() && estado.fase === "mirar";
+  const muestraTapada = estado.fase === "mirar";
   dom.muestraCarta.innerHTML = muestra
     ? dibujarCarta(muestra, { visible: !muestraTapada })
     : `<div class="hueco vacio"></div>`;
   dom.descarteContador.textContent = `${estado.descarte.length} en la pila`;
 
   const puedeLevantar = estado.fase === "turno" && estado.indiceTurno === YO;
+  // El mazo se dibuja como una carta OCULTA, no como una carta vacía.
+  //
+  // Iba con `{ imagen: "", numero: "", palo: "" }`, y eso hace que
+  // `dibujarCarta` pinte las dos caras: el dorso, y una cara con
+  // `<img src="">`. Un `src` vacío no es una imagen que falta —el navegador
+  // lo resuelve contra la URL de la página y se descarga `mesa.html` como si
+  // fuera un PNG, en cada redibujado— y encima queda un nodo de imagen rota
+  // detrás del dorso, donde no se ve.
+  //
+  // `oculta` es exactamente esto y ya existía: la usan las cartas de los
+  // rivales en red, cuya cara no viaja. El nombre accesible no cambia
+  // —"Carta, boca abajo" en los dos casos— y lo que se ve, tampoco.
   dom.mazoCarta.innerHTML = estado.mazo.length
     ? dibujarCarta(
-        { imagen: "", numero: "", palo: "" },
+        { oculta: true },
         {
           visible: false,
           asiento: 0,
@@ -786,7 +923,11 @@ function actualizarBotones() {
     miTurno &&
     Boolean(PODERES[estado.levantada?.numero]);
   dom.btnTirar.classList.toggle("con-poder", poderDisponible);
-  dom.btnTirar.textContent = poderDisponible ? "🔮 Poder" : "Tirar";
+  // Sólo la palabra: el dibujo se queda. Y sin el 🔮 que llevaba antes,
+  // que era el ícono de este botón cuando no tenía uno. Dos símbolos para
+  // lo mismo, uno encima del otro, es ruido; que hay poder ya lo dicen el
+  // ámbar y el latido de `.con-poder`.
+  if (dom.btnTirarTexto) dom.btnTirarTexto.textContent = poderDisponible ? "Poder" : "Tirar";
   dom.btnCortar.disabled = !(estado.fase === "postLevantada" && miTurno);
   dom.btnPasar.disabled = !(estado.fase === "postLevantada" && miTurno);
 }
@@ -881,11 +1022,35 @@ function relojDeLaFase() {
     return { ms: MS_TURNO, alVencer: resolverPorTiempo };
   }
 
-  // Decidir el corte. Sólo en entrenamiento y sólo si el turno es mío: en una
-  // partida por Leyendas el plazo lo lleva el servidor, y un reloj de acá
-  // compitiendo con el suyo pasaría turnos que el servidor no dio por vencidos.
-  if (!enRed() && estado.fase === "postLevantada" && estado.indiceTurno === YO) {
-    return { ms: MS_PASO_AUTOMATICO, alVencer: pasarPorTiempo };
+  // Decidir el corte, y sólo si el turno es mío.
+  //
+  // ─────────────────────────────────────────────────────────────────────
+  // EN RED SE MUESTRA EL RELOJ DEL SERVIDOR, NO UNO PROPIO
+  // ─────────────────────────────────────────────────────────────────────
+  //
+  // Acá no había reloj en red, y el argumento era bueno: un reloj de este
+  // navegador compitiendo con el del servidor pasaría turnos que el
+  // servidor no dio por vencidos.
+  //
+  // Pero la conclusión estaba de más. El servidor SÍ cuenta esos treinta
+  // segundos —`plazoDe`, caso `postLevantada`, acción `pasarPorTiempo`— y
+  // pasa el turno cuando vencen. Lo que faltaba no era el reloj: era
+  // mostrarlo. El que jugaba por Leyendas se quedaba pensando y lo pasaban
+  // sin un solo aviso, mientras el que entrenaba veía la barra bajar.
+  //
+  // Así que en red se dibuja el vencimiento que manda el servidor, medido
+  // contra SU reloj —`ahoraDelServidor`, que ya está sincronizado para la
+  // ventana de reflejos— y al llegar a cero no se hace nada: quien pasa el
+  // turno es el servidor. La autoridad del tiempo no se movió de lugar.
+  if (estado.fase === "postLevantada" && estado.indiceTurno === YO) {
+    if (!enRed()) return { ms: MS_PASO_AUTOMATICO, alVencer: pasarPorTiempo };
+
+    const plazo = miVista?.plazo?.fase === "postLevantada" ? miVista.plazo : null;
+    if (!plazo) return null;
+
+    const restante = plazo.hasta - Red.ahoraDelServidor();
+    if (restante <= 0) return null;
+    return { ms: restante, alVencer: () => {} };
   }
 
   return null;

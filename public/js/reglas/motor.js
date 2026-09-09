@@ -83,9 +83,30 @@ const siguienteActivo = (jugadores, desde) => {
   return desde;
 };
 
-export const crearJugador = ({ id, nombre, esIA = false, dificultad = "medio" }) => ({
+/**
+ * Un jugador nuevo.
+ *
+ * `retrato` es la ruta de la imagen que lo representa en la mesa, y viaja
+ * acá al lado de `nombre` por la misma razón que el nombre: es identidad, y
+ * la identidad se fija al repartir. En una partida por Leyendas la elige el
+ * servidor cuando el jugador entra a la sala; en entrenamiento no se pasa y
+ * queda en `null`, que es lo que hace que la mesa use las caras de la casa.
+ *
+ * Es lo único de este objeto que no participa de ninguna regla. Se acepta
+ * porque la alternativa —llevar los retratos por un canal aparte, indexado
+ * igual que los jugadores— son dos listas paralelas que tarde o temprano se
+ * desfasan; y porque `nombre` ya sentó el precedente.
+ */
+export const crearJugador = ({
   id,
   nombre,
+  esIA = false,
+  dificultad = "medio",
+  retrato = null,
+}) => ({
+  id,
+  nombre,
+  retrato,
   esIA,
   dificultad,
   mano: [],
@@ -442,11 +463,36 @@ export function intentarDescarteRival(
  * lleva `volverA: "postLevantada"`, porque el que tiró todavía tiene que
  * decidir si corta.
  */
-export const cerrarVentanaDescarte = (estado) => ({
-  ...estado,
-  fase: estado.ventanaDescarte?.volverA ?? "turno",
-  ventanaDescarte: null,
-});
+/**
+ * Cierra la ventana de reflejos y devuelve la mesa a donde corresponda.
+ *
+ * ...salvo que alguien se haya quedado sin cartas, en cuyo caso la ronda no
+ * vuelve a ningún lado: se corta.
+ *
+ * Va acá y no en las dos funciones que vacían manos porque éste es el único
+ * punto por el que pasan las dos, y porque es el único momento en que la
+ * pregunta tiene una respuesta estable. Ver `quienSeQuedoSinCartas`.
+ *
+ * Que el corte automático viva DENTRO de esta función y no al lado importa:
+ * la llaman la mesa local y el servidor, cada uno por su cuenta. Puesto
+ * afuera habría que acordarse en los dos lugares, y el día que uno se
+ * olvide, el entrenamiento y las partidas por Leyendas terminarían las
+ * rondas con reglas distintas.
+ */
+export const cerrarVentanaDescarte = (estado) => {
+  const cerrada = {
+    ...estado,
+    fase: estado.ventanaDescarte?.volverA ?? "turno",
+    ventanaDescarte: null,
+  };
+
+  // Se pregunta sobre el estado ANTERIOR: `cerrada` ya no tiene la ventana, y
+  // el desempate entre dos manos vacías sale justamente de sus intentos.
+  const sinCartas = quienSeQuedoSinCartas(estado);
+  if (sinCartas == null) return cerrada;
+
+  return resolverCorteDesde(cerrada, sinCartas, { automatico: true });
+};
 
 // ----------------------------------------------------------------- turnos
 
@@ -960,7 +1006,24 @@ export const puedeCortar = (estado) => estado.fase === "postLevantada";
 
 export function cortar(estado) {
   if (!puedeCortar(estado)) return estado;
-  const indiceCortador = estado.indiceTurno;
+  return resolverCorteDesde(estado, estado.indiceTurno);
+}
+
+/**
+ * El corte, resuelto para un cortador cualquiera.
+ *
+ * Existe separado de `cortar` porque ahora hay DOS maneras de cerrar una
+ * ronda y las dos tienen que hacer exactamente lo mismo con los puntos, las
+ * eliminaciones y el fin de partida:
+ *
+ *   - cortar a propósito, en el turno propio y después de levantar;
+ *   - quedarse sin cartas, que corta solo.
+ *
+ * Si el corte automático hubiera copiado este cuerpo, la primera diferencia
+ * entre las dos copias sería una ronda que se puntúa distinta según cómo
+ * terminó, y eso no se ve hasta que alguien suma mal.
+ */
+function resolverCorteDesde(estado, indiceCortador, { automatico = false } = {}) {
   const cortador = estado.jugadores[indiceCortador];
 
   // Se mide ANTES de resolver: al resolver las manos quedan reveladas igual,
@@ -1007,10 +1070,54 @@ export function cortar(estado) {
       ganador: fin.ganador,
       desempate: Boolean(fin.desempate),
     },
-    corteFallido
-      ? `${estado.jugadores[indiceCortador].nombre} cortó mal: +10 puntos`
-      : `${estado.jugadores[indiceCortador].nombre} cortó correctamente`,
+    automatico
+      ? `${estado.jugadores[indiceCortador].nombre} se quedó sin cartas: corte automático`
+      : corteFallido
+        ? `${estado.jugadores[indiceCortador].nombre} cortó mal: +10 puntos`
+        : `${estado.jugadores[indiceCortador].nombre} cortó correctamente`,
   );
+}
+
+/**
+ * Quién se quedó sin cartas, si alguien.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ SE MIRA AL CERRAR LA VENTANA Y NO AL SACAR LA CARTA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque una mano sólo se puede vaciar durante la ventana de reflejos, y en
+ * esa ventana los cuatro jugadores actúan A LA VEZ. Cortando en el instante
+ * en que una mano queda vacía, la ronda terminaría con los reflejos de los
+ * demás todavía en camino — y quién llega antes lo decidiría la conexión,
+ * que es exactamente lo que `red.js` existe para impedir.
+ *
+ * Al cerrarse la ventana ya están todos los intentos resueltos y ordenados
+ * por tiempo efectivo. Recién ahí se sabe quién quedó sin cartas de verdad.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * SI SE VACIARON DOS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Corta el que se vació antes, y ese orden ya está resuelto: es el de
+ * `intentos`, que la ventana dejó ordenado por tiempo efectivo. Elegir por
+ * índice de jugador sería darle la ronda al que se sentó primero.
+ *
+ * A los eliminados no se los mira: no tienen cartas porque no están
+ * jugando, y un eliminado no puede cortar nada.
+ */
+export function quienSeQuedoSinCartas(estado) {
+  const vacios = estado.jugadores
+    .map((j, i) => (!j.eliminado && cartasVivas(j.mano).length === 0 ? i : -1))
+    .filter((i) => i >= 0);
+
+  if (vacios.length <= 1) return vacios[0] ?? null;
+
+  // El que perdió una carta en cada intento: el que descartó, o el que
+  // entregó una al acertarle a un rival.
+  const enOrden = (estado.ventanaDescarte?.intentos ?? []).map((x) =>
+    x.actor != null ? x.actor : x.indiceJugador,
+  );
+  return enOrden.find((i) => vacios.includes(i)) ?? vacios[0];
 }
 
 /**
