@@ -443,15 +443,32 @@ body::before {
    paño entero.
 
    Lo que hace que el tope no corte nada es el `flex-shrink` de las cartas,
-   más abajo: al no entrar, encogen. */
-.asiento-izq,
-.asiento-der {
-  max-width: 32%;
-}
+   más abajo: al no entrar, encogen.
 
-.asiento-arriba,
-.asiento-abajo {
-  max-width: 92%;
+   ─────────────────────────────────────────────────────────────────────────
+   Y POR QUÉ VA DENTRO DE UNA CONSULTA DE MEDIOS
+   ─────────────────────────────────────────────────────────────────────────
+
+   Porque este tope describe el óvalo de escritorio, donde los laterales son
+   absolutos y se reparten el paño a los costados de las pilas. De 950 para
+   abajo la mesa deja de ser un óvalo y pasa a ser una grilla, y ahí el 32%
+   se resuelve contra la CELDA y no contra el paño: a 768 de ancho dejaba a
+   cada rival en 76 píxeles, y sus cuatro cartas encogían hasta 16.
+
+   A 360 el resultado era peor y es lo que se veía: cartas de diez píxeles y
+   los tres nombres escritos unos encima de otros. El `flex-shrink` no
+   estaba fallando —hacía exactamente lo que se le pidió— sino obedeciendo a
+   un tope que no correspondía a ese diseño. */
+@media (min-width: 951px) {
+  .asiento-izq,
+  .asiento-der {
+    max-width: 32%;
+  }
+
+  .asiento-arriba,
+  .asiento-abajo {
+    max-width: 92%;
+  }
 }
 
 .asiento-izq {
@@ -2267,10 +2284,17 @@ button.accion.con-poder {
     text-align: left;
   }
 
+  /* Cuarenta por ciento, no cuarenta y seis.
+
+     La cuenta a 360 de ancho: adentro del paño quedan 316 píxeles. La cara y
+     el nombre se llevan 126 y el hueco 8, así que a las cuatro cartas les
+     quedan 182 — y con los huecos de 4, cuarenta y dos por carta, que es
+     justo lo que pide `--carta-alto` a ese ancho. Con 46% la cuenta daba
+     diecinueve píxeles de menos y la mano se salía. */
   .asiento:not(.asiento-abajo) .cabecera-jugador {
     flex: 0 1 auto;
     min-width: 0;
-    max-width: 46%;
+    max-width: 40%;
     justify-content: flex-start;
     margin-bottom: 0;
   }
@@ -2279,15 +2303,57 @@ button.accion.con-poder {
      empujaba las cartas por encima del nombre. */
   .asiento:not(.asiento-abajo) .insignia { display: none; }
 
+  /* Del rival se muestra el TOTAL y no la ronda.
+
+     Los dos no entran: en 126 píxeles, «Ronda 0 Total 0» se cortaba y lo que
+     quedaba afuera era justo el número del total. Y de los dos, el que
+     importa mirar de un rival es el acumulado —cuánto le falta para pasarse
+     del límite y quedar eliminado—; lo que anotó en la ronda anterior se ve
+     entero en el marcador del final de ronda.
+
+     En el asiento propio siguen los dos: ahí hay ancho de sobra. */
+  .asiento:not(.asiento-abajo) .puntos .parcial { display: none; }
+
+  /* En el teléfono la mano de un rival BAJA en vez de encoger.
+
+     En escritorio, cuando los castigos suman cartas, la mano encoge: el
+     ancho es lo que sobra y el alto lo que falta. En un teléfono es al
+     revés, y encogiendo se llegaba a cartas de veintidós píxeles, donde ya
+     no se distingue el dorso rojo del azul —que es lo único que distingue de
+     quién es cada mano—.
+
+     Por eso acá se envuelve en dos filas y se ignora la escala: siete cartas
+     son cuatro arriba y tres abajo, todas del mismo tamaño legible. El alto
+     que cuesta sólo se paga cuando alguien recibió un castigo. */
   .asiento:not(.asiento-abajo) .mano {
     flex: 1 1 auto;
     min-width: 0;
     padding-top: 0;
     justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 4px;
+    --escala: 1;
   }
 
+  /* Un piso, para que encoger no llegue nunca a hacerlas desaparecer. Si
+     algo no entra, que se note: una carta de diez píxeles no se ve como un
+     problema, se ve como que el rival no tiene cartas. */
+  .mano > .carta,
+  .mano > .hueco {
+    min-width: 26px;
+  }
+
+  /* La carta del rival, medida contra el renglón en el que vive.
+
+     Con 17.5vw daba 42 píxeles de ancho, y cuatro más sus huecos pedían 192
+     donde hay 182: envolvía a dos filas con la mano LLENA, que es el caso
+     normal. Tres cartas arriba y una abajo, en los cuatro asientos, y la
+     mesa dejaba de entrar en la pantalla.
+
+     Con 15.5vw entran las cuatro con aire de sobra, y las dos filas quedan
+     para lo que se pensaron: la mano de alguien que recibió un castigo. */
   :root {
-    --carta-alto: min(clamp(46px, 9.2dvh, 84px), 17.5vw);
+    --carta-alto: min(clamp(40px, 8.6dvh, 84px), 15.5vw);
     --carta-ancho: calc(var(--carta-alto) * 0.667);
   }
 }
