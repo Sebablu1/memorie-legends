@@ -176,6 +176,11 @@ Los secretos no existen todavía, así que las dos funciones de pago
 (`crearOrdenDeCompra` y `webhookPago`) **no se pueden desplegar**. Por eso los
 despliegues de functions van con lista explícita y las excluyen.
 
+Ojo con una confusión que ya costó una vuelta: las dos **aparecen** en
+`firebase functions:list`. Lo que está desplegado ahí es una compilación
+vieja, de antes de que el código pidiera los secretos; el código de hoy no
+sube. Verlas en la lista no significa que la integración esté andando.
+
 ```bash
 npx firebase-tools functions:secrets:set MP_ACCESS_TOKEN
 ```
