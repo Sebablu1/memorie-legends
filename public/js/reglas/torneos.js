@@ -83,11 +83,14 @@ export const esEditable = (estado) => estado === ESTADOS.BORRADOR;
  *
  * Terminado o cancelado no se toca nada: son historia.
  */
+/** Lo que se puede corregir sin cambiarle el trato a nadie. */
+const ETIQUETAS = ["nombre", "tipo", "descripcion", "comienzaEn"];
+
 const EDITABLES = Object.freeze({
-  [ESTADOS.BORRADOR]: ["nombre", "tipo", "entrada", "maxJugadores"],
-  [ESTADOS.INSCRIPCIONES_ABIERTAS]: ["nombre", "tipo"],
-  [ESTADOS.COMPLETO]: ["nombre", "tipo"],
-  [ESTADOS.EN_CURSO]: ["nombre", "tipo"],
+  [ESTADOS.BORRADOR]: [...ETIQUETAS, "entrada", "maxJugadores"],
+  [ESTADOS.INSCRIPCIONES_ABIERTAS]: ETIQUETAS,
+  [ESTADOS.COMPLETO]: ETIQUETAS,
+  [ESTADOS.EN_CURSO]: ETIQUETAS,
 });
 
 export const camposEditables = (estado) => EDITABLES[estado] ?? [];
@@ -276,6 +279,19 @@ export function puntosDeTorneo(ordenFinal, todos = ordenFinal) {
 const LARGO_MAXIMO_NOMBRE = 80;
 
 /**
+ * La descripción es para contar CÓMO se juega el torneo.
+ *
+ * Hace falta porque el torneo se corre a mano: `iniciar` agrupa los uid en
+ * mesas dentro del documento y no crea salas ni avisa a nadie. Sin un lugar
+ * donde decir «se juega el sábado por Discord», el jugador paga una entrada
+ * sin saber qué compró.
+ *
+ * Trescientos caracteres: un párrafo. Más que eso es un reglamento, y el
+ * reglamento tiene su propia página.
+ */
+const LARGO_MAXIMO_DESCRIPCION = 300;
+
+/**
  * Qué le falta o le sobra a un torneo para poder guardarse.
  *
  * Devuelve una lista de problemas y no lanza, por lo mismo que
@@ -301,6 +317,28 @@ export function problemasDelTorneo(torneo, problemasDeEntrada) {
     if (!Number.isInteger(max) || max < 4) {
       problemas.push("El máximo de jugadores tiene que ser un entero de 4 para arriba.");
     }
+  }
+
+  const descripcion = torneo?.descripcion;
+  if (descripcion != null && String(descripcion).length > LARGO_MAXIMO_DESCRIPCION) {
+    problemas.push(
+      `La descripción no puede pasar de ${LARGO_MAXIMO_DESCRIPCION} caracteres.`,
+    );
+  }
+
+  /**
+   * El comienzo es un instante, en milisegundos.
+   *
+   * `null` es válido y quiere decir «todavía no hay fecha»: se puede crear
+   * el borrador antes de saber cuándo se juega.
+   *
+   * NO se exige que sea futuro. Editarlo es la forma de postergar un
+   * torneo, y también de corregir una fecha mal tipeada de un torneo que ya
+   * arrancó; exigir futuro convertiría las dos cosas en un error.
+   */
+  const comienza = torneo?.comienzaEn;
+  if (comienza != null && (!Number.isFinite(comienza) || comienza <= 0)) {
+    problemas.push("La fecha de comienzo no es válida.");
   }
 
   return problemas;

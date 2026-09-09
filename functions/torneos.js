@@ -125,6 +125,10 @@ export function crearTorneos({
       tipo: datos?.tipo === "semanal" ? "semanal" : "especial",
       entrada: Number(datos?.entrada),
       maxJugadores: Number.isInteger(datos?.maxJugadores) ? datos.maxJugadores : 10000,
+      // Las dos que le dicen al jugador qué está comprando. Se pueden dejar
+      // vacías: un borrador puede existir antes de saber cuándo se juega.
+      descripcion: String(datos?.descripcion ?? "").trim(),
+      comienzaEn: Number.isFinite(datos?.comienzaEn) ? datos.comienzaEn : null,
     };
 
     const problemas = problemasDelTorneo(torneo, problemasDeEntrada);
@@ -195,6 +199,15 @@ export function crearTorneos({
         : (datos.tipo === "semanal" ? "semanal" : "especial"),
       entrada: Number(datos?.entrada ?? torneo.entrada),
       maxJugadores: Number.isInteger(datos?.maxJugadores) ? datos.maxJugadores : torneo.maxJugadores,
+      descripcion:
+        datos?.descripcion === undefined
+          ? (torneo.descripcion ?? "")
+          : String(datos.descripcion).trim(),
+      // `null` explícito borra la fecha; `undefined` la deja como estaba.
+      comienzaEn:
+        datos?.comienzaEn === undefined
+          ? (torneo.comienzaEn ?? null)
+          : (Number.isFinite(datos.comienzaEn) ? datos.comienzaEn : null),
     };
 
     const bloqueados = camposBloqueados(torneo.estado, torneo, propuesto);

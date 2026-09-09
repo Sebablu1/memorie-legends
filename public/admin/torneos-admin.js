@@ -39,7 +39,10 @@ const finalizarTorneo = httpsCallable(funciones, "finalizarTorneoAdmin");
 const cancelarTorneo = httpsCallable(funciones, "cancelarTorneoAdmin");
 const editarTorneo = httpsCallable(funciones, "editarTorneoAdmin");
 const detalleTorneo = httpsCallable(funciones, "detalleTorneoAdmin");
-const listarTorneos = httpsCallable(funciones, "listarTorneos");
+// La del PANEL, que trae todos. La del jugador —`listarTorneos`— devuelve
+// sólo los que tienen inscripciones abiertas, y con ésa el panel no veía
+// sus propios borradores ni los torneos ya cerrados o en curso.
+const listarTorneos = httpsCallable(funciones, "listarTorneosAdmin");
 const leerUmbrales = httpsCallable(funciones, "leerUmbralesAdmin");
 const guardarUmbrales = httpsCallable(funciones, "guardarUmbralesAdmin");
 
@@ -82,8 +85,8 @@ function accionesDe(estado) {
    * con el formulario de creación; una vez publicadas ya hay gente que pagó
    * mirando esos números.
    */
-  const renombrar = camposEditables(estado).includes("nombre")
-    ? [{ accion: "renombrar", texto: "Renombrar" }]
+  const editar = camposEditables(estado).includes("nombre")
+    ? [{ accion: "editar", texto: "Editar" }]
     : [];
 
   if (estado === ESTADOS.BORRADOR) {
@@ -155,11 +158,35 @@ async function refrescar() {
     ultimos = data.torneos ?? [];
     $("listaTorneos").innerHTML = ultimos.length
       ? ultimos.map(dibujarTorneo).join("")
-      : '<p class="nota">No hay torneos con inscripciones abiertas.</p>';
-    decir($("avisoTorneos"), `${ultimos.length} con inscripciones abiertas.`);
+      : '<p class="nota">Todavía no creaste ningún torneo.</p>';
+    decir($("avisoTorneos"), `${ultimos.length} torneo${ultimos.length === 1 ? "" : "s"}.`);
   } catch (error) {
     decir($("avisoTorneos"), error?.message ?? "No se pudieron leer los torneos.", "mal");
   }
+}
+
+/**
+ * Lo que escribe un `datetime-local`, a milisegundos.
+ *
+ * El campo da una hora LOCAL sin zona —`2026-09-20T20:00`— y `new Date` la
+ * interpreta en la zona del navegador, que es justo lo que se quiere: el
+ * administrador escribe la hora de su reloj y eso es lo que se guarda.
+ *
+ * Vacío devuelve `null`, que el servidor entiende como «todavía sin fecha».
+ */
+function enMilisegundos(valor) {
+  if (!valor) return null;
+  const t = new Date(valor).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
+/** Y la vuelta, para poder editar la fecha guardada. */
+function comoCampo(ms) {
+  if (!Number.isFinite(ms) || ms <= 0) return "";
+  const d = new Date(ms);
+  const dos = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}` +
+    `T${dos(d.getHours())}:${dos(d.getMinutes())}`;
 }
 
 async function crear() {
@@ -173,15 +200,65 @@ async function crear() {
       entrada: Number($("torneoEntrada").value),
       maxJugadores: Number($("torneoMaximo").value),
       tipo: $("torneoTipo").value,
+      descripcion: $("torneoDescripcion").value.trim(),
+      comienzaEn: enMilisegundos($("torneoComienza").value),
     });
     decir($("avisoTorneos"), `Creado «${data.nombre}» en borrador. Abrí las inscripciones cuando quieras.`, "bien");
     $("torneoNombre").value = "";
+    $("torneoDescripcion").value = "";
+    $("torneoComienza").value = "";
     await refrescar();
   } catch (error) {
     decir($("avisoTorneos"), error?.message ?? "No se pudo crear.", "mal");
   } finally {
     boton.disabled = false;
   }
+}
+
+/**
+ * Corrige lo que se puede corregir sin cambiarle el trato a nadie.
+ *
+ * Nombre, descripción y fecha. La entrada y el cupo no: son las dos cosas
+ * que el jugador miró antes de pagar, y el servidor las rechaza igual si
+ * llegaran cambiadas.
+ *
+ * Se pide de a un campo con `prompt`, que es el modo del resto de este
+ * panel. Cancelar en cualquiera corta todo: no se guarda a medias.
+ *
+ * Los valores actuales salen de `ultimos`, la última lista traída, en vez
+ * de volver a pedirla: la fila desde la que se tocó el botón se dibujó con
+ * esos mismos datos.
+ */
+async function editarEtiquetas(id) {
+  const t = ultimos.find((x) => x.id === id);
+  if (!t) {
+    decir($("avisoTorneos"), "Ese torneo ya no está en la lista. Refrescá.", "mal");
+    return false;
+  }
+
+  const nombre = prompt("Nombre del torneo:", t.nombre ?? "");
+  if (nombre === null) return false;
+
+  const descripcion = prompt(
+    "De qué va (lo lee el jugador antes de pagar):",
+    t.descripcion ?? "",
+  );
+  if (descripcion === null) return false;
+
+  const cuando = prompt(
+    "Cuándo empieza, con formato 2026-09-20T20:00.\nVacío = sin fecha.",
+    comoCampo(t.comienzaEn),
+  );
+  if (cuando === null) return false;
+
+  const { data } = await editarTorneo({
+    torneoId: id,
+    nombre,
+    descripcion,
+    comienzaEn: enMilisegundos(cuando),
+  });
+  decir($("avisoTorneos"), `«${data.nombre}» actualizado.`, "bien");
+  return true;
 }
 
 /**
@@ -212,11 +289,8 @@ async function ejecutar(accion, id) {
   decir($("avisoTorneos"), "…");
 
   try {
-    if (accion === "renombrar") {
-      const nombre = prompt("Nombre del torneo:");
-      if (nombre === null) return;
-      const { data } = await editarTorneo({ torneoId: id, nombre });
-      decir($("avisoTorneos"), `Ahora se llama «${data.nombre}».`, "bien");
+    if (accion === "editar") {
+      if (!(await editarEtiquetas(id))) return;
     } else if (accion === "abrir") {
       await abrirInscripciones({ torneoId: id });
       decir($("avisoTorneos"), "Inscripciones abiertas: ya se cobra la entrada.", "bien");

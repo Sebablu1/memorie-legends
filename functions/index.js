@@ -1310,6 +1310,32 @@ export const listarTorneos = functions.https.onCall(async (_data, context) => {
 });
 
 /**
+ * TODOS los torneos, para el panel.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ HACÍA FALTA UNA SEGUNDA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * El panel usaba `listarTorneos`, que es la del jugador y devuelve sólo los
+ * que tienen inscripciones abiertas. O sea que un torneo recién creado —que
+ * nace en BORRADOR— no aparecía en la lista, y el botón «Abrir
+ * inscripciones» vive en la fila de la lista.
+ *
+ * El torneo quedaba inalcanzable apenas se creaba, y con él los tres pasos
+ * siguientes: cerrar inscripciones lo saca de la lista otra vez, así que
+ * «Armar mesas y empezar» y «Cargar ganadores y pagar» tampoco se podían
+ * tocar. `accionesDe` tenía ramas para BORRADOR, COMPLETO y EN_CURSO que no
+ * se dibujaban nunca, que es lo que delató el asunto.
+ *
+ * Es la misma función de siempre con otro filtro; lo que cambia es quién
+ * puede llamarla.
+ */
+export const listarTorneosAdmin = functions.https.onCall(async (_data, context) => {
+  await administradores.exigir(context);
+  return { torneos: await torneos.listar({ soloAbiertos: false }) };
+});
+
+/**
  * Se anota y paga la entrada.
  *
  * Techo de plata: mueve Leyendas. Viaja el id del torneo y nada más — la

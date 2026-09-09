@@ -30,6 +30,7 @@
  * después de escribir, que es lo que el Firestore de verdad rechaza.
  */
 
+import { readFileSync } from "node:fs";
 import { crearTorneos } from "../functions/torneos.js";
 import { crearMoverLeyendas } from "../functions/leyendas.js";
 import { MOTIVOS } from "../public/js/reglas/economia.js";
@@ -652,6 +653,150 @@ console.log("\n=== 9. Todo lo que es del panel exige ser administrador ===");
   // Inscribirse NO: es la única que hace el jugador.
   const { error: e } = await capturar(() => torneos.inscribir("j1", "t1"));
   ok(e?.codigo !== "permission-denied", "pero inscribirse no lo exige", e?.codigo);
+}
+
+// =====================================================================
+console.log("\n=== 10. Qué está comprando el que se anota ===");
+// =====================================================================
+
+{
+  /**
+   * La descripción y la fecha existen por una razón concreta.
+   *
+   * `iniciar` agrupa los uid en mesas DENTRO del documento del torneo: no crea
+   * salas, no crea partidas y no notifica a nadie. El aviso al anotarse decía
+   * «te avisamos cuando arranque» y no hay nada que avise.
+   *
+   * O sea que el jugador pagaba una entrada sin saber cuándo tenía que estar
+   * ni qué se iba a jugar. Las dos son la mitad de lo que compra.
+   */
+  const { db, torneos } = montar({ saldos: {} });
+  const CUANDO = Date.UTC(2026, 8, 20, 23, 0);
+
+  const { id } = await torneos.crear(ADMIN, {
+    nombre: "Copa",
+    entrada: 100,
+    descripcion: "Cuatro mesas, se juega por Discord.",
+    comienzaEn: CUANDO,
+  });
+
+  const guardado = db._leer(`torneos/${id}`);
+  ok(guardado.descripcion === "Cuatro mesas, se juega por Discord.", "la descripción se guarda");
+  ok(guardado.comienzaEn === CUANDO, "y la fecha también", guardado.comienzaEn);
+}
+
+{
+  // Se pueden dejar vacías: un torneo puede publicarse antes de saber cuándo
+  // se juega, y forzar una fecha inventada sería peor que no tenerla.
+  const { db, torneos } = montar({ saldos: {} });
+  const { id } = await torneos.crear(ADMIN, { nombre: "Copa", entrada: 100 });
+
+  const guardado = db._leer(`torneos/${id}`);
+  ok(guardado.descripcion === "", "sin descripción, queda vacía", guardado.descripcion);
+  ok(guardado.comienzaEn === null, "y sin fecha, en null", guardado.comienzaEn);
+}
+
+{
+  // Lo que no puede entrar.
+  const { torneos } = montar({ saldos: {} });
+
+  const larga = await capturar(() =>
+    torneos.crear(ADMIN, { nombre: "Copa", entrada: 100, descripcion: "x".repeat(301) }));
+  ok(larga.error?.codigo === "invalid-argument", "una descripción de 301 no entra", larga.error?.codigo);
+
+  const fea = await capturar(() =>
+    torneos.crear(ADMIN, { nombre: "Copa", entrada: 100, comienzaEn: -5 }));
+  ok(fea.error?.codigo === "invalid-argument", "ni una fecha negativa", fea.error?.codigo);
+}
+
+{
+  /**
+   * Postergar es una operación normal, y por eso la fecha se edita DESPUÉS de
+   * publicar. La alternativa —cancelar, devolver a todos y recrear— es peor
+   * para todo el mundo.
+   *
+   * Es la decisión más discutible de este grupo: cambia algo que el jugador
+   * miró antes de pagar, a diferencia del nombre. Queda acá escrita.
+   */
+  const { db, torneos, id } = await conInscriptos(4);
+  const NUEVA = Date.UTC(2026, 9, 1, 23, 0);
+  const antes = db._leer(`torneos/${id}`);
+
+  const r = await torneos.editar(ADMIN, id, {
+    descripcion: "Se pasó para octubre.",
+    comienzaEn: NUEVA,
+  });
+
+  ok(r.comienzaEn === NUEVA, "con inscripciones abiertas, la fecha se puede mover", r.comienzaEn);
+  ok(db._leer(`torneos/${id}`).descripcion === "Se pasó para octubre.", "y la descripción también");
+  ok(db._leer(`torneos/${id}`).entrada === antes.entrada, "sin tocar la entrada");
+  ok(db._leer(`torneos/${id}`).pozo === antes.pozo, "ni el pozo");
+}
+
+{
+  // Borrar la fecha es mandarla en null explícito. No mandarla no la borra:
+  // el panel manda el formulario entero en cada guardado.
+  const { db, torneos } = montar({ saldos: {} });
+  const { id } = await torneos.crear(ADMIN, {
+    nombre: "Copa", entrada: 100, comienzaEn: Date.UTC(2026, 8, 20, 23, 0),
+  });
+
+  await torneos.editar(ADMIN, id, { nombre: "Copa II" });
+  ok(db._leer(`torneos/${id}`).comienzaEn !== null, "editar sólo el nombre no borra la fecha");
+
+  await torneos.editar(ADMIN, id, { comienzaEn: null });
+  ok(db._leer(`torneos/${id}`).comienzaEn === null, "y mandarla en null sí la borra");
+}
+
+// =====================================================================
+console.log("\n=== 11. El panel tiene que VER los torneos que administra ===");
+// =====================================================================
+
+{
+  /**
+   * ESTO ERA UN FALLO, y bloqueaba el flujo entero.
+   *
+   * El panel listaba con `listarTorneos`, que es la del jugador y devuelve
+   * sólo los que tienen inscripciones abiertas. Un torneo nace en BORRADOR, y
+   * el botón «Abrir inscripciones» vive en la fila de la lista: o sea que el
+   * torneo quedaba inalcanzable apenas se creaba.
+   *
+   * Y no era sólo el primer paso. Cerrar inscripciones lo saca de la lista
+   * otra vez, así que «Armar mesas y empezar» y «Cargar ganadores y pagar»
+   * tampoco se podían tocar nunca. `accionesDe` tenía ramas escritas para
+   * BORRADOR, COMPLETO y EN_CURSO que no se dibujaban jamás.
+   */
+  const { torneos } = montar({ saldos: {} });
+  await torneos.crear(ADMIN, { nombre: "Borrador", entrada: 100 });
+  const { id: abierto } = await torneos.crear(ADMIN, { nombre: "Abierto", entrada: 100 });
+  await torneos.abrirInscripciones(ADMIN, abierto);
+
+  const delJugador = await torneos.listar({ soloAbiertos: true });
+  ok(delJugador.length === 1, "el jugador ve sólo el abierto", delJugador.map((t) => t.nombre));
+
+  const delPanel = await torneos.listar({ soloAbiertos: false });
+  ok(delPanel.length === 2, "y el panel ve los dos", delPanel.map((t) => t.nombre));
+  ok(
+    delPanel.some((t) => t.estado === ESTADOS.BORRADOR),
+    "incluido el borrador, que es el que hay que poder abrir",
+  );
+}
+
+{
+  // Y que el panel llame a la del panel. Es una auditoría de texto porque las
+  // callables no se pueden importar sin levantar medio Firebase.
+  const panel = readFileSync(new URL("../public/admin/torneos-admin.js", import.meta.url), "utf8");
+  ok(
+    /httpsCallable\(funciones, "listarTorneosAdmin"\)/.test(panel),
+    "el panel lista con la suya, no con la del jugador",
+  );
+
+  const servidor = readFileSync(new URL("../functions/index.js", import.meta.url), "utf8");
+  const desde = servidor.indexOf("export const listarTorneosAdmin");
+  const cuerpo = servidor.slice(desde, servidor.indexOf("\nexport const ", desde + 1));
+  ok(desde > 0, "la callable existe");
+  ok(/administradores\.exigir\(context\)/.test(cuerpo), "y sólo la puede llamar un administrador");
+  ok(/soloAbiertos: false/.test(cuerpo), "y trae todos");
 }
 
 console.log(fallos ? `\n❌ ${fallos} fallos` : "\n✅ TODO OK");

@@ -239,6 +239,10 @@ export const EsquemaDesposeer = z.object({
  * llega a que uno diga 20000 y el otro 10000, y a que nadie sepa cuál manda.
  */
 export const EsquemaTorneo = z.object({
+  // Las dos que le cuentan al jugador qué compra: de qué va el torneo y
+  // cuándo se juega. Opcionales: un borrador puede no saberlo todavía.
+  descripcion: z.string().max(300).optional(),
+  comienzaEn: z.coerce.number().int().positive().nullable().optional(),
   nombre: z.string().min(1).max(80),
   tipo: z.enum(["especial", "semanal"]).optional().default("especial"),
   entrada: z.coerce.number().int(),

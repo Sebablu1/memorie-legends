@@ -43,8 +43,29 @@ function avisar(texto, esError = false) {
   caja.classList.toggle("error", Boolean(esError));
 }
 
+/**
+ * Cuándo empieza, escrito para leer.
+ *
+ * Es lo primero que quiere saber quien está por pagar una entrada, y hasta
+ * hace poco no estaba en ningún lado: el aviso decía «te avisamos cuando
+ * arranque» y no hay nada que avise —`iniciar` agrupa los uid en mesas
+ * dentro del documento del torneo y no notifica a nadie—. Con la fecha
+ * puesta, el jugador puede anotarse la hora.
+ *
+ * Sin fecha se dice que no hay, y no se inventa una: un torneo puede
+ * publicarse antes de saber cuándo se juega.
+ */
+export function cuandoEmpieza(ms) {
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  return new Date(ms).toLocaleString("es-UY", {
+    weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
+  });
+}
+
 function dibujarTorneo(t) {
   const faltan = Math.max(0, 4 - Number(t.inscriptos ?? 0));
+  const empieza = cuandoEmpieza(t.comienzaEn);
+  const dice = String(t.descripcion ?? "").trim();
 
   return `
     <div class="fila-torneo">
@@ -53,11 +74,14 @@ function dibujarTorneo(t) {
         <span>Entrada ${numero(t.entrada)} Leyendas · ${numero(t.inscriptos ?? 0)} anotado${
           Number(t.inscriptos ?? 0) === 1 ? "" : "s"
         }${faltan ? ` · faltan ${faltan} para que se juegue` : ""}</span>
+        ${empieza ? `<span class="cuando-torneo">🗓 Empieza el ${escapar(empieza)}</span>` : ""}
+        ${dice ? `<span class="dice-torneo">${escapar(dice)}</span>` : ""}
       </div>
       <button class="accion" type="button"
               data-torneo="${escapar(t.id)}"
               data-entrada="${Number(t.entrada ?? 0)}"
-              data-nombre="${escapar(t.nombre ?? "Torneo")}">Anotarme</button>
+              data-nombre="${escapar(t.nombre ?? "Torneo")}"
+              data-comienza="${Number(t.comienzaEn ?? 0)}">Anotarme</button>
     </div>`;
 }
 
@@ -78,9 +102,13 @@ function dibujar() {
 async function anotarse(boton) {
   const entrada = Number(boton.dataset.entrada);
   const nombre = boton.dataset.nombre;
+  const empieza = cuandoEmpieza(Number(boton.dataset.comienza));
 
+  // La fecha va ANTES de cobrar, no después. Es la mitad de lo que la
+  // persona está comprando: de nada le sirve el torneo si no puede estar.
   const seguro = window.confirm(
     `Anotarte a «${nombre}» cuesta ${numero(entrada)} Leyendas y se cobra ahora.\n\n` +
+      (empieza ? `Empieza el ${empieza}.\n\n` : "") +
       `Si el torneo no llega a cuatro jugadores, se cancela y se te devuelve todo.`,
   );
   if (!seguro) return;
@@ -93,7 +121,19 @@ async function anotarse(boton) {
   try {
     const r = await inscribirseATorneo(boton.dataset.torneo);
     if (typeof r.saldo === "number") mostrarSaldo(r.saldo);
-    avisar(`Anotado a «${nombre}». Te avisamos cuando arranque.`);
+    /**
+     * No se promete avisar, porque no hay nada que avise.
+     *
+     * `iniciar` agrupa los uid en mesas dentro del documento del torneo y no
+     * manda un correo, ni una notificación, ni crea una sala. Decir «te
+     * avisamos» era comprometer algo que el sistema no hace; ahora se le da
+     * al jugador lo único cierto que hay: la hora, si la hay.
+     */
+    avisar(
+      empieza
+        ? `Anotado a «${nombre}». Empieza el ${empieza}.`
+        : `Anotado a «${nombre}». Mirá la cartelera para saber cuándo arranca.`,
+    );
     boton.textContent = "✓ Anotado";
     await cargar();
   } catch (e) {
