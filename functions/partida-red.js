@@ -42,6 +42,28 @@ import {
 /** Sin señales durante este tiempo, se considera que el jugador se cayó. */
 export const MS_SIN_SENALES = 15000;
 
+/**
+ * Sin señales de NADIE durante este tiempo, la mesa se da por desierta.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ DIEZ MINUTOS Y NO QUINCE SEGUNDOS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `MS_SIN_SENALES` mide a UNO para saltarle el turno, y equivocarse ahí
+ * cuesta un turno. Esto mide a los CUATRO para terminar la partida y
+ * devolver el pozo, y equivocarse cuesta una partida en curso.
+ *
+ * Los latidos siguen saliendo con la pestaña escondida —`mantenerVivo` es un
+ * `setInterval` sin condición de visibilidad, a diferencia de
+ * `mantenerEnMarcha`— pero el navegador los frena a uno por minuto en una
+ * pestaña de fondo, y pasados unos minutos puede congelar la página del
+ * todo. Quince segundos de silencio no significan nada; diez minutos sí.
+ *
+ * Y el error, si lo hubiera, cae del lado bueno: una mesa cerrada de más le
+ * devuelve a cada uno lo que puso. Nadie pierde Leyendas por esto.
+ */
+export const MS_MESA_DESIERTA = 10 * 60 * 1000;
+
 /** Lo que espera la mesa a que alguien levante antes de saltarle el turno. */
 export const MS_TURNO = 8000;
 
@@ -1187,19 +1209,24 @@ export function crearMotorEnRed({
   }
 
   /**
-   * Efecto del abandono sobre la mesa, con la partida YA leída. Sólo escribe.
+   * Efecto del abandono sobre la mesa. No escribe: devuelve la partida.
    *
    * Su entrada ya está en el pozo y se queda. Se lo marca eliminado para que
    * los turnos lo salteen, y `abandono: true` lo distingue de un eliminado
    * por puntos: no es lo mismo perder que irse.
    *
-   * @returns true si cambió algo; false si ya estaba abandonado
+   * Es pura para poder aplicarla VARIAS VECES antes de escribir. Vaciar una
+   * mesa desierta marca a los cuatro de una vez, y dentro de una transacción
+   * no se puede releer lo que uno mismo acaba de escribir: cuatro llamadas
+   * con la misma partida de partida habrían dejado sólo el último abandono.
+   *
+   * @returns la partida con el abandono aplicado, o null si no cambió nada
    */
-  function marcarAbandonoEn(tx, codigo, partida, uid) {
-    if (!partida) return false;
+  function conAbandono(partida, uid) {
+    if (!partida) return null;
     const indice = partida.jugadores.indexOf(uid);
-    if (indice < 0) return false;
-    if ((partida.abandonaron ?? []).includes(uid)) return false;
+    if (indice < 0) return null;
+    if ((partida.abandonaron ?? []).includes(uid)) return null;
 
     const estado = {
       ...partida.estado,
@@ -1255,12 +1282,23 @@ export function crearMotorEnRed({
           }
         : conTurno;
 
-    publicar(tx, codigo, {
+    return {
       ...partida,
       estado: terminada,
       abandonaron: [...(partida.abandonaron ?? []), uid],
       version: partida.version + 1,
-    });
+    };
+  }
+
+  /**
+   * Lo mismo, escrito. Con la partida YA leída: sólo escribe.
+   *
+   * @returns true si cambió algo; false si ya estaba abandonado
+   */
+  function marcarAbandonoEn(tx, codigo, partida, uid) {
+    const siguiente = conAbandono(partida, uid);
+    if (!siguiente) return false;
+    publicar(tx, codigo, siguiente);
     return true;
   }
 
@@ -1296,11 +1334,91 @@ export function crearMotorEnRed({
     });
   }
 
+  /**
+   * Cierra la mesa que se quedó sin nadie.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * POR QUÉ EL BARREDOR SOLO NO ALCANZABA
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * El barredor destraba la partida —le da los golpes que nadie estaba
+   * dando— pero destrabar no es terminar. Una mesa en `turno` donde no queda
+   * nadie recibe `saltarTurno`, y `saltarTurno` no hace más que correr el
+   * turno al siguiente y anotar un renglón: no mueve una carta, no elimina a
+   * nadie y no termina la ronda. Con los cuatro ausentes el turno da vueltas
+   * a la mesa para siempre.
+   *
+   * Se vio en producción a los doce minutos de desplegar el barredor: dos
+   * partidas, un paso cada una, cada minuto, `cerradas: 0` siempre. Ni un
+   * error. Y cada vuelta escribía cinco documentos y le sumaba un renglón al
+   * registro, que vive dentro del documento de la partida y tiene un tope de
+   * un mega: la partida no se colgaba, se iba llenando.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * ES LA MISMA REGLA QUE YA EXISTÍA, APLICADA A LOS CUATRO
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * No inventa una forma nueva de terminar una partida: marca el abandono
+   * que ya sabía marcarse, con `conAbandono`, uno por jugador. Cuando no
+   * queda ninguno en pie, esa misma función pone `finPartida`, y de ahí en
+   * adelante todo es el camino de siempre: el plazo de `finPartida`, el
+   * cierre, y el pozo devuelto por cabeza porque no hay a quién premiar.
+   *
+   * NO cobra la penalización de abandono. La cobra `abandonarPartida`, que
+   * es una decisión de una persona; acá nadie decidió nada — la mesa se
+   * murió sola, y encima por un fallo nuestro.
+   */
+  async function vaciarMesaDesierta({ codigo, silencioMs = MS_MESA_DESIERTA } = {}) {
+    return db.runTransaction(async (tx) => {
+      const snap = await tx.get(refPartida(codigo));
+      if (!snap.exists) return { vaciada: false, motivo: "no_existe" };
+
+      const partida = snap.data();
+      if (partida.cerrada) return { vaciada: false, motivo: "ya_cerrada" };
+
+      const idos = partida.abandonaron ?? [];
+      const quedan = partida.jugadores.filter(
+        (uid, i) => !idos.includes(uid) && !partida.estado.jugadores[i]?.eliminado,
+      );
+      if (!quedan.length) return { vaciada: false, motivo: "no_queda_nadie" };
+
+      // El latido MÁS RECIENTE de los que siguen en pie. Basta con que UNO
+      // esté mirando para que la mesa no sea de nadie más que suya.
+      const t = ahora();
+      const latidos = partida.latidos ?? {};
+      const ultimo = Math.max(...quedan.map((uid) => latidos[uid] ?? 0));
+      const silencio = t - ultimo;
+      if (silencio <= silencioMs) return { vaciada: false, motivo: "alguien_sigue", silencio };
+
+      let acumulada = partida;
+      const marcados = [];
+      for (const uid of quedan) {
+        const siguiente = conAbandono(acumulada, uid);
+        if (!siguiente) continue;
+        acumulada = siguiente;
+        marcados.push(uid);
+      }
+      if (!marcados.length) return { vaciada: false, motivo: "nada_que_marcar" };
+
+      // Una sola escritura para los cuatro: dentro de una transacción no se
+      // relee lo propio, y publicar cuatro veces dejaría valer sólo la última.
+      publicar(tx, codigo, acumulada);
+      return {
+        vaciada: true,
+        marcados,
+        silencio,
+        fase: acumulada.estado.fase,
+        version: acumulada.version,
+      };
+    });
+  }
+
   return {
     repartir,
     repartirEn,
     leerPartidaParaAbandono,
     marcarAbandonoEn,
+    vaciarMesaDesierta,
     avanzarPartida,
     cerrarMirada,
     abrirVentana,

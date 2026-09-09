@@ -32,7 +32,13 @@
  *      gente todavía está jugando.
  *   3. Que una partida cerrada quede afuera. Si no, el barrido la republica en
  *      cada vuelta, para siempre, escribiendo cinco documentos por minuto.
- *   4. Que el barrido la lleve hasta el final, y no un paso por minuto.
+ *   4. Que una mesa DESIERTA se termine, y no gire. Es la parte que faltaba y
+ *      que se vio en producción: el barredor destraba, pero destrabar no es
+ *      terminar. A una mesa sin nadie le da `saltarTurno`, que corre el turno
+ *      y no hace nada más; el turno da la vuelta a la mesa un minuto tras
+ *      otro, sin error, sin avanzar y sin devolver el pozo.
+ *   5. Que una mesa VIVA no se termine por error. Basta con que uno siga
+ *      latiendo. Es la mitad que impide que el arreglo sea peor que el fallo.
  */
 
 import { crearMotorEnRed } from "../functions/partida-red.js";
@@ -280,6 +286,140 @@ console.log("\n=== El barredor no adelanta el reloj ===");
     "la fase no se movió",
     db.leer("partidas/ABCDEF").estado.fase,
   );
+}
+
+console.log("\n=== Una mesa sin nadie GIRA: el barredor solo no la termina ===");
+{
+  /**
+   * Esto se descubrió en producción, doce minutos después de desplegar el
+   * barredor. Dos partidas, un paso cada una, cada minuto, `cerradas: 0`
+   * siempre. Ni un error en el registro.
+   *
+   * La causa: `saltarTurno` corre el turno al siguiente y anota un renglón.
+   * Nada más. No mueve una carta, no elimina a nadie, no termina la ronda.
+   * Con los cuatro ausentes el turno da la vuelta a la mesa para siempre, y
+   * cada vuelta escribe cinco documentos y alarga el registro, que vive
+   * dentro del documento de la partida y tiene un tope de un mega.
+   *
+   * La primera mitad de esta prueba deja constancia del giro. Sin ella, la
+   * segunda mitad —el vaciado— parecería una precaución de más.
+   */
+  const db = db0();
+  const red = motorDe(db);
+
+  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+
+  // Media hora sin que nadie lata: se fueron todos, sin abandonar.
+  reloj += 30 * 60 * 1000;
+
+  let pasos = 0;
+  for (let minuto = 0; minuto < 12; minuto++) {
+    reloj += 60_000;
+    for (let i = 0; i < 8; i++) {
+      const r = await red.avanzarPartida({ codigo: "ABCDEF" });
+      if (!r?.hizo) break;
+      pasos++;
+    }
+  }
+
+  const girando = db.leer("partidas/ABCDEF");
+  ok(pasos >= 12, "el barredor da un paso por vuelta, doce vueltas", pasos);
+  ok(girando.estado.fase === "turno", "y sigue en turno: gira sin llegar a nada", girando.estado.fase);
+  ok(!girando.cerrada, "la partida sigue abierta, con el pozo adentro");
+  ok(
+    girando.estado.registro.length > 10,
+    "y el registro se va llenando, un renglón por vuelta",
+    girando.estado.registro.length,
+  );
+}
+
+console.log("\n=== Vaciarla la termina, y el pozo puede volver ===");
+{
+  const db = db0();
+  const red = motorDe(db);
+
+  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+  reloj += 30 * 60 * 1000;
+
+  const r = await red.vaciarMesaDesierta({ codigo: "ABCDEF" });
+  ok(r.vaciada, "la mesa desierta se vacía", r);
+  ok(r.marcados.length === 4, "marcando a los cuatro de una sola escritura", r.marcados);
+
+  const estado = db.leer("partidas/ABCDEF").estado;
+  ok(estado.fase === "finPartida", "la partida termina", estado.fase);
+  ok(
+    estado.jugadores.every((j) => j.abandono),
+    "y los cuatro quedan como abandono, que es lo que mira el cierre",
+  );
+  // De ahí en adelante es el camino de siempre: el plazo de `finPartida`
+  // vence a los pocos segundos y el mismo barrido llama al cierre. Lo que
+  // pasa con la plata lo prueba la sección 4 de `pruebas/cierre.mjs`: sin
+  // ningún elegible, el pozo vuelve entero a quien lo puso.
+  const plazo = db.leer("partidas/ABCDEF").plazo;
+  ok(plazo?.que === "cerrarPartida", "y queda con el plazo del cierre", plazo);
+}
+
+console.log("\n=== Con uno solo mirando, no se toca ===");
+{
+  /**
+   * La mitad que impide que esto sea peor que el problema. Vaciar una mesa
+   * viva le corta la partida a quien la está jugando, así que basta con que
+   * UNO siga latiendo para que la mesa siga siendo suya.
+   *
+   * El umbral es de diez minutos y no de quince segundos justamente por esto:
+   * el navegador frena los latidos de una pestaña de fondo a uno por minuto.
+   */
+  const db = db0();
+  const red = motorDe(db);
+
+  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+  reloj += 30 * 60 * 1000;
+  await red.latir({ codigo: "ABCDEF", uid: "caro" });
+
+  const r = await red.vaciarMesaDesierta({ codigo: "ABCDEF" });
+  ok(!r.vaciada, "no se vacía", r);
+  ok(r.motivo === "alguien_sigue", "porque queda alguien del otro lado", r.motivo);
+  ok(db.leer("partidas/ABCDEF").estado.fase !== "finPartida", "y la partida sigue viva");
+
+  // Y en cuanto ESE también se calla, sí.
+  reloj += 30 * 60 * 1000;
+  ok((await red.vaciarMesaDesierta({ codigo: "ABCDEF" })).vaciada, "callado él, ahora sí");
+}
+
+console.log("\n=== Una recién repartida no se vacía nunca ===");
+{
+  // El peligro obvio del umbral: `repartir` siembra los latidos con la hora
+  // del reparto justamente para esto. Si la mesa naciera sin latidos, el
+  // primer barrido la encontraría en silencio absoluto y la cerraría antes de
+  // que nadie jugara una carta.
+  const db = db0();
+  const red = motorDe(db);
+
+  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+  const r = await red.vaciarMesaDesierta({ codigo: "ABCDEF" });
+
+  ok(!r.vaciada, "no se vacía recién repartida", r);
+  ok(
+    Object.keys(db.leer("partidas/ABCDEF").latidos).length === 4,
+    "porque nace con los cuatro latidos puestos",
+  );
+}
+
+console.log("\n=== Lo que ya está cerrado o vacío se deja en paz ===");
+{
+  const db = db0();
+  const red = motorDe(db);
+
+  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+  reloj += 30 * 60 * 1000;
+  for (const uid of CUATRO) await red.marcarAbandono({ codigo: "ABCDEF", uid });
+
+  const r = await red.vaciarMesaDesierta({ codigo: "ABCDEF" });
+  ok(!r.vaciada, "con todos ya afuera, no hay nada que vaciar", r);
+  ok(r.motivo === "no_queda_nadie", "y lo dice", r.motivo);
+
+  const sinPartida = await red.vaciarMesaDesierta({ codigo: "NOEXISTE" });
+  ok(!sinPartida.vaciada && sinPartida.motivo === "no_existe", "una que no existe no rompe nada", sinPartida);
 }
 
 console.log(fallos === 0 ? "\n✅ TODO OK" : `\n❌ ${fallos} fallos`);

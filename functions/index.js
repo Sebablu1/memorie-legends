@@ -1484,9 +1484,32 @@ async function barrerPartidasVencidas() {
 
   let pasos = 0;
   let cerradas = 0;
+  let vaciadas = 0;
   const problemas = [];
+  const detalle = [];
 
   for (const codigo of codigos) {
+    /**
+     * Primero: ¿queda alguien del otro lado?
+     *
+     * Antes de empujar, se comprueba si la mesa está desierta. Sin esto el
+     * barredor le salta el turno a una mesa vacía un minuto tras otro, sin
+     * error y sin avanzar hacia ningún lado: `saltarTurno` corre el turno y
+     * no hace nada más. Pasó de verdad, y la única señal fue que `cerradas`
+     * se quedaba en cero mientras `pasos` subía.
+     *
+     * Vaciarla la deja en `finPartida`, y de ahí la cierra el mismo bucle de
+     * abajo en la vuelta siguiente, cuando venza el plazo del resultado.
+     */
+    let vacio = null;
+    try {
+      vacio = await enRed.vaciarMesaDesierta({ codigo });
+      if (vacio?.vaciada) vaciadas++;
+    } catch (e) {
+      problemas.push({ codigo, motivo: `vaciar: ${e?.message ?? "error desconocido"}` });
+    }
+
+    let ultimo = null;
     for (let i = 0; i < PASOS_POR_PARTIDA; i++) {
       let r;
       try {
@@ -1497,6 +1520,7 @@ async function barrerPartidasVencidas() {
         problemas.push({ codigo, motivo: e?.message ?? "error desconocido" });
         break;
       }
+      ultimo = r;
 
       if (r?.hizo === "cerrarPartida") {
         // Lo mismo que hace el camino normal: insignias y ranking.
@@ -1507,10 +1531,20 @@ async function barrerPartidasVencidas() {
       if (!r?.hizo) break; // nada que hacer todavía
       pasos++;
     }
+
+    // Qué le pasó a ESTA partida. Sin esto, el resumen no distingue una mesa
+    // que avanza de una que gira: las dos suman un paso por vuelta.
+    detalle.push({
+      codigo,
+      vaciada: Boolean(vacio?.vaciada),
+      hizo: ultimo?.hizo ?? null,
+      motivo: ultimo?.motivo ?? null,
+      fase: ultimo?.fase ?? null,
+    });
   }
 
-  const resumen = { revisadas: codigos.length, pasos, cerradas, problemas };
-  if (pasos || problemas.length) logger.info("Barrido de partidas", resumen);
+  const resumen = { revisadas: codigos.length, pasos, cerradas, vaciadas, problemas, detalle };
+  if (pasos || vaciadas || problemas.length) logger.info("Barrido de partidas", resumen);
   return resumen;
 }
 
