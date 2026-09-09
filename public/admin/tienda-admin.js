@@ -34,6 +34,9 @@ const guardarItem = httpsCallable(funciones, "guardarItemAdmin");
 const activarItem = httpsCallable(funciones, "activarItemAdmin");
 const borrarItem = httpsCallable(funciones, "borrarItemAdmin");
 const apagarViejos = httpsCallable(funciones, "apagarCatalogoViejoAdmin");
+const listarPoseedores = httpsCallable(funciones, "listarPoseedoresItemAdmin");
+const desposeerItem = httpsCallable(funciones, "desposeerItemAdmin");
+const forzarBorrar = httpsCallable(funciones, "forzarBorrarItemAdmin");
 
 /** Escapa lo que venga de la base. Mismo criterio que `admin.js`. */
 const limpio = (t) =>
@@ -80,6 +83,7 @@ function dibujarLista() {
                 data-a="${item.activo === false ? "1" : "0"}" type="button">
           ${item.activo === false ? "Encender" : "Apagar"}
         </button>
+        <button class="btn sobrio chico" data-quien="${limpio(item.id)}" type="button">Quién lo tiene</button>
         <button class="btn peligro chico" data-borrar="${limpio(item.id)}" type="button">Borrar</button>
       </div>`;
     })
@@ -203,6 +207,131 @@ async function alternar(id, encender) {
  * el servidor porque una confirmación del navegador no protege nada: ahí se
  * comprueba que nadie lo haya comprado, que es lo que de verdad importa.
  */
+// ------------------------------------------------- quién tiene un artículo
+
+/**
+ * La lista de quienes compraron un artículo, debajo de su fila.
+ *
+ * Va en la lista y no en una ventana aparte a propósito: lo que se hace acá
+ * es decidir si sacárselo a alguien, y esa decisión se toma mirando la fila
+ * del artículo. Una ventana modal taparía justamente eso.
+ *
+ * El panel no guarda esta lista: cada vez que se abre se vuelve a pedir. Es
+ * la consulta más cara que hay —recorre todas las compras— pero una lista
+ * vieja acá haría que el administrador le quite algo a quien ya no lo tiene.
+ */
+async function verPoseedores(id) {
+  const item = catalogo.find((i) => i.id === id);
+  const caja = $(`poseedores-${id}`);
+
+  // Segundo clic: se cierra. Es un desplegable, no una ventana.
+  if (caja) {
+    caja.remove();
+    return;
+  }
+
+  const fila = $("listaCatalogo").querySelector(`[data-quien="${CSS.escape(id)}"]`)?.closest(".fila");
+  if (!fila) return;
+
+  const panel = document.createElement("div");
+  panel.id = `poseedores-${id}`;
+  panel.className = "poseedores";
+  panel.innerHTML = '<p class="nota">Buscando…</p>';
+  fila.after(panel);
+
+  try {
+    const { data } = await listarPoseedores({ itemId: id });
+    const gente = data?.poseedores ?? [];
+
+    if (!gente.length) {
+      panel.innerHTML = '<p class="nota">No lo tiene nadie. Se puede borrar con el botón de al lado.</p>';
+      return;
+    }
+
+    panel.innerHTML = `
+      <p class="nota">Lo tienen ${gente.length} jugador${gente.length === 1 ? "" : "es"}.
+         Quitárselo les devuelve lo que pagaron.</p>
+      ${gente
+        .map(
+          (p) => `
+        <div class="fila chica">
+          <span class="campo"><b>${limpio(p.username ?? "(sin nombre)")}</b><br />${limpio(p.email ?? p.uid)}</span>
+          <span class="campo">${Number(p.precioPagado ?? 0).toLocaleString("es-UY")} Leyendas</span>
+          <span class="campo">${p.equipado ? "lo lleva puesto" : ""}</span>
+          <button class="btn peligro chico" data-quitar="${limpio(id)}"
+                  data-a="${limpio(p.uid)}" type="button">Quitárselo</button>
+        </div>`,
+        )
+        .join("")}
+      <button class="btn peligro chico" data-forzar="${limpio(id)}" type="button">
+        ⚠️ Sacárselo a todos y borrar «${limpio(item?.nombre ?? id)}»
+      </button>`;
+  } catch (error) {
+    panel.innerHTML = `<p class="nota mal">${limpio(error?.message ?? "No se pudo consultar.")}</p>`;
+  }
+}
+
+/** Le saca el artículo a una persona. */
+async function quitar(id, uid) {
+  const item = catalogo.find((i) => i.id === id);
+  if (!confirm(
+    `¿Quitarle «${item?.nombre ?? id}» a este jugador?\n\n` +
+      "Se le devuelven las Leyendas que pagó y, si lo tenía puesto, se lo saca.",
+  )) return;
+
+  try {
+    const { data } = await desposeerItem({ itemId: id, uid });
+    decir(
+      $("avisoCatalogoLista"),
+      data?.yaEstaba
+        ? "Ese jugador ya no lo tenía."
+        : `Se lo quitaste. Le devolvimos ${Number(data?.devueltas ?? 0).toLocaleString("es-UY")} Leyendas.`,
+      "bien",
+    );
+    $(`poseedores-${id}`)?.remove();
+    await verPoseedores(id);
+  } catch (error) {
+    decir($("avisoCatalogoLista"), error?.message ?? "No se pudo quitar.", "mal");
+  }
+}
+
+/**
+ * Se lo saca a todos y lo borra.
+ *
+ * Dos confirmaciones y la segunda pide escribir el id. Es la única operación
+ * del panel que le quita algo a gente que no está mirando, y un `confirm` se
+ * acepta sin leerlo — escribir el nombre obliga a mirar cuál se está
+ * borrando.
+ */
+async function forzar(id) {
+  const item = catalogo.find((i) => i.id === id);
+  const nombre = item?.nombre ?? id;
+
+  if (!confirm(
+    `⚠️ Esto le saca «${nombre}» a TODOS los que lo compraron y después lo borra ` +
+      "del catálogo.\n\nA cada uno se le devuelven las Leyendas que pagó. No se puede deshacer.",
+  )) return;
+
+  const escrito = prompt(`Para confirmar, escribí el id del artículo:\n\n${id}`);
+  if (escrito?.trim() !== id) {
+    decir($("avisoCatalogoLista"), "No se borró: el id no coincide.", "mal");
+    return;
+  }
+
+  try {
+    const { data } = await forzarBorrar({ itemId: id });
+    await refrescar();
+    decir(
+      $("avisoCatalogoLista"),
+      `Borrado «${nombre}». Se lo quitamos a ${data?.quitadoA ?? 0} y devolvimos ` +
+        `${Number(data?.devueltasEnTotal ?? 0).toLocaleString("es-UY")} Leyendas.`,
+      "bien",
+    );
+  } catch (error) {
+    decir($("avisoCatalogoLista"), error?.message ?? "No se pudo borrar.", "mal");
+  }
+}
+
 async function borrar(id) {
   const item = catalogo.find((i) => i.id === id);
   if (!confirm(`¿Borrar «${item?.nombre ?? id}» del catálogo?\n\nSi alguien ya lo compró, el servidor lo va a rechazar: en ese caso apagalo en vez de borrarlo.`)) {
@@ -211,8 +340,8 @@ async function borrar(id) {
 
   try {
     await borrarItem({ itemId: id });
-    decir($("avisoCatalogoLista"), `Borrado «${item?.nombre ?? id}».`, "bien");
     await refrescar();
+    decir($("avisoCatalogoLista"), `Borrado «${item?.nombre ?? id}».`, "bien");
   } catch (error) {
     decir($("avisoCatalogoLista"), error?.message ?? "No se pudo borrar.", "mal");
   }
@@ -299,6 +428,9 @@ export function montarTiendaAdmin() {
     if (boton.dataset.editar) editar(boton.dataset.editar);
     else if (boton.dataset.activar) alternar(boton.dataset.activar, boton.dataset.a === "1");
     else if (boton.dataset.borrar) borrar(boton.dataset.borrar);
+    else if (boton.dataset.quien) verPoseedores(boton.dataset.quien);
+    else if (boton.dataset.quitar) quitar(boton.dataset.quitar, boton.dataset.a);
+    else if (boton.dataset.forzar) forzar(boton.dataset.forzar);
   });
 
   refrescar();

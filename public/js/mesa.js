@@ -42,6 +42,8 @@ import {
   asientosParaMesa,
   dorsoDe,
   usarDorsoPropio,
+  usarMazoCentral,
+  dorsoDelMazo,
 } from "./modulos/cartas.js";
 import { retratoDe, usarRetratoPropio, RETRATO_INICIAL } from "./modulos/retratos.js";
 import { esRutaDelSitio } from "./reglas/catalogo.js";
@@ -113,9 +115,30 @@ function aplicarDorsoPropio() {
 
 (async () => {
   const equipo = (await Guardia.equipadoEnMesa?.(miSesion?.uid)) ?? null;
-  miDorso = equipo?.dorso ?? null;
-  miRetrato = equipo?.retrato ?? null;
-  miPano = equipo?.pano ?? null;
+
+  /**
+   * Las cuatro pasan por el mismo filtro antes de tocar un `src`.
+   *
+   * `equipadoEnMesa` valida con `imagenEsArchivo`, que es la regla de la
+   * TIENDA y deja pasar una URL de otro dominio: allá está bien, porque la
+   * tienda muestra lo que el panel haya cargado. Acá no, y por la misma
+   * razón por la que la vista en red filtra los retratos ajenos — una ruta
+   * de afuera haría que el navegador le pida la imagen a ese servidor cada
+   * vez que alguien se sienta a jugar.
+   *
+   * Lo que no pasa el filtro queda en `null`, que es «usá lo de la casa».
+   */
+  const propio = (ruta) => (esRutaDelSitio(ruta) ? ruta : null);
+  miDorso = propio(equipo?.dorso);
+  miRetrato = propio(equipo?.retrato);
+  miPano = propio(equipo?.pano);
+
+  // El dorso del mazo del centro: su propio artículo, aparte del de la mano.
+  const miMazo = propio(equipo?.mazo);
+  if (miMazo) {
+    usarMazoCentral(miMazo);
+    if (estado) dibujar();
+  }
 
   /**
    * El paño comprado se pone con una variable, no repintando nada.
@@ -125,12 +148,10 @@ function aplicarDorsoPropio() {
    * mesa ni esperar a la próxima jugada, y si el jugador no compró ninguno
    * esta línea no corre y el paño sigue siendo el de siempre.
    *
-   * `esRutaDelSitio` y no `imagenEsArchivo`: esto termina dentro de un
-   * `url()` de CSS, que es lo mismo que un `src` — una URL de otro dominio
-   * haría que el navegador le pida la imagen a ese servidor cada vez que
-   * alguien se sienta a jugar.
+   * Termina dentro de un `url()` de CSS, que a estos efectos es un `src`:
+   * de ahí que la ruta venga filtrada de arriba y no directa de `equipo`.
    */
-  if (esRutaDelSitio(miPano)) {
+  if (miPano) {
     document.querySelector(".mesa")?.style.setProperty(
       "--pano",
       `url("${miPano}") center / 100% 100% no-repeat`,
@@ -539,6 +560,40 @@ const FASES_CON_TURNO = new Set(["turno", "levantada", "postLevantada", "poder"]
 const caraDe = (jugador, i) =>
   esRutaDelSitio(jugador?.retrato) ? jugador.retrato : retratoDe(i);
 
+/**
+ * El reverso de las cartas de un jugador.
+ *
+ * En una partida por Leyendas viaja en la vista, así que los cuatro ven el
+ * dorso que cada uno compró. Sin eso, quien se compraba uno lo veía sólo en
+ * su propia pantalla y para los demás seguía con el del asiento — que es
+ * exactamente lo contrario de comprarse algo para que se vea.
+ *
+ * En entrenamiento no viene ninguno y manda `dorsoDe`, que ya conoce la
+ * excepción del asiento propio.
+ */
+const reversoDe = (jugador, i) =>
+  esRutaDelSitio(jugador?.dorso) ? jugador.dorso : dorsoDe(i);
+
+/**
+ * La insignia que el jugador eligió mostrar, o la dificultad de la IA.
+ *
+ * Son dos cosas distintas ocupando el mismo lugar, y está bien: las dos
+ * responden «quién es éste». En entrenamiento los rivales son máquinas y lo
+ * que hace falta saber de ellas es cuánto aprietan; en una partida por
+ * Leyendas son personas y lo que muestran es lo que ganaron.
+ *
+ * La insignia se dibuja como imagen con su `alt`: es un logro y tiene
+ * nombre, a diferencia del retrato, que es decoración y va con `alt` vacío.
+ */
+function marcaDe(jugador) {
+  if (esRutaDelSitio(jugador?.insignia)) {
+    return `<img class="insignia-mesa" src="${escapar(jugador.insignia)}" alt="Insignia" />`;
+  }
+  return jugador.esIA
+    ? `<span class="insignia">${IA.DIFICULTADES[jugador.dificultad]?.etiqueta ?? "IA"}</span>`
+    : "";
+}
+
 function dibujarJugador(jugador, i) {
   const enTurno =
     FASES_CON_TURNO.has(estado.fase) &&
@@ -561,13 +616,13 @@ function dibujarJugador(jugador, i) {
         asiento: i,
         posicion: pos,
         estilo: estiloAbanico(pos, jugador.mano.length, geometria),
+        // El dorso que compró ESTE jugador, no el que le tocaría al asiento.
+        dorso: reversoDe(jugador, i),
       });
     })
     .join("");
 
-  const insignia = jugador.esIA
-    ? `<span class="insignia">${IA.DIFICULTADES[jugador.dificultad]?.etiqueta ?? "IA"}</span>`
-    : "";
+  const insignia = marcaDe(jugador);
 
   /**
    * "Ronda" es lo que se anotó en la ronda ANTERIOR, no un marcador en vivo.
@@ -741,6 +796,9 @@ function dibujar() {
           visible: false,
           asiento: 0,
           clases: puedeLevantar ? "jugable" : "",
+          // La pila del centro no es de ningún asiento: lleva su propio
+          // dorso, que se compra aparte del de la mano.
+          dorso: dorsoDelMazo(),
         },
       )
     : `<div class="hueco vacio"></div>`;

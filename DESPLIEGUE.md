@@ -63,8 +63,8 @@ Calculada sobre el archivo sin comentarios ni espacios sobrantes, para poder
 citarla en una revisión:
 
 ```
-sha256 (16 primeros) : edcd939c5a557ada
-líneas               : 125
+sha256 (16 primeros) : 1c0029088e89f6fa
+líneas               : 259
 ```
 
 Se recalcula así:

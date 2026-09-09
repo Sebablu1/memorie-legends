@@ -615,3 +615,37 @@ select {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ============================================================
+   Quién tiene un artículo
+   ============================================================
+
+   Se despliega DEBAJO de la fila del artículo, no en una ventana: lo que se
+   decide acá es si sacárselo a alguien, y esa decisión se toma mirando el
+   artículo. Una ventana modal taparía justamente eso.
+
+   El borde de la izquierda es lo que dice de quién cuelga la lista: sin él,
+   con varios artículos abiertos a la vez, no se sabe cuál es de cuál. */
+.poseedores {
+  margin: -4px 0 10px 26px;
+  padding: 12px 14px;
+  border-radius: 0 13px 13px 0;
+  border-left: 3px solid var(--borde);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.poseedores .nota { margin: 0; }
+.poseedores .nota.mal { color: #fca5a5; }
+
+/* Una fila de persona pesa menos que una de artículo: es una lista de
+   consulta dentro de otra lista, y con el mismo peso las dos se confunden. */
+.fila.chica {
+  padding: 8px 12px;
+  gap: 8px 14px;
+  font-size: 0.92rem;
+}
+
+.fila.chica .campo { font-size: 0.92rem; }

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300" width="200" height="300">
+  <!--
+    Mazo Real: azul de medianoche con la brújula en oro.
+
+    Mide 200x300 —la proporción 2:3 de la carta— y se dibuja con la misma rosa
+    de los vientos que lleva grabada el paño. No es casualidad: el mazo del
+    centro es la única pila que se ve la partida entera, y emparentarla con la
+    mesa la hace parte del mueble en vez de un naipe apoyado encima.
+  -->
+  <defs>
+    <linearGradient id="f-real" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1d2c4d" /><stop offset="100%" stop-color="#0b1426" />
+    </linearGradient>
+  </defs>
+  <rect width="200" height="300" rx="10" fill="url(#f-real)" />
+  <rect x="7" y="7" width="186" height="286" rx="6" fill="none" stroke="#d4a843" stroke-width="2" opacity="0.85" />
+  <rect x="13" y="13" width="174" height="274" rx="4" fill="none" stroke="#d4a843" stroke-width="0.8" opacity="0.5" />
+  <g transform="translate(100 150)" fill="none" stroke="#d4a843" stroke-linejoin="round">
+    <circle r="66" stroke-width="1.5" opacity="0.5" />
+    <circle r="58" stroke-width="0.8" opacity="0.32" />
+    <circle r="20" stroke-width="1.2" opacity="0.45" />
+    <path stroke-width="1.4" opacity="0.62"
+      d="M62 0 L14.5 6.4 L38.5 38.5 L6.4 14.5 L0 62 L-6.4 14.5 L-38.5 38.5 L-14.5 6.4
+         L-62 0 L-14.5 -6.4 L-38.5 -38.5 L-6.4 -14.5 L0 -62 L6.4 -14.5 L38.5 -38.5 L14.5 -6.4 Z" />
+    <g stroke="none" fill="#d4a843" opacity="0.22">
+      <path d="M62 0 L14.5 -6.4 L0 0 L14.5 6.4 Z" /><path d="M0 62 L-6.4 14.5 L0 0 L6.4 14.5 Z" />
+      <path d="M-62 0 L-14.5 6.4 L0 0 L-14.5 -6.4 Z" /><path d="M0 -62 L6.4 -14.5 L0 0 L-6.4 -14.5 Z" />
+    </g>
+  </g>
+</svg>

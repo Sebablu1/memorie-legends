@@ -68,6 +68,7 @@ const TITULOS = {
   insignia: "Insignias",
   dorso: "Dorsos",
   fondo: "Paños de mesa",
+  mazo: "Mazos",
 };
 
 const seccion = (titulo, tipo) => `

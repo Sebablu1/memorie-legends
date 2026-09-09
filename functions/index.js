@@ -74,6 +74,7 @@ import {
   EsquemaUmbrales,
   EsquemaItemAdmin,
   EsquemaActivarItem,
+  EsquemaDesposeer,
 } from "./esquemas.js";
 import { crearSalirDeSalaEnEspera } from "./salida.js";
 import { crearAdmin } from "./admin.js";
@@ -233,21 +234,47 @@ const azarCodigo = () => crypto.randomInt(0, 2 ** 32) / 2 ** 32;
  * avatar no está en el catálogo o si la lectura falla, se devuelve `null` y
  * la mesa usa las caras de la casa. Un retrato es decoración.
  */
+const SIN_NADA = Object.freeze({ retrato: null, dorso: null, insignia: null });
+
+/**
+ * El formato anterior, en que la lista llevaba sólo la cara.
+ *
+ * Hay salas abiertas creadas con `jugadoresRetratos` y sus partidas tienen que
+ * repartirse igual. Está acá y no en los dos lugares que lo necesitan porque
+ * la traducción tiene que ser LA MISMA en los dos: si una pusiera los huecos
+ * en `undefined` y la otra en `null`, la diferencia aparecería recién en la
+ * mesa de alguien.
+ */
+const desdeRetratos = (retratos) =>
+  (retratos ?? []).map((retrato) => ({ ...SIN_NADA, retrato: retrato ?? null }));
+
 async function identidadEnSala(uid) {
   const perfil = await db.collection(USUARIOS).doc(uid).get();
-  if (!perfil.exists) return { nombre: "Jugador", retrato: null };
+  if (!perfil.exists) return { nombre: "Jugador", luce: { ...SIN_NADA } };
 
   const datos = perfil.data();
   const nombre = datos.username ?? "Jugador";
-  if (!datos.avatar) return { nombre, retrato: null };
 
   try {
-    const item = await db.collection(COLECCION_CATALOGO).doc(datos.avatar).get();
-    const imagen = item.exists ? item.data().imagen : null;
-    return { nombre, retrato: esRutaDelSitio(imagen) ? imagen : null };
+    /** La ruta de un artículo del catálogo, o null. */
+    const ruta = async (id) => {
+      if (!id) return null;
+      const item = await db.collection(COLECCION_CATALOGO).doc(id).get();
+      const imagen = item.exists ? item.data().imagen : null;
+      return esRutaDelSitio(imagen) ? imagen : null;
+    };
+
+    // Las tres juntas: son tres lecturas independientes y esperarlas en fila
+    // triplicaría lo que tarda entrar a una sala.
+    const [retrato, dorso, insignia] = await Promise.all([
+      ruta(datos.avatar),
+      ruta(datos.dorso),
+      ruta(datos.insignia),
+    ]);
+    return { nombre, luce: { retrato, dorso, insignia } };
   } catch (error) {
-    logger.warn("No se pudo leer el avatar para la sala", { uid, error: error.message });
-    return { nombre, retrato: null };
+    logger.warn("No se pudo leer lo equipado para la sala", { uid, error: error.message });
+    return { nombre, luce: { ...SIN_NADA } };
   }
 }
 
@@ -274,7 +301,7 @@ export const crearSala = functions.https.onCall(async (data, context) => {
   // Fuera de la transacción a propósito: son dos lecturas y adentro sólo se
   // puede leer antes de escribir. Además, el nombre y la cara de uno mismo no
   // son datos que puedan cambiar entre esta línea y el `runTransaction`.
-  const { nombre: nombreJugador, retrato } = await identidadEnSala(uid);
+  const { nombre: nombreJugador, luce } = await identidadEnSala(uid);
 
   // Hasta cinco intentos por si un código ya estaba tomado.
   for (let intento = 0; intento < 5; intento++) {
@@ -303,15 +330,18 @@ export const crearSala = functions.https.onCall(async (data, context) => {
           entrada,
           creador: uid,
           creadorNombre: nombreJugador,
-          // Las tres listas son paralelas: el asiento de cada quien es su
-          // posición en las tres. Van juntas acá, en `unirseASala` y en
-          // `salida.js`, y `pruebas/retratos-en-red.mjs` audita que sigan
-          // yendo juntas. Una sala vieja sin retratos no rompe nada —los
-          // huecos caen a la cara de la casa— pero una con dos nombres y un
-          // retrato le pone a alguien la cara de otro.
+          // Dos listas paralelas: el asiento de cada quien es su posición en
+          // las dos. Van juntas acá, en `unirseASala` y en `salida.js`, y
+          // `pruebas/retratos-en-red.mjs` audita que sigan yendo juntas.
+          //
+          // `jugadoresLuce` reemplazó a `jugadoresRetratos`, que sólo llevaba
+          // la cara. Con el dorso y la insignia además, habrían sido CUATRO
+          // listas que mantener alineadas en tres lugares — y ya se desalineó
+          // una vez: `salida.js` reconstruía los nombres y no los retratos, y
+          // los que quedaban detrás heredaban la cara del de adelante.
           jugadores: [uid],
           jugadoresNombres: [nombreJugador],
-          jugadoresRetratos: [retrato],
+          jugadoresLuce: [luce],
           maxJugadores: MAX_JUGADORES,
           estado: ESTADOS_SALA.ESPERANDO,
           listos: [],
@@ -347,7 +377,7 @@ export const unirseASala = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("invalid-argument", "Código inválido.");
   }
 
-  const { nombre: nombreJugador, retrato } = await identidadEnSala(uid);
+  const { nombre: nombreJugador, luce } = await identidadEnSala(uid);
 
   return db.runTransaction(async (tx) => {
     const refSala = db.collection(SALAS).doc(codigo);
@@ -374,20 +404,19 @@ export const unirseASala = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError("already-exists", "Ya pagaste la entrada a esta sala.");
     }
 
-    // La lista de retratos se rellena hasta donde haga falta antes de sumar
-    // el propio.
+    // La lista se rellena hasta donde haga falta antes de sumar la propia.
     //
     // Una sala creada antes de que esto existiera tiene jugadores y no tiene
-    // retratos; empujando el nuevo sobre una lista vacía, la cara del recién
-    // llegado terminaría en el asiento del primer jugador. Los huecos van con
-    // `null`, que es lo que la mesa entiende como «usá la cara de la casa».
-    const retratos = [...(sala.jugadoresRetratos ?? [])];
-    while (retratos.length < (sala.jugadores ?? []).length) retratos.push(null);
+    // la lista; empujando la del recién llegado sobre una vacía, su cara
+    // terminaría en el asiento del primer jugador. Los huecos van vacíos, que
+    // es lo que la mesa entiende como «usá lo de la casa».
+    const luces = [...(sala.jugadoresLuce ?? desdeRetratos(sala.jugadoresRetratos))];
+    while (luces.length < (sala.jugadores ?? []).length) luces.push({ ...SIN_NADA });
 
     tx.update(refSala, {
       jugadores: [...(sala.jugadores ?? []), uid],
       jugadoresNombres: [...(sala.jugadoresNombres ?? []), nombreJugador],
-      jugadoresRetratos: [...retratos, retrato],
+      jugadoresLuce: [...luces, luce],
       pozo: Number(sala.entrada) * ((sala.jugadores ?? []).length + 1),
     });
 
@@ -491,7 +520,7 @@ export const iniciarPartida = functions.https.onCall(async (data, context) => {
       codigo,
       jugadores,
       nombres: sala.jugadoresNombres ?? [],
-      retratos: sala.jugadoresRetratos ?? [],
+      luce: sala.jugadoresLuce ?? desdeRetratos(sala.jugadoresRetratos),
     });
 
     tx.update(refSala, {
@@ -632,6 +661,7 @@ const tienda = crearTienda({
   marcaDeTiempo,
   error: errorHttp,
   motivoCompra: MOTIVOS.COMPRA_PERSONALIZACION,
+  motivoDevolucion: MOTIVOS.DEVOLUCION_ARTICULO,
   usuarios: USUARIOS,
   administradores,
 });
@@ -763,6 +793,46 @@ export const apagarCatalogoViejoAdmin = functions.https.onCall((data, context) =
 export const borrarItemAdmin = functions.https.onCall((data, context) =>
   tienda.borrarItem(context, validar(EsquemaItem, data, errorHttp).itemId));
 
+/**
+ * Quiénes compraron un artículo.
+ *
+ * Existe para poder mirar antes de romper: `borrarItemAdmin` se niega a
+ * borrar lo que alguien tiene, y hasta ahora no había forma de saber quién
+ * era ese alguien ni cuántos eran.
+ */
+export const listarPoseedoresItemAdmin = functions.https.onCall((data, context) =>
+  tienda.listarPoseedores(context, validar(EsquemaItem, data, errorHttp).itemId));
+
+/**
+ * Le saca un artículo a una persona y le devuelve lo que pagó.
+ *
+ * Mueve saldo, así que su techo de ritmo vive en la tabla de plata.
+ */
+export const desposeerItemAdmin = functions.https.onCall(async (data, context) => {
+  // Acá hay DOS uid y conviene no confundirlos: `uid` es quien pide —el
+  // administrador, que es a quien se le cuenta el ritmo— y `aQuien` es la
+  // persona a la que se le saca el artículo. Que el segundo venga en la
+  // llamada es justamente lo que hace que esto sea una operación de panel y
+  // no algo que cualquiera pueda hacerle a otro: quién puede pedirla lo
+  // decide `administradores.exigir`, adentro de la tienda.
+  const uid = exigirSesion(context, "desposeerItemAdmin");
+  await limite.exigirRitmoDePlata(uid, "desposeerItemAdmin");
+  const { itemId, uid: aQuien } = validar(EsquemaDesposeer, data, errorHttp);
+  return tienda.desposeer(context, { itemId, uid: aQuien });
+});
+
+/**
+ * Se lo saca a todos y después lo borra del catálogo.
+ *
+ * La advertencia la da el panel; acá lo único que se garantiza es que el
+ * artículo no se borre si quedó alguien teniéndolo.
+ */
+export const forzarBorrarItemAdmin = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context, "forzarBorrarItemAdmin");
+  await limite.exigirRitmoDePlata(uid, "forzarBorrarItemAdmin");
+  return tienda.forzarBorrar(context, validar(EsquemaItem, data, errorHttp).itemId);
+});
+
 export const listarSalasAdmin = functions.https.onCall((_data, context) =>
   panel.listarSalas(context));
 
@@ -869,6 +939,11 @@ const cierre = crearCierre({
   partidas: "partidas",
   moverLeyendas,
   motivo: MOTIVOS.PREMIO_PARTIDA,
+  // Si abandonaron todos no hay a quién premiar y el pozo vuelve a quien lo
+  // puso. En el libro mayor eso es la apuesta que regresa, igual que la
+  // devolución de una sala cancelada: mismo motivo, para que todas las
+  // devoluciones de sala se lean iguales.
+  motivoDevolucion: MOTIVOS.APUESTA,
   marcaDeTiempo,
   error: errorHttp,
   estados: ESTADOS_SALA,
@@ -1352,6 +1427,102 @@ async function cerrarPeriodo(periodo, fechaDelPeriodoQueCierra) {
   logger.info("Período de ranking cerrado", { clave, periodo, premiados });
   return { clave, premiados };
 }
+
+/**
+ * Empuja las partidas que se quedaron esperando a alguien.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ HACE FALTA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque hasta ahora la única forma de que una partida avanzara era que un
+ * navegador llamara a `avanzarPartida`, y el cliente sólo lo hace con la
+ * pestaña VISIBLE —`mantenerEnMarcha` arranca con `if (document.hidden)
+ * return`—. Si los cuatro jugadores minimizan, cambian de pestaña o bloquean
+ * el teléfono a la vez, nadie golpea la puerta y la partida se congela.
+ *
+ * El final de ronda es donde más pasa, porque es la pausa en la que todo el
+ * mundo mira el marcador y se va a hacer otra cosa. Y congelada ahí, la sala
+ * queda en `jugando` con las entradas cobradas y el pozo retenido: para
+ * siempre, porque cerrarla también es una transición de esa misma máquina
+ * que no corre.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * NO ES UN PARCHE: ES QUIEN FALTABA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La autoridad del tiempo ya era del servidor —él guarda el plazo y él
+ * decide si venció—; lo que no había era nadie que le preguntara sin que un
+ * jugador estuviera mirando. Esto no cambia ninguna regla: llama a la misma
+ * `avanzarPartida` que llaman los clientes, que no hace nada si el plazo no
+ * venció.
+ *
+ * Y arregla solo el caso de la sala abandonada: con las transiciones
+ * corriendo, una partida donde todos abandonaron llega a `finPartida`, el
+ * cierre reparte el pozo —y si no quedó nadie elegible, lo devuelve— y la
+ * sala queda cerrada.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * VARIOS PASOS POR PARTIDA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `avanzarPartida` hace UNA transición por llamada, a propósito: cada paso
+ * publica vistas y encadenarlos en una transacción dejaría a los jugadores
+ * sin ver los intermedios. Pero acá no hay jugadores mirando —por eso está
+ * congelada— así que se encadenan unos pocos pasos y la partida se destraba
+ * en un barrido en vez de en ocho minutos.
+ *
+ * El tope de pasos no es decorativo: sin él, una partida que por algún
+ * motivo volviera a estar vencida después de cada paso giraría para siempre
+ * dentro de una sola ejecución.
+ */
+const PASOS_POR_PARTIDA = 8;
+
+async function barrerPartidasVencidas() {
+  const codigos = await enRed.vencidas();
+  if (!codigos.length) return { revisadas: 0, pasos: 0, cerradas: 0 };
+
+  let pasos = 0;
+  let cerradas = 0;
+  const problemas = [];
+
+  for (const codigo of codigos) {
+    for (let i = 0; i < PASOS_POR_PARTIDA; i++) {
+      let r;
+      try {
+        r = await enRed.avanzarPartida({ codigo });
+      } catch (e) {
+        // Una partida que falla no puede frenar a las demás: son
+        // independientes y cada una tiene su propia transacción.
+        problemas.push({ codigo, motivo: e?.message ?? "error desconocido" });
+        break;
+      }
+
+      if (r?.hizo === "cerrarPartida") {
+        // Lo mismo que hace el camino normal: insignias y ranking.
+        await despuesDelCierre(r);
+        cerradas++;
+      }
+
+      if (!r?.hizo) break; // nada que hacer todavía
+      pasos++;
+    }
+  }
+
+  const resumen = { revisadas: codigos.length, pasos, cerradas, problemas };
+  if (pasos || problemas.length) logger.info("Barrido de partidas", resumen);
+  return resumen;
+}
+
+/**
+ * Cada minuto. Es el intervalo más corto que admite el programador de
+ * Firebase, y es el que corresponde: lo que se está destrabando es una mesa
+ * con gente esperando del otro lado.
+ */
+export const barrerPartidas = functions.pubsub
+  .schedule("* * * * *")
+  .timeZone(ZONA)
+  .onRun(() => barrerPartidasVencidas());
 
 const ayer = () => new Date(Date.now() - 86400000);
 

@@ -171,6 +171,19 @@ export const EsquemaTipo = z.object({
   tipo: z.enum(TIPOS_VALIDOS),
 });
 
+/**
+ * Quitarle un artículo a una persona.
+ *
+ * El `uid` viaja en la llamada porque el administrador está actuando SOBRE
+ * otra cuenta, que es la única familia de operaciones donde eso es
+ * legítimo. Se valida la forma acá y quién lo pide en `administradores.js`:
+ * un uid bien escrito de nada sirve si lo manda cualquiera.
+ */
+export const EsquemaDesposeer = z.object({
+  itemId: z.string().trim().min(2).max(64),
+  uid: z.string().trim().min(1).max(128),
+});
+
 // -------------------------------------------------------------- torneos
 
 /**

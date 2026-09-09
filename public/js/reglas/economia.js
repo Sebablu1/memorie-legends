@@ -232,4 +232,19 @@ export const MOTIVOS = {
    * con dinero. Ésta las gasta.
    */
   COMPRA_PERSONALIZACION: "compra_personalizacion",
+
+  /**
+   * Le devuelven las Leyendas de un artículo que le sacaron.
+   *
+   * Lo usa una sola cosa: el administrador quitándole a alguien un artículo
+   * del inventario. Quitarlo sin devolver sería quedarse con lo que esa
+   * persona pagó, y el libro mayor tiene que poder explicar por qué le
+   * volvió el saldo.
+   *
+   * Es su propio motivo y no `COMPRA_PERSONALIZACION` en negativo, por lo
+   * mismo que la devolución de un torneo no es un premio: va en la
+   * dirección contraria y por una razón distinta. A la persona no le fue
+   * bien ni mal; le sacaron algo.
+   */
+  DEVOLUCION_ARTICULO: "devolucion_articulo",
 };

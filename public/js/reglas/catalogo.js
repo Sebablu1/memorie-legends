@@ -47,6 +47,19 @@ export const TIPOS = {
    * partida entera.
    */
   FONDO: "fondo",
+
+  /**
+   * El dorso del mazo del centro.
+   *
+   * No es lo mismo que un DORSO: aquél es el reverso de las cartas que uno
+   * tiene en la mano, y de él hay dos alternados para que se distinga de
+   * quién es cada mano. Éste es la pila del medio, que no es de nadie y se
+   * mira la partida entera.
+   *
+   * Por eso son tipos distintos y no colores de uno solo: se equipan por
+   * separado, se compran por separado, y ponerse uno no cambia el otro.
+   */
+  MAZO: "mazo",
 };
 
 export const TIPOS_VALIDOS = Object.values(TIPOS);
@@ -66,7 +79,7 @@ export const esTipoValido = (tipo) => TIPOS_VALIDOS.includes(tipo);
  * el servidor, donde el cliente no llega: esconder el botón de comprar no es
  * impedir la compra.
  */
-export const TIPOS_VENDIBLES = Object.freeze([TIPOS.AVATAR, TIPOS.DORSO, TIPOS.FONDO]);
+export const TIPOS_VENDIBLES = Object.freeze([TIPOS.AVATAR, TIPOS.DORSO, TIPOS.FONDO, TIPOS.MAZO]);
 
 export const esVendible = (tipo) => TIPOS_VENDIBLES.includes(tipo);
 
@@ -141,6 +154,7 @@ export const CAMPO_EQUIPADO = {
   // que todo campo que no esté nombrado ahí ya está prohibido. Es la ventaja
   // de haberla escrito como lista de lo permitido y no de lo negado.
   [TIPOS.FONDO]: "fondo",
+  [TIPOS.MAZO]: "mazo",
 };
 
 /** Subcolección donde se anota qué compró cada jugador. */
@@ -368,6 +382,18 @@ export const CATALOGO_INICIAL = [
   { id: "pano_fieltro", tipo: TIPOS.FONDO, nombre: "Fieltro Verde", descripcion: "El paño de casino de toda la vida.", precio: 200, imagen: "/img/mesa/panos/fieltro.svg", activo: true, orden: 20, metadata: { rareza: "poco_comun" } },
   { id: "pano_madera", tipo: TIPOS.FONDO, nombre: "Roble de Taberna", descripcion: "Una tabla lustrada por mil partidas.", precio: 300, imagen: "/img/mesa/panos/madera.svg", activo: true, orden: 30, metadata: { rareza: "raro" } },
   { id: "pano_carmesi", tipo: TIPOS.FONDO, nombre: "Terciopelo Carmesí", descripcion: "Para las mesas donde se juega en serio.", precio: 400, imagen: "/img/mesa/panos/carmesi.svg", activo: true, orden: 40, metadata: { rareza: "epico" } },
+
+  // -------------------------------------------------- mazos del centro
+  //
+  // El gratuito es el dorso azul que la pila del medio ya usaba: equiparlo
+  // no cambia nada de lo que se ve, y está para que quien se probó otro
+  // pueda volver. Los tres pagos son SVG con la misma rosa de los vientos
+  // que lleva grabada el paño, para que el mazo se lea como parte del
+  // mueble y no como un naipe apoyado encima.
+  { id: "mazo_azul", tipo: TIPOS.MAZO, nombre: "Mazo Azul", descripcion: "El del medio de siempre.", precio: 0, imagen: "/img/dorsos/dorso-azul.png", activo: true, orden: 10, metadata: { rareza: "inicial" } },
+  { id: "mazo_real", tipo: TIPOS.MAZO, nombre: "Mazo Real", descripcion: "Azul de medianoche, brújula en oro.", precio: 200, imagen: "/img/mazos/real.svg", activo: true, orden: 20, metadata: { rareza: "poco_comun" } },
+  { id: "mazo_esmeralda", tipo: TIPOS.MAZO, nombre: "Mazo Esmeralda", descripcion: "Verde profundo y plata verdosa.", precio: 300, imagen: "/img/mazos/esmeralda.svg", activo: true, orden: 30, metadata: { rareza: "raro" } },
+  { id: "mazo_carmesi", tipo: TIPOS.MAZO, nombre: "Mazo Carmesí", descripcion: "El de las mesas donde se juega en serio.", precio: 400, imagen: "/img/mazos/carmesi.svg", activo: true, orden: 40, metadata: { rareza: "epico" } },
 ];
 
 /**

@@ -128,6 +128,19 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Bitácora del panel: qué artículo le sacó un administrador a quién.
+    //
+    // NI SIQUIERA EL DUEÑO LA LEE, a diferencia del libro mayor. Ahí cada
+    // quien ve sus propios movimientos porque son su plata; esto es el
+    // registro de una decisión de administración, y quien la tomó tiene
+    // derecho a que no se la lea desde una pestaña cualquiera. La devolución
+    // de Leyendas que acompaña a cada desposesión SÍ aparece en
+    // `movimientos`, así que el afectado puede ver que le volvió el saldo.
+    match /auditoria/{id} {
+      allow read: if false;
+      allow write: if false;
+    }
+
     // Órdenes de compra: sólo las propias.
     match /ordenes/{id} {
       allow read: if autenticado() && resource.data.uid == request.auth.uid;

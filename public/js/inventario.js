@@ -45,6 +45,7 @@ const GRUPOS = [
   { tipo: TIPOS.AVATAR, titulo: "Mis avatares", vacio: "Todavía no tenés ningún avatar." },
   { tipo: TIPOS.DORSO, titulo: "Mis dorsos", vacio: "Todavía no tenés ningún dorso." },
   { tipo: TIPOS.FONDO, titulo: "Mis paños de mesa", vacio: "Todavía no tenés ningún paño." },
+  { tipo: TIPOS.MAZO, titulo: "Mis mazos", vacio: "Todavía no tenés ningún mazo." },
 ];
 
 /**

@@ -265,19 +265,61 @@ console.log("\n=== 3. Un solo elegible: 75 % y el resto sobrante ===");
 
 // ==================================================================== 4
 
-console.log("\n=== 4. Ningún elegible: todo sobrante ===");
+console.log("\n=== 4. Si abandonaron todos, el pozo vuelve ===");
 {
+  /**
+   * Antes el pozo entero quedaba como `sobrante`, o sea que se lo quedaba la
+   * casa: cuatro jugadores a cien eran cuatrocientas Leyendas que se
+   * evaporaban. Nadie jugó, nadie ganó, y encima cada uno ya había pagado su
+   * penalización de abandono por separado.
+   *
+   * No era una decisión: era lo que salía de calcular premios para una lista
+   * de elegibles vacía. El `sobrante` de la sección 3 SÍ es una decisión —ahí
+   * hay un ganador y el segundo premio no tiene a quién ir— y por eso esa
+   * sección no cambia.
+   */
   const { db, cerrar } = montar({ orden: CUATRO, abandonaron: [...CUATRO] });
   const r = await capturar(() => cerrar({ uid: "ana", codigo: CODIGO }));
   ok(r.valor && !r.error, "cierra igual", r.error?.message);
 
-  ok(CUATRO.every((u) => ganado(db, u) === 0), "nadie cobra nada",
-     CUATRO.map((u) => ganado(db, u)));
-  ok(r.valor.repartido === 0, "no se repartió nada", r.valor.repartido);
-  ok(r.valor.sobrante === 400, "el pozo entero queda como sobrante", r.valor.sobrante);
-  ok(r.valor.premios.length === 0, "sin premios");
-  ok(!db.rutas().some((x) => x.startsWith("movimientos/")), "y sin ningún asiento");
-  ok(sala(db).estado === ESTADOS_SALA.TERMINADA, "pero la sala igual queda cerrada");
+  ok(
+    CUATRO.every((u) => ganado(db, u) === 100),
+    "a cada uno le vuelve su entrada",
+    CUATRO.map((u) => ganado(db, u)),
+  );
+  ok(r.valor.repartido === 400, "se devolvió el pozo entero", r.valor.repartido);
+  ok(r.valor.sobrante === 0, "y no queda sobrante", r.valor.sobrante);
+
+  // La cuenta tiene que cerrar exacta, como en todos los demás casos: lo
+  // devuelto más lo que sobra es lo que había.
+  ok(r.valor.repartido + r.valor.sobrante === 400, "el pozo cierra exacto");
+
+  const asientos = db.rutas().filter((x) => x.startsWith("movimientos/"));
+  ok(asientos.length === 4, "un asiento por jugador en el libro mayor", asientos.length);
+
+  // Y el documento de cierre dice POR QUÉ no hay premios. Sin esto, una
+  // partida devuelta y una sin pozo se leen igual.
+  ok(sala(db).cierre?.sinGanadores === true, "queda escrito que no hubo ganadores");
+  ok(sala(db).estado === ESTADOS_SALA.TERMINADA, "y la sala queda cerrada");
+}
+
+console.log("\n=== 4b. Devolver dos veces no paga dos veces ===");
+{
+  // La devolución lleva su propia clave de idempotencia, por jugador. Sin
+  // ella compartiría la del premio —que va por PUESTO, y acá no hay puestos—
+  // y dos cierres simultáneos podrían pagar de más.
+  const { db, cerrar } = montar({ orden: CUATRO, abandonaron: [...CUATRO] });
+  await capturar(() => cerrar({ uid: "ana", codigo: CODIGO }));
+  const antes = CUATRO.map((u) => ganado(db, u));
+
+  await capturar(() => cerrar({ uid: "beto", codigo: CODIGO }));
+  const despues = CUATRO.map((u) => ganado(db, u));
+
+  ok(
+    JSON.stringify(antes) === JSON.stringify(despues),
+    "el segundo cierre no vuelve a pagar",
+    { antes, despues },
+  );
 }
 
 // ==================================================================== 5

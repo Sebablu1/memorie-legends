@@ -61,6 +61,25 @@ export function dorsoDe(asiento) {
 }
 
 /**
+ * El dorso de la pila del centro.
+ *
+ * Es un artículo aparte del dorso de la mano —se compra y se equipa por su
+ * cuenta— porque son dos cosas distintas: el de la mano distingue de quién
+ * es cada juego, y el del centro no es de nadie.
+ *
+ * Sin nada comprado cae al dorso del asiento cero, que es lo que la pila
+ * usaba antes de que esto existiera: el cambio no se nota hasta que alguien
+ * compra uno.
+ */
+let mazoCentral = null;
+
+export function usarMazoCentral(ruta = null) {
+  mazoCentral = ruta;
+}
+
+export const dorsoDelMazo = () => mazoCentral ?? dorsoDeAsiento(0);
+
+/**
  * Con sólo dos dorsos, el 3º y el 4º jugador repiten imagen. Lo que los
  * distingue es el color del aro que rodea sus cartas y su ficha.
  */
@@ -89,12 +108,14 @@ function etiqueta(posicion, cartaVisible) {
 
 export function dibujarCarta(
   carta,
-  { visible, asiento = 0, posicion = null, clases = "", estilo = "" },
+  { visible, asiento = 0, posicion = null, clases = "", estilo = "", dorso: dorsoPedido = null },
 ) {
   if (!carta) {
     return `<div class="hueco vacio" style="${estilo}"></div>`;
   }
-  const dorso = dorsoDe(asiento);
+  // El dorso sale del asiento salvo que quien dibuja pida otro. Lo pide la
+  // pila del centro, que no pertenece a ningún asiento y tiene el suyo.
+  const dorso = dorsoPedido ?? dorsoDe(asiento);
 
   // El servidor manda las cartas ajenas como un marcador sin palo, número ni
   // imagen. No es que no se dibuje la cara: es que la cara NO VIAJÓ. Dibujar
@@ -160,7 +181,19 @@ export function geometriaAbanico(cantidad, propio) {
   if (cantidad <= 1) return { anguloTotal: 0, arco: 0, solape: 0, escala: 1 };
 
   const anguloTotal = Math.min(propio ? 26 : 18, cantidad * (propio ? 5.5 : 4));
-  const arco = propio ? 3.2 : 2.2;
+  /**
+   * Cuánto caen las cartas de los extremos, como una mano sostenida.
+   *
+   * Los rivales van PLANOS. Su curva era de dos coma dos, que en una mano de
+   * cuatro deja las de las puntas casi siete píxeles más abajo — y el asiento
+   * de arriba tiene justo debajo las pilas del centro. Desde que el centro
+   * mide lo mismo que una carta de la mesa, esos siete píxeles se le metían
+   * encima al mazo y a la muestra.
+   *
+   * Aplanarlo no cuesta alto, que es lo que escasea, y en una mano chica y
+   * boca abajo la curva no se veía. La propia la conserva: es la que se mira.
+   */
+  const arco = propio ? 3.2 : 0;
 
   return {
     anguloTotal,

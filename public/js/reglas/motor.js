@@ -86,16 +86,17 @@ const siguienteActivo = (jugadores, desde) => {
 /**
  * Un jugador nuevo.
  *
- * `retrato` es la ruta de la imagen que lo representa en la mesa, y viaja
- * acá al lado de `nombre` por la misma razón que el nombre: es identidad, y
- * la identidad se fija al repartir. En una partida por Leyendas la elige el
- * servidor cuando el jugador entra a la sala; en entrenamiento no se pasa y
- * queda en `null`, que es lo que hace que la mesa use las caras de la casa.
+ * `retrato`, `dorso` e `insignia` son rutas de imagen: la cara, el reverso de
+ * sus cartas y el logro que eligió mostrar. Viajan acá al lado de `nombre` por
+ * la misma razón que el nombre: son identidad, y la identidad se fija al
+ * repartir. En una partida por Leyendas las elige el servidor cuando el
+ * jugador entra a la sala; en entrenamiento no se pasan y quedan en `null`,
+ * que es lo que hace que la mesa use las caras y los dorsos de la casa.
  *
- * Es lo único de este objeto que no participa de ninguna regla. Se acepta
- * porque la alternativa —llevar los retratos por un canal aparte, indexado
- * igual que los jugadores— son dos listas paralelas que tarde o temprano se
- * desfasan; y porque `nombre` ya sentó el precedente.
+ * Son lo único de este objeto que no participa de ninguna regla. Se aceptan
+ * porque la alternativa —llevarlas por un canal aparte, indexadas igual que
+ * los jugadores— son tres listas paralelas que tarde o temprano se desfasan;
+ * y porque `nombre` ya sentó el precedente.
  */
 export const crearJugador = ({
   id,
@@ -103,10 +104,14 @@ export const crearJugador = ({
   esIA = false,
   dificultad = "medio",
   retrato = null,
+  dorso = null,
+  insignia = null,
 }) => ({
   id,
   nombre,
   retrato,
+  dorso,
+  insignia,
   esIA,
   dificultad,
   mano: [],

@@ -1,21 +1,26 @@
 /**
- * El retrato de cada jugador en una partida por Leyendas.
+ * Lo que cada jugador lleva puesto en una partida por Leyendas.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * QUÉ SE DEFIENDE ACÁ
  * ─────────────────────────────────────────────────────────────────────────
  *
  * En entrenamiento los rivales son IA y llevan las caras de la casa. En una
- * partida por Leyendas hay cuatro personas con un avatar comprado cada una, y
- * hasta ahora ese avatar no llegaba a la mesa: la sala guardaba el uid y el
- * nombre, y nada más.
+ * partida por Leyendas hay cuatro personas con lo suyo comprado —cara, dorso
+ * de sus cartas, insignia— y hasta hace poco nada de eso llegaba a la mesa:
+ * la sala guardaba el uid y el nombre, y nada más.
  *
- * Ahora el retrato viaja, y hay cuatro cosas que pueden salir mal en silencio:
+ * Los tres viajan juntos, en una sola lista de objetos. Podrían haber sido
+ * tres listas paralelas más la de nombres, cuatro en total; se descartó
+ * porque el modo en que esto se rompe es justamente que dos listas se
+ * desfasen, y cada lista nueva es una manera más de que ocurra.
+ *
+ * Hay cuatro cosas que pueden salir mal en silencio:
  *
  *   1. Que la cara termine en el asiento equivocado. Es lo peor que puede
  *      pasar, porque la mesa se sigue viendo perfecta: cuatro jugadores con
- *      cuatro caras, sólo que no son las suyas. Pasa en cuanto las tres listas
- *      paralelas de la sala se desfasan en un elemento.
+ *      cuatro caras, sólo que no son las suyas. Pasa en cuanto la lista y la
+ *      de nombres se desfasan en un elemento.
  *   2. Que una sala vieja —creada antes de que esto existiera— corra los
  *      retratos un lugar al entrar el siguiente jugador.
  *   3. Que el retrato cambie a mitad de la partida. Si se leyera del perfil en
@@ -31,7 +36,7 @@
  *
  * `crearSala` y `unirseASala` son `functions.https.onCall` declaradas al
  * cargar `functions/index.js`: no se pueden importar sin levantar medio
- * Firebase. Lo que sí se puede comprobar de ellas es que escriban las tres
+ * Firebase. Lo que sí se puede comprobar de ellas es que escriban las dos
  * listas JUNTAS, y eso se hace leyendo el archivo, igual que
  * `transacciones.mjs` y `ritmo.mjs`. Una auditoría de texto no prueba que el
  * valor sea el correcto; prueba que nadie agregue un jugador olvidándose de su
@@ -164,30 +169,43 @@ const motorDe = (db) =>
     semillaDe: () => 777,
   });
 
-async function repartirCon(retratos) {
+/**
+ * Reparte con lo que cada uno lleva puesto y devuelve cómo quedó en la mesa.
+ *
+ * `luce` es UNA lista de objetos y no tres listas paralelas. Con el dorso y
+ * la insignia sumados al retrato habrían sido cuatro listas que mantener
+ * alineadas —nombres incluidos— en tres lugares distintos, y ya se desalineó
+ * una vez: `salida.js` reconstruía los nombres y no los retratos.
+ */
+async function repartirCon(luce) {
   const db = db0();
   const red = motorDe(db);
-  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO, retratos });
-  return db.leer("partidas/ABCDEF").estado.jugadores.map((j) => j.retrato);
+  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO, luce });
+  return db.leer("partidas/ABCDEF").estado.jugadores;
 }
+
+/** Atajo: sólo las caras, que es lo que miran varias de estas pruebas. */
+const caras = (jugadores) => jugadores.map((j) => j.retrato);
 
 {
   const CARAS = ["/img/avatar/a.webp", "/img/avatar/b.webp", "/img/avatar/c.webp", "/img/avatar/d.webp"];
-  const puestas = await repartirCon(CARAS);
+  const puestas = caras(await repartirCon(CARAS.map((retrato) => ({ retrato }))));
   ok(JSON.stringify(puestas) === JSON.stringify(CARAS), "cada uno con la suya", puestas);
 }
 
 {
   // Una sala vieja: tiene cuatro jugadores y ningún retrato. Nadie tiene cara,
   // y sobre todo nadie tiene la de otro.
-  const puestas = await repartirCon(undefined);
-  ok(puestas.every((r) => r === null), "sin lista de retratos, los cuatro en null", puestas);
+  const puestas = caras(await repartirCon(undefined));
+  ok(puestas.every((r) => r === null), "sin lista, los cuatro en null", puestas);
 }
 
 {
   // El caso feo: la lista llega más corta que los jugadores. Los que faltan
   // quedan sin cara; lo que NO puede pasar es que se corran de asiento.
-  const puestas = await repartirCon(["/img/avatar/a.webp", "/img/avatar/b.webp"]);
+  const puestas = caras(
+    await repartirCon([{ retrato: "/img/avatar/a.webp" }, { retrato: "/img/avatar/b.webp" }]),
+  );
   ok(
     puestas[0] === "/img/avatar/a.webp" && puestas[1] === "/img/avatar/b.webp",
     "los que sí tienen, en su lugar",
@@ -201,22 +219,22 @@ async function repartirCon(retratos) {
   // uno se sentó, y nada la vuelve a mirar después.
   const db = db0();
   const red = motorDe(db);
-  const CARAS = ["/img/avatar/a.webp", null, null, null];
-  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO, retratos: CARAS });
+  const CARAS = [{ retrato: "/img/avatar/a.webp" }, {}, {}, {}];
+  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO, luce: CARAS });
   const antes = db.leer("partidas/ABCDEF").estado.jugadores[0].retrato;
 
   // Repartir de nuevo con otra cara no cambia nada: el reparto es idempotente.
   await red.repartir({
     codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO,
-    retratos: ["/img/avatar/OTRA.webp", null, null, null],
+    luce: [{ retrato: "/img/avatar/OTRA.webp" }, {}, {}, {}],
   });
   const despues = db.leer("partidas/ABCDEF").estado.jugadores[0].retrato;
   ok(antes === despues, "la cara queda fijada al repartir y no se vuelve a tocar", { antes, despues });
 }
 
-// ================================== la auditoría de las tres listas paralelas
+// =================================== la auditoría de las listas paralelas
 
-console.log("\n=== Las tres listas de la sala se escriben juntas ===");
+console.log("\n=== Las listas de la sala se escriben juntas ===");
 {
   // Los DOS archivos que tocan la lista. `salida.js` se auditó desde el
   // principio y no por precaución: cuando alguien se iba de una sala en espera,
@@ -227,11 +245,11 @@ console.log("\n=== Las tres listas de la sala se escriben juntas ===");
     readFileSync(new URL("../functions/salida.js", import.meta.url), "utf8"),
   ].join("\n// ---- archivo siguiente ----\n");
 
-  // Cada bloque que agrega a `jugadores` tiene que agregar también a las otras
-  // dos. Se buscan las apariciones de `jugadoresNombres` —que es la lista que
-  // ya existía— y se comprueba que `jugadoresRetratos` esté a menos de cinco
-  // líneas: si alguien agrega un jugador en un tercer lugar y se olvida de la
-  // cara, la mesa muestra caras corridas y no falla nada.
+  // Cada bloque que agrega a `jugadores` tiene que agregar también a la otra.
+  // Se buscan las apariciones de `jugadoresNombres` —que es la lista que ya
+  // existía— y se comprueba que `jugadoresLuce` esté a menos de cinco líneas:
+  // si alguien agrega un jugador en un tercer lugar y se olvida de lo que
+  // lleva puesto, la mesa muestra caras corridas y no falla nada.
   const lineas = fuente.split("\n");
   const conNombres = lineas
     .map((l, i) => (l.includes("jugadoresNombres") ? i : -1))
@@ -240,26 +258,94 @@ console.log("\n=== Las tres listas de la sala se escriben juntas ===");
   ok(conNombres.length >= 2, `hay ${conNombres.length} lugares que tocan la lista de nombres`);
 
   const huerfanos = conNombres.filter(
-    (i) => !lineas.slice(i, i + 6).some((l) => l.includes("jugadoresRetratos")),
+    (i) => !lineas.slice(i, i + 6).some((l) => l.includes("jugadoresLuce")),
   );
   ok(
     huerfanos.length === 0,
-    "ninguno escribe nombres sin escribir retratos",
+    "ninguno escribe nombres sin escribir lo que cada uno lleva puesto",
     huerfanos.map((i) => `línea ${i + 1}: ${lineas[i].trim()}`),
   );
 
-  // Y el reparto tiene que recibirlos: sin esto las salas guardan retratos que
-  // nunca llegan a la mesa.
+  // Y el reparto tiene que recibirla: sin esto las salas guardan avatares y
+  // dorsos que nunca llegan a la mesa.
   ok(
-    /repartirEn\(tx, \{[\s\S]{0,220}retratos:/.test(fuente),
-    "iniciarPartida le pasa los retratos al reparto",
+    /repartirEn\(tx, \{[\s\S]{0,420}luce:/.test(fuente),
+    "iniciarPartida le pasa al reparto lo que cada uno lleva puesto",
   );
 
   // La ruta se filtra antes de guardarse.
   ok(fuente.includes("esRutaDelSitio"), "el servidor mira la ruta antes de publicarla a la mesa");
 }
 
-console.log("\n=== La mesa prefiere el retrato de la vista ===");
+console.log("\n=== El dorso y la insignia viajan igual que la cara ===");
+{
+  /**
+   * El DORSO es el que más importa de los tres.
+   *
+   * Sin él, cada navegador dibujaba las manos ajenas con el reverso que le
+   * tocaba al asiento: quien se compraba uno lo veía sólo en su propia
+   * pantalla, que es exactamente lo contrario de comprarse algo para que se
+   * vea.
+   */
+  const LUCE = [
+    { retrato: "/img/avatar/a.webp", dorso: "/img/dorsos/dorso-rojo.png", insignia: "/img/insignias/heroe.webp" },
+    { retrato: null, dorso: "/img/dorsos/dorso-azul.png", insignia: null },
+    {},
+    {},
+  ];
+  const jugadores = await repartirCon(LUCE);
+
+  ok(
+    jugadores[0].dorso === "/img/dorsos/dorso-rojo.png",
+    "el dorso comprado llega a la mesa",
+    jugadores[0].dorso,
+  );
+  ok(
+    jugadores[0].insignia === "/img/insignias/heroe.webp",
+    "y la insignia también",
+    jugadores[0].insignia,
+  );
+  ok(jugadores[2].dorso === null && jugadores[2].insignia === null, "quien no tiene, en null");
+
+  // Los tres son independientes: tener dorso no implica tener cara.
+  ok(
+    jugadores[1].retrato === null && jugadores[1].dorso === "/img/dorsos/dorso-azul.png",
+    "se pueden tener unos sí y otros no",
+    jugadores[1],
+  );
+}
+
+console.log("\n=== Y los cuatro navegadores ven lo mismo ===");
+{
+  // Es la mitad que importa: de nada sirve que el dorso llegue al estado si
+  // después la vista se lo entrega a uno solo.
+  const LUCE = [
+    { retrato: "/img/avatar/a.webp", dorso: "/img/dorsos/dorso-rojo.png", insignia: "/img/insignias/heroe.webp" },
+    {}, {}, {},
+  ];
+  const estado = motor.empezarRonda(
+    motor.crearPartida(
+      CUATRO.map((id, i) => ({ id, nombre: id, ...LUCE[i] })),
+      { semilla: 7 },
+    ),
+  );
+
+  for (let quien = 0; quien < 4; quien++) {
+    const v = vistaDe(estado, quien);
+    ok(
+      v.jugadores[0].dorso === "/img/dorsos/dorso-rojo.png",
+      `el jugador ${quien} ve el dorso comprado del 0`,
+      v.jugadores[0].dorso,
+    );
+  }
+
+  ok(
+    filtracionesEn(vistaDe(estado, 0), estado).length === 0,
+    "y los campos nuevos no filtran ninguna carta",
+  );
+}
+
+console.log("\n=== La mesa prefiere lo que trae la vista ===");
 {
   const mesa = readFileSync(new URL("../public/js/mesa.js", import.meta.url), "utf8");
   ok(
@@ -269,6 +355,33 @@ console.log("\n=== La mesa prefiere el retrato de la vista ===");
   ok(
     !/src="\$\{retratoDe\(/.test(mesa),
     "no queda ningún retrato dibujado sin pasar por caraDe",
+  );
+
+  // El dorso, igual, con la misma caída. `dorsoDe` ya sabe la excepción del
+  // asiento propio, así que en entrenamiento —donde la vista no trae dorso—
+  // no cambia absolutamente nada.
+  ok(
+    /const reversoDe = \(jugador, i\) =>\s*\n\s*esRutaDelSitio\(jugador\?\.dorso\) \? jugador\.dorso : dorsoDe\(i\)/.test(mesa),
+    "el reverso sale de la vista, y si no sirve cae al del asiento",
+  );
+
+  // Y la mano tiene que PEDIRLO. Sin esta línea `reversoDe` existe, la prueba
+  // de arriba pasa, y en la mesa se siguen viendo los dorsos del asiento.
+  ok(
+    /dorso: reversoDe\(jugador, i\)/.test(mesa),
+    "y la mano de cada jugador se dibuja con el suyo",
+  );
+
+  // La insignia va como imagen y con `alt`: es un logro, tiene nombre y se
+  // cuenta. El retrato es decoración —el nombre está al lado— y va con `alt`
+  // vacío. Son dos decisiones distintas a propósito.
+  ok(
+    /class="insignia-mesa" src="\$\{escapar\(jugador\.insignia\)\}" alt="Insignia"/.test(mesa),
+    "la insignia se dibuja escapada y anunciada",
+  );
+  ok(
+    readFileSync(new URL("../public/css/mesa.css", import.meta.url), "utf8").includes(".insignia-mesa"),
+    "y tiene estilo: sin regla saldría del tamaño del archivo",
   );
 }
 

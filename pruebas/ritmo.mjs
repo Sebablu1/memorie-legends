@@ -151,6 +151,13 @@ console.log("\n=== Las de plata están apretadas ===");
     "comprarItem",
     "comprarPack",
     "inscribirseATorneo",
+    // Las dos del panel que le sacan un artículo a alguien: devuelven lo
+    // que esa persona pagó, así que mueven saldo. Que sólo las pueda tocar
+    // un administrador no las exime — el techo en memoria se pierde al
+    // reciclarse la instancia, y éstas son las operaciones más
+    // destructivas del panel.
+    "desposeerItemAdmin",
+    "forzarBorrarItemAdmin",
   ];
   const declaradas = Object.keys(LIMITES_DE_PLATA).sort();
   ok(

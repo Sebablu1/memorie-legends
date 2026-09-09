@@ -40,7 +40,7 @@ import { repartirPozo, usaLeyendas } from "./reglas/salas.js";
  * Tres primitivas, no una función.
  *
  *   leer(tx, codigo)          sólo lee
- *   planificar({partida, sala})  puro, sin I/O
+ *   planificar({codigo, partida, sala})  puro, sin I/O
  *   aplicar(tx, …)            sólo escribe
  *
  * Separadas así por una razón concreta: el cierre tiene que poder ocurrir
@@ -58,6 +58,7 @@ export function crearCierre({
   partidas,
   moverLeyendas,
   motivo,
+  motivoDevolucion,
   marcaDeTiempo,
   error,
   estados,
@@ -123,7 +124,7 @@ export function crearCierre({
    * correcta a un segundo intento, y la que hace que dos disparos simultáneos
    * no paguen dos veces.
    */
-  function planificar({ partida, sala }) {
+  function planificar({ codigo, partida, sala }) {
     if (sala.estado === estados.TERMINADA) {
       return { yaEstaba: true, cierre: sala.cierre ?? null };
     }
@@ -145,6 +146,67 @@ export function crearCierre({
 
     const abandonaron = sala.abandonaron ?? [];
     const elegibles = elegiblesParaPremio(partida.estado, abandonaron);
+
+    /**
+     * Si no quedó nadie que pueda cobrar, el pozo VUELVE.
+     *
+     * ───────────────────────────────────────────────────────────────────
+     * QUÉ PASABA ANTES
+     * ───────────────────────────────────────────────────────────────────
+     *
+     * Con todos los jugadores abandonados, `elegibles` queda vacío, `pagos`
+     * vacío, y el pozo entero caía en `sobrante`: cuatro jugadores a cien
+     * eran cuatrocientas Leyendas que se evaporaban. Nadie jugó, nadie
+     * ganó, y la casa cobraba todo — encima de la penalización de abandono
+     * que cada uno ya había pagado por su lado.
+     *
+     * `sobrante` está pensado para el resto de un redondeo o para el 25%
+     * que no se paga cuando terminó uno solo: unas pocas Leyendas sin
+     * destinatario. Un pozo completo no es eso.
+     *
+     * ───────────────────────────────────────────────────────────────────
+     * LA PENALIZACIÓN NO SE DEVUELVE
+     * ───────────────────────────────────────────────────────────────────
+     *
+     * Vuelve la ENTRADA, que es lo que forma el pozo. La penalización de
+     * abandono se cobró aparte y se queda cobrada: si volviera todo,
+     * abandonar entre todos sería la forma gratis de salirse de una partida
+     * que uno va perdiendo.
+     *
+     * Se reparte por cabeza y hacia abajo en vez de devolver `sala.entrada`
+     * a cada uno. Normalmente da lo mismo —el pozo es la entrada por la
+     * cantidad de jugadores— pero calculado desde el pozo es imposible
+     * pagar más de lo que hay, y eso vale más que la elegancia.
+     */
+    if (elegibles.length === 0 && pozo > 0) {
+      const jugadores = partida.jugadores ?? sala.jugadores ?? [];
+      const porCabeza = jugadores.length ? Math.floor(pozo / jugadores.length) : 0;
+
+      const devoluciones = porCabeza
+        ? jugadores.map((uid) => ({
+            jugador: { id: uid, nombre: uid },
+            puesto: null,
+            monto: porCabeza,
+            // Su propia clave y su propio motivo: en el libro mayor esto no
+            // es un premio, es la entrada que vuelve.
+            idempotencia: `devolucion_${codigo}_${uid}`,
+            motivo: motivoDevolucion ?? motivo,
+          }))
+        : [];
+
+      const devuelto = devoluciones.reduce((s, d) => s + d.monto, 0);
+      return {
+        yaEstaba: false,
+        pozo,
+        repartido: devuelto,
+        sobrante: pozo - devuelto,
+        pagos: devoluciones,
+        abandonaron,
+        // Para que el documento de cierre diga POR QUÉ nadie cobró premio.
+        sinGanadores: true,
+      };
+    }
+
     const { premios, repartido, sobrante } = repartirPozo(pozo, Math.min(elegibles.length, 2));
 
     const pagos = [];
@@ -155,7 +217,7 @@ export function crearCierre({
       pagos.push({ jugador: elegibles[1], puesto: 2, monto: premios.segundo });
     }
 
-    return { yaEstaba: false, pozo, repartido, sobrante, pagos, abandonaron };
+    return { yaEstaba: false, pozo, repartido, sobrante, pagos, abandonaron, sinGanadores: false };
   }
 
   /**
@@ -172,11 +234,14 @@ export function crearCierre({
           plan.pagos.map((p) => ({
             uid: p.jugador.id,
             delta: p.monto,
-            motivo,
+            // Cada línea puede traer los suyos: un premio y una devolución de
+            // pozo van al libro mayor con motivos distintos, y si compartieran
+            // la clave de idempotencia una impediría la otra.
+            motivo: p.motivo ?? motivo,
             referencia: codigo,
-            // La clave incluye el puesto: dos cierres simultáneos chocan en el
-            // mismo documento y sólo uno paga.
-            idempotencia: `premio_${codigo}_${p.puesto}`,
+            // La del premio incluye el puesto: dos cierres simultáneos chocan
+            // en el mismo documento y sólo uno paga.
+            idempotencia: p.idempotencia ?? `premio_${codigo}_${p.puesto}`,
           })),
         )
       : [];
@@ -190,6 +255,9 @@ export function crearCierre({
       cerradaEn: marcaDeTiempo(),
       cerradaPor,
       abandonaron: plan.abandonaron,
+      // Sin ganadores: abandonaron todos y el pozo se devolvió. Queda
+      // escrito para que el documento explique por qué no hay premios.
+      sinGanadores: Boolean(plan.sinGanadores),
       premios: plan.pagos.map((p, i) => ({
         uid: p.jugador.id,
         nombre: p.jugador.nombre,

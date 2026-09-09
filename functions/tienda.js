@@ -55,9 +55,11 @@ export function crearTienda({
   marcaDeTiempo,
   error,
   motivoCompra,
+  motivoDevolucion,
   usuarios = "users",
   catalogo = "catalogo",
   items = "items",
+  auditoria = "auditoria",
   // Quién puede administrar el catálogo. Se inyecta desde `administradores.js`,
   // que es el único lugar donde se decide eso.
   administradores,
@@ -65,6 +67,7 @@ export function crearTienda({
   const refItemCatalogo = (id) => db.collection(catalogo).doc(id);
   const refPerfil = (uid) => db.collection(usuarios).doc(uid);
   const refPosesion = (uid, id) => refPerfil(uid).collection(items).doc(id);
+  const refAuditoria = () => db.collection(auditoria).doc();
 
   // ------------------------------------------------------------- comprar
 
@@ -527,22 +530,261 @@ export function crearTienda({
     const snap = await ref.get();
     if (!snap.exists) throw error("not-found", "Ese artículo no existe.");
 
-    const comprados = await db.collectionGroup(items).get();
-    const dueños = [];
-    comprados.forEach((d) => {
-      if (d.id === id) dueños.push(d.id);
-    });
+    const dueños = await poseedoresDe(id);
 
     if (dueños.length) {
       throw error(
         "failed-precondition",
         `No se puede borrar: ${dueños.length} jugador${dueños.length === 1 ? "" : "es"} ya lo ` +
-          "compró. Desactivalo en vez de borrarlo, así deja de venderse pero no se le quita a nadie.",
+          "compró. Desactivalo, o usá el borrado forzado si de verdad hay que " +
+          "sacárselo a todo el mundo.",
       );
     }
 
     await ref.delete();
     return { id, borrado: true };
+  }
+
+  // ------------------------------------------------- quitar un artículo
+
+  /**
+   * Quiénes tienen un artículo, y cuánto pagaron.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * POR QUÉ RECORRE TODO EN VEZ DE CONSULTAR
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Porque la posesión se guarda como el ID DEL DOCUMENTO —`users/{uid}/
+   * items/{itemId}`, que es lo que hace imposible comprar dos veces lo
+   * mismo— y en una consulta de grupo de colecciones no se puede filtrar
+   * por el último tramo del identificador: `documentId()` compara la ruta
+   * entera, que incluye el uid.
+   *
+   * Filtrar de verdad pediría guardar el id también como campo y migrar lo
+   * ya comprado. No vale la pena: esto lo llama el panel de administración,
+   * a mano y de a una vez, y lo que recorre son las compras que hubo, no
+   * los usuarios que hay. El día que sean decenas de miles, el arreglo es
+   * ese campo — y este comentario dice cuál era el motivo.
+   */
+  async function poseedoresDe(id) {
+    const comprados = await db.collectionGroup(items).get();
+    const dueños = [];
+    comprados.forEach((d) => {
+      if (d.id !== id) return;
+      dueños.push({ uid: dueñoDe(d.ref), precioPagado: Number(d.data()?.precioPagado ?? 0) });
+    });
+    return dueños;
+  }
+
+  /**
+   * De quién es una posesión: `users/{uid}/items/{itemId}`.
+   *
+   * Se intenta primero por la ruta y después por el abuelo del documento.
+   * Los dos caminos existen en Firestore; el de la ruta existe además en el
+   * Firestore de mentira de las pruebas, que no arma la cadena de padres.
+   *
+   * Devuelve `null` si no se pudo averiguar, y ese `null` NO se descarta en
+   * silencio: una posesión cuyo dueño no se sabe sigue contando como
+   * poseída —para que `borrarItem` se siga negando— y hace que el borrado
+   * forzado se plante. Descartarla sería borrar el artículo dejándole a esa
+   * persona un id que no apunta a nada.
+   */
+  function dueñoDe(ref) {
+    const porRuta = String(ref?.path ?? "").split("/");
+    if (porRuta.length >= 2 && porRuta[1]) return porRuta[1];
+    return ref?.parent?.parent?.id ?? null;
+  }
+
+  /**
+   * La lista de poseedores, con nombre y correo para poder reconocerlos.
+   *
+   * Antes de sacarle algo a alguien hay que poder ver a quién. Un `uid` no
+   * le dice nada a nadie.
+   */
+  async function listarPoseedores(context, id) {
+    await administradores.exigir(context);
+
+    const dueños = await poseedoresDe(id);
+    if (!dueños.length) return { itemId: id, poseedores: [] };
+
+    const perfiles = await Promise.all(dueños.map((d) => refPerfil(d.uid).get()));
+
+    return {
+      itemId: id,
+      poseedores: dueños.map((d, i) => {
+        const datos = perfiles[i].exists ? perfiles[i].data() : {};
+        // Si lo tiene puesto, hace falta saberlo: quitárselo le va a
+        // cambiar lo que se ve, no sólo lo que tiene guardado.
+        const equipadoEn = Object.entries(CAMPO_EQUIPADO)
+          .filter(([, campo]) => datos[campo] === id)
+          .map(([tipo]) => tipo);
+        return {
+          uid: d.uid,
+          username: datos.username ?? null,
+          email: datos.email ?? null,
+          precioPagado: d.precioPagado,
+          equipado: equipadoEn.length > 0,
+        };
+      }),
+    };
+  }
+
+  /**
+   * Le saca un artículo a una persona, y le devuelve lo que pagó.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * POR QUÉ DEVUELVE
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Porque si no, es quedarse con lo que pagó. El caso que motivó esto son
+   * artículos de prueba que compró la propia cuenta de administración, y
+   * ahí devolver o no da lo mismo; pero la función es general y algún día
+   * se va a usar sobre alguien de verdad.
+   *
+   * La devolución pasa por `moverLeyendas` como todo lo que toca el saldo,
+   * con una clave de idempotencia por artículo y persona: repetir la
+   * operación no paga dos veces.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * Y POR QUÉ SE LO DESEQUIPA
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Porque el perfil guarda el id de lo que lleva puesto, no una copia del
+   * artículo. Sacándoselo del inventario y dejando el campo apuntando ahí,
+   * la mesa y la tienda quedan buscando un artículo que ya no le pertenece
+   * —y si además se borra del catálogo, uno que no existe—.
+   *
+   * Se miran TODOS los campos equipados y no sólo el del tipo que dice la
+   * posesión: las compras viejas podrían no tener guardado el tipo, y un
+   * campo que quedó apuntando a la nada no avisa, sólo deja de dibujar.
+   */
+  async function desposeer(context, { itemId, uid }) {
+    const quien = await administradores.exigir(context);
+
+    return db.runTransaction(async (tx) => {
+      // Todas las lecturas antes de cualquier escritura. `moverLeyendas`
+      // lee el saldo y escribe, así que va después de éstas y antes del
+      // resto.
+      const posesion = await tx.get(refPosesion(uid, itemId));
+      const perfil = await tx.get(refPerfil(uid));
+
+      if (!posesion.exists) {
+        // No es un error: quitar dos veces tiene que ser inofensivo.
+        return { uid, itemId, yaEstaba: true, devueltas: 0, desequipado: [] };
+      }
+
+      const datos = perfil.exists ? perfil.data() : {};
+      const precio = Number(posesion.data()?.precioPagado ?? 0);
+
+      const devolucion =
+        precio > 0
+          ? await moverLeyendas(tx, {
+              uid,
+              delta: precio,
+              motivo: motivoDevolucion,
+              referencia: itemId,
+              idempotencia: `desposesion_${itemId}_${uid}`,
+            })
+          : { aplicado: false };
+
+      tx.delete(refPosesion(uid, itemId));
+
+      const desequipado = [];
+      for (const campo of Object.values(CAMPO_EQUIPADO)) {
+        if (datos[campo] === itemId) desequipado.push(campo);
+      }
+      if (desequipado.length) {
+        tx.set(
+          refPerfil(uid),
+          Object.fromEntries(desequipado.map((campo) => [campo, null])),
+          { merge: true },
+        );
+      }
+
+      // El libro mayor explica el saldo; esto explica el artículo. Son dos
+      // preguntas distintas y mezclarlas dejaría el libro con asientos de
+      // cero Leyendas que no dicen nada de dónde fue el dinero.
+      tx.set(refAuditoria(), {
+        accion: "desposeer",
+        itemId,
+        uid,
+        admin: quien?.email ?? quien?.uid ?? null,
+        precioDevuelto: devolucion.aplicado ? precio : 0,
+        desequipado,
+        cuando: marcaDeTiempo(),
+      });
+
+      return {
+        uid,
+        itemId,
+        yaEstaba: false,
+        devueltas: devolucion.aplicado ? precio : 0,
+        desequipado,
+      };
+    });
+  }
+
+  /**
+   * Saca el artículo de todos los inventarios y después lo borra.
+   *
+   * Una transacción POR PERSONA, no una para todas. Es la misma decisión
+   * que toma `cancelarTodasEnEspera` con las salas y por el mismo motivo:
+   * si el saldo de alguien no se puede leer, los demás igual se resuelven
+   * y se informa cuál falló. Una transacción única las haría fracasar a
+   * todas por culpa de una — y además `pruebas/transacciones.mjs` prohíbe,
+   * con razón, mover plata dentro de un bucle en una transacción.
+   *
+   * El artículo se borra sólo si NO quedó ningún poseedor. Borrarlo igual
+   * dejaría a esa persona con un id que no apunta a nada: ni se ve, ni se
+   * puede desequipar, ni se puede volver a quitar.
+   */
+  async function forzarBorrar(context, id) {
+    await administradores.exigir(context);
+
+    const ref = refItemCatalogo(id);
+    if (!(await ref.get()).exists) throw error("not-found", "Ese artículo no existe.");
+
+    const dueños = await poseedoresDe(id);
+
+    // Si de alguna posesión no se sabe de quién es, no se toca nada. Borrar
+    // el artículo dejaría a esa persona con un id colgado: no se ve, no se
+    // puede desequipar y no se puede volver a quitar.
+    const anonimas = dueños.filter((d) => !d.uid).length;
+    if (anonimas) {
+      throw error(
+        "internal",
+        `Hay ${anonimas} posesion${anonimas === 1 ? "" : "es"} de las que no se pudo ` +
+          "averiguar el dueño. No se borró nada.",
+      );
+    }
+
+    const quitados = [];
+    const fallidos = [];
+
+    for (const dueño of dueños) {
+      try {
+        quitados.push(await desposeer(context, { itemId: id, uid: dueño.uid }));
+      } catch (e) {
+        fallidos.push({ uid: dueño.uid, motivo: e?.message ?? "error desconocido" });
+      }
+    }
+
+    if (fallidos.length) {
+      throw error(
+        "aborted",
+        `No se le pudo quitar a ${fallidos.length} de ${dueños.length}. El artículo NO se ` +
+          `borró: ${fallidos.map((f) => f.motivo).join("; ")}`,
+      );
+    }
+
+    await ref.delete();
+
+    return {
+      id,
+      borrado: true,
+      quitadoA: quitados.filter((q) => !q.yaEstaba).length,
+      devueltasEnTotal: quitados.reduce((s, q) => s + q.devueltas, 0),
+    };
   }
 
   return {
@@ -558,5 +800,8 @@ export function crearTienda({
     activarItem,
     apagarCatalogoViejo,
     borrarItem,
+    listarPoseedores,
+    desposeer,
+    forzarBorrar,
   };
 }

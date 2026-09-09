@@ -487,7 +487,7 @@ export function crearMotorEnRed({
    * partida podría quedar iniciada sin documento maestro —o al revés— y no
    * habría forma de saber cuál de las dos cosas pasó.
    */
-  async function repartirEn(tx, { codigo, jugadores, nombres, retratos }) {
+  async function repartirEn(tx, { codigo, jugadores, nombres, luce }) {
     const snap = await tx.get(refPartida(codigo));
     // Idempotente: repartir dos veces la misma partida no la reinicia.
     if (snap.exists) return { codigo, yaExistia: true, version: snap.data().version };
@@ -501,7 +501,9 @@ export function crearMotorEnRed({
     const configuracion = jugadores.map((uid, i) => ({
       id: uid,
       nombre: nombres?.[i] ?? `Jugador ${i + 1}`,
-      retrato: retratos?.[i] ?? null,
+      retrato: luce?.[i]?.retrato ?? null,
+      dorso: luce?.[i]?.dorso ?? null,
+      insignia: luce?.[i]?.insignia ?? null,
       esIA: false,
     }));
 
@@ -872,6 +874,31 @@ export function crearMotorEnRed({
    * y encadenar varios en una transacción dejaría a los jugadores sin ver los
    * pasos intermedios.
    */
+  /**
+   * Las partidas cuyo plazo ya venció.
+   *
+   * `plazo.hasta` es un número de milisegundos, así que la desigualdad
+   * funciona con el índice que Firestore arma solo para cada campo. Una
+   * partida cerrada no tiene plazo —`plazoDe` devuelve null— y un campo
+   * ausente no entra en una comparación: quedan afuera sin filtrar nada.
+   *
+   * El tope existe para que un barrido no se vuelva ilimitado si algo se
+   * acumula. Con el barredor corriendo cada minuto, veinte partidas por
+   * vuelta es más de lo que este juego va a tener vencidas a la vez, y si
+   * alguna vez lo fuera, la vuelta siguiente sigue donde quedó.
+   */
+  async function vencidas({ hasta = ahora(), tope = 20 } = {}) {
+    const snap = await db
+      .collection(partidas)
+      .where("plazo.hasta", "<=", hasta)
+      .limit(tope)
+      .get();
+
+    const codigos = [];
+    snap.forEach((d) => codigos.push(d.id));
+    return codigos;
+  }
+
   async function avanzarPartida({ codigo }) {
     return db.runTransaction(async (tx) => {
       const snap = await tx.get(refPartida(codigo));
@@ -1187,9 +1214,50 @@ export function crearMotorEnRed({
       ? motor.saltarTurno(estado)
       : estado;
 
+    /**
+     * Si no queda nadie jugando, la partida TERMINA acá.
+     *
+     * ─────────────────────────────────────────────────────────────────────
+     * POR QUÉ NO TERMINABA SOLA
+     * ─────────────────────────────────────────────────────────────────────
+     *
+     * El fin de partida se evalúa dentro de `cortar`, y cortar necesita que
+     * alguien esté jugando. Con los cuatro afuera no cortaba nadie nunca: el
+     * turno se le pasaba al siguiente activo y, como no había ninguno,
+     * `siguienteActivo` devolvía el mismo índice. La partida giraba en
+     * `turno` para siempre.
+     *
+     * Eso dejaba la sala en «jugando» con las entradas cobradas y el pozo
+     * retenido, sin forma de cerrarla: es la mitad del problema de las salas
+     * colgadas. La otra mitad era que nadie llamaba a `avanzarPartida` con
+     * todas las pestañas escondidas, y la arregla el barredor.
+     *
+     * ─────────────────────────────────────────────────────────────────────
+     * SIN DESEMPATE
+     * ─────────────────────────────────────────────────────────────────────
+     *
+     * `comprobarFinPartida` sabe resolver «no queda nadie», pero cuando eso
+     * pasa por PUNTOS manda a jugar una ronda de desempate. Acá no queda
+     * nadie porque se fueron todos, y no hay a quién sentar a desempatar.
+     * Termina sin ganador, y el cierre le devuelve el pozo a cada uno.
+     *
+     * Con uno solo en pie gana él, que es la regla de siempre: el último que
+     * queda gana la partida.
+     */
+    const siguen = conTurno.jugadores.filter((j) => !j.eliminado);
+    const terminada =
+      siguen.length <= 1 && !enJuego
+        ? {
+            ...conTurno,
+            fase: "finPartida",
+            ganador: siguen[0] ?? null,
+            desempate: false,
+          }
+        : conTurno;
+
     publicar(tx, codigo, {
       ...partida,
-      estado: conTurno,
+      estado: terminada,
       abandonaron: [...(partida.abandonaron ?? []), uid],
       version: partida.version + 1,
     });
@@ -1209,33 +1277,22 @@ export function crearMotorEnRed({
     return db.runTransaction(async (tx) => {
       const snap = await tx.get(refPartida(codigo));
       const partida = exigirPartida(snap, codigo);
-      const indice = partida.jugadores.indexOf(uid);
-      if (indice < 0) throw error("permission-denied", "No estaba en esta partida.");
-
-      if ((partida.abandonaron ?? []).includes(uid)) {
-        return { yaEstaba: true, version: partida.version };
+      if (partida.jugadores.indexOf(uid) < 0) {
+        throw error("permission-denied", "No estaba en esta partida.");
       }
 
-      const estado = {
-        ...partida.estado,
-        jugadores: partida.estado.jugadores.map((j, i) =>
-          i === indice ? { ...j, eliminado: true, abandono: true } : j,
-        ),
-      };
-      // Si le tocaba a él, el turno pasa al siguiente que siga jugando.
-      const conTurno =
-        estado.indiceTurno === indice && estado.fase !== "finRonda" && estado.fase !== "finPartida"
-          ? motor.saltarTurno(estado)
-          : estado;
-
-      const siguiente = {
-        ...partida,
-        estado: conTurno,
-        abandonaron: [...(partida.abandonaron ?? []), uid],
-        version: partida.version + 1,
-      };
-      publicar(tx, codigo, siguiente);
-      return { yaEstaba: false, version: siguiente.version };
+      // Delega en `marcarAbandonoEn` en vez de repetir la marca.
+      //
+      // Eran dos copias del mismo cuerpo —ésta y la que usa
+      // `abandonarPartida`— y ya se habían separado: al agregar el fin de
+      // partida cuando no queda nadie, la otra lo aprendió y ésta no. Con eso,
+      // abandonar desde el juego terminaba la partida y abandonar desde el
+      // servidor la dejaba girando para siempre, según por dónde se hubiera
+      // entrado. Una regla, un lugar.
+      const marcado = marcarAbandonoEn(tx, codigo, partida, uid);
+      return marcado
+        ? { yaEstaba: false, version: partida.version + 1 }
+        : { yaEstaba: true, version: partida.version };
     });
   }
 
@@ -1252,6 +1309,7 @@ export function crearMotorEnRed({
     accionDeTurno,
     latir,
     saltarAusente,
+    vencidas,
     marcarAbandono,
     ACCIONES,
   };

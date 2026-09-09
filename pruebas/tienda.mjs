@@ -70,8 +70,23 @@ const capturar = async (fn) => {
 function crearFirestore(inicial = {}) {
   const docs = new Map(Object.entries(inicial));
 
+  /**
+   * `doc()` sin id genera uno, como el Firestore de verdad.
+   *
+   * Sin esto, todas las llamadas sin id caían en la misma ruta
+   * —`coleccion/undefined`— y se pisaban entre sí. Lo encontró la prueba del
+   * borrado forzado: esperaba una anotación de auditoría por persona y
+   * llegaba una sola, porque las tres se habían escrito encima.
+   *
+   * Un Firestore de mentira que se porta distinto del de verdad da pruebas en
+   * verde sobre código roto, que es exactamente lo contrario de para qué
+   * está.
+   */
+  let siguienteId = 0;
+  const idAutomatico = () => `auto${++siguienteId}`;
+
   const coleccion = (prefijo) => ({
-    doc: (id) => documento(`${prefijo}/${id}`),
+    doc: (id) => documento(`${prefijo}/${id ?? idAutomatico()}`),
     async get() {
       const filas = [...docs.entries()]
         .filter(([r]) => r.startsWith(`${prefijo}/`) && !r.slice(prefijo.length + 1).includes("/"))
@@ -132,9 +147,16 @@ function crearFirestore(inicial = {}) {
           escribio = true;
           pendientes.push([ref.ruta, datos, true]);
         },
+        // Borrar dentro de la transacción: lo estrena `desposeer`, que saca
+        // la posesión y devuelve las Leyendas en la misma operación.
+        delete(ref) {
+          escribio = true;
+          pendientes.push([ref.ruta, null, false]);
+        },
       });
       for (const [ruta, datos, fusionar] of pendientes) {
-        docs.set(ruta, fusionar ? { ...(docs.get(ruta) ?? {}), ...datos } : datos);
+        if (datos === null) docs.delete(ruta);
+        else docs.set(ruta, fusionar ? { ...(docs.get(ruta) ?? {}), ...datos } : datos);
       }
       return r;
     },
@@ -163,7 +185,8 @@ function montar({ saldo = 5000, catalogo = CATALOGO_INICIAL } = {}) {
     marcaDeTiempo: () => "T",
     error,
     motivoCompra: MOTIVOS.COMPRA_PERSONALIZACION,
-    administradores: { exigir: async () => ({ uid: "admin" }) },
+    motivoDevolucion: MOTIVOS.DEVOLUCION_ARTICULO,
+    administradores: { exigir: async () => ({ uid: "admin", email: "admin@x" }) },
   });
 
   return { db, tienda };
@@ -805,6 +828,169 @@ console.log("\n=== 21. Apagar el catálogo de demostración ===");
   ok(otraVez.apagados === 0, "correrlo dos veces no hace nada la segunda", otraVez.apagados);
 }
 
+
+console.log("\n=== 22. Quitarle un artículo a alguien ===");
+{
+  /**
+   * El caso que motivó todo esto: la cuenta de administración compró
+   * artículos de prueba y `borrarItem` se niega a borrar lo que alguien
+   * tiene —bien: si no, esa persona queda con un id que no apunta a nada—.
+   * Faltaba la herramienta para sacárselo primero.
+   */
+  const { db, tienda } = montar();
+  const como = {};
+
+  await tienda.sembrarCatalogo(como);
+  await tienda.comprar("ana", DRAGON);
+  await tienda.equipar("ana", DRAGON);
+
+  const saldoTrasComprar = db._leer("users/ana").credits;
+  ok(db._leer("users/ana").avatar === DRAGON, "lo tiene puesto antes de que se lo saquen");
+
+  // --- ver quién lo tiene ---
+  const antes = await tienda.listarPoseedores(como, DRAGON);
+  ok(antes.poseedores.length === 1, "lo tiene una sola persona", antes.poseedores.length);
+  ok(antes.poseedores[0].uid === "ana", "y es quien lo compró", antes.poseedores[0].uid);
+  ok(antes.poseedores[0].username === "Ana", "con su nombre, para poder reconocerla");
+  ok(antes.poseedores[0].equipado === true, "y avisa que lo lleva puesto");
+  ok(
+    antes.poseedores[0].precioPagado === precioDe(DRAGON),
+    "y cuánto pagó",
+    antes.poseedores[0].precioPagado,
+  );
+
+  // --- borrar a secas sigue negándose ---
+  try {
+    await tienda.borrarItem(como, DRAGON);
+    ok(false, "el borrado normal sigue negándose si alguien lo tiene");
+  } catch {
+    ok(true, "el borrado normal sigue negándose si alguien lo tiene");
+  }
+
+  // --- quitárselo ---
+  const quita = await tienda.desposeer(como, { itemId: DRAGON, uid: "ana" });
+  ok(!db._leer(`users/ana/items/${DRAGON}`), "deja de tenerlo");
+  ok(db._leer("users/ana").avatar === null, "y se lo desequipa: el campo queda en null");
+  ok(quita.desequipado.includes("avatar"), "y lo informa", quita.desequipado);
+
+  // Le vuelve lo que pagó. Sacárselo sin devolver sería quedarse con su
+  // plata, y el libro mayor tiene que poder explicar por qué le subió.
+  ok(
+    db._leer("users/ana").credits === saldoTrasComprar + precioDe(DRAGON),
+    "le devuelven exactamente lo que pagó",
+    db._leer("users/ana").credits,
+  );
+  ok(quita.devueltas === precioDe(DRAGON), "y lo informa", quita.devueltas);
+
+  // --- repetirlo es inofensivo ---
+  const saldoTrasQuitar = db._leer("users/ana").credits;
+  const otraVez = await tienda.desposeer(como, { itemId: DRAGON, uid: "ana" });
+  ok(otraVez.yaEstaba === true, "quitar dos veces no es un error");
+  ok(otraVez.devueltas === 0, "y no paga de nuevo");
+  ok(
+    db._leer("users/ana").credits === saldoTrasQuitar,
+    "el saldo no se movió la segunda vez",
+    db._leer("users/ana").credits,
+  );
+
+  // --- y ahora sí se puede borrar ---
+  await tienda.borrarItem(como, DRAGON);
+  ok(!db._leer(`catalogo/${DRAGON}`), "sin poseedores, el borrado normal funciona");
+}
+
+console.log("\n=== 23. Borrado forzado: se lo saca a todos y lo borra ===");
+{
+  const { db, tienda } = montar();
+  const como = {};
+
+  await tienda.sembrarCatalogo(como);
+  for (const quien of ["ana", "beto", "caro"]) {
+    if (quien !== "ana") await db.collection("users").doc(quien).set({ credits: 5000, username: quien });
+    await tienda.comprar(quien, DRAGON);
+  }
+  await tienda.equipar("beto", DRAGON);
+
+  const saldos = Object.fromEntries(
+    ["ana", "beto", "caro"].map((q) => [q, db._leer(`users/${q}`).credits]),
+  );
+
+  const r = await tienda.forzarBorrar(como, DRAGON);
+
+  ok(r.borrado === true, "lo borra");
+  ok(r.quitadoA === 3, "después de sacárselo a los tres", r.quitadoA);
+  ok(
+    r.devueltasEnTotal === precioDe(DRAGON) * 3,
+    "devolviéndoles a los tres lo que pagaron",
+    r.devueltasEnTotal,
+  );
+  ok(!db._leer(`catalogo/${DRAGON}`), "el documento del catálogo ya no está");
+
+  for (const quien of ["ana", "beto", "caro"]) {
+    ok(!db._leer(`users/${quien}/items/${DRAGON}`), `${quien} deja de tenerlo`);
+    ok(
+      db._leer(`users/${quien}`).credits === saldos[quien] + precioDe(DRAGON),
+      `  y le volvieron sus Leyendas`,
+      db._leer(`users/${quien}`).credits,
+    );
+  }
+
+  // El que lo tenía puesto no puede quedar apuntando a un artículo borrado:
+  // la mesa y la tienda buscarían algo que no existe.
+  ok(db._leer("users/beto").avatar === null, "y al que lo llevaba puesto se lo desequipó");
+
+  // Queda escrito quién lo hizo y a quién. El libro mayor explica el saldo;
+  // esto explica el artículo.
+  const bitacora = db._rutas().filter((r) => r.startsWith("auditoria/"));
+  ok(bitacora.length === 3, "queda una anotación por persona", bitacora.length);
+  ok(
+    db._leer(bitacora[0]).accion === "desposeer" && db._leer(bitacora[0]).admin === "admin@x",
+    "con la acción y quién la pidió",
+    db._leer(bitacora[0]),
+  );
+}
+
+console.log("\n=== 24. Forzar el borrado de lo que no existe ===");
+{
+  const { tienda } = montar();
+  try {
+    await tienda.forzarBorrar({}, "no-existe");
+    ok(false, "un artículo inventado no se puede borrar");
+  } catch (e) {
+    ok(e.codigo === "not-found", "un artículo inventado no se puede borrar", e.codigo);
+  }
+}
+
+console.log("\n=== 25. Quitar y forzar exigen ser administrador ===");
+{
+  // Las tres son de panel. Sin esta comprobación, cualquiera con la consola
+  // abierta podría sacarle a otro lo que compró.
+  const db = crearFirestore();
+  const tienda = crearTienda({
+    db,
+    moverLeyendas: crearMoverLeyendas({ db, usuarios: "users", campoSaldo: "credits",
+      marcaDeTiempo: () => "T", error }),
+    marcaDeTiempo: () => "T",
+    error,
+    motivoCompra: MOTIVOS.COMPRA_PERSONALIZACION,
+    motivoDevolucion: MOTIVOS.DEVOLUCION_ARTICULO,
+    administradores: {
+      exigir: async () => { throw error("permission-denied", "No sos administrador."); },
+    },
+  });
+
+  for (const [nombre, correr] of [
+    ["listarPoseedores", () => tienda.listarPoseedores({}, DRAGON)],
+    ["desposeer", () => tienda.desposeer({}, { itemId: DRAGON, uid: "ana" })],
+    ["forzarBorrar", () => tienda.forzarBorrar({}, DRAGON)],
+  ]) {
+    try {
+      await correr();
+      ok(false, `${nombre} exige ser administrador`);
+    } catch (e) {
+      ok(e.codigo === "permission-denied", `${nombre} exige ser administrador`, e.codigo);
+    }
+  }
+}
 
 console.log(fallos ? `\n❌ ${fallos} fallos` : "\n✅ TODO OK");
 process.exit(fallos ? 1 : 0);

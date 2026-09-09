@@ -122,7 +122,7 @@ export function exigirSesionEnMesa() {
  * y sigue; cuando llega, redibuja.
  */
 export async function equipadoEnMesa(uid) {
-  const vacio = { dorso: null, retrato: null, pano: null };
+  const vacio = { dorso: null, retrato: null, pano: null, mazo: null };
   if (!uid) return vacio;
   try {
     const { db, doc, getDoc } = await import("./firebase.js");
@@ -146,12 +146,13 @@ export async function equipadoEnMesa(uid) {
       return imagenEsArchivo(imagen) ? imagen : null;
     };
 
-    const [dorso, retrato, pano] = await Promise.all([
+    const [dorso, retrato, pano, mazo] = await Promise.all([
       ruta(perfil.data().dorso),
       ruta(perfil.data().avatar),
       ruta(perfil.data().fondo),
+      ruta(perfil.data().mazo),
     ]);
-    return { dorso, retrato, pano };
+    return { dorso, retrato, pano, mazo };
   } catch (error) {
     console.warn("No se pudo leer lo equipado:", error);
     return vacio;
