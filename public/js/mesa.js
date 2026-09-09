@@ -3002,10 +3002,17 @@ function panelDeRevancha() {
     // La cifra pasa por `Number` antes de entrar al HTML. Viene de
     // Firestore y es un importe: si algún día llegara otra cosa, acá se
     // convierte en `NaN` y no en etiquetas.
+    // El precio va EN EL BOTÓN, igual que en «jugar otra».
+    //
+    // La apuesta la fijó el primero que tocó, y los otros tres la aceptan o
+    // no entran. Para eso tienen que verla sin buscarla: el renglón de
+    // arriba se lee salteado, el botón que se va a tocar no.
     return `
-      <p class="aviso-suave">Ya hay revancha, por ${Number(revanchaAbierta.entrada)} Leyendas.</p>
+      <p class="aviso-suave">Ya hay revancha en marcha.</p>
       <div class="botonera-poder">
-        <button class="accion" data-accion="revancha-unirme" type="button">Unirme</button>
+        <button class="accion" data-accion="revancha-unirme" type="button">
+          Unirme · ${Number(revanchaAbierta.entrada)} Leyendas
+        </button>
       </div>
       <button class="enlace-modal" data-accion="revancha-salir" type="button">Salir al tablero</button>`;
   }

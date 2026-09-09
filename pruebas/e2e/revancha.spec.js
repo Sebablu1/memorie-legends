@@ -103,8 +103,16 @@ const firebaseFalso = (entrada) => `
   // depende que la mesa llame o no a unirseASala, y se prueba en los dos
   // sentidos.
   window.__dentro = true;
+  // __falla hace que el servidor conteste que no. El caso real es quedarse
+  // sin Leyendas para la entrada, y el jugador tiene que enterarse de por qué.
+  window.__falla = null;
   export const httpsCallable = (_f, nombre) => async (datos) => {
     anotar({ nombre, datos });
+    if (nombre === "revanchaDeSala" && window.__falla) {
+      const e = new Error(window.__falla);
+      e.code = "functions/failed-precondition";
+      throw e;
+    }
     if (nombre === "revanchaDeSala") {
       return { data: { codigo: "NUEVA1", entrada: datos.entrada, dentro: window.__dentro } };
     }
@@ -274,8 +282,12 @@ test("si la abre otro, el panel lo avisa solo", async ({ page }) => {
 
   const unirme = page.locator('[data-accion="revancha-unirme"]');
   await expect(unirme).toBeVisible();
-  // Y con la apuesta que fijó quien la abrió, no la de la mesa anterior.
-  await expect(page.locator("#panelRevancha")).toContainText("25");
+
+  // La apuesta la fijó quien la abrió, y es 25, no los 50 de la mesa anterior.
+  // Tiene que estar EN EL BOTÓN: es lo que se va a cobrar al tocarlo, y el
+  // que no la quiera pagar tiene que poder no tocarlo.
+  await expect(unirme).toContainText("25");
+  await expect(unirme).not.toContainText(String(ENTRADA));
   // Ya no se ofrece abrir otra: sería una segunda sala con una segunda entrada.
   await expect(page.locator('[data-accion="revancha-igual"]')).toHaveCount(0);
 });
@@ -303,6 +315,33 @@ test("unirse a la revancha ajena pasa por la puerta de siempre", async ({ page }
   const unirse = llamadas.find((l) => l.nombre === "unirseASala");
   expect(unirse, "no se llamó a unirseASala").toBeTruthy();
   expect(unirse.datos).toEqual({ codigo: "NUEVA1" });
+});
+
+test("si no alcanza el saldo, se dice por qué y se puede volver a elegir", async ({ page }) => {
+  /**
+   * El caso más probable de todos: el que acaba de perder la partida no tiene
+   * para pagar la entrada de la siguiente.
+   *
+   * Lo que NO puede pasar es que el botón se toque y no ocurra nada. El
+   * mensaje lo redacta el servidor —«tenés X y hacen falta Y»— porque es el
+   * único que sabe el saldo de verdad; acá sólo se muestra.
+   */
+  await abrirFinal(page);
+  await cerrarLaSala(page);
+  await page.evaluate(() => {
+    window.__falla = "Saldo insuficiente: tenés 12 Leyendas y hacen falta 50.";
+  });
+
+  await page.click('[data-accion="revancha-igual"]');
+
+  const panel = page.locator("#panelRevancha");
+  await expect(panel).toContainText("12 Leyendas");
+  await expect(panel).toContainText("50");
+
+  // Y el panel vuelve: se puede probar con una apuesta más chica, que es
+  // justamente para lo que está «cambiar apuesta».
+  await expect(page.locator('[data-accion="revancha-cambiar"]')).toBeVisible();
+  expect(page.url()).toContain("mesa.html");
 });
 
 test("en entrenamiento no hay revancha que ofrecer", async ({ page }) => {
