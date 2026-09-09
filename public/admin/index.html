@@ -101,6 +101,7 @@
         <div class="dato"><b id="totalSalas">—</b><span>salas vivas</span></div>
         <div class="dato"><b id="totalPartidas">—</b><span>partidas en curso</span></div>
         <div class="dato acento"><b id="totalRetenido">—</b><span>Leyendas retenidas</span></div>
+        <div class="dato"><b id="totalMuertas">—</b><span>salas cerradas sin borrar</span></div>
       </section>
 
       <div class="acciones">
@@ -290,6 +291,27 @@
       <section>
         <h2>Salas</h2>
         <div id="salas" class="lista"></div>
+      </section>
+
+      <!-- SALAS CERRADAS
+           No es sólo prolijidad: `listarSalasAdmin` lee la colección entera
+           en cada refresco y descarta las cerradas DESPUÉS de leerlas, así
+           que abrir el panel cuesta lo que hayan sido todas las salas de la
+           historia. Borrarlas es lo que acota eso. -->
+      <section>
+        <h2>Salas cerradas</h2>
+        <p class="nota">
+          Terminadas y canceladas. No retienen Leyendas: lo que se movió quedó
+          asentado en el libro mayor, que no se borra. Se van con su partida y
+          con las vistas de cada jugador.
+        </p>
+        <div class="acciones">
+          <button class="btn peligro" id="btnLimpiarCerradas" type="button">
+            Borrar todas las cerradas
+          </button>
+        </div>
+        <div class="aviso" id="avisoMuertas"></div>
+        <div id="muertas" class="lista"></div>
       </section>
 
       <!-- TORNEOS

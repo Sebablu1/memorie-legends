@@ -23,7 +23,10 @@
  * resumen que se arma en el servidor y no lleva ni una carta.
  */
 
-import { ESTADOS_SALA } from "./reglas/salas.js";
+import { ESTADOS_SALA, MIN_JUGADORES, MAX_JUGADORES } from "./reglas/salas.js";
+
+/** Lo mismo que corta `crearSala`: un nombre de sala no pasa de 40. */
+const LARGO_NOMBRE_SALA = 40;
 
 export function crearAdmin({
   db,
@@ -77,12 +80,30 @@ export function crearAdmin({
 
     const snap = await db.collection(salas).get();
     const vivas = [];
+    /**
+     * Las cerradas, que son las que se pueden borrar.
+     *
+     * Se leen igual —la consulta trae la colección entera— así que
+     * informarlas no cuesta una lectura más y es lo único que hace
+     * visible el problema: el panel cuesta cada vez más de abrir porque
+     * arrastra todas las salas que hubo desde siempre.
+     */
+    const muertas = [];
     let retenidoTotal = 0;
 
     snap.forEach((doc) => {
       const sala = doc.data();
       const estado = sala.estado ?? estados.ESPERANDO;
-      if (estado === estados.TERMINADA || estado === estados.CANCELADA) return;
+      if (estado === estados.TERMINADA || estado === estados.CANCELADA) {
+        muertas.push({
+          codigo: doc.id,
+          estado,
+          cuantos: (sala.jugadores ?? []).length,
+          cerrada:
+            sala.terminadaEn?.toMillis?.() ?? sala.canceladaEn?.toMillis?.() ?? null,
+        });
+        return;
+      }
 
       const retenido = retenidoDe(sala);
       retenidoTotal += retenido;
@@ -90,6 +111,8 @@ export function crearAdmin({
       vivas.push({
         codigo: doc.id,
         estado,
+        // El nombre, para poder retocarlo desde el panel sin adivinarlo.
+        nombre: sala.nombre ?? "Sala",
         entrada: Number(sala.entrada) || 0,
         // Nombres, no identificadores: el panel los muestra y no los necesita
         // para nada más.
@@ -124,22 +147,62 @@ export function crearAdmin({
     return {
       salas: vivas.sort((a, b) => (b.creada ?? 0) - (a.creada ?? 0)),
       partidas: partidasVivas.sort((a, b) => (b.actualizada ?? 0) - (a.actualizada ?? 0)),
+      // Las cerradas van recortadas: son para saber cuántas hay y poder
+      // borrar alguna suelta, no para mirarlas de a mil.
+      muertas: muertas.sort((a, b) => (b.cerrada ?? 0) - (a.cerrada ?? 0)).slice(0, 40),
       totales: {
         salas: vivas.length,
         partidas: partidasVivas.length,
+        muertas: muertas.length,
         leyendasRetenidas: retenidoTotal,
       },
     };
   }
 
+
   /**
-   * Cancela UNA sala en espera y devuelve las entradas.
+   * Cancela una sala y le devuelve la entrada a quien le corresponda.
    *
-   * Se niega si la partida ya empezó: ahí las Leyendas están en juego y
-   * sacarlas por la fuerza sería decidir el resultado desde afuera. Para eso
-   * está el abandono, que es una decisión de cada jugador y tiene su regla.
+   * ───────────────────────────────────────────────────────────────────────
+   * UNA SALA EN JUEGO TAMBIÉN, PERO HAY QUE PEDIRLO
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Antes se negaba en seco: «sus Leyendas están en juego». Y estaba bien
+   * mientras devolver el pozo pudiera pagarse dos veces — el cierre reparte
+   * premios de ese mismo pozo cuando la partida llega al final.
+   *
+   * Ahora la puerta se cierra por los dos lados, y por eso se puede:
+   *
+   *   · la partida queda marcada `cerrada`, y `avanzarPartida` se niega a
+   *     mover una partida cerrada. El barredor deja de encontrarla;
+   *   · la sala queda CANCELADA, y `planificar` no reparte nada de una sala
+   *     cancelada.
+   *
+   * Cualquiera de las dos sola ya alcanza. Van las dos porque el precio de
+   * equivocarse acá es pagar la misma plata dos veces.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * A QUIÉN LE CORRESPONDE
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * A cada jugador de la sala, su entrada. Ni más —el pozo no se reparte, no
+   * hay ganador— ni de nuevo: la clave de idempotencia es la MISMA que usan
+   * `salida.js` y el cierre sin ganadores, así que a quien ya se le devolvió
+   * no se le devuelve otra vez.
+   *
+   * La penalización por abandono NO se devuelve. Es un cobro aparte, por una
+   * decisión que esa persona tomó, y cancelar la sala no la deshace.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * HAY QUE PEDIRLO CON `forzar`
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Sin esa marca, una sala en juego se sigue negando. Cancelarla corta una
+   * partida que cuatro personas están jugando, y eso no puede pasar por un
+   * clic de más en una lista donde las salas esperando y las jugando se ven
+   * casi iguales. Es la misma precaución que `forzarBorrarItemAdmin`.
    */
-  async function cancelarUna(codigo, quien) {
+  async function cancelarUna(codigo, quien, { forzar = false } = {}) {
     const codigoLimpio = String(codigo ?? "").trim().toUpperCase();
     if (!codigoLimpio) throw error("invalid-argument", "Falta el código de la sala.");
 
@@ -153,14 +216,22 @@ export function crearAdmin({
 
       if (estado === estados.CANCELADA || estado === estados.TERMINADA) {
         // No es un error: cancelar dos veces tiene que ser inofensivo.
-        return { codigo: codigoLimpio, yaEstaba: true, devueltas: 0, jugadores: [] };
+        return { codigo: codigoLimpio, yaEstaba: true, devueltas: 0, jugadores: [], enJuego: false };
       }
-      if (estado === estados.JUGANDO) {
+
+      const enJuego = estado === estados.JUGANDO;
+      if (enJuego && !forzar) {
         throw error(
           "failed-precondition",
-          `La sala ${codigoLimpio} está jugando: sus Leyendas están en juego y no se sacan desde acá.`,
+          `La sala ${codigoLimpio} está jugando. Si de verdad querés cortarla, pedilo con la confirmación: se le devuelve la entrada a cada uno y la partida no reparte nada.`,
         );
       }
+
+      // La partida se lee ACÁ, antes de mover un peso: dentro de una
+      // transacción no se puede leer después de escribir, y `moverLeyendas`
+      // escribe.
+      const refPartida = db.collection(partidas).doc(codigoLimpio);
+      const snapPartida = enJuego ? await tx.get(refPartida) : null;
 
       const jugadores = sala.jugadores ?? [];
       const entrada = Number(sala.entrada);
@@ -188,10 +259,24 @@ export function crearAdmin({
 
       const devueltos = jugadores.filter((_, i) => resultados[i]?.aplicado);
 
+      // La partida deja de moverse. Se escribe con `update` y no republicando
+      // las vistas: no hay nada nuevo que mostrarle a nadie, y `publicar`
+      // volvería a calcularle un plazo, que es justo lo que se está apagando.
+      if (enJuego && snapPartida?.exists) {
+        tx.update(refPartida, {
+          cerrada: true,
+          plazo: null,
+          canceladaPor: quien,
+          canceladaEn: marcaDeTiempo(),
+        });
+      }
+
       tx.update(refSala, {
         estado: estados.CANCELADA,
         canceladaEn: marcaDeTiempo(),
-        motivoCancelacion: "cancelada por administración",
+        motivoCancelacion: enJuego
+          ? "cortada por administración en mitad de la partida"
+          : "cancelada por administración",
         canceladaPor: quien,
         devolucionesHechas: devueltos,
       });
@@ -201,13 +286,196 @@ export function crearAdmin({
         yaEstaba: false,
         devueltas: devueltos.length * entrada,
         jugadores: devueltos,
+        enJuego,
       };
     });
   }
 
-  async function cancelarSala(context, { codigo }) {
+  async function cancelarSala(context, { codigo, forzar }) {
     const quien = await exigirAdmin(context);
-    return cancelarUna(codigo, quien);
+    return cancelarUna(codigo, quien, { forzar: Boolean(forzar) });
+  }
+
+
+  /**
+   * Retoca lo que se puede retocar de una sala en espera.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * LA ENTRADA NO ESTÁ ACÁ, Y NO ES UN OLVIDO
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * La regla es que la entrada queda fija en cuanto alguien pagó. Y en una
+   * sala viva siempre pagó alguien: la paga el creador en la misma
+   * transacción que crea la sala, y si el creador se va, la sala se cancela
+   * entera —lo hace `salida.js`—. O sea que no existe una sala en espera con
+   * cero jugadores.
+   *
+   * Así que la regla, aplicada, dice «nunca». Aceptar el campo igual sería
+   * escribir una rama que no se puede alcanzar y que el día que alguien la
+   * alcance va a desincronizar el pozo: la sala guarda `pozo` congelado y
+   * cada jugador ya pagó SU número. Para cambiar la apuesta se cancela —con
+   * devolución— y se abre otra.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * EL CUPO SÍ, PERO NO POR DEBAJO DE LOS QUE YA ESTÁN
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Bajarlo por debajo de los que ya entraron dejaría una sala con más gente
+   * que lugares: el panel mostraría 4/2 y `puedeUnirse` diría que está llena
+   * desde antes de estarlo.
+   */
+  async function editarSala(context, { codigo, nombre, maxJugadores }) {
+    const quien = await exigirAdmin(context);
+    const codigoLimpio = String(codigo ?? "").trim().toUpperCase();
+    if (!codigoLimpio) throw error("invalid-argument", "Falta el código de la sala.");
+
+    return db.runTransaction(async (tx) => {
+      const refSala = db.collection(salas).doc(codigoLimpio);
+      const snap = await tx.get(refSala);
+      if (!snap.exists) throw error("not-found", `La sala ${codigoLimpio} no existe.`);
+
+      const sala = snap.data();
+      const estado = sala.estado ?? estados.ESPERANDO;
+      if (estado !== estados.ESPERANDO) {
+        throw error(
+          "failed-precondition",
+          `La sala ${codigoLimpio} no está esperando: sólo se retoca una sala que todavía no empezó.`,
+        );
+      }
+
+      const cambios = {};
+
+      if (nombre !== undefined) {
+        const limpio = String(nombre).trim().slice(0, LARGO_NOMBRE_SALA);
+        if (!limpio) throw error("invalid-argument", "El nombre no puede quedar vacío.");
+        cambios.nombre = limpio;
+      }
+
+      if (maxJugadores !== undefined) {
+        const cupo = Number(maxJugadores);
+        const dentro = (sala.jugadores ?? []).length;
+        if (!Number.isInteger(cupo) || cupo < MIN_JUGADORES || cupo > MAX_JUGADORES) {
+          throw error(
+            "invalid-argument",
+            `El cupo va de ${MIN_JUGADORES} a ${MAX_JUGADORES}.`,
+          );
+        }
+        if (cupo < dentro) {
+          throw error(
+            "failed-precondition",
+            `Ya hay ${dentro} jugador(es) adentro: el cupo no puede quedar en ${cupo}.`,
+          );
+        }
+        cambios.maxJugadores = cupo;
+      }
+
+      if (!Object.keys(cambios).length) {
+        throw error("invalid-argument", "No mandaste nada que cambiar.");
+      }
+
+      tx.update(refSala, { ...cambios, editadaEn: marcaDeTiempo(), editadaPor: quien });
+      return { codigo: codigoLimpio, cambios };
+    });
+  }
+
+  /**
+   * Borra una sala que ya no le debe nada a nadie, con su partida.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * POR QUÉ HACE FALTA BORRAR
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * `listarSalas` lee la colección ENTERA en cada refresco del panel y
+   * descarta las cerradas después de leerlas. O sea que el costo de abrir el
+   * panel crece con todas las salas que hubo desde siempre, no con las que
+   * están vivas. Borrarlas es lo que acota eso.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * SÓLO LAS QUE NO DEBEN NADA
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * CANCELADA y TERMINADA: en las dos, la plata ya se movió —devuelta o
+   * repartida— y quedó asentada en el libro mayor, que es lo que no se borra
+   * nunca. Una sala esperando o jugando tiene entradas adentro; ésas se
+   * cancelan primero, que devuelve, y recién después se borran.
+   *
+   * Se van con ella el documento de la partida y las vistas de cada jugador,
+   * que son subcolección suya y quedarían huérfanas.
+   */
+  async function eliminarSala(context, { codigo }) {
+    await exigirAdmin(context);
+    const codigoLimpio = String(codigo ?? "").trim().toUpperCase();
+    if (!codigoLimpio) throw error("invalid-argument", "Falta el código de la sala.");
+
+    const snap = await db.collection(salas).doc(codigoLimpio).get();
+    if (!snap.exists) throw error("not-found", `La sala ${codigoLimpio} no existe.`);
+
+    const estado = snap.data().estado ?? estados.ESPERANDO;
+    if (estado !== estados.CANCELADA && estado !== estados.TERMINADA) {
+      throw error(
+        "failed-precondition",
+        `La sala ${codigoLimpio} está ${estado}: todavía tiene Leyendas adentro. Cancelala primero, que las devuelve.`,
+      );
+    }
+
+    return borrarSalaMuerta(codigoLimpio);
+  }
+
+  /**
+   * El borrado en sí. Sin comprobaciones: las hace quien llama.
+   *
+   * No va en una transacción a propósito. Una transacción de Firestore no
+   * puede consultar, y las vistas son una subcolección que hay que listar; y
+   * además nada compite por una sala muerta —no la lee el juego, no la lee el
+   * ranking, no la lee un reporte—.
+   */
+  async function borrarSalaMuerta(codigo) {
+    const vistas = await db.collection(`${partidas}/${codigo}/vistas`).get();
+
+    const lote = db.batch();
+    vistas.forEach((d) => lote.delete(d.ref));
+    lote.delete(db.collection(partidas).doc(codigo));
+    lote.delete(db.collection(salas).doc(codigo));
+    await lote.commit();
+
+    return { codigo, vistas: vistas.size };
+  }
+
+  /**
+   * Borra TODAS las salas cerradas de una pasada.
+   *
+   * Con tope, y el tope importa: un lote de Firestore admite 500 escrituras,
+   * y cada sala se lleva su partida más una vista por jugador. Cien salas por
+   * vuelta deja aire de sobra y no hace falta contar exacto.
+   */
+  async function limpiarSalasCerradas(context, { tope = 100 } = {}) {
+    await exigirAdmin(context);
+
+    const snap = await db.collection(salas).get();
+    const muertas = [];
+    snap.forEach((d) => {
+      const estado = d.data().estado ?? estados.ESPERANDO;
+      if (estado === estados.CANCELADA || estado === estados.TERMINADA) muertas.push(d.id);
+    });
+
+    const aBorrar = muertas.slice(0, Math.max(1, Math.min(Number(tope) || 100, 200)));
+    const borradas = [];
+    const fallidas = [];
+    for (const codigo of aBorrar) {
+      try {
+        await borrarSalaMuerta(codigo);
+        borradas.push(codigo);
+      } catch (e) {
+        fallidas.push({ codigo, motivo: e?.message ?? "error desconocido" });
+      }
+    }
+
+    return {
+      encontradas: muertas.length,
+      borradas: borradas.length,
+      quedan: muertas.length - borradas.length,
+      fallidas,
+    };
   }
 
   /**
@@ -399,6 +667,7 @@ export function crearAdmin({
 
   return {
     listarSalas, cancelarSala, cancelarTodasEnEspera,
+    editarSala, eliminarSala, limpiarSalasCerradas,
     revisarNombres, listarUsuarios, eliminarUsuario, exigirAdmin,
   };
 }

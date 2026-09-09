@@ -125,7 +125,23 @@ export function crearCierre({
    * no paguen dos veces.
    */
   function planificar({ codigo, partida, sala }) {
-    if (sala.estado === estados.TERMINADA) {
+    /**
+     * Una sala que ya no está en juego no tiene nada que repartir.
+     *
+     * TERMINADA es el caso de siempre: dos disparos simultáneos del cierre,
+     * y el segundo no paga.
+     *
+     * CANCELADA es el otro, y es el que puede costar plata: la
+     * administración puede cancelar una sala EN JUEGO devolviéndole la
+     * entrada a cada uno. Si después alguien llegara a cerrar esa partida,
+     * pagaría premios de un pozo que ya volvió a sus dueños.
+     *
+     * Son dos cierres —éste y `avanzarPartida`, que se niega a mover una
+     * partida cerrada— y a propósito: el que cancela escribe las dos
+     * marcas, y cualquiera de las dos sola alcanza para que no se pague
+     * dos veces.
+     */
+    if (sala.estado === estados.TERMINADA || sala.estado === estados.CANCELADA) {
       return { yaEstaba: true, cierre: sala.cierre ?? null };
     }
 

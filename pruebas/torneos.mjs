@@ -369,12 +369,61 @@ console.log("\n=== 3. Crear valida la entrada contra el rango acordado ===");
 }
 
 {
-  // Editar sólo en borrador: después ya hay gente que pagó.
-  const { torneos, id } = await conInscriptos(4);
+  /**
+   * Publicado, se retoca la etiqueta pero no el trato.
+   *
+   * La ENTRADA y el CUPO son las dos cosas que el jugador miró antes de
+   * pagar: cuánto le costaba y contra cuántos iba a jugar. El nombre no.
+   *
+   * Antes esto era un portón —publicado no se tocaba nada, ni una falta de
+   * ortografía en el nombre—. Ahora es una lista de campos.
+   */
+  const { torneos, id, db } = await conInscriptos(4);
+  const antes = db._leer(`torneos/${id}`);
+
   const { error: e } = await capturar(() =>
     torneos.editar(ADMIN, id, { nombre: "Otra", entrada: 5 }));
-  ok(e?.codigo === "failed-precondition", "no se edita un torneo con inscriptos", e?.codigo);
-  ok(/pagó la entrada/.test(e?.message ?? ""), "y el mensaje dice por qué");
+  ok(e?.codigo === "failed-precondition", "la entrada no se cambia con inscriptos", e?.codigo);
+  ok(/entrada/.test(e?.message ?? ""), "y el mensaje nombra el campo", e?.message);
+  ok(/pag/i.test(e?.message ?? ""), "y dice por qué", e?.message);
+
+  const cupo = await capturar(() => torneos.editar(ADMIN, id, { maxJugadores: 64 }));
+  ok(cupo.error?.codigo === "failed-precondition", "el cupo tampoco", cupo.error?.codigo);
+
+  // Nada de eso se guardó: falla entero o no falla.
+  ok(db._leer(`torneos/${id}`).nombre !== "Otra", "y no se guardó a medias");
+
+  // El nombre solo, sí.
+  const r = await torneos.editar(ADMIN, id, { nombre: "Copa de otoño" });
+  ok(r.nombre === "Copa de otoño", "el nombre sí se corrige", r.nombre);
+  ok(db._leer(`torneos/${id}`).nombre === "Copa de otoño", "y queda escrito");
+  ok(
+    db._leer(`torneos/${id}`).entrada === antes.entrada,
+    "sin mover la entrada",
+    db._leer(`torneos/${id}`).entrada,
+  );
+  ok(
+    db._leer(`torneos/${id}`).pozo === antes.pozo,
+    "ni el pozo, que se armó con la entrada vieja",
+    db._leer(`torneos/${id}`).pozo,
+  );
+
+  // Mandar la entrada IGUAL a la que ya estaba no es cambiarla: el panel
+  // manda el formulario entero en cada guardado.
+  const igual = await capturar(() =>
+    torneos.editar(ADMIN, id, { nombre: "Copa de otoño", entrada: antes.entrada }));
+  ok(!igual.error, "mandar la entrada sin cambiarla no molesta", igual.error?.message);
+}
+
+{
+  // En borrador se sigue pudiendo todo: es el estado donde no hay nadie.
+  const { db, torneos } = montar({ saldos: {} });
+  const { id } = await torneos.crear(ADMIN, { nombre: "Copa", entrada: 100 });
+
+  const r = await torneos.editar(ADMIN, id, { nombre: "Nueva", entrada: 50, maxJugadores: 8 });
+  ok(r.entrada === 50, "en borrador la entrada se cambia", r.entrada);
+  ok(db._leer(`torneos/${id}`).maxJugadores === 8, "y el cupo también");
+  ok(db._leer(`torneos/${id}`).nombre === "Nueva", "y el nombre");
 }
 
 // =====================================================================

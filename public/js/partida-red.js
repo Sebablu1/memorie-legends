@@ -130,30 +130,70 @@ export const MS_ENTRE_GOLPES = 900;
  * Mantiene la partida avanzando.
  *
  * Todos los jugadores golpean, y está bien que sea así: si dependiera de uno
- * solo, su desconexión congelaría la mesa para los demás. Que sobren llamadas
- * no es un problema —el servidor contesta "todavía no" sin tocar nada— y que
- * lleguen a la vez tampoco: la transacción deja pasar una.
+ * solo, su desconexión congelaría la mesa para los demás. Que lleguen a la
+ * vez tampoco es problema: la transacción deja pasar una.
  *
- * Con la pestaña oculta se deja de golpear: el navegador estrangula los
- * temporizadores en segundo plano y no tiene sentido insistir. Al volver,
- * la primera llamada pone la partida al día de una vez.
+ * ─────────────────────────────────────────────────────────────────────────
+ * SE GOLPEA CUANDO HAY ALGO QUE PEDIR, NO CADA 900 MS
+ * ─────────────────────────────────────────────────────────────────────────
  *
+ * Antes el temporizador llamaba al servidor en CADA vuelta, toda la partida.
+ * Con cuatro jugadores son unas 267 llamadas por minuto y por mesa —cada una
+ * una función y una transacción de Firestore— y la enorme mayoría contestaba
+ * «todavía no» sin tocar nada.
+ *
+ * El servidor ya publica en cada vista CUÁNDO vence el plazo: es el mismo
+ * dato con el que la mesa dibuja la cuenta regresiva. Así que el reloj local
+ * sigue latiendo igual —eso no cuesta nada— pero sólo se sale a la red
+ * cuando ese plazo ya venció, que es el único momento en que el servidor
+ * tiene algo que hacer.
+ *
+ * Sin plazo NO se golpea, y es correcto: `plazoDe` devuelve null en las
+ * fases que no tienen reloj —levantada, poder— y ahí `avanzarPartida`
+ * contesta `sin_plazo` sin mover nada. Al que no está se lo saca por otra
+ * vía, `saltarAusente`, que tiene su propio ciclo.
+ *
+ * Queda un caso raro: una partida a la que le falte el plazo o lo tenga
+ * desfasado se arregla golpeando, y con esto nadie golpearía. Lo cubre el
+ * barredor del servidor, que pasa cada minuto — un minuto de demora en algo
+ * que no debería ocurrir nunca.
+ *
+ * @param cuandoVence  función que devuelve el vencimiento del plazo en el
+ *                     reloj del SERVIDOR, o null si no hay plazo.
  * @returns función para dejar de golpear
  */
-export function mantenerEnMarcha(codigo) {
+export function mantenerEnMarcha(codigo, cuandoVence = () => null) {
   let corriendo = false;
-  const golpe = async () => {
+
+  /** ¿El servidor tiene algo que hacer ahora mismo? */
+  const vencido = () => {
+    const hasta = cuandoVence();
+    if (typeof hasta !== "number") return false;
+    return ahoraDelServidor() >= hasta;
+  };
+
+  /**
+   * `forzado` saltea la comprobación del plazo.
+   *
+   * Lo usan el arranque y la vuelta a la pestaña: en los dos casos lo que se
+   * sabe del plazo puede estar viejo —o no haber llegado todavía— y una
+   * llamada de más es más barata que una mesa congelada.
+   */
+  const golpe = async (forzado = false) => {
     if (corriendo || document.hidden) return;
+    if (!forzado && !vencido()) return;
     corriendo = true;
     try { await avanzarPartida(codigo); } catch { /* el siguiente golpe reintenta */ }
     finally { corriendo = false; }
   };
-  const t = setInterval(golpe, MS_ENTRE_GOLPES);
-  document.addEventListener("visibilitychange", golpe);
-  golpe();
+
+  const alVolver = () => golpe(true);
+  const t = setInterval(() => golpe(false), MS_ENTRE_GOLPES);
+  document.addEventListener("visibilitychange", alVolver);
+  golpe(true);
   return () => {
     clearInterval(t);
-    document.removeEventListener("visibilitychange", golpe);
+    document.removeEventListener("visibilitychange", alVolver);
   };
 }
 

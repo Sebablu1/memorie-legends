@@ -422,5 +422,47 @@ console.log("\n=== Lo que ya está cerrado o vacío se deja en paz ===");
   ok(!sinPartida.vaciada && sinPartida.motivo === "no_existe", "una que no existe no rompe nada", sinPartida);
 }
 
+console.log("\n=== Una partida cerrada no se mueve más, la empuje quien la empuje ===");
+{
+  /**
+   * La segunda mitad de «cancelar una sala en juego».
+   *
+   * Cuando la administración corta una partida y le devuelve la entrada a
+   * cada uno, la partida queda `cerrada` y sin plazo. Pero sigue existiendo,
+   * y sigue en la fase en que estaba —`turno`, no `finPartida`—.
+   *
+   * Sin este freno, el primer golpe la ve sin plazo, se lo recalcula, el
+   * barredor la encuentra vencida y la empuja hasta el final. Ahí el cierre
+   * repartiría premios de un pozo que ya volvió a sus dueños: la misma plata
+   * pagada dos veces.
+   */
+  const db = db0();
+  const red = motorDe(db);
+
+  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+  reloj += 60_000;
+
+  // Lo que escribe la cancelación: cerrada y sin plazo.
+  const antes = db.leer("partidas/ABCDEF");
+  db.escribir("partidas/ABCDEF", { ...antes, cerrada: true, plazo: null });
+
+  const r = await red.avanzarPartida({ codigo: "ABCDEF" });
+  ok(r.hizo === null, "no hace nada", r);
+  ok(r.motivo === "cerrada", "y dice que es porque está cerrada", r.motivo);
+
+  const despues = db.leer("partidas/ABCDEF");
+  ok(despues.plazo === null, "no se le recalcula el plazo", despues.plazo);
+  ok(despues.estado.fase === antes.estado.fase, "y la fase no se movió", despues.estado.fase);
+  ok(!(await red.vencidas()).includes("ABCDEF"), "así que el barredor deja de verla");
+
+  // Y por si alguien la golpea diez veces seguidas.
+  for (let i = 0; i < 10; i++) await red.avanzarPartida({ codigo: "ABCDEF" });
+  ok(
+    db.leer("partidas/ABCDEF").estado.fase === antes.estado.fase,
+    "ni con diez golpes",
+    db.leer("partidas/ABCDEF").estado.fase,
+  );
+}
+
 console.log(fallos === 0 ? "\n✅ TODO OK" : `\n❌ ${fallos} fallos`);
 process.exit(fallos === 0 ? 0 : 1);

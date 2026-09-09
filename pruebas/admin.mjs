@@ -39,6 +39,9 @@ function crearFirestore(datos = {}) {
   const instantanea = (col, id) => ({
     id, exists: dameCol(col).has(id),
     data: () => structuredClone(dameCol(col).get(id)),
+    // La referencia va adentro porque el borrado en lote itera un `get()`
+    // y borra `d.ref`, igual que en Firestore de verdad.
+    ref: { __col: col, __id: id },
   });
 
   const consulta = (col, filtro = null) => ({
@@ -54,10 +57,32 @@ function crearFirestore(datos = {}) {
   const db = {
     escrituras: [],
     collection: (n) => ({
-      doc: (id) => ({ __col: n, __id: id }),
+      // Una referencia sabe leerse sola, como en Firestore: `eliminarSala`
+      // lee la sala FUERA de una transacción, porque después borra en lote
+      // y un lote no es una transacción.
+      doc: (id) => ({ __col: n, __id: id, get: async () => instantanea(n, id) }),
       where: (...a) => consulta(n).where(...a),
       get: () => consulta(n).get(),
     }),
+    /**
+     * Lote de escrituras. Sólo `delete`, que es lo único que se usa.
+     *
+     * Es de verdad diferido: nada se toca hasta `commit()`. Un lote que
+     * borrara al vuelo escondería el error de leer después de borrar.
+     */
+    batch() {
+      const pendientes = [];
+      return {
+        delete: (ref) => pendientes.push(ref),
+        async commit() {
+          for (const ref of pendientes) {
+            db.escrituras.push({ ruta: `${ref.__col}/${ref.__id}`, borrado: true });
+            dameCol(ref.__col).delete(ref.__id);
+          }
+          return pendientes.length;
+        },
+      };
+    },
     async runTransaction(cuerpo) {
       let yaEscribio = false;
       const tx = {
@@ -79,6 +104,8 @@ function crearFirestore(datos = {}) {
       return cuerpo(tx);
     },
     leer: (col, id) => dameCol(col).get(id),
+    existe: (col, id) => dameCol(col).has(id),
+    cuantos: (col) => dameCol(col).size,
   };
   return db;
 }
@@ -271,9 +298,9 @@ console.log("\n=== 4b. La misma clave que usa salir de la sala ===");
   ok(r.jugadores.join() === "beto", "ana no cobra dos veces", r.jugadores);
 }
 
-// ==================================== 5. una partida en juego no se toca
+// ============================ 5. una partida en juego: sólo si se confirma
 
-console.log("\n=== 5. Una sala jugando no se vacía desde acá ===");
+console.log("\n=== 5. Una sala jugando no se corta por accidente ===");
 {
   const { db, admin, banco } = montar({
     rooms: {
@@ -282,13 +309,122 @@ console.log("\n=== 5. Una sala jugando no se vacía desde acá ===");
   });
 
   const r = await capturar(() => admin.cancelarSala(comoAdmin, { codigo: "JUEGA1" }));
-  ok(r.error?.codigo === "failed-precondition", "se niega", r.error?.codigo);
-  ok(/en juego/i.test(r.error?.message ?? ""), "diciendo por qué", r.error?.message);
+  ok(r.error?.codigo === "failed-precondition", "sin confirmar, se niega", r.error?.codigo);
+  ok(/jugando/i.test(r.error?.message ?? ""), "diciendo por qué", r.error?.message);
+  ok(/confirmaci/i.test(r.error?.message ?? ""), "y qué hacer si va en serio", r.error?.message);
   ok(banco.movimientos.length === 0, "sin mover una sola Leyenda");
   ok(db.leer("rooms", "JUEGA1").estado === ESTADOS_SALA.JUGANDO, "y la sala sigue jugando");
 
   const noExiste = await capturar(() => admin.cancelarSala(comoAdmin, { codigo: "NADA" }));
   ok(noExiste.error?.codigo === "not-found", "una sala inexistente se rechaza", noExiste.error?.codigo);
+}
+
+console.log("\n=== 5b. Confirmada, se corta y se devuelve la entrada ===");
+{
+  /**
+   * Devolver LA ENTRADA, no el pozo.
+   *
+   * El pozo es la suma de las entradas y se reparte entre el primero y el
+   * segundo cuando la partida termina. Acá no termina: se corta. Así que cada
+   * uno recupera lo suyo y no hay premio que repartir.
+   */
+  const { db, admin, banco } = montar({
+    rooms: {
+      JUEGA2: {
+        estado: ESTADOS_SALA.JUGANDO, entrada: 200, pozo: 400,
+        jugadores: ["ana", "beto"], jugadoresNombres: ["A", "B"],
+      },
+    },
+    partidas: {
+      JUEGA2: {
+        estado: { fase: "turno" },
+        plazo: { fase: "turno", marca: "t0-0", hasta: 1, que: "saltarTurno" },
+        version: 7,
+      },
+    },
+  });
+
+  const r = await admin.cancelarSala(comoAdmin, { codigo: "JUEGA2", forzar: true });
+
+  ok(r.enJuego === true, "se sabe que estaba en juego", r.enJuego);
+  ok(r.devueltas === 400, "vuelven las dos entradas: 200 cada uno", r.devueltas);
+  ok(r.jugadores.join() === "ana,beto", "a los dos", r.jugadores);
+  ok(
+    banco.movimientos.every((m) => m.delta === 200),
+    "y cada movimiento es UNA entrada, no el pozo",
+    banco.movimientos.map((m) => m.delta),
+  );
+
+  const sala = db.leer("rooms", "JUEGA2");
+  ok(sala.estado === ESTADOS_SALA.CANCELADA, "la sala queda cancelada", sala.estado);
+  ok(/partida/i.test(sala.motivoCancelacion ?? ""), "y el motivo dice que se cortó jugando", sala.motivoCancelacion);
+
+  /**
+   * Las dos marcas que impiden pagar dos veces.
+   *
+   * Sin ellas, la partida sigue en `turno` con un plazo vencido: el barredor
+   * la encuentra, la empuja hasta `finPartida` y el cierre reparte premios de
+   * un pozo que acaba de volver a sus dueños.
+   */
+  const partida = db.leer("partidas", "JUEGA2");
+  ok(partida.cerrada === true, "la partida queda cerrada", partida.cerrada);
+  ok(partida.plazo === null, "y sin plazo, así que el barredor no la ve", partida.plazo);
+}
+
+console.log("\n=== 5c. A quien ya se le devolvió, no se le devuelve otra vez ===");
+{
+  const { admin, banco } = montar({
+    rooms: {
+      JUEGA3: {
+        estado: ESTADOS_SALA.JUGANDO, entrada: 100,
+        jugadores: ["ana", "beto", "caro"], jugadoresNombres: ["A", "B", "C"],
+      },
+    },
+    partidas: { JUEGA3: { estado: { fase: "turno" }, version: 2 } },
+  });
+  // Beto ya había cobrado su devolución por otra vía.
+  banco.asientos.add("devolucion_JUEGA3_beto");
+
+  const r = await admin.cancelarSala(comoAdmin, { codigo: "JUEGA3", forzar: true });
+  ok(r.devueltas === 200, "cobran los otros dos y nadie más", r.devueltas);
+  ok(r.jugadores.join() === "ana,caro", "beto no cobra dos veces", r.jugadores);
+}
+
+console.log("\n=== 5d. Sin partida escrita, la sala se cancela igual ===");
+{
+  // Una sala marcada JUGANDO cuyo documento de partida no existe: no debería
+  // pasar, pero si pasa lo que no puede es que las entradas queden retenidas
+  // porque falta un documento.
+  const { db, admin } = montar({
+    rooms: {
+      HUERFANA: { estado: ESTADOS_SALA.JUGANDO, entrada: 50, jugadores: ["ana"], jugadoresNombres: ["A"] },
+    },
+  });
+
+  const r = await admin.cancelarSala(comoAdmin, { codigo: "HUERFANA", forzar: true });
+  ok(r.devueltas === 50, "la entrada vuelve igual", r.devueltas);
+  ok(db.leer("rooms", "HUERFANA").estado === ESTADOS_SALA.CANCELADA, "y la sala queda cancelada");
+}
+
+console.log("\n=== 5e. El barrido masivo NUNCA corta una partida ===");
+{
+  // `cancelarTodasEnEspera` consulta sólo las que esperan, y además llama sin
+  // confirmación. Las dos cosas, porque es el botón que se toca a ciegas.
+  const { db, admin, banco } = montar({
+    rooms: {
+      ESPERA9: { estado: ESTADOS_SALA.ESPERANDO, entrada: 25, jugadores: ["ana"], jugadoresNombres: ["A"] },
+      JUEGA9: { estado: ESTADOS_SALA.JUGANDO, entrada: 500, jugadores: ["beto"], jugadoresNombres: ["B"] },
+    },
+  });
+
+  const r = await admin.cancelarTodasEnEspera(comoAdmin);
+  ok(r.canceladas === 1, "cancela la que esperaba", r.canceladas);
+  ok(db.leer("rooms", "JUEGA9").estado === ESTADOS_SALA.JUGANDO, "y no toca la que juega");
+  ok(
+    banco.movimientos.every((m) => m.uid !== "beto"),
+    "a beto no se le mueve nada",
+    banco.movimientos,
+  );
 }
 
 // ======================================= 6. cancelar todas las que esperan
@@ -321,6 +457,159 @@ console.log("\n=== 6. Cancelar todas las que esperan ===");
   const otra = await admin.cancelarTodasEnEspera(comoAdmin);
   ok(otra.intentadas === 0, "repetir no encuentra ninguna", otra.intentadas);
   ok(banco.movimientos.length === 3, "y no paga de nuevo", banco.movimientos.length);
+}
+
+// ======================================= 6b. retocar una sala en espera
+
+console.log("\n=== 6b. Lo que se puede retocar de una sala ===");
+{
+  const { db, admin } = montar({
+    rooms: {
+      RETOQUE: {
+        estado: ESTADOS_SALA.ESPERANDO, entrada: 50, maxJugadores: 4,
+        nombre: "Sala", jugadores: ["ana", "beto"], jugadoresNombres: ["A", "B"],
+      },
+    },
+  });
+
+  const r = await admin.editarSala(comoAdmin, { codigo: "RETOQUE", nombre: "Mesa de los martes" });
+  ok(r.cambios.nombre === "Mesa de los martes", "el nombre se cambia", r.cambios);
+  ok(db.leer("rooms", "RETOQUE").nombre === "Mesa de los martes", "y queda escrito");
+  ok(db.leer("rooms", "RETOQUE").entrada === 50, "sin tocar la entrada");
+
+  await admin.editarSala(comoAdmin, { codigo: "RETOQUE", maxJugadores: 3 });
+  ok(db.leer("rooms", "RETOQUE").maxJugadores === 3, "el cupo también");
+
+  const chico = await capturar(() =>
+    admin.editarSala(comoAdmin, { codigo: "RETOQUE", maxJugadores: 1 }));
+  ok(chico.error, "el cupo no baja de lo permitido", chico.error?.message);
+
+  // Por debajo de los que YA entraron, tampoco: dejaría una sala con más
+  // gente que lugares, que el panel mostraría como 3/2.
+  const { admin: a2, db: db2 } = montar({
+    rooms: {
+      LLENA: {
+        estado: ESTADOS_SALA.ESPERANDO, entrada: 50, maxJugadores: 4,
+        jugadores: ["ana", "beto", "caro"], jugadoresNombres: ["A", "B", "C"],
+      },
+    },
+  });
+  const bajo = await capturar(() => a2.editarSala(comoAdmin, { codigo: "LLENA", maxJugadores: 2 }));
+  ok(bajo.error?.codigo === "failed-precondition", "ni por debajo de los que ya entraron", bajo.error?.message);
+  ok(db2.leer("rooms", "LLENA").maxJugadores === 4, "y el cupo queda como estaba");
+}
+
+console.log("\n=== 6c. La entrada NO se toca desde el panel ===");
+{
+  /**
+   * No hay campo que mandar, y no es un olvido: la entrada queda fija en
+   * cuanto alguien pagó, y en una sala viva siempre pagó alguien —la paga el
+   * creador al crearla, y si el creador se va la sala se cancela entera—.
+   *
+   * Si se pudiera cambiar, la sala guardaría un `pozo` congelado que ya no
+   * coincide con lo que cada jugador pagó. Para cambiar la apuesta se cancela
+   * (que devuelve) y se abre otra.
+   */
+  const { db, admin } = montar({
+    rooms: {
+      APUESTA: {
+        estado: ESTADOS_SALA.ESPERANDO, entrada: 50, pozo: 100, maxJugadores: 4,
+        jugadores: ["ana", "beto"], jugadoresNombres: ["A", "B"],
+      },
+    },
+  });
+
+  const r = await capturar(() =>
+    admin.editarSala(comoAdmin, { codigo: "APUESTA", entrada: 500 }));
+  ok(r.error?.codigo === "invalid-argument", "mandar sólo la entrada no cambia nada", r.error?.message);
+  ok(db.leer("rooms", "APUESTA").entrada === 50, "la entrada sigue siendo la de siempre");
+
+  await admin.editarSala(comoAdmin, { codigo: "APUESTA", nombre: "Otra", entrada: 500 });
+  ok(db.leer("rooms", "APUESTA").entrada === 50, "ni de contrabando junto al nombre");
+  ok(db.leer("rooms", "APUESTA").pozo === 100, "y el pozo tampoco se mueve");
+
+  const { admin: a2 } = montar({
+    rooms: { YAVA: { estado: ESTADOS_SALA.JUGANDO, entrada: 50, jugadores: ["ana"], jugadoresNombres: ["A"] } },
+  });
+  const jugando = await capturar(() => a2.editarSala(comoAdmin, { codigo: "YAVA", nombre: "x" }));
+  ok(jugando.error?.codigo === "failed-precondition", "una sala jugando no se retoca", jugando.error?.message);
+}
+
+// ============================================ 6d. borrar las salas muertas
+
+console.log("\n=== 6d. Sólo se borra lo que no le debe nada a nadie ===");
+{
+  const { db, admin } = montar({
+    rooms: {
+      VIVA: { estado: ESTADOS_SALA.ESPERANDO, entrada: 50, jugadores: ["ana"], jugadoresNombres: ["A"] },
+      JUEGA: { estado: ESTADOS_SALA.JUGANDO, entrada: 50, jugadores: ["ana"], jugadoresNombres: ["A"] },
+      MUERTA: { estado: ESTADOS_SALA.TERMINADA, entrada: 50, jugadores: ["ana"], jugadoresNombres: ["A"] },
+    },
+  });
+
+  for (const codigo of ["VIVA", "JUEGA"]) {
+    const r = await capturar(() => admin.eliminarSala(comoAdmin, { codigo }));
+    ok(r.error?.codigo === "failed-precondition", `${codigo} no se borra`, r.error?.codigo);
+    ok(/cancelala/i.test(r.error?.message ?? ""), `${codigo}: y dice qué hacer antes`, r.error?.message);
+    ok(db.existe("rooms", codigo), `${codigo} sigue estando`);
+  }
+
+  await admin.eliminarSala(comoAdmin, { codigo: "MUERTA" });
+  ok(!db.existe("rooms", "MUERTA"), "la terminada sí se borra");
+
+  const noExiste = await capturar(() => admin.eliminarSala(comoAdmin, { codigo: "NADA" }));
+  ok(noExiste.error?.codigo === "not-found", "y una que no existe se rechaza", noExiste.error?.codigo);
+}
+
+console.log("\n=== 6e. Se lleva la partida y las vistas ===");
+{
+  // Las vistas son una subcolección de la partida: sin borrarlas quedan
+  // documentos huérfanos que nadie va a volver a leer y que siguen ocupando.
+  const { db, admin } = montar({
+    rooms: { FIN: { estado: ESTADOS_SALA.CANCELADA, entrada: 50, jugadores: ["ana", "beto"], jugadoresNombres: ["A", "B"] } },
+    partidas: { FIN: { estado: { fase: "finPartida" }, cerrada: true, version: 9 } },
+    "partidas/FIN/vistas": { ana: { yo: 0 }, beto: { yo: 1 } },
+  });
+
+  const r = await admin.eliminarSala(comoAdmin, { codigo: "FIN" });
+
+  ok(r.vistas === 2, "cuenta las vistas que borró", r.vistas);
+  ok(!db.existe("rooms", "FIN"), "la sala se fue");
+  ok(!db.existe("partidas", "FIN"), "la partida también");
+  ok(db.cuantos("partidas/FIN/vistas") === 0, "y no quedó ninguna vista", db.cuantos("partidas/FIN/vistas"));
+}
+
+console.log("\n=== 6f. Limpiar todas las cerradas de una pasada ===");
+{
+  /**
+   * Por qué existe: `listarSalas` lee la colección ENTERA en cada refresco y
+   * descarta las cerradas DESPUÉS de leerlas. Sin una limpieza, abrir el panel
+   * cuesta cada vez más, y crece con todas las salas que hubo desde siempre.
+   */
+  const rooms = {};
+  for (let i = 0; i < 6; i++) {
+    rooms[`FIN${i}`] = {
+      estado: i % 2 ? ESTADOS_SALA.TERMINADA : ESTADOS_SALA.CANCELADA,
+      entrada: 10, jugadores: [], jugadoresNombres: [],
+    };
+  }
+  rooms.VIVA = { estado: ESTADOS_SALA.ESPERANDO, entrada: 10, jugadores: ["ana"], jugadoresNombres: ["A"] };
+  rooms.JUEGA = { estado: ESTADOS_SALA.JUGANDO, entrada: 10, jugadores: ["ana"], jugadoresNombres: ["A"] };
+
+  const { db, admin } = montar({ rooms });
+  const r = await admin.limpiarSalasCerradas(comoAdmin, {});
+
+  ok(r.encontradas === 6, "encuentra las seis cerradas", r.encontradas);
+  ok(r.borradas === 6, "y las borra", r.borradas);
+  ok(r.quedan === 0, "no queda ninguna", r.quedan);
+  ok(db.existe("rooms", "VIVA") && db.existe("rooms", "JUEGA"), "las vivas siguen enteras");
+
+  // El tope existe porque un lote de Firestore admite 500 escrituras.
+  const { admin: a2, db: db2 } = montar({ rooms: { ...rooms } });
+  const conTope = await a2.limpiarSalasCerradas(comoAdmin, { tope: 2 });
+  ok(conTope.borradas === 2, "con tope, borra sólo esas", conTope.borradas);
+  ok(conTope.quedan === 4, "y dice cuántas quedan", conTope.quedan);
+  ok(db2.cuantos("rooms") === 6, "quedan las cuatro cerradas y las dos vivas", db2.cuantos("rooms"));
 }
 
 // ============================ 7. las lecturas van antes que las escrituras

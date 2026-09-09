@@ -76,6 +76,9 @@ import {
   EsquemaActivarItem,
   EsquemaDesposeer,
   EsquemaRevancha,
+  EsquemaCancelarSala,
+  EsquemaEditarSala,
+  EsquemaLimpiarSalas,
 } from "./esquemas.js";
 import { crearSalirDeSalaEnEspera } from "./salida.js";
 import { crearAdmin } from "./admin.js";
@@ -994,8 +997,40 @@ export const forzarBorrarItemAdmin = functions.https.onCall(async (data, context
 export const listarSalasAdmin = functions.https.onCall((_data, context) =>
   panel.listarSalas(context));
 
-export const cancelarSalaAdmin = functions.https.onCall((data, context) =>
-  panel.cancelarSala(context, { codigo: data?.codigo }));
+/**
+ * Cancela una sala y devuelve las entradas.
+ *
+ * Con `forzar` corta también una partida en curso: le devuelve la entrada a
+ * cada jugador y apaga la partida para que el cierre no reparta nada
+ * después. Sin `forzar`, una sala en juego se niega.
+ */
+export const cancelarSalaAdmin = functions.https.onCall((data, context) => {
+  const d = validar(EsquemaCancelarSala, data, errorHttp);
+  return panel.cancelarSala(context, { codigo: d.codigo, forzar: d.forzar });
+});
+
+/** Retoca el nombre o el cupo de una sala que todavía no empezó. */
+export const editarSalaAdmin = functions.https.onCall((data, context) =>
+  panel.editarSala(context, validar(EsquemaEditarSala, data, errorHttp)));
+
+/**
+ * Borra una sala cerrada, con su partida y las vistas de cada jugador.
+ *
+ * Sólo las que no le deben nada a nadie. Lo que se movió queda igual en el
+ * libro mayor, que es lo que no se borra nunca.
+ */
+export const eliminarSalaAdmin = functions.https.onCall((data, context) =>
+  panel.eliminarSala(context, validar(EsquemaDeSala, data, errorHttp)));
+
+/**
+ * Borra TODAS las salas cerradas.
+ *
+ * Existe por una razón medible: `listarSalasAdmin` lee la colección entera
+ * en cada refresco y descarta las cerradas después de leerlas, así que
+ * abrir el panel cuesta lo que hayan sido todas las salas de la historia.
+ */
+export const limpiarSalasCerradasAdmin = functions.https.onCall((data, context) =>
+  panel.limpiarSalasCerradas(context, validar(EsquemaLimpiarSalas, data ?? {}, errorHttp)));
 
 export const cancelarSalasEnEsperaAdmin = functions.https.onCall((_data, context) =>
   panel.cancelarTodasEnEspera(context));

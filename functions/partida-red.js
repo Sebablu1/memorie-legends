@@ -926,6 +926,24 @@ export function crearMotorEnRed({
       const snap = await tx.get(refPartida(codigo));
       const partida = exigirPartida(snap, codigo);
       const t = ahora();
+
+      /**
+       * Una partida cerrada no vuelve a moverse. Nunca.
+       *
+       * `cerrada` la pone el cierre cuando ya repartió el pozo, y también
+       * la administración cuando cancela una sala en juego y devuelve las
+       * entradas. En los dos casos la plata ya se movió.
+       *
+       * Sin esta línea, una partida cancelada a mitad —que sigue en `turno`,
+       * no en `finPartida`— vuelve a calcular su plazo en el golpe
+       * siguiente, el barredor la encuentra vencida y la empuja hasta el
+       * final. Ahí el cierre pagaría premios de un pozo que ya se devolvió:
+       * la misma plata dos veces.
+       */
+      if (partida.cerrada) {
+        return { hizo: null, motivo: "cerrada", fase: partida.estado.fase };
+      }
+
       const plazo = partida.plazo;
 
       // Un plazo que no corresponde a la fase actual sería una partida

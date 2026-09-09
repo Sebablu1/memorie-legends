@@ -71,6 +71,38 @@ const Milisegundos = z.coerce.number().finite().min(0).max(600_000);
 
 export const EsquemaDeSala = z.object({ codigo: Codigo });
 
+/**
+ * Cancelar una sala desde el panel.
+ *
+ * `forzar` es lo que separa cancelar una sala que espera —inofensivo— de
+ * cortar una partida que cuatro personas están jugando. Va acá, en el
+ * esquema, para que el servidor no dependa de que el panel se acuerde de
+ * mandarlo: sin la marca, una sala en juego se niega.
+ */
+export const EsquemaCancelarSala = z.object({
+  codigo: Codigo,
+  forzar: z.coerce.boolean().optional(),
+});
+
+/**
+ * Retocar una sala desde el panel.
+ *
+ * `entrada` NO está, y no es un olvido: la apuesta queda fija en cuanto
+ * alguien pagó, y en una sala viva siempre pagó el creador. Aceptar el
+ * campo acá sería dejar entrar un valor que el servidor descarta después,
+ * que es la clase de cosa que un día alguien conecta sin mirar.
+ */
+export const EsquemaEditarSala = z.object({
+  codigo: Codigo,
+  nombre: z.string().max(40).optional(),
+  maxJugadores: z.coerce.number().int().min(2).max(4).optional(),
+});
+
+/** Cuántas salas cerradas se barren de una pasada. */
+export const EsquemaLimpiarSalas = z.object({
+  tope: z.coerce.number().int().min(1).max(200).optional(),
+});
+
 export const EsquemaCrearSala = z.object({
   entrada: z.coerce.number().int().min(0),
   nombre: z.string().max(40).optional(),

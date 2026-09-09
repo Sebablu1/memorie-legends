@@ -62,6 +62,10 @@ const dom = {
   btnCancelarTodas: $("btnCancelarTodas"),
   aviso: $("aviso"),
   salas: $("salas"),
+  muertas: $("muertas"),
+  totalMuertas: $("totalMuertas"),
+  avisoMuertas: $("avisoMuertas"),
+  btnLimpiarCerradas: $("btnLimpiarCerradas"),
   btnSembrarCatalogo: $("btnSembrarCatalogo"),
   avisoCatalogo: $("avisoCatalogo"),
   btnRevisarNombres: $("btnRevisarNombres"),
@@ -85,6 +89,9 @@ const dom = {
 const listar = httpsCallable(funciones, "listarSalasAdmin");
 const cancelar = httpsCallable(funciones, "cancelarSalaAdmin");
 const cancelarTodas = httpsCallable(funciones, "cancelarSalasEnEsperaAdmin");
+const editarSala = httpsCallable(funciones, "editarSalaAdmin");
+const eliminarSala = httpsCallable(funciones, "eliminarSalaAdmin");
+const limpiarCerradas = httpsCallable(funciones, "limpiarSalasCerradasAdmin");
 const sembrarCatalogo = httpsCallable(funciones, "sembrarCatalogoAdmin");
 const revisarNombres = httpsCallable(funciones, "revisarNombresAdmin");
 const listarUsuarios = httpsCallable(funciones, "listarUsuariosAdmin");
@@ -287,12 +294,96 @@ function filaDeSala(s) {
     boton.textContent = "Cancelar y devolver";
     boton.addEventListener("click", () => cancelarUna(s, boton));
   } else {
-    boton.textContent = "En juego";
-    boton.disabled = true;
-    boton.title = "Sus Leyendas están en juego. Para salir, cada jugador abandona.";
+    // Una sala EN JUEGO también se puede cortar, pero se pide dos veces.
+    //
+    // Estaba deshabilitado, y eso dejaba sin salida a una partida trabada
+    // de verdad. Ahora se puede, con la misma ceremonia que el borrado
+    // forzado del catálogo: confirmar y después escribir el código. En una
+    // lista donde las salas esperando y las jugando se ven casi iguales, un
+    // clic de más no puede cortarle la partida a cuatro personas.
+    boton.textContent = "Cortar y devolver";
+    boton.title = "Corta la partida en curso y le devuelve la entrada a cada jugador.";
+    boton.addEventListener("click", () => cortarEnJuego(s, boton));
   }
+  // Retocar sólo tiene sentido antes de empezar: una vez repartidas las
+  // cartas, el nombre y el cupo ya no cambian nada.
+  if (s.cancelable) {
+    const retocar = document.createElement("button");
+    retocar.type = "button";
+    retocar.className = "btn chico";
+    retocar.textContent = "Retocar";
+    retocar.addEventListener("click", () => retocarSala(s, retocar));
+    div.appendChild(retocar);
+  }
+
   div.appendChild(boton);
   return div;
+}
+
+/**
+ * Cambia el nombre o el cupo de una sala que todavía no empezó.
+ *
+ * La ENTRADA no está, y no es un olvido: la apuesta queda fija en cuanto
+ * alguien pagó, y en una sala viva siempre pagó el creador. Para cambiarla
+ * se cancela —que devuelve— y se abre otra.
+ */
+async function retocarSala(sala, boton) {
+  const nombre = prompt(`Nombre de ${sala.codigo}:`, sala.nombre ?? "Sala");
+  if (nombre === null) return;
+
+  const cupo = prompt(
+    `Cupo de ${sala.codigo} (entre 2 y 4, y no menos que los ${sala.cuantos} que ya están):`,
+    String(sala.maxJugadores),
+  );
+  if (cupo === null) return;
+
+  boton.disabled = true;
+  decir(dom.aviso, `Retocando ${sala.codigo}…`);
+  try {
+    await editarSala({ codigo: sala.codigo, nombre, maxJugadores: Number(cupo) });
+    await refrescar();
+    decir(dom.aviso, `${sala.codigo} actualizada.`, "bien");
+  } catch (error) {
+    decir(dom.aviso, error?.message ?? "No se pudo retocar.", "mal");
+    console.error(error);
+  } finally {
+    boton.disabled = false;
+  }
+}
+
+/** Una sala cerrada: lo único que se puede hacer con ella es borrarla. */
+function filaDeMuerta(s) {
+  const div = document.createElement("div");
+  div.className = "fila";
+  div.innerHTML = `
+    <span class="codigo">${limpio(s.codigo)}</span>
+    <span class="etiqueta ${limpio(s.estado)}">${limpio(s.estado)}</span>
+    <span class="campo"><b>${s.cuantos}</b> jugador(es)</span>
+    <span class="campo">${limpio(fecha(s.cerrada))}</span>`;
+
+  const boton = document.createElement("button");
+  boton.type = "button";
+  boton.className = "btn peligro chico";
+  boton.textContent = "Borrar";
+  boton.addEventListener("click", () => borrarMuerta(s, boton));
+  div.appendChild(boton);
+  return div;
+}
+
+async function borrarMuerta(sala, boton) {
+  if (!confirm(`Borrar ${sala.codigo} y su partida? No retiene Leyendas y el libro mayor no se toca.`)) {
+    return;
+  }
+  boton.disabled = true;
+  try {
+    const { data } = await eliminarSala({ codigo: sala.codigo });
+    decir(dom.avisoMuertas, `${data.codigo} borrada (${data.vistas} vistas).`, "bien");
+    await refrescar();
+  } catch (error) {
+    decir(dom.avisoMuertas, error?.message ?? "No se pudo borrar.", "mal");
+    console.error(error);
+    boton.disabled = false;
+  }
 }
 
 function filaDePartida(p) {
@@ -319,6 +410,22 @@ function pintar(datos) {
     dom.salas.innerHTML = '<p class="vacio">No hay salas vivas.</p>';
   } else {
     datos.salas.forEach((s) => dom.salas.appendChild(filaDeSala(s)));
+  }
+
+  dom.totalMuertas.textContent = datos.totales.muertas ?? 0;
+  dom.muertas.replaceChildren();
+  const muertas = datos.muertas ?? [];
+  if (!muertas.length) {
+    dom.muertas.innerHTML = '<p class="vacio">No hay salas cerradas sin borrar.</p>';
+  } else {
+    muertas.forEach((s) => dom.muertas.appendChild(filaDeMuerta(s)));
+    // El listado viene recortado: si hay más, la limpieza es lo que sirve.
+    if ((datos.totales.muertas ?? 0) > muertas.length) {
+      const nota = document.createElement("p");
+      nota.className = "vacio";
+      nota.textContent = `…y ${datos.totales.muertas - muertas.length} más. Usá «borrar todas».`;
+      dom.muertas.appendChild(nota);
+    }
   }
 
   dom.partidas.replaceChildren();
@@ -352,6 +459,52 @@ async function refrescar() {
   }
 }
 
+/**
+ * Corta una partida en curso y devuelve las entradas.
+ *
+ * Lo que se devuelve es LA ENTRADA de cada uno, no el pozo repartido: la
+ * partida no terminó, así que no hay ganador ni premio. Y la partida queda
+ * apagada, para que nada la cierre después y pague dos veces.
+ */
+async function cortarEnJuego(sala, boton) {
+  const aviso =
+    `CORTAR la partida de ${sala.codigo}, que está EN JUEGO.
+
+` +
+    `Hay ${sala.cuantos} jugador(es) adentro. A cada uno se le devuelve su ` +
+    `entrada de ${sala.entrada} Leyendas y la partida no reparte ningún premio.
+
+` +
+    `Esto no se deshace.`;
+  if (!confirm(aviso)) return;
+
+  const escrito = prompt(`Para confirmar, escribí el código de la sala:
+
+${sala.codigo}`);
+  if ((escrito ?? "").trim().toUpperCase() !== sala.codigo) {
+    decir(dom.aviso, "El código no coincide. No se cortó nada.", "mal");
+    return;
+  }
+
+  boton.disabled = true;
+  decir(dom.aviso, `Cortando ${sala.codigo}…`);
+  try {
+    const { data } = await cancelar({ codigo: sala.codigo, forzar: true });
+    decir(
+      dom.aviso,
+      data.yaEstaba
+        ? `${data.codigo} ya estaba cerrada.`
+        : `${data.codigo} cortada. Devueltas ${data.devueltas} Leyendas a ${data.jugadores.length} jugador(es).`,
+      "bien",
+    );
+    await refrescar();
+  } catch (error) {
+    decir(dom.aviso, error?.message ?? "No se pudo cortar.", "mal");
+    console.error(error);
+    boton.disabled = false;
+  }
+}
+
 async function cancelarUna(sala, boton) {
   const cuantos = sala.cuantos;
   const aviso = cuantos
@@ -379,6 +532,41 @@ async function cancelarUna(sala, boton) {
 }
 
 dom.btnRefrescar.addEventListener("click", refrescar);
+
+/**
+ * Borra todas las salas cerradas.
+ *
+ * Una sola confirmación, a diferencia de cancelar: acá no se mueve una sola
+ * Leyenda. Lo que se borra son salas que ya terminaron o se cancelaron, y lo
+ * que se movió quedó asentado en el libro mayor, que no se toca.
+ */
+dom.btnLimpiarCerradas.addEventListener("click", async () => {
+  const cuantas = Number(dom.totalMuertas.textContent) || 0;
+  if (!cuantas) {
+    decir(dom.avisoMuertas, "No hay salas cerradas para borrar.");
+    return;
+  }
+  if (!confirm(`Borrar ${cuantas} sala(s) cerrada(s), con sus partidas y sus vistas?`)) return;
+
+  dom.btnLimpiarCerradas.disabled = true;
+  decir(dom.avisoMuertas, "Borrando…");
+  try {
+    const { data } = await limpiarCerradas({});
+    decir(
+      dom.avisoMuertas,
+      data.quedan
+        ? `Borradas ${data.borradas}. Quedan ${data.quedan}: volvé a tocar.`
+        : `Borradas ${data.borradas}. No queda ninguna.`,
+      "bien",
+    );
+    await refrescar();
+  } catch (error) {
+    decir(dom.avisoMuertas, error?.message ?? "No se pudo limpiar.", "mal");
+    console.error(error);
+  } finally {
+    dom.btnLimpiarCerradas.disabled = false;
+  }
+});
 
 dom.btnCancelarTodas.addEventListener("click", async () => {
   // Dos confirmaciones: la primera dice cuánto se mueve, la segunda pide

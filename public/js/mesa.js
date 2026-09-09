@@ -3551,7 +3551,10 @@ async function arrancarModoLeyendas(sala, uid) {
   dejarDeLatir = Red.mantenerVivo(salaPedida);
   // Todos los jugadores golpean la puerta. Si dependiera de uno solo, su
   // desconexión congelaría la mesa para los demás.
-  dejarDeAvanzar = Red.mantenerEnMarcha(salaPedida);
+  // El plazo sale de la vista que publica el servidor: con él, el golpe a
+  // `avanzarPartida` se manda sólo cuando de verdad venció algo, en vez de
+  // cada 900 ms toda la partida.
+  dejarDeAvanzar = Red.mantenerEnMarcha(salaPedida, () => miVista?.plazo?.hasta ?? null);
 
   // Además de con cada vista nueva, por reloj: si el ausente ya estaba
   // marcado antes de entrar en la fase sin reloj, `latir` no republica

@@ -105,12 +105,20 @@ const SALDO_INICIAL = 1000;
  * rondas de eliminación para que `posicionesFinales` reconstruya ese mismo
  * orden por su cuenta — no se le pasa el orden hecho.
  */
-function montar({ orden = CUATRO, abandonaron = [], pozo = POZO, entrada = ENTRADA } = {}) {
+function montar({
+  orden = CUATRO,
+  abandonaron = [],
+  pozo = POZO,
+  entrada = ENTRADA,
+  // El estado de la sala. Por omisión JUGANDO, que es de donde sale un
+  // cierre normal; se pisa para probar las salas que ya salieron del juego.
+  estado = ESTADOS_SALA.JUGANDO,
+} = {}) {
   const inicial = {};
   for (const uid of CUATRO) inicial[`users/${uid}`] = { credits: SALDO_INICIAL };
 
   inicial[`rooms/${CODIGO}`] = {
-    codigo: CODIGO, modo: MODOS.LEYENDAS, estado: ESTADOS_SALA.JUGANDO,
+    codigo: CODIGO, modo: MODOS.LEYENDAS, estado,
     entrada, jugadores: [...CUATRO], jugadoresNombres: CUATRO.map((u) => NOMBRES[u]),
     pozo, abandonaron: [...abandonaron],
   };
@@ -323,6 +331,42 @@ console.log("\n=== 4b. Devolver dos veces no paga dos veces ===");
 }
 
 // ==================================================================== 5
+
+console.log("\n=== 4c. Una sala CANCELADA no reparte nada ===");
+{
+  /**
+   * La administración puede cortar una partida en curso: le devuelve la
+   * entrada a cada uno y deja la sala CANCELADA.
+   *
+   * Si después alguien cerrara esa partida —el barredor, un navegador que
+   * quedó abierto, un reintento— repartiría premios de un pozo que ya volvió
+   * a sus dueños. La misma plata, dos veces.
+   *
+   * `planificar` ya contestaba `yaEstaba` para TERMINADA, que es el caso de
+   * dos cierres simultáneos. CANCELADA es el mismo razonamiento y faltaba: la
+   * sala salió del juego, no hay nada que repartir.
+   *
+   * Es el segundo cerrojo. El primero es `avanzarPartida`, que se niega a
+   * mover una partida cerrada; cualquiera de los dos solo ya alcanzaría, y
+   * van los dos porque equivocarse acá cuesta plata de verdad.
+   */
+  const { db, cerrar } = montar({ estado: ESTADOS_SALA.CANCELADA });
+  const antes = CUATRO.map((u) => ganado(db, u));
+
+  const r = await capturar(() => cerrar({ uid: "ana", codigo: CODIGO }));
+
+  ok(r.valor && !r.error, "no revienta: contesta que ya estaba", r.error?.message);
+  ok(r.valor?.yaEstaba === true, "y lo dice", r.valor);
+  ok(
+    CUATRO.every((u, i) => ganado(db, u) === antes[i]),
+    "a nadie se le movió el saldo",
+    CUATRO.map((u) => ganado(db, u)),
+  );
+  ok(
+    db.rutas().filter((x) => x.startsWith("movimientos/")).length === 0,
+    "y no se escribió un solo asiento en el libro mayor",
+  );
+}
 
 console.log("\n=== 5. Dos y tres elegibles ===");
 {

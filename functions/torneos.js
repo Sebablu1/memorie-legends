@@ -38,7 +38,8 @@
 import {
   ESTADOS,
   puedePasarA,
-  esEditable,
+  camposEditables,
+  camposBloqueados,
   admiteInscripciones,
   hayQueDevolver,
   armarMesas,
@@ -145,29 +146,76 @@ export function crearTorneos({
   }
 
   /** Cambia lo que se pueda cambiar. Sólo en borrador. */
+  /**
+   * Retoca un torneo.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * QUÉ SE PUEDE Y CUÁNDO
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * En BORRADOR, todo: no hay nadie inscripto y nadie pagó nada.
+   *
+   * Publicado, sólo las etiquetas —nombre y tipo—. La ENTRADA y el CUPO
+   * son las dos cosas que el jugador miró antes de pagar: cuánto le
+   * costaba y contra cuántos iba a jugar. Cambiárselas después es cambiarle
+   * el trato con la plata ya cobrada, y además desincroniza el pozo, que se
+   * calculó con la entrada vieja.
+   *
+   * Antes esto era un portón: publicado no se tocaba NADA, ni para
+   * corregirle una falta de ortografía al nombre.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * SE QUEJA, NO IGNORA
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Si llega una entrada distinta con las inscripciones abiertas, la
+   * llamada falla y lo dice. Guardar el resto en silencio dejaría al
+   * administrador creyendo que cambió la entrada, que es peor que no
+   * dejarlo: se entera cuando alguien pague el número viejo.
+   */
   async function editar(context, id, datos) {
     await administradores.exigir(context);
     const torneo = await leerTorneo(id);
 
-    if (!esEditable(torneo.estado)) {
+    const permitidos = camposEditables(torneo.estado);
+    if (!permitidos.length) {
       throw error(
         "failed-precondition",
-        "Sólo se puede editar un torneo en borrador: ya hay gente que pagó la entrada.",
+        `Un torneo ${torneo.estado} no se edita: ya es historia.`,
       );
     }
 
-    const cambios = {
+    // Lo que quedaría guardado si se aceptara todo. Se arma completo para
+    // poder validarlo entero: `problemasDelTorneo` mira el torneo, no los
+    // campos sueltos.
+    const propuesto = {
       nombre: String(datos?.nombre ?? torneo.nombre).trim(),
-      tipo: datos?.tipo === "semanal" ? "semanal" : "especial",
+      tipo: datos?.tipo === undefined
+        ? torneo.tipo
+        : (datos.tipo === "semanal" ? "semanal" : "especial"),
       entrada: Number(datos?.entrada ?? torneo.entrada),
       maxJugadores: Number.isInteger(datos?.maxJugadores) ? datos.maxJugadores : torneo.maxJugadores,
     };
 
-    const problemas = problemasDelTorneo(cambios, problemasDeEntrada);
+    const bloqueados = camposBloqueados(torneo.estado, torneo, propuesto);
+    if (bloqueados.length) {
+      throw error(
+        "failed-precondition",
+        `Con el torneo ${torneo.estado} no se puede cambiar: ${bloqueados.join(", ")}. Ya hay gente que pagó mirando esos números.`,
+      );
+    }
+
+    const problemas = problemasDelTorneo(propuesto, problemasDeEntrada);
     if (problemas.length) throw error("invalid-argument", problemas.join(" "));
 
+    // Se escribe SÓLO lo permitido. Aunque `propuesto` traiga el resto igual
+    // que estaba, guardar un campo congelado sería escribirlo por una vía
+    // que no debería existir.
+    const cambios = {};
+    for (const campo of permitidos) cambios[campo] = propuesto[campo];
+
     await refTorneo(id).set({ ...cambios, actualizadoEn: marcaDeTiempo() }, { merge: true });
-    return { id, ...cambios };
+    return { id, ...cambios, editables: permitidos };
   }
 
   /** Publica el torneo: a partir de acá se cobra. */

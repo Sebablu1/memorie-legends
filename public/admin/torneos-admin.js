@@ -26,7 +26,7 @@
  */
 
 import { funciones, httpsCallable } from "../js/firebase.js";
-import { ESTADOS } from "../js/reglas/torneos.js";
+import { ESTADOS, camposEditables } from "../js/reglas/torneos.js";
 import { ENTRADAS_SUGERIDAS } from "../js/reglas/configuracion.js";
 
 const $ = (id) => document.getElementById(id);
@@ -37,6 +37,7 @@ const cerrarInscripciones = httpsCallable(funciones, "cerrarInscripcionesAdmin")
 const iniciarTorneo = httpsCallable(funciones, "iniciarTorneoAdmin");
 const finalizarTorneo = httpsCallable(funciones, "finalizarTorneoAdmin");
 const cancelarTorneo = httpsCallable(funciones, "cancelarTorneoAdmin");
+const editarTorneo = httpsCallable(funciones, "editarTorneoAdmin");
 const detalleTorneo = httpsCallable(funciones, "detalleTorneoAdmin");
 const listarTorneos = httpsCallable(funciones, "listarTorneos");
 const leerUmbrales = httpsCallable(funciones, "leerUmbralesAdmin");
@@ -69,26 +70,45 @@ const ETIQUETA = {
  * hacer que no sea peligroso.
  */
 function accionesDe(estado) {
+  /**
+   * Renombrar sale de las REGLAS, no de esta lista.
+   *
+   * `camposEditables` dice qué se puede tocar en cada estado, y es la misma
+   * función que usa el servidor para decidir. Si mañana se congela el
+   * nombre en algún estado, el botón desaparece solo: no hay dos listas que
+   * mantener de acuerdo.
+   *
+   * La entrada y el cupo no están acá a propósito. Se editan en borrador,
+   * con el formulario de creación; una vez publicadas ya hay gente que pagó
+   * mirando esos números.
+   */
+  const renombrar = camposEditables(estado).includes("nombre")
+    ? [{ accion: "renombrar", texto: "Renombrar" }]
+    : [];
+
   if (estado === ESTADOS.BORRADOR) {
     return [
       { accion: "abrir", texto: "Abrir inscripciones" },
+      ...renombrar,
       { accion: "cancelar", texto: "Cancelar", clase: "peligro" },
     ];
   }
   if (estado === ESTADOS.INSCRIPCIONES_ABIERTAS) {
     return [
       { accion: "cerrar", texto: "Cerrar inscripciones" },
+      ...renombrar,
       { accion: "cancelar", texto: "Cancelar y devolver", clase: "peligro" },
     ];
   }
   if (estado === ESTADOS.COMPLETO) {
     return [
       { accion: "iniciar", texto: "Armar mesas y empezar" },
+      ...renombrar,
       { accion: "cancelar", texto: "Cancelar y devolver", clase: "peligro" },
     ];
   }
   if (estado === ESTADOS.EN_CURSO) {
-    return [{ accion: "finalizar", texto: "Cargar ganadores y pagar" }];
+    return [{ accion: "finalizar", texto: "Cargar ganadores y pagar" }, ...renombrar];
   }
   return [];
 }
@@ -192,7 +212,12 @@ async function ejecutar(accion, id) {
   decir($("avisoTorneos"), "…");
 
   try {
-    if (accion === "abrir") {
+    if (accion === "renombrar") {
+      const nombre = prompt("Nombre del torneo:");
+      if (nombre === null) return;
+      const { data } = await editarTorneo({ torneoId: id, nombre });
+      decir($("avisoTorneos"), `Ahora se llama «${data.nombre}».`, "bien");
+    } else if (accion === "abrir") {
       await abrirInscripciones({ torneoId: id });
       decir($("avisoTorneos"), "Inscripciones abiertas: ya se cobra la entrada.", "bien");
     } else if (accion === "cerrar") {

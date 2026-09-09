@@ -60,8 +60,54 @@ export const TRANSICIONES = Object.freeze({
 export const puedePasarA = (desde, hasta) =>
   (TRANSICIONES[hasta] ?? []).includes(desde);
 
-/** Sólo se puede editar lo que todavía no se publicó. */
+/** En borrador se puede editar todo: no hay nadie inscripto. */
 export const esEditable = (estado) => estado === ESTADOS.BORRADOR;
+
+/**
+ * Qué campos se pueden tocar en cada estado.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ NO ES «SE PUEDE O NO SE PUEDE»
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Era eso, y por eso un torneo publicado no se podía tocar en nada: ni
+ * corregirle una falta de ortografía al nombre. Pero no todos los campos
+ * pesan lo mismo.
+ *
+ * La ENTRADA y el CUPO son las dos cosas que el jugador miró ANTES de
+ * pagar: cuánto le costaba y contra cuántos iba a jugar. Cambiárselos
+ * después es cambiarle el trato una vez que ya pagó, y además desincroniza
+ * el pozo, que se calculó con la entrada vieja.
+ *
+ * El nombre y el tipo son etiquetas. No cambian lo que nadie aceptó.
+ *
+ * Terminado o cancelado no se toca nada: son historia.
+ */
+const EDITABLES = Object.freeze({
+  [ESTADOS.BORRADOR]: ["nombre", "tipo", "entrada", "maxJugadores"],
+  [ESTADOS.INSCRIPCIONES_ABIERTAS]: ["nombre", "tipo"],
+  [ESTADOS.COMPLETO]: ["nombre", "tipo"],
+  [ESTADOS.EN_CURSO]: ["nombre", "tipo"],
+});
+
+export const camposEditables = (estado) => EDITABLES[estado] ?? [];
+
+/**
+ * Los campos que se quisieron cambiar y no se pueden en este estado.
+ *
+ * Compara CONTRA LO GUARDADO, no contra la lista de campos: el panel manda
+ * el formulario entero en cada guardado, así que recibir `entrada` no
+ * significa que se la quiera cambiar. Sólo molesta si el número es otro.
+ */
+export function camposBloqueados(estado, torneo, cambios) {
+  const permitidos = camposEditables(estado);
+  return Object.keys(cambios ?? {}).filter(
+    (campo) =>
+      !permitidos.includes(campo) &&
+      cambios[campo] !== undefined &&
+      cambios[campo] !== torneo?.[campo],
+  );
+}
 
 /** Sólo se cobra entrada mientras las inscripciones están abiertas. */
 export const admiteInscripciones = (estado) => estado === ESTADOS.INSCRIPCIONES_ABIERTAS;
