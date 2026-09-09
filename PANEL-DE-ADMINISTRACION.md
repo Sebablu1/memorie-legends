@@ -127,10 +127,10 @@ devolverle la entrada a quien ya perdió y a quien ya ganó por igual. Desde
 
 | Estado | Campos editables |
 |---|---|
-| `borrador` | nombre, tipo, entrada, cupo |
-| `inscripciones_abiertas` | nombre, tipo |
-| `completo` | nombre, tipo |
-| `en_curso` | nombre, tipo |
+| `borrador` | nombre, tipo, descripción, fecha, entrada, cupo |
+| `inscripciones_abiertas` | nombre, tipo, descripción, fecha |
+| `completo` | nombre, tipo, descripción, fecha |
+| `en_curso` | nombre, tipo, descripción, fecha |
 | `finalizado`, `cancelado` | ninguno: son historia |
 
 **Por qué no es «se puede o no se puede».** Era eso, y por eso un torneo
@@ -140,7 +140,7 @@ son las dos cosas que el jugador miró antes de pagar —cuánto le costaba y co
 cuántos iba a jugar—. El nombre y el tipo son etiquetas.
 
 La lista vive en `camposEditables`, en las reglas, y la usan **el panel y el
-servidor**. El botón «Renombrar» aparece o no según esa misma función: no hay
+servidor**. El botón «Editar» aparece o no según esa misma función: no hay
 dos listas que mantener de acuerdo.
 
 **Se queja, no ignora.** Si llega una entrada distinta con las inscripciones
@@ -151,14 +151,45 @@ pague el número viejo.
 Mandar la entrada **igual** a la que ya estaba no es cambiarla: el panel manda el
 formulario entero en cada guardado.
 
-### Lo que el torneo NO tiene
+**La fecha se puede mover después de publicar**, y es deliberado. Postergar un
+torneo es una operación normal y la alternativa —cancelar, devolverle a todos y
+recrear— es peor para todo el mundo. Es la decisión más discutible de la lista,
+porque cambia algo que el jugador miró antes de pagar; queda escrita en
+`pruebas/torneos.mjs` en vez de escondida.
 
-No hay fecha de inicio ni descripción. Un jugador que se anota ve el nombre, la
-entrada y cuántos van anotados, y el aviso dice «te avisamos cuando arranque» —
-**y no hay nada que avise**. `iniciar` agrupa los uid en mesas dentro del
-documento del torneo y no crea salas, no crea partidas y no notifica a nadie.
+### Cuándo se juega, y lo que sigue faltando
 
-Está anotado acá porque es una promesa que el sistema hoy no cumple.
+El torneo lleva `descripcion` y `comienzaEn`, y las dos aparecen en la cartelera
+y en el aviso de confirmación **antes de cobrar**. Las dos pueden quedar vacías:
+un torneo puede publicarse antes de saber cuándo se juega, y una fecha inventada
+sería peor que ninguna.
+
+Existen por una razón concreta. `iniciar` agrupa los uid en mesas **dentro del
+documento del torneo**: no crea salas, no crea partidas y **no notifica a
+nadie**. El aviso al anotarse decía «te avisamos cuando arranque» y no hay nada
+que avise, así que el jugador pagaba sin saber cuándo tenía que estar.
+
+Ahora dice «Empieza el sábado 20:00» si hay fecha, y «Mirá la cartelera para
+saber cuándo arranca» si no la hay — porque prometer un aviso que no existe era
+peor que no prometer nada.
+
+**Esto no cierra el agujero.** Sigue sin haber notificación y sin mesas donde
+jugar el torneo: el torneo se corre a mano, fuera del juego, y el administrador
+carga los ganadores al final. La fecha mejora la vidriera; el flujo del torneo
+dentro del juego no existe.
+
+### El panel tiene que ver lo que administra
+
+Durante un tiempo no lo veía. `torneos-admin.js` listaba con `listarTorneos`,
+que es **la del jugador** y devuelve sólo los que tienen inscripciones abiertas.
+Un torneo nace en borrador y el botón «Abrir inscripciones» vive en la fila de
+la lista: el torneo quedaba inalcanzable apenas se creaba, y cerrar inscripciones
+lo sacaba de la lista otra vez, así que los tres pasos siguientes tampoco se
+podían tocar.
+
+Lo delató que `accionesDe` tenía ramas para `borrador`, `completo` y `en_curso`
+que no se dibujaban jamás. El panel usa `listarTorneosAdmin`, que es la misma
+consulta sin el filtro.
 
 ---
 
