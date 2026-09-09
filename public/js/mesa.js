@@ -49,7 +49,7 @@ import { retratoDe, usarRetratoPropio, RETRATO_INICIAL } from "./modulos/retrato
 import { esRutaDelSitio } from "./reglas/catalogo.js";
 import { LIMITE_ELIMINACION, puntosMano } from "./reglas/puntaje.js";
 import * as IA from "./reglas/ia.js";
-import { MODOS, costoDeAbandonar } from "./reglas/salas.js";
+import { MODOS, ENTRADAS, ESTADOS_SALA, costoDeAbandonar } from "./reglas/salas.js";
 import * as Red from "./partida-red.js";
 import { elegibleParaPoder, pasoDelPoder } from "./reglas/red.js";
 import { MS_REVELACION } from "./reglas/vista.js";
@@ -2255,6 +2255,36 @@ dom.modal.addEventListener("click", async (evento) => {
     cerrarModal();
     return;
   }
+
+  // ---- la revancha, al final de una partida por Leyendas ----
+  if (evento.target.closest('[data-accion="revancha-igual"]')) {
+    sonidos.clic();
+    await irALaRevancha(apuestaDeLaMesa());
+    return;
+  }
+  if (evento.target.closest('[data-accion="revancha-cambiar"]')) {
+    sonidos.clic();
+    pintarRevancha(panelDeApuesta());
+    return;
+  }
+  if (evento.target.closest('[data-accion="revancha-crear"]')) {
+    sonidos.clic();
+    const elegida = Number(document.getElementById("apuestaRevancha")?.value);
+    await irALaRevancha(ENTRADAS.includes(elegida) ? elegida : apuestaDeLaMesa());
+    return;
+  }
+  if (evento.target.closest('[data-accion="revancha-unirme"]')) {
+    sonidos.clic();
+    // La misma llamada que para abrirla: encuentra la que ya existe y
+    // devuelve su código. La apuesta la fijó quien la abrió.
+    await irALaRevancha(revanchaAbierta?.entrada ?? apuestaDeLaMesa());
+    return;
+  }
+  if (evento.target.closest('[data-accion="revancha-salir"]')) {
+    if (dejarDeMirarLaSala) dejarDeMirarLaSala();
+    window.location.href = "dashboard.html";
+    return;
+  }
   const confirmar = evento.target.closest('[data-accion="abandonar-si"]');
   if (confirmar) {
     await confirmarAbandono(confirmar);
@@ -2892,6 +2922,167 @@ function abrirModalPoderDeRed(vista) {
   `);
 }
 
+// ---------------------------------------------------------- la revancha
+
+/**
+ * Volver a jugar con la misma gente, o cambiar la apuesta.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ NO SE REUSA ESTA SALA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque la partida vive en `partidas/{codigo}`, con el mismo código que la
+ * sala, y ahí está escrito qué pasó: el reparto, el registro y el cierre con
+ * lo que cobró cada uno. La revancha abre una sala NUEVA y deja la vieja como
+ * quedó. Lo explica entero `revanchaDeSala`, en el servidor.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * CÓMO SE ENTERAN LOS OTROS TRES
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Escuchando la sala. Cuando alguien pide revancha, el servidor le escribe un
+ * puntero a la sala vieja, y los cuatro navegadores están mirando ese
+ * documento: el panel se repinta solo y aparece «unirme».
+ *
+ * La escucha arranca recién cuando termina la partida, no antes. Durante el
+ * juego no hay nada que mirar ahí —la mesa se dibuja con la vista que publica
+ * el servidor— y tener la suscripción abierta toda la partida es una lectura
+ * cada vez que la sala se toque.
+ */
+let revanchaAbierta = null;
+let estadoDeLaSala = null;
+let dejarDeMirarLaSala = null;
+
+/** La apuesta de esta mesa, para proponer la misma. */
+const apuestaDeLaMesa = () => partidaEconomica.entrada ?? ENTRADAS[0];
+
+function escucharLaSala() {
+  if (dejarDeMirarLaSala || !enRed()) return;
+  import("./firebase.js")
+    .then(({ db, doc, onSnapshot }) => {
+      dejarDeMirarLaSala = onSnapshot(
+        doc(db, "rooms", salaPedida),
+        (snap) => {
+          const sala = snap.exists() ? snap.data() : null;
+          const antes = `${estadoDeLaSala}|${revanchaAbierta?.codigo ?? ""}`;
+          estadoDeLaSala = sala?.estado ?? null;
+          revanchaAbierta = sala?.revancha ?? null;
+          // Se repinta sólo si cambió algo de lo que el panel muestra: la
+          // sala recibe escrituras por otros motivos y repintar en cada una
+          // le borraría al jugador el selector de apuesta a medio elegir.
+          if (`${estadoDeLaSala}|${revanchaAbierta?.codigo ?? ""}` !== antes) pintarRevancha();
+        },
+        // Un fallo acá no puede romper el final de la partida: el jugador ve
+        // su resultado igual, sólo que sin el aviso de la revancha ajena.
+        (error) => console.warn("No se pudo escuchar la sala:", error),
+      );
+    })
+    .catch((error) => console.warn("No se pudo escuchar la sala:", error));
+}
+
+/**
+ * El contenido del panel según lo que se sepa de la sala.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * PRIMERO SE REPARTE EL POZO, DESPUÉS SE OFRECE OTRA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La vista dice `finPartida` unos segundos ANTES de que la sala quede
+ * terminada: en el medio corre el cierre, que es el que reparte el pozo.
+ * Y `revanchaDeSala` exige la sala terminada —abrir la siguiente mientras
+ * la anterior todavía está pagando es justo lo que no puede pasar—.
+ *
+ * Ofrecer el botón en ese hueco daba un «esta partida todavía no terminó»
+ * en la cara de quien acababa de ver el resultado. Así que mientras tanto
+ * el panel dice qué está pasando, que además es lo que el jugador quiere
+ * saber en ese momento: dónde está su plata.
+ */
+function panelDeRevancha() {
+  if (revanchaAbierta?.codigo) {
+    // La cifra pasa por `Number` antes de entrar al HTML. Viene de
+    // Firestore y es un importe: si algún día llegara otra cosa, acá se
+    // convierte en `NaN` y no en etiquetas.
+    return `
+      <p class="aviso-suave">Ya hay revancha, por ${Number(revanchaAbierta.entrada)} Leyendas.</p>
+      <div class="botonera-poder">
+        <button class="accion" data-accion="revancha-unirme" type="button">Unirme</button>
+      </div>
+      <button class="enlace-modal" data-accion="revancha-salir" type="button">Salir al tablero</button>`;
+  }
+
+  if (estadoDeLaSala !== ESTADOS_SALA.TERMINADA) {
+    return `<p class="aviso-suave">Repartiendo el pozo…</p>`;
+  }
+
+  return `
+    <p class="aviso-suave">¿Juegan otra?</p>
+    <div class="botonera-poder">
+      <button class="accion" data-accion="revancha-igual" type="button">
+        Jugar otra · ${apuestaDeLaMesa()} Leyendas
+      </button>
+      <button class="accion sobria" data-accion="revancha-cambiar" type="button">
+        Cambiar apuesta
+      </button>
+    </div>
+    <button class="enlace-modal" data-accion="revancha-salir" type="button">Salir al tablero</button>`;
+}
+
+/** El mismo panel, con el selector de apuesta abierto. */
+function panelDeApuesta() {
+  const opciones = ENTRADAS.map(
+    (n) =>
+      `<option value="${n}"${n === apuestaDeLaMesa() ? " selected" : ""}>${n} Leyendas</option>`,
+  ).join("");
+
+  return `
+    <p class="aviso-suave">¿Con cuánto?</p>
+    <div class="botonera-poder">
+      <select class="apuesta-revancha" id="apuestaRevancha" aria-label="Apuesta de la revancha">
+        ${opciones}
+      </select>
+      <button class="accion" data-accion="revancha-crear" type="button">Abrir sala</button>
+    </div>
+    <button class="enlace-modal" data-accion="revancha-salir" type="button">Salir al tablero</button>`;
+}
+
+function pintarRevancha(html = panelDeRevancha()) {
+  const panel = document.getElementById("panelRevancha");
+  if (panel) panel.innerHTML = html;
+}
+
+/** Un aviso DENTRO del panel: cerrar el modal le taparía el resultado. */
+function avisarEnRevancha(texto) {
+  const panel = document.getElementById("panelRevancha");
+  if (!panel) return;
+  const p = document.createElement("p");
+  p.className = "error-modal";
+  p.textContent = texto;
+  panel.append(p);
+}
+
+/**
+ * Abre —o encuentra— la revancha y lleva al jugador a esa sala.
+ *
+ * Son dos llamadas y no una a propósito. La primera decide cuál es la sala; la
+ * segunda es `unirseASala`, la puerta de siempre, que es la que sabe de cupo,
+ * de estado y de saldo. Duplicar esas comprobaciones en la revancha sería
+ * tener dos puertas con dos criterios, y una de las dos se olvidaría de algo.
+ */
+async function irALaRevancha(entrada) {
+  pintarRevancha('<p class="aviso-suave">Abriendo la sala…</p>');
+  try {
+    const { revanchaDeSala, unirseASala } = await import("./servidor.js");
+    const r = await revanchaDeSala(salaPedida, entrada);
+    // El que la abre ya está adentro; el resto entra por la puerta.
+    if (!r.dentro) await unirseASala(r.codigo);
+    if (dejarDeMirarLaSala) dejarDeMirarLaSala();
+    window.location.href = `room.html?code=${r.codigo}`;
+  } catch (error) {
+    pintarRevancha();
+    avisarEnRevancha(error?.message ?? "No pudimos abrir la revancha.");
+  }
+}
+
 /** Resultado de la ronda o de la partida, con lo que publicó el servidor. */
 function abrirModalFinDeRed(vista) {
   const filas = vista.jugadores
@@ -2913,7 +3104,11 @@ function abrirModalFinDeRed(vista) {
   if (vista.fase === "finPartida") {
     const gane = vista.jugadores[YO] && !vista.jugadores[YO].eliminado;
     abrirModal(`<h2>${gane ? "🏆 ¡Ganaste!" : "Partida terminada"}</h2>${tabla}
-      <p class="aviso-suave">Volvé al lobby para jugar otra.</p>`);
+      <div class="revancha" id="panelRevancha">${panelDeRevancha()}</div>`);
+
+    // Y desde acá se mira la sala, por si la revancha la abre otro.
+    escucharLaSala();
+
     if (gane) {
       sonidos.victoria();
       lanzarConfeti(dom.confeti);
@@ -3317,6 +3512,23 @@ function mostrarUnMomento(indiceJugador, posicion, carta, ms = MS_MIRAR) {
  */
 async function arrancarModoLeyendas(sala, uid) {
   miUid = uid;
+
+  /**
+   * La entrada de ESTA sala, que hasta acá era `null`.
+   *
+   * Sin esto, `costoDeAbandonar` no reconocía la partida como de Leyendas
+   * —`usaLeyendas` exige una entrada válida— y devolvía `esEntrenamiento`.
+   * Con eso, el cartel de abandono decía «no perderás Leyendas» en una
+   * partida apostada, y `confirmarAbandono` tomaba la rama de
+   * entrenamiento: se iba al tablero SIN avisarle al servidor. Ni se
+   * cobraba la penalización ni la mesa se enteraba de que el jugador se
+   * había ido.
+   *
+   * La cifra es sólo para redactar el aviso. Lo que se cobra lo decide el
+   * servidor leyendo la sala, así que retocarla acá no cambia un cobro:
+   * sólo le mentiría al propio jugador sobre lo que va a pagar.
+   */
+  partidaEconomica.entrada = Number(sala?.entrada) || null;
 
   // El reloj se sincroniza antes de la primera ventana de reflejos: sin esto
   // el servidor asume la peor incertidumbre posible y todo empate se resuelve

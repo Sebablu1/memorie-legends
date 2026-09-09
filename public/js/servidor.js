@@ -60,6 +60,17 @@ async function llamar(nombre, datos = {}) {
 export const crearSala = (entrada, nombre) => llamar("crearSala", { entrada, nombre });
 
 /**
+ * Abre —o encuentra— la revancha de una sala que ya terminó.
+ *
+ * Devuelve `{ codigo, entrada, laAbrioOtro, dentro }`. `dentro` dice si
+ * quien llamó ya está en esa sala: el que la abre entra al abrirla, y el
+ * resto todavía tiene que pasar por `unirseASala`, que es la puerta que
+ * sabe de cupo y de saldo.
+ */
+export const revanchaDeSala = (codigo, entrada) =>
+  llamar("revanchaDeSala", { codigo, entrada });
+
+/**
  * Abandona una partida en curso.
  *
  * Se manda SÓLO el código. La entrada y la penalización las calcula el

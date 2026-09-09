@@ -427,6 +427,10 @@ function arrancarSalas() {
 
       const salas = snap.docs
         .map((d) => d.data())
+        // Las salas de revancha no se ofrecen a quien no jugó esa partida.
+        // Si YA estoy adentro sí aparece, que es como se vuelve tras un
+        // corte de conexión.
+        .filter((s) => s.listada !== false || (s.jugadores ?? []).includes(miUid))
         // Las llenas se muestran igual —para saber que existen— pero las mías
         // van primero: si me cayó la conexión, lo que quiero es volver.
         .sort((a, b) => {

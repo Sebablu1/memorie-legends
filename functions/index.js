@@ -75,6 +75,7 @@ import {
   EsquemaItemAdmin,
   EsquemaActivarItem,
   EsquemaDesposeer,
+  EsquemaRevancha,
 } from "./esquemas.js";
 import { crearSalirDeSalaEnEspera } from "./salida.js";
 import { crearAdmin } from "./admin.js";
@@ -89,6 +90,7 @@ import {
   ESTADOS_SALA,
   esEntradaValida,
   puedeUnirse,
+  puedeRevancha,
   generarCodigo,
   esCodigoValido,
 } from "./reglas/salas.js";
@@ -279,13 +281,73 @@ async function identidadEnSala(uid) {
 }
 
 /**
- * Crea una sala por Leyendas y cobra la entrada al creador.
+ * Crea la sala y le cobra la entrada a quien la abre, en una sola transacción.
  *
  * El código es el ID del documento: así la unicidad la garantiza Firestore
  * (una transacción que encuentra el documento ocupado reintenta con otro
  * código) sin necesidad de consultas, que dentro de transacciones no se
  * pueden hacer.
+ *
+ * Está separado porque hay DOS puertas que abren una sala: `crearSala`, desde
+ * el tablero, y `revanchaDeSala`, desde la mesa cuando la partida terminó. Lo
+ * único que no puede diferir entre las dos es el cobro — dos copias de una
+ * línea que mueve Leyendas es exactamente lo que `pruebas/transacciones.mjs`
+ * está para impedir.
+ *
+ * LEE ANTES DE ESCRIBIR, y eso importa para quien lo llame: `moverLeyendas`
+ * lee el perfil. Si el que llama ya escribió algo en la transacción, Firestore
+ * la rechaza — no en las pruebas, en producción. Por eso la revancha lee la
+ * sala vieja ANTES de llamar acá.
+ *
+ * @throws Error("codigo-ocupado") si el código ya existe — quien llama reintenta
+ * @throws Error("ya-pagada") si la entrada de este código ya se había cobrado
  */
+async function abrirSalaEn(tx, { codigo, uid, entrada, nombre, nombreJugador, luce, extra }) {
+  const refSala = db.collection(SALAS).doc(codigo);
+  if ((await tx.get(refSala)).exists) throw new Error("codigo-ocupado");
+
+  // Se cobra la entrada dentro de la MISMA transacción que crea la sala: o
+  // pasan las dos cosas, o no pasa ninguna.
+  const r = await moverLeyendas(tx, {
+    uid,
+    delta: -entrada,
+    motivo: MOTIVOS.APUESTA,
+    referencia: codigo,
+    idempotencia: `entrada_${codigo}_${uid}`,
+  });
+  if (!r.aplicado) throw new Error("ya-pagada");
+
+  tx.set(refSala, {
+    codigo,
+    nombre,
+    modo: "leyendas",
+    entrada,
+    creador: uid,
+    creadorNombre: nombreJugador,
+    // Dos listas paralelas: el asiento de cada quien es su posición en
+    // las dos. Van juntas acá, en `unirseASala` y en `salida.js`, y
+    // `pruebas/retratos-en-red.mjs` audita que sigan yendo juntas.
+    //
+    // `jugadoresLuce` reemplazó a `jugadoresRetratos`, que sólo llevaba
+    // la cara. Con el dorso y la insignia además, habrían sido CUATRO
+    // listas que mantener alineadas en tres lugares — y ya se desalineó
+    // una vez: `salida.js` reconstruía los nombres y no los retratos, y
+    // los que quedaban detrás heredaban la cara del de adelante.
+    jugadores: [uid],
+    jugadoresNombres: [nombreJugador],
+    jugadoresLuce: [luce],
+    maxJugadores: MAX_JUGADORES,
+    estado: ESTADOS_SALA.ESPERANDO,
+    listos: [],
+    pozo: entrada,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    ...(extra ?? {}),
+  });
+
+  return refSala;
+}
+
+/** Crea una sala por Leyendas desde el tablero, y cobra la entrada. */
 export const crearSala = functions.https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "crearSala");
   const entrada = Number(data?.entrada);
@@ -306,49 +368,10 @@ export const crearSala = functions.https.onCall(async (data, context) => {
   // Hasta cinco intentos por si un código ya estaba tomado.
   for (let intento = 0; intento < 5; intento++) {
     const codigo = generarCodigo(azarCodigo);
-    const refSala = db.collection(SALAS).doc(codigo);
 
     try {
-      await db.runTransaction(async (tx) => {
-        if ((await tx.get(refSala)).exists) throw new Error("codigo-ocupado");
-
-        // Se cobra la entrada dentro de la MISMA transacción que crea la
-        // sala: o pasan las dos cosas, o no pasa ninguna.
-        const r = await moverLeyendas(tx, {
-          uid,
-          delta: -entrada,
-          motivo: MOTIVOS.APUESTA,
-          referencia: codigo,
-          idempotencia: `entrada_${codigo}_${uid}`,
-        });
-        if (!r.aplicado) throw new Error("ya-pagada");
-
-        tx.set(refSala, {
-          codigo,
-          nombre,
-          modo: "leyendas",
-          entrada,
-          creador: uid,
-          creadorNombre: nombreJugador,
-          // Dos listas paralelas: el asiento de cada quien es su posición en
-          // las dos. Van juntas acá, en `unirseASala` y en `salida.js`, y
-          // `pruebas/retratos-en-red.mjs` audita que sigan yendo juntas.
-          //
-          // `jugadoresLuce` reemplazó a `jugadoresRetratos`, que sólo llevaba
-          // la cara. Con el dorso y la insignia además, habrían sido CUATRO
-          // listas que mantener alineadas en tres lugares — y ya se desalineó
-          // una vez: `salida.js` reconstruía los nombres y no los retratos, y
-          // los que quedaban detrás heredaban la cara del de adelante.
-          jugadores: [uid],
-          jugadoresNombres: [nombreJugador],
-          jugadoresLuce: [luce],
-          maxJugadores: MAX_JUGADORES,
-          estado: ESTADOS_SALA.ESPERANDO,
-          listos: [],
-          pozo: entrada,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      });
+      await db.runTransaction((tx) =>
+        abrirSalaEn(tx, { codigo, uid, entrada, nombre, nombreJugador, luce }));
 
       return { codigo, entrada };
     } catch (e) {
@@ -356,6 +379,141 @@ export const crearSala = functions.https.onCall(async (data, context) => {
       if (e.message === "codigo-ocupado") continue; // otro código y de nuevo
       logger.error("No se pudo crear la sala", { uid, entrada, error: e.message });
       throw new functions.https.HttpsError("internal", "No pudimos crear la sala.");
+    }
+  }
+
+  throw new functions.https.HttpsError("internal", "No pudimos generar un código libre.");
+});
+
+/**
+ * La revancha: la misma gente, otra sala, y la apuesta que decidan.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ UNA SALA NUEVA Y NO LA MISMA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque la partida vive en `partidas/{codigo}`, con el MISMO código que la
+ * sala. Volver a jugar en la sala terminada obligaría a borrar o mover ese
+ * documento, que es donde está escrito qué pasó — el reparto, el registro y
+ * el cierre con lo que cobró cada uno—. Y `repartirEn` es idempotente
+ * justamente sobre ese documento: si existe, no reparte. Reusar el código
+ * sería pelearse con las dos cosas a la vez.
+ *
+ * Así que la sala vieja queda como está, terminada y con su cierre, y se
+ * abre una nueva. La vieja guarda un puntero, `revancha`, que es lo que hace
+ * que los otros tres se enteren: la mesa la está escuchando cuando aparece
+ * el resultado.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * EL PRIMERO QUE TOCA ELIGE LA APUESTA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * No hay votación. El primero que pide revancha fija la entrada, y los otros
+ * ven cuánto es ANTES de pagar: el botón lo dice y la sala nueva también.
+ * Quien no quiera esa apuesta, no entra — igual que con cualquier otra sala.
+ *
+ * Una segunda llamada no abre una segunda sala: encuentra el puntero y
+ * devuelve el mismo código. Sin eso, cuatro jugadores tocando a la vez
+ * abrirían cuatro salas de un jugador cada una, con cuatro entradas
+ * cobradas y ninguna partida.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * NO UNE: DEVUELVE EL CÓDIGO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Al que la abre lo mete adentro, porque abrirla es entrar. A los demás les
+ * dice cuál es, y entran por `unirseASala`, que es la puerta de siempre y la
+ * que sabe de cupo, de estado y de saldo. Duplicar esas comprobaciones acá
+ * sería tener dos puertas con dos criterios.
+ *
+ * `dentro` responde lo único que el navegador no puede saber solo: si ya
+ * está adentro o le falta entrar.
+ */
+export const revanchaDeSala = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context, "revanchaDeSala");
+  const { codigo, entrada } = validar(EsquemaRevancha, data, errorHttp);
+
+  if (!esEntradaValida(entrada)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      `Entrada inválida. Las disponibles son: ${ENTRADAS.join(", ")}.`,
+    );
+  }
+
+  const { nombre: nombreJugador, luce } = await identidadEnSala(uid);
+  const refVieja = db.collection(SALAS).doc(codigo);
+
+  for (let intento = 0; intento < 5; intento++) {
+    const nuevo = generarCodigo(azarCodigo);
+
+    try {
+      return await db.runTransaction(async (tx) => {
+        // Esta lectura va PRIMERO, antes de que `abrirSalaEn` escriba nada:
+        // Firestore prohíbe leer después de escribir dentro de una
+        // transacción.
+        const snap = await tx.get(refVieja);
+        if (!snap.exists) {
+          throw new functions.https.HttpsError("not-found", "Esa sala no existe.");
+        }
+        const sala = snap.data();
+
+        // La MISMA función que usa el navegador para decidir si mostrar el
+        // panel. Acá es la que decide.
+        const veredicto = puedeRevancha(sala, uid);
+        if (!veredicto.puede) {
+          throw new functions.https.HttpsError("failed-precondition", veredicto.mensaje);
+        }
+
+        // Ya la abrió otro. Se devuelve la suya, y de paso si ya está adentro.
+        if (sala.revancha?.codigo) {
+          const suya = await tx.get(db.collection(SALAS).doc(sala.revancha.codigo));
+          return {
+            codigo: sala.revancha.codigo,
+            entrada: sala.revancha.entrada ?? sala.entrada,
+            laAbrioOtro: true,
+            dentro: Boolean(suya.exists && (suya.data().jugadores ?? []).includes(uid)),
+          };
+        }
+
+        await abrirSalaEn(tx, {
+          codigo: nuevo,
+          uid,
+          entrada,
+          // El nombre se corta a 40 como en `crearSala`: es el mismo campo y
+          // lo lee la misma pantalla.
+          nombre: `Revancha de ${sala.nombre ?? codigo}`.slice(0, 40),
+          nombreJugador,
+          luce,
+          extra: {
+            // De dónde viene, para poder seguir la cadena hacia atrás.
+            revanchaDe: codigo,
+            /**
+             * Fuera de la lista de salas abiertas.
+             *
+             * La revancha es de los que acababan de jugar. Si apareciera en
+             * la lista pública, un desconocido podría ocupar el asiento
+             * antes de que el tercero toque «unirme», y los cuatro que
+             * venían jugando se quedan sin su revancha.
+             *
+             * NO es un permiso: cualquiera con el código entra, como en
+             * cualquier sala —el código sirve para encontrarla, no para
+             * autorizar—. Es sólo dejar de ofrecérsela a quien no estuvo.
+             */
+            listada: false,
+          },
+        });
+
+        tx.update(refVieja, {
+          revancha: { codigo: nuevo, entrada, por: uid, en: marcaDeTiempo() },
+        });
+
+        return { codigo: nuevo, entrada, laAbrioOtro: false, dentro: true };
+      });
+    } catch (e) {
+      if (e instanceof functions.https.HttpsError) throw e;
+      if (e.message === "codigo-ocupado") continue; // otro código y de nuevo
+      logger.error("No se pudo abrir la revancha", { uid, codigo, entrada, error: e.message });
+      throw new functions.https.HttpsError("internal", "No pudimos abrir la revancha.");
     }
   }
 

@@ -123,6 +123,10 @@ export const RECHAZO = {
   LLENA: "llena",
   YA_ESTA: "ya_esta",
   SIN_SALDO: "sin_saldo",
+  // Los dos de la revancha: se pide desde la mesa cuando la partida
+  // terminó, y sólo la puede pedir alguien que la jugó.
+  NO_TERMINO: "no_termino",
+  NO_JUGASTE: "no_jugaste",
 };
 
 export const MENSAJES_RECHAZO = {
@@ -133,6 +137,8 @@ export const MENSAJES_RECHAZO = {
   [RECHAZO.LLENA]: "La sala ya está completa.",
   [RECHAZO.YA_ESTA]: "Ya estás en esta sala.",
   [RECHAZO.SIN_SALDO]: "No tenés suficientes Leyendas.",
+  [RECHAZO.NO_TERMINO]: "Esta partida todavía no terminó.",
+  [RECHAZO.NO_JUGASTE]: "No jugaste esta partida.",
 };
 
 export const ESTADOS_SALA = {
@@ -164,6 +170,32 @@ export function puedeUnirse(sala, jugadorId, saldo) {
   if (jugadores.length >= capacidad) return no(RECHAZO.LLENA);
 
   if (usaLeyendas(sala) && Number(saldo) < Number(sala.entrada)) return no(RECHAZO.SIN_SALDO);
+
+  return { puede: true };
+}
+
+/**
+ * ¿Puede este jugador pedir la revancha de esta sala?
+ *
+ * Como `puedeUnirse`: la misma función en el navegador —que decide si
+ * mostrar el panel— y en el servidor, que es quien decide de verdad.
+ *
+ * Se pide DESPUÉS de jugar, así que las condiciones son las opuestas a las
+ * de entrar: la partida tiene que haber terminado, y hay que haberla
+ * jugado. Que la sala esté terminada no es un rechazo acá; es el requisito.
+ *
+ * No mira el saldo. La revancha abre una sala nueva y ahí se cobra la
+ * entrada: quien no llegue lo va a saber por el cobro, con el mensaje del
+ * servidor, y no por un cálculo del navegador que puede estar mirando un
+ * saldo viejo.
+ */
+export function puedeRevancha(sala, jugadorId) {
+  const no = (motivo) => ({ puede: false, motivo, mensaje: MENSAJES_RECHAZO[motivo] });
+
+  if (!sala) return no(RECHAZO.NO_EXISTE);
+  if (sala.estado === ESTADOS_SALA.CANCELADA) return no(RECHAZO.CANCELADA);
+  if (sala.estado !== ESTADOS_SALA.TERMINADA) return no(RECHAZO.NO_TERMINO);
+  if (!(sala.jugadores ?? []).includes(jugadorId)) return no(RECHAZO.NO_JUGASTE);
 
   return { puede: true };
 }

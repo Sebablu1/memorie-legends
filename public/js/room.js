@@ -26,7 +26,7 @@ let yaRedirigido = false;
 let salaActual = null;
 let miUid = null;
 
-function mostrarFinal(icono, titulo, texto) {
+function mostrarFinal(icono, titulo, texto, revancha = null) {
   if (dejarDeEscuchar) dejarDeEscuchar();
   $("cargando").hidden = true;
   $("sala").hidden = true;
@@ -34,6 +34,14 @@ function mostrarFinal(icono, titulo, texto) {
   $("iconoFinal").textContent = icono;
   $("tituloFinal").textContent = titulo;
   $("textoFinal").textContent = texto;
+
+  // Si esta sala ya tiene revancha, se ofrece en vez de dejar al jugador
+  // en una pantalla sin salida. Quien llega acá es alguien que volvió al
+  // enlace viejo —de la mesa se sale por el panel del final—.
+  const enlace = $("enlaceRevancha");
+  if (!enlace) return;
+  enlace.hidden = !revancha?.codigo;
+  if (revancha?.codigo) enlace.href = `room.html?code=${encodeURIComponent(revancha.codigo)}`;
 }
 
 // ------------------------------------------------------------ arranque
@@ -99,7 +107,14 @@ function pintar(sala, uid) {
   }
 
   if (sala.estado === ESTADOS_SALA.TERMINADA) {
-    mostrarFinal("🏁", "Partida terminada", "Esta sala ya jugó su partida.");
+    mostrarFinal(
+      "🏁",
+      "Partida terminada",
+      sala.revancha?.codigo
+        ? `Esta sala ya jugó su partida, y hay revancha por ${sala.revancha.entrada} Leyendas.`
+        : "Esta sala ya jugó su partida.",
+      sala.revancha,
+    );
     return;
   }
 

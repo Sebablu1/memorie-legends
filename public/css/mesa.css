@@ -2102,6 +2102,45 @@ button.accion.sobria:hover:not(:disabled) {
 
 .botonera-poder .accion { min-width: 200px; }
 
+/* ------------------------------------------------------- la revancha
+
+   El panel que aparece debajo del resultado cuando la partida termina.
+   Va separado de la tabla por una línea: lo de arriba es lo que pasó y lo
+   de abajo una decisión, y sin la línea el botón se lee como parte del
+   marcador. */
+.revancha {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(212, 168, 67, 0.22);
+}
+
+/* El selector de apuesta.
+
+   Los `option` se pintan aparte y con colores explícitos: en Windows los
+   dibuja el sistema, y sobre un desplegable claro un texto claro queda
+   ilegible. Es el mismo cuidado que ya tiene `lobby.css` con sus selects. */
+.apuesta-revancha {
+  min-width: 170px;
+  padding: 12px 14px;
+  border-radius: var(--corte, 10px);
+  border: 1px solid rgba(212, 168, 67, 0.4);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--oro-claro, #fcf0c4);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.apuesta-revancha option {
+  background: #1a2233;
+  color: #fcf0c4;
+}
+
+.apuesta-revancha:focus-visible {
+  outline: 2px solid var(--oro, #d4a843);
+  outline-offset: 2px;
+}
+
 /* Tercera salida del reglamento, deliberadamente discreta. */
 .enlace-modal {
   display: block;
@@ -2136,7 +2175,19 @@ button.accion.con-poder {
 /* La carta levantada con poder invita a tocarla. */
 .levantada-caja.con-poder .carta { cursor: pointer; }
 
-.tabla-final {
+/* El marcador del final.
+
+   `.tabla-final` es la de entrenamiento y `.tabla-resultado` la de una
+   partida por Leyendas. Comparten estas reglas porque son la misma tabla
+   con distinto origen del dato: la primera la arma el motor del navegador y
+   la segunda llega en la vista que publica el servidor.
+
+   La de red no tenía NINGUNA regla —ni relleno en las celdas— así que sus
+   encabezados salían pegados: «JugadorEn manoTotal». Se veía sólo al
+   terminar una partida apostada, que es la pantalla que menos conviene
+   tener descuidada. */
+.tabla-final,
+.tabla-resultado {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 22px;
@@ -2144,17 +2195,28 @@ button.accion.con-poder {
 }
 
 .tabla-final th,
-.tabla-final td {
+.tabla-final td,
+.tabla-resultado th,
+.tabla-resultado td {
   padding: 10px 12px;
   text-align: left;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-.tabla-final th {
+.tabla-final th,
+.tabla-resultado th {
   font-size: 0.66rem;
   text-transform: uppercase;
   letter-spacing: 1.4px;
   color: var(--oro);
+}
+
+/* La fila de uno mismo, destacada igual que la del que cortó: en una mesa
+   de cuatro, encontrarse en el marcador no puede costar una lectura. */
+.tabla-resultado tr.propio td {
+  color: var(--oro-claro);
+  font-weight: 700;
+  background: rgba(212, 168, 67, 0.07);
 }
 
 .tabla-final td.num {

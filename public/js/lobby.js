@@ -173,6 +173,8 @@ function escucharSalas() {
     (snap) => {
       const salas = snap.docs
         .map((d) => d.data())
+        // Igual que en el tablero: la revancha es de los que jugaron.
+        .filter((s) => s.listada !== false)
         .filter((s) => (s.jugadores ?? []).length < MAX_JUGADORES);
 
       if (!salas.length) {

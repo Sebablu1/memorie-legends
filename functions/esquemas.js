@@ -76,6 +76,18 @@ export const EsquemaCrearSala = z.object({
   nombre: z.string().max(40).optional(),
 });
 
+/**
+ * La revancha: de qué sala viene y con qué apuesta se vuelve a jugar.
+ *
+ * El nombre NO se acepta del cliente. Lo arma el servidor a partir del de
+ * la sala vieja, que ya pasó por acá cuando aquélla se creó: un campo menos
+ * que validar y un lugar menos por donde entra texto de alguien.
+ */
+export const EsquemaRevancha = z.object({
+  codigo: Codigo,
+  entrada: z.coerce.number().int().min(0),
+});
+
 export const EsquemaMarcarListo = z.object({
   codigo: Codigo,
   listo: z.coerce.boolean().optional(),
