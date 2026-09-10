@@ -197,6 +197,80 @@ export const enLaTienda = (tipo) => ETIQUETA_TIPO[tipo]?.tienda ?? tipo;
 /** Cómo se llama un tipo en Mi colección. */
 export const enMiColeccion = (tipo) => ETIQUETA_TIPO[tipo]?.mios ?? tipo;
 
+/**
+ * Qué rareza le corresponde a cada precio.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ES UNO A UNO, Y SALIÓ DE LOS AVATARES
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Los trece avatares ya venían así: seis precios, seis rarezas, sin
+ * superposición. La tabla se sacó de ellos y no al revés — y por eso los
+ * avatares no hubo que tocarlos.
+ *
+ * Agrupar los precios en tramos y darle una rareza a cada tramo fue el
+ * primer intento, y estaba mal: colapsaba `comun` y `poco_comun` en uno y
+ * marcaba como errados los tres avatares de 150, que estaban bien.
+ */
+export const RAREZA_DE_PRECIO = Object.freeze({
+  0: "inicial",
+  100: "comun",
+  150: "poco_comun",
+  300: "raro",
+  450: "epico",
+  600: "legendario",
+});
+
+/**
+ * Los precios que puede tener cada tipo.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * CADA TIPO CON LA SUYA, Y NO ES UN DESCUIDO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Un avatar se ve todo el tiempo y en todas las pantallas, y lo ven los
+ * cuatro jugadores. Un paño se ve sólo en la mesa y sólo su dueño. Que
+ * valgan lo mismo sería una decisión, y la decisión fue que no: los paños y
+ * los dorsos de mazo van de 0 a 450 en cuatro escalones, sin el de 100 ni
+ * el de 600.
+ *
+ * El precio significa la misma rareza en las dos escalas, que es lo que las
+ * mantiene comparables entre sí.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LAS INSIGNIAS NO ESTÁN, Y POR ESO NO TIENEN ESCALA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * No se venden: `TIPOS_VENDIBLES` las excluye y el servidor rechaza la
+ * compra. Su precio es cero porque no tienen precio, y su rareza mide
+ * cuánto cuesta GANARLAS — otro eje con el mismo nombre. Medirlas contra
+ * una escala de precios obligaría a que todas dijeran `inicial`.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ESTO NO COBRA NADA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * El servidor cobra lo que diga el catálogo de Firestore, valga lo que
+ * valga. Esta lista es una intención: sirve para que el panel avise cuando
+ * un precio se sale de la forma, y para que la auditoría lo note. Un
+ * artículo especial puede salirse a propósito.
+ */
+export const ESCALA_DE_PRECIOS = Object.freeze({
+  [TIPOS.AVATAR]: Object.freeze([0, 100, 150, 300, 450, 600]),
+  [TIPOS.DORSO]: Object.freeze([0, 100, 150, 300, 450, 600]),
+  [TIPOS.FONDO]: Object.freeze([0, 150, 300, 450]),
+  [TIPOS.MAZO]: Object.freeze([0, 150, 300, 450]),
+});
+
+/** La escala de un tipo, o `null` si ese tipo no tiene. */
+export const escalaDe = (tipo) => ESCALA_DE_PRECIOS[tipo] ?? null;
+
+/** ¿Este precio es uno de los de su escala? Sin escala, cualquiera vale. */
+export function precioEnEscala(tipo, precio) {
+  const escala = escalaDe(tipo);
+  return !escala || escala.includes(Number(precio));
+}
+
 /** Subcolección donde se anota qué compró cada jugador. */
 export const COLECCION_CATALOGO = "catalogo";
 export const SUBCOLECCION_ITEMS = "items";
@@ -405,7 +479,7 @@ export const CATALOGO_INICIAL = [
 
   // -------------------------------------------------------------- dorsos
   { id: "dorso_azul", tipo: TIPOS.DORSO, nombre: "Dorso Azul", descripcion: "El de siempre.", precio: 0, imagen: "/img/dorsos/dorso-azul.png", activo: true, orden: 10, metadata: { rareza: "inicial" } },
-  { id: "dorso_rojo", tipo: TIPOS.DORSO, nombre: "Dorso Rojo", descripcion: "El otro de siempre.", precio: 80, imagen: "/img/dorsos/dorso-rojo.png", activo: true, orden: 20, metadata: { rareza: "inicial" } },
+  { id: "dorso_rojo", tipo: TIPOS.DORSO, nombre: "Dorso Rojo", descripcion: "El otro de siempre.", precio: 100, imagen: "/img/dorsos/dorso-rojo.png", activo: true, orden: 20, metadata: { rareza: "comun" } },
 
   // ------------------------------------------------------ paños de mesa
   //
@@ -419,9 +493,9 @@ export const CATALOGO_INICIAL = [
   // quien se probó otro pueda volver, que es exactamente lo que faltaba
   // cuando los avatares no se podían desequipar.
   { id: "pano_piedra", tipo: TIPOS.FONDO, nombre: "Salón de Piedra", descripcion: "La mesa de siempre, fría y sobria.", precio: 0, imagen: "/img/mesa/panos/piedra.svg", activo: true, orden: 10, metadata: { rareza: "inicial" } },
-  { id: "pano_fieltro", tipo: TIPOS.FONDO, nombre: "Fieltro Verde", descripcion: "El paño de casino de toda la vida.", precio: 200, imagen: "/img/mesa/panos/fieltro.svg", activo: true, orden: 20, metadata: { rareza: "poco_comun" } },
+  { id: "pano_fieltro", tipo: TIPOS.FONDO, nombre: "Fieltro Verde", descripcion: "El paño de casino de toda la vida.", precio: 150, imagen: "/img/mesa/panos/fieltro.svg", activo: true, orden: 20, metadata: { rareza: "poco_comun" } },
   { id: "pano_madera", tipo: TIPOS.FONDO, nombre: "Roble de Taberna", descripcion: "Una tabla lustrada por mil partidas.", precio: 300, imagen: "/img/mesa/panos/madera.svg", activo: true, orden: 30, metadata: { rareza: "raro" } },
-  { id: "pano_carmesi", tipo: TIPOS.FONDO, nombre: "Terciopelo Carmesí", descripcion: "Para las mesas donde se juega en serio.", precio: 400, imagen: "/img/mesa/panos/carmesi.svg", activo: true, orden: 40, metadata: { rareza: "epico" } },
+  { id: "pano_carmesi", tipo: TIPOS.FONDO, nombre: "Terciopelo Carmesí", descripcion: "Para las mesas donde se juega en serio.", precio: 450, imagen: "/img/mesa/panos/carmesi.svg", activo: true, orden: 40, metadata: { rareza: "epico" } },
 
   // -------------------------------------------------- mazos del centro
   //
@@ -431,9 +505,9 @@ export const CATALOGO_INICIAL = [
   // que lleva grabada el paño, para que el mazo se lea como parte del
   // mueble y no como un naipe apoyado encima.
   { id: "mazo_azul", tipo: TIPOS.MAZO, nombre: "Mazo Azul", descripcion: "El del medio de siempre.", precio: 0, imagen: "/img/dorsos/dorso-azul.png", activo: true, orden: 10, metadata: { rareza: "inicial" } },
-  { id: "mazo_real", tipo: TIPOS.MAZO, nombre: "Mazo Real", descripcion: "Azul de medianoche, brújula en oro.", precio: 200, imagen: "/img/mazos/real.svg", activo: true, orden: 20, metadata: { rareza: "poco_comun" } },
+  { id: "mazo_real", tipo: TIPOS.MAZO, nombre: "Mazo Real", descripcion: "Azul de medianoche, brújula en oro.", precio: 150, imagen: "/img/mazos/real.svg", activo: true, orden: 20, metadata: { rareza: "poco_comun" } },
   { id: "mazo_esmeralda", tipo: TIPOS.MAZO, nombre: "Mazo Esmeralda", descripcion: "Verde profundo y plata verdosa.", precio: 300, imagen: "/img/mazos/esmeralda.svg", activo: true, orden: 30, metadata: { rareza: "raro" } },
-  { id: "mazo_carmesi", tipo: TIPOS.MAZO, nombre: "Mazo Carmesí", descripcion: "El de las mesas donde se juega en serio.", precio: 400, imagen: "/img/mazos/carmesi.svg", activo: true, orden: 40, metadata: { rareza: "epico" } },
+  { id: "mazo_carmesi", tipo: TIPOS.MAZO, nombre: "Mazo Carmesí", descripcion: "El de las mesas donde se juega en serio.", precio: 450, imagen: "/img/mazos/carmesi.svg", activo: true, orden: 40, metadata: { rareza: "epico" } },
 ];
 
 /**

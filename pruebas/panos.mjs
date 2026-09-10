@@ -31,6 +31,9 @@ import {
   esVendible,
   esRutaDelSitio,
   problemasDelItem,
+  precioEnEscala,
+  escalaDe,
+  RAREZA_DE_PRECIO,
 } from "../public/js/reglas/catalogo.js";
 import { EsquemaTipo } from "../functions/esquemas.js";
 
@@ -105,13 +108,33 @@ ok(
   "así que le toca a toda cuenta nueva, como los dorsos",
 );
 
+/**
+ * Los precios salen de la escala de su tipo, no de un rango escrito acá.
+ *
+ * Decía «entre 200 y 400», que eran los precios que los paños tenían ese día.
+ * Al ordenar la escala pasaron a 150, 300 y 450 y la prueba se puso en rojo
+ * sin que nada estuviera mal: afirmaba unos números, no una regla.
+ *
+ * Los paños y los dorsos de mazo tienen la suya —0, 150, 300, 450— más corta
+ * que la de los avatares, porque un paño lo ve sólo su dueño y sólo en la
+ * mesa. Ver `ESCALA_DE_PRECIOS` en las reglas.
+ */
 const pagos = PANOS.filter((p) => p.precio > 0).map((p) => p.precio);
 ok(
-  pagos.every((p) => p >= 200 && p <= 400),
-  "los otros tres cuestan entre 200 y 400",
-  pagos,
+  PANOS.every((p) => precioEnEscala(p.tipo, p.precio)),
+  `todos caen en la escala de su tipo (${escalaDe(TIPOS.FONDO).join(", ")})`,
+  PANOS.map((p) => p.precio),
 );
 ok(new Set(pagos).size === pagos.length, "y no hay dos al mismo precio", pagos);
+
+// Y la rareza dice lo mismo que el precio: son dos formas de contar cuánto
+// vale, y si se contradicen el jugador lee dos cosas distintas en la ficha.
+const torcidos = PANOS.filter((p) => p.metadata?.rareza !== RAREZA_DE_PRECIO[p.precio]);
+ok(
+  torcidos.length === 0,
+  "y la rareza de cada uno coincide con su precio",
+  torcidos.map((p) => `${p.id}: ${p.metadata?.rareza} a ${p.precio}`),
+);
 
 console.log("\n=== El arte existe y no sale del sitio ===");
 for (const pano of PANOS) {
