@@ -670,6 +670,100 @@ console.log("\n=== 17. Las insignias NO se venden: se otorgan ===");
   ok(db._leer("users/ana").insignia === INSIGNIA, "y una vez otorgada se puede equipar");
 }
 
+
+{
+  /**
+   * Y NO SE LES PUEDE PONER PRECIO.
+   *
+   * Esto se podía. `problemasDelItem` validaba el precio en general —entero,
+   * no negativo, con techo— y tenía una regla especial sólo para avatares, así
+   * que una insignia a 500 pasaba y quedaba guardada.
+   *
+   * No se vendía —`comprar` la rechaza igual, es lo que prueba el bloque de
+   * arriba— pero el número quedaba escrito y el panel lo mostraba: «500
+   * Leyendas» al lado de un logro. Un administrador que ve eso concluye,
+   * razonablemente, que la insignia está a la venta y algo anda mal.
+   *
+   * El candado va en el servidor y no en el formulario. El panel manda un
+   * objeto a una Cloud Function: bloquear el campo avisa, no impide.
+   */
+  const { db, tienda } = montar({ saldo: 100 });
+  const como = { auth: { uid: "admin" } };
+
+  const conPrecio = await capturar(() =>
+    tienda.guardarItem(como, {
+      id: "insignia_cara",
+      tipo: "insignia",
+      nombre: "Cara",
+      precio: 500,
+      imagen: "/img/insignias/heroe.webp",
+    }));
+
+  ok(conPrecio.error?.codigo === "invalid-argument", "guardar una insignia con precio se rechaza", conPrecio.error?.codigo);
+  ok(/logros/i.test(conPrecio.error?.message ?? ""), "y el mensaje dice qué son", conPrecio.error?.message);
+  ok(!db._leer("catalogo/insignia_cara"), "no queda nada escrito");
+
+  // Con precio 0 entra, que es como tienen que ser.
+  const sinPrecio = await capturar(() =>
+    tienda.guardarItem(como, {
+      id: "insignia_cara",
+      tipo: "insignia",
+      nombre: "Cara",
+      precio: 0,
+      imagen: "/img/insignias/heroe.webp",
+    }));
+  ok(!sinPrecio.error, "con precio 0 se guarda", sinPrecio.error?.message);
+  ok(db._leer("catalogo/insignia_cara")?.precio === 0, "y queda en 0", db._leer("catalogo/insignia_cara")?.precio);
+
+  // Editar una que ya estaba para ponerle precio, tampoco.
+  const editada = await capturar(() =>
+    tienda.guardarItem(como, {
+      id: "insignia_cara",
+      tipo: "insignia",
+      nombre: "Cara",
+      precio: 150,
+      imagen: "/img/insignias/heroe.webp",
+    }));
+  ok(editada.error?.codigo === "invalid-argument", "ponerle precio después tampoco", editada.error?.codigo);
+  ok(db._leer("catalogo/insignia_cara")?.precio === 0, "y la que estaba sigue en 0");
+}
+
+{
+  /**
+   * Lo que SÍ se vende puede costar cero, y no es lo mismo.
+   *
+   * El avatar predeterminado, el dorso azul, el paño de piedra y el mazo azul
+   * cuestan 0: son los que le tocan a toda cuenta nueva. Si la regla de arriba
+   * se hubiera escrito como «precio 0 significa que no se vende», estos cuatro
+   * habrían quedado del lado equivocado.
+   *
+   * Lo que decide es el TIPO.
+   */
+  const { db, tienda } = montar({ saldo: 100 });
+  const como = { auth: { uid: "admin" } };
+
+  const gratis = await capturar(() =>
+    tienda.guardarItem(como, {
+      id: "dorso_gratis",
+      tipo: "dorso",
+      nombre: "Dorso de regalo",
+      precio: 0,
+      imagen: "/img/dorsos/dorso-azul.png",
+    }));
+  ok(!gratis.error, "un dorso a 0 se guarda igual", gratis.error?.message);
+  ok(db._leer("catalogo/dorso_gratis")?.precio === 0, "y queda a 0");
+
+  const pago = await capturar(() =>
+    tienda.guardarItem(como, {
+      id: "dorso_pago",
+      tipo: "dorso",
+      nombre: "Dorso pago",
+      precio: 150,
+      imagen: "/img/dorsos/dorso-rojo.png",
+    }));
+  ok(!pago.error, "y uno con precio también", pago.error?.message);
+}
+
 // =====================================================================
 console.log("\n=== 18. El pack descuenta por cantidad de artículos NUEVOS ===");
 // =====================================================================

@@ -326,6 +326,41 @@ export function problemasDelItem(item) {
     problemas.push(`Un avatar no puede costar menos de ${PRECIO_MINIMO_AVATAR} Leyendas.`);
   }
 
+  /**
+   * Lo que no se vende no lleva precio. Ni cero de adorno: cero.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * POR QUÉ ES UNA REGLA Y NO UN CAMPO DESHABILITADO
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Una insignia con precio 500 se podía guardar. La tienda no la vendía
+   * —`TIPOS_VENDIBLES` la excluye y `comprarItem` la rechaza dentro de la
+   * transacción— pero el número quedaba escrito y se mostraba: el panel
+   * decía «500 Leyendas» al lado de un logro.
+   *
+   * Apagar el campo en el formulario no alcanza. El panel manda un objeto
+   * a una Cloud Function, y quien tenga la consola abierta manda el que
+   * quiera. La única forma de que un logro no tenga precio es que el
+   * servidor no acepte guardarlo con uno, y esta función corre en los dos
+   * lados: en el panel para avisar antes, y adentro de `guardarItem` para
+   * decidir.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * VENDIBLE ES POR TIPO, NO POR PRECIO
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Cuatro artículos que SÍ se venden cuestan cero: el avatar
+   * predeterminado, el dorso azul, el paño de piedra y el mazo azul — los
+   * que le tocan a toda cuenta nueva. Separar por precio los mandaría al
+   * lado equivocado. Lo que decide es `TIPOS_VENDIBLES`, que es lo mismo
+   * que mira el servidor al cobrar.
+   */
+  if (esTipoValido(item?.tipo) && !esVendible(item.tipo) && Number(item?.precio) !== 0) {
+    problemas.push(
+      "Las insignias son logros: se ganan jugando, no se venden. Su precio tiene que ser 0.",
+    );
+  }
+
   if (!texto(item?.imagen)) problemas.push("Falta la imagen.");
 
   if (item?.activo != null && typeof item.activo !== "boolean") {

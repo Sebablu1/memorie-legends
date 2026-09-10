@@ -649,3 +649,55 @@ select {
 }
 
 .fila.chica .campo { font-size: 0.92rem; }
+
+/* ------------------------------------- el catálogo, en dos grupos
+
+   Lo que se vende y lo que se gana, separados. Mezclados, una insignia se
+   leía como un producto apagado: la fila decía «apagado» y ofrecía
+   «Encender», que en un artículo de venta significa ponerlo a la venta. Un
+   administrador nuevo la enciende creyendo que la arregla. */
+.grupo-catalogo {
+  margin-bottom: 26px;
+}
+
+.grupo-catalogo h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  letter-spacing: 0.5px;
+}
+
+/* El grupo que no se vende va marcado con una guía al costado. No es un
+   aviso rojo: no hay nada que arreglar, es otra clase de cosa. */
+.grupo-catalogo.no-vendible {
+  padding-left: 14px;
+  border-left: 2px solid rgba(212, 168, 67, 0.35);
+}
+
+.grupo-catalogo .titulo-tipo {
+  margin: 16px 0 6px;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: var(--oro, #d4a843);
+}
+
+.grupo-catalogo .cuenta {
+  color: var(--texto-tenue, #9aa0aa);
+  font-weight: 400;
+}
+
+/* El aviso de debajo del precio, cuando el tipo no se vende. */
+/* El `display` va con su excepción: una regla de autor con `display`
+   anula el `[hidden]` de la hoja del navegador, y el aviso quedaba visible
+   con el atributo puesto. Es el mismo tropiezo que ya documenta
+   `admin-puerta.spec.js`. */
+.nota-campo[hidden] {
+  display: none;
+}
+
+.nota-campo {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--oro-claro, #fcf0c4);
+}

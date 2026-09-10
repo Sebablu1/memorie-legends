@@ -25,7 +25,49 @@
  */
 
 import { funciones, httpsCallable } from "../js/firebase.js";
-import { TIPOS_VALIDOS, problemasDelItem, imagenEsArchivo } from "../js/reglas/catalogo.js";
+import {
+  TIPOS_VALIDOS,
+  TIPOS_VENDIBLES,
+  esVendible,
+  problemasDelItem,
+  imagenEsArchivo,
+  ETIQUETA_TIPO,
+} from "../js/reglas/catalogo.js";
+
+/**
+ * Lo que se vende y lo que se gana, separados.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ NO ALCANZA CON ORDENAR LA LISTA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Mezcladas, las insignias se leían como productos apagados: la fila decía
+ * «🚫 apagado» y ofrecía «Encender», que en un artículo de venta significa
+ * ponerlo a la venta. Un administrador nuevo las enciende creyendo que
+ * están mal, y lo que hace en realidad es marcar el logro como disponible
+ * — otra cosa, con el mismo botón.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * VENDIBLE ES POR TIPO, NO POR PRECIO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Cuatro artículos que sí se venden cuestan CERO: el avatar predeterminado,
+ * el dorso azul, el paño de piedra y el mazo azul, que son los que le tocan
+ * a toda cuenta nueva. Separar por precio los mandaría al lado equivocado.
+ * Lo que decide es `TIPOS_VENDIBLES`, que es lo mismo que mira el servidor.
+ */
+const GRUPOS_DEL_CATALOGO = [
+  {
+    titulo: "Vendibles",
+    tipos: TIPOS_VENDIBLES,
+    nota: "Se compran con Leyendas. El precio tiene que caer en la escala de su tipo.",
+  },
+  {
+    titulo: "No vendibles (logros)",
+    tipos: TIPOS_VALIDOS.filter((t) => !esVendible(t)),
+    nota: "Las insignias son logros. No se venden: las otorga el servidor al cerrar una partida o un período de ranking. Su precio es siempre 0.",
+  },
+];
 
 const $ = (id) => document.getElementById(id);
 
@@ -64,33 +106,111 @@ function dibujarLista() {
     return;
   }
 
-  caja.innerHTML = catalogo
-    .map((item) => {
-      const figura = imagenEsArchivo(item.imagen)
-        ? `<img src="${limpio(item.imagen)}" alt="" style="width:34px;height:34px;object-fit:contain;border-radius:8px" />`
-        : `<span style="font-size:1.6rem;line-height:1">${limpio(item.imagen)}</span>`;
+  caja.innerHTML = GRUPOS_DEL_CATALOGO.map((grupo) => dibujarGrupo(grupo, catalogo)).join("");
+}
 
+/** Un grupo del catálogo, con sus tipos adentro y su cuenta. */
+function dibujarGrupo(grupo, catalogo) {
+  const delGrupo = catalogo.filter((i) => grupo.tipos.includes(i.tipo));
+  const vende = grupo.tipos.some((t) => esVendible(t));
+
+  const porTipo = grupo.tipos
+    .map((tipo) => {
+      const items = catalogo.filter((i) => i.tipo === tipo);
+      if (!items.length) return "";
+      const nombre = ETIQUETA_TIPO[tipo]?.tienda ?? tipo;
       return `
-      <div class="fila ${item.activo === false ? "apagada" : ""}">
-        ${figura}
-        <span class="codigo">${limpio(item.tipo)}</span>
-        <span class="campo"><b>${limpio(item.nombre)}</b><br />${limpio(item.id)}</span>
-        <span class="campo">${Number(item.precio).toLocaleString("es-UY")} Leyendas</span>
-        <span class="campo">orden ${Number(item.orden ?? 0)}</span>
-        <span class="campo">${item.activo === false ? "🚫 apagado" : "✅ a la venta"}</span>
-        <button class="btn sobrio chico" data-editar="${limpio(item.id)}" type="button">Editar</button>
-        <button class="btn sobrio chico" data-activar="${limpio(item.id)}"
-                data-a="${item.activo === false ? "1" : "0"}" type="button">
-          ${item.activo === false ? "Encender" : "Apagar"}
-        </button>
-        <button class="btn sobrio chico" data-quien="${limpio(item.id)}" type="button">Quién lo tiene</button>
-        <button class="btn peligro chico" data-borrar="${limpio(item.id)}" type="button">Borrar</button>
-      </div>`;
+        <h4 class="titulo-tipo">${limpio(nombre)} <span class="cuenta">(${items.length})</span></h4>
+        ${items.map((i) => dibujarFila(i, vende)).join("")}`;
     })
     .join("");
+
+  return `
+    <section class="grupo-catalogo ${vende ? "" : "no-vendible"}">
+      <h3>${limpio(grupo.titulo)} <span class="cuenta">(${delGrupo.length})</span></h3>
+      <p class="nota">${limpio(grupo.nota)}</p>
+      ${porTipo || '<p class="nota">Nada de este grupo en el catálogo.</p>'}
+    </section>`;
+}
+
+/**
+ * Una fila del catálogo.
+ *
+ * `vende` cambia lo que se DICE, no lo que se puede hacer. Un logro se
+ * apaga y se enciende igual que un producto —es el mismo campo `activo`—
+ * pero apagar un producto es sacarlo de la venta y apagar un logro es
+ * dejar de ofrecerlo. Con las mismas palabras para las dos cosas, un
+ * administrador nuevo enciende una insignia creyendo que la arregla.
+ */
+function dibujarFila(item, vende) {
+  const figura = imagenEsArchivo(item.imagen)
+    ? `<img src="${limpio(item.imagen)}" alt="" style="width:34px;height:34px;object-fit:contain;border-radius:8px" />`
+    : `<span style="font-size:1.6rem;line-height:1">${limpio(item.imagen)}</span>`;
+
+  const apagado = item.activo === false;
+  const estado = vende
+    ? (apagado ? "🚫 apagado" : "✅ a la venta")
+    : (apagado ? "🚫 no disponible" : "🏅 disponible");
+
+  // Un logro no tiene precio, y mostrar «0 Leyendas» al lado invita a
+  // pensar que es un producto gratis. No lo es: no está en venta.
+  const precio = vende
+    ? `${Number(item.precio).toLocaleString("es-UY")} Leyendas`
+    : "se gana jugando";
+
+  return `
+    <div class="fila ${apagado ? "apagada" : ""}">
+      ${figura}
+      <span class="codigo">${limpio(item.tipo)}</span>
+      <span class="campo"><b>${limpio(item.nombre)}</b><br />${limpio(item.id)}</span>
+      <span class="campo">${precio}</span>
+      <span class="campo">orden ${Number(item.orden ?? 0)}</span>
+      <span class="campo">${estado}</span>
+      <button class="btn sobrio chico" data-editar="${limpio(item.id)}" type="button">Editar</button>
+      <button class="btn sobrio chico" data-activar="${limpio(item.id)}"
+              data-a="${apagado ? "1" : "0"}" type="button">
+        ${apagado ? (vende ? "Encender" : "Ofrecer") : (vende ? "Apagar" : "Retirar")}
+      </button>
+      <button class="btn sobrio chico" data-quien="${limpio(item.id)}" type="button">Quién lo tiene</button>
+      <button class="btn peligro chico" data-borrar="${limpio(item.id)}" type="button">Borrar</button>
+    </div>`;
 }
 
 // ---------------------------------------------------------- el formulario
+
+/**
+ * Acomoda el formulario a lo que el tipo elegido permite.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ESTO NO ES LO QUE IMPIDE NADA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Bloquear un campo es una cortesía: avisa antes de que alguien escriba un
+ * número que va a ser rechazado. Quien abra la consola manda el objeto que
+ * quiera. Lo que de verdad impide guardar una insignia con precio es
+ * `problemasDelItem`, que corre acá para avisar y DENTRO de `guardarItem`
+ * para decidir.
+ *
+ * Es la misma división que el resto del panel: la pantalla explica, el
+ * servidor manda.
+ */
+function ajustarFormularioAlTipo() {
+  const tipo = $("itemTipo").value;
+  const vende = esVendible(tipo);
+
+  const precio = $("itemPrecio");
+  precio.disabled = !vende;
+  if (!vende) precio.value = "0";
+
+  const aviso = $("avisoNoVendible");
+  if (aviso) aviso.hidden = vende;
+
+  // El campo no se esconde: se explica. Un logro también se ofrece y se
+  // retira —es el mismo `activo`— y esconder la casilla dejaría al
+  // administrador sin poder sacar una insignia de circulación.
+  const etiqueta = $("etiquetaActivo");
+  if (etiqueta) etiqueta.textContent = vende ? "A la venta" : "Logro disponible";
+}
 
 /** Vacía el formulario y lo deja listo para crear uno nuevo. */
 function limpiarFormulario() {
@@ -103,6 +223,7 @@ function limpiarFormulario() {
   $("itemImagen").value = "";
   $("itemOrden").value = "0";
   $("itemActivo").checked = true;
+  ajustarFormularioAlTipo();
   decir($("avisoItem"), "");
 }
 
@@ -126,6 +247,7 @@ function editar(id) {
   $("itemImagen").value = item.imagen ?? "";
   $("itemOrden").value = String(item.orden ?? 0);
   $("itemActivo").checked = item.activo !== false;
+  ajustarFormularioAlTipo();
 
   decir($("avisoItem"), `Editando «${item.nombre}». El id no se puede cambiar.`);
   $("itemNombre").focus();
@@ -414,6 +536,12 @@ export function montarTiendaAdmin() {
   $("itemTipo").innerHTML = TIPOS_VALIDOS.map(
     (t) => `<option value="${t}">${t}</option>`,
   ).join("");
+
+  // El formulario se ajusta al tipo elegido en cuanto se elige, no al
+  // guardar: enterarse de que una insignia no lleva precio DESPUÉS de
+  // escribirlo es enterarse tarde.
+  $("itemTipo").addEventListener("change", ajustarFormularioAlTipo);
+  ajustarFormularioAlTipo();
 
   $("btnGuardarItem").addEventListener("click", guardar);
   $("btnNuevoItem").addEventListener("click", limpiarFormulario);

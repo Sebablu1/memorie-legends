@@ -168,9 +168,15 @@
             <span>Nombre</span>
             <input id="itemNombre" type="text" placeholder="El Lobo" autocomplete="off" />
           </label>
-          <label>
+          <label id="campoPrecio">
             <span>Precio en Leyendas</span>
             <input id="itemPrecio" type="number" min="0" step="1" value="0" />
+            <!-- Se enciende cuando el tipo elegido no se vende. El precio
+                 queda en 0 y bloqueado; lo que de verdad lo impide es
+                 `problemasDelItem`, del lado del servidor. -->
+            <small class="nota-campo" id="avisoNoVendible" hidden>
+              Las insignias son logros. No se venden.
+            </small>
           </label>
           <label class="ancho">
             <span>Descripción</span>
@@ -186,9 +192,12 @@
             <span>Orden</span>
             <input id="itemOrden" type="number" step="1" value="0" />
           </label>
-          <label class="casilla">
+          <label class="casilla" id="campoActivo">
             <input id="itemActivo" type="checkbox" checked />
-            <span>A la venta</span>
+            <!-- La palabra cambia con el tipo: un producto se pone «a la
+                 venta» y un logro se «ofrece». Es el mismo campo `activo`,
+                 y por eso hay que decir cuál de las dos cosas hace. -->
+            <span id="etiquetaActivo">A la venta</span>
           </label>
         </div>
 
