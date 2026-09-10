@@ -44,6 +44,8 @@ import {
   MONEDA,
 } from "./reglas/economia.js";
 
+import { PUESTO_MENSUAL_CON_INSIGNIA } from "./reglas/insignias.js";
+
 import { crearMoverLeyendas } from "./leyendas.js";
 import { crearAbandonarPartida } from "./abandono.js";
 import { crearMotorEnRed } from "./partida-red.js";
@@ -823,6 +825,7 @@ const tienda = crearTienda({
   error: errorHttp,
   motivoCompra: MOTIVOS.COMPRA_PERSONALIZACION,
   motivoDevolucion: MOTIVOS.DEVOLUCION_ARTICULO,
+  motivoLogro: MOTIVOS.PREMIO_LOGRO,
   usuarios: USUARIOS,
   administradores,
 });
@@ -1175,10 +1178,60 @@ const rankingDePartidas = crearRankingDePartidas({ db, marcaDeTiempo, logger, zo
  * Ninguna puede tumbar el cierre: los premios ya se pagaron y la sala ya se
  * cerró. Un ranking sin escribir se arregla; una partida que no cierra, no.
  */
-async function despuesDelCierre(r) {
+async function despuesDelCierre(r, codigo = null) {
   if (!r || r.yaEstaba) return;
   if (r.puntuable) await rankingDePartidas.registrarPartidaSinRomper(r.puntuable);
-  await insignias.otorgarAVarios(r.jugadores ?? []);
+  const ganadas = await insignias.otorgarAVarios(r.jugadores ?? []);
+  await publicarLogros(codigo, ganadas);
+}
+
+/**
+ * Deja lo que cada uno ganó donde su propia mesa lo pueda leer.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * POR QUÉ UN DOCUMENTO APARTE Y NO LA VISTA
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * La vista de cada jugador la escribe el motor DENTRO de la transacción que
+ * cierra, y el cliente la filtra por `version`: descarta cualquier vista cuya
+ * versión no sea mayor que la última que vio. Las insignias, en cambio, se
+ * otorgan DESPUÉS de esa transacción —hay que leer contadores que ella acaba
+ * de escribir—, así que meterlas ahí obligaba a inventar una versión más y a
+ * que el motor y este añadido se pusieran de acuerdo sobre quién numera.
+ *
+ * Con su propio documento no hay carrera: si el aviso llega antes de que se
+ * abra el modal, el `onSnapshot` lo entrega al suscribirse; si llega después,
+ * lo entrega cuando aparece. En los dos casos el jugador lo ve.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * UNO POR JUGADOR
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * `partidas/{codigo}/logros/{uid}`, y las reglas sólo dejan leer el propio.
+ * Un único documento con los cuatro adentro le contaría a cada uno lo que
+ * ganaron los otros, que no es asunto suyo y encima llega antes de que
+ * terminen de mirarse la mano.
+ *
+ * No lanza: el resultado ya está pago y la insignia ya está otorgada. Que
+ * falle el cartelito no puede tumbar nada.
+ */
+async function publicarLogros(codigo, ganadas) {
+  if (!codigo || !ganadas) return;
+  const uids = Object.keys(ganadas);
+  if (!uids.length) return;
+
+  try {
+    await Promise.all(
+      uids.map((uid) =>
+        db.doc(`partidas/${codigo}/logros/${uid}`).set({
+          insignias: ganadas[uid],
+          creado: marcaDeTiempo(),
+        }),
+      ),
+    );
+  } catch (e) {
+    logger.warn("No se pudo publicar el aviso de insignias", { codigo, error: e.message });
+  }
 }
 
 /**
@@ -1356,7 +1409,7 @@ export const inscribirseATorneo = functions.https.onCall(async (data, context) =
 export const cerrarPartida = functions.https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "cerrarPartida");
   const r = await cierre.cerrarPartida({ uid, codigo: data?.codigo });
-  await despuesDelCierre(r);
+  await despuesDelCierre(r, data?.codigo);
   return r;
 });
 
@@ -1438,10 +1491,11 @@ export const cerrarVentanaDescarte = functions.https.onCall(async (data, context
  */
 export const avanzarPartida = functions.https.onCall(async (data, context) => {
   exigirSesion(context, "avanzarPartida");
-  const r = await enRed.avanzarPartida({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
+  const { codigo } = validar(EsquemaDeSala, data, errorHttp);
+  const r = await enRed.avanzarPartida({ codigo });
   // Éste es el camino NORMAL de cierre: lo dispara el vencimiento del plazo, no
   // un jugador. Tiene que hacer lo mismo que el cierre pedido a mano.
-  if (r?.hizo === "cerrarPartida") await despuesDelCierre(r);
+  if (r?.hizo === "cerrarPartida") await despuesDelCierre(r, codigo);
   return r;
 });
 
@@ -1576,14 +1630,13 @@ async function cerrarPeriodo(periodo, fechaDelPeriodoQueCierra) {
       });
       if (!r.aplicado) return;
 
+      // Sólo el puesto y las Leyendas. Acá se escribían además cuatro
+      // insignias —`dorada`, `plateada`, `bronce`, `top10`— con `arrayUnion`
+      // en un campo del perfil que no lee nadie, y con ids que no existían ni
+      // en `CONDICIONES` ni en el catálogo. La única insignia del ranking es
+      // `leyenda`, y la otorga `registrarPuestoMensual` unas líneas más
+      // abajo, por el mismo camino que todas: `users/{uid}/items/`.
       tx.set(fila.ref, { puesto, premiado: true }, { merge: true });
-      if (premio.insignia) {
-        tx.set(
-          db.collection(USUARIOS).doc(fila.id),
-          { insignias: admin.firestore.FieldValue.arrayUnion(premio.insignia) },
-          { merge: true },
-        );
-      }
     });
     premiados++;
   }
@@ -1602,9 +1655,14 @@ async function cerrarPeriodo(periodo, fechaDelPeriodoQueCierra) {
       const fila = tabla.docs[i];
       const puesto = i + 1;
 
-      // El top 5 se lleva la insignia. Es lo único del ranking que queda para
-      // siempre: el puesto se pierde al mes siguiente, la insignia no.
-      if (puesto <= 5) {
+      // El corte se lo lleva la insignia. Es lo único del ranking que queda
+      // para siempre: el puesto se pierde al mes siguiente, la insignia no.
+      //
+      // El número sale de la condición y no está escrito acá. Con una copia
+      // suelta, mover el corte de 5 a 10 en `reglas/insignias.js` habría
+      // dejado a los puestos 6 a 10 mereciendo la insignia y sin que nadie
+      // les anotara el puesto que la justifica.
+      if (puesto <= PUESTO_MENSUAL_CON_INSIGNIA) {
         await insignias.registrarPuestoMensual(fila.id, puesto);
       }
 
@@ -1743,7 +1801,7 @@ async function barrerPartidasVencidas() {
 
       if (r?.hizo === "cerrarPartida") {
         // Lo mismo que hace el camino normal: insignias y ranking.
-        await despuesDelCierre(r);
+        await despuesDelCierre(r, codigo);
         cerradas++;
       }
 
@@ -1985,13 +2043,10 @@ export const webhookPago = functions
         { merge: true },
       );
 
-      if (paquete?.insignia) {
-        tx.set(
-          db.collection(USUARIOS).doc(orden.uid),
-          { insignias: admin.firestore.FieldValue.arrayUnion(paquete.insignia) },
-          { merge: true },
-        );
-      }
+      // Acá se le escribía al comprador del Pack Élite la insignia
+      // `comprador-elite`, en un campo que no lee nadie y con un id que no
+      // existía en ningún catálogo. Los paquetes dan Leyendas; las insignias
+      // se ganan jugando.
     });
 
     return res.status(200).send("ok");

@@ -56,6 +56,9 @@ export function crearTienda({
   error,
   motivoCompra,
   motivoDevolucion,
+  // Lo que se asienta al pagar una insignia. Es su propio motivo: la casa
+  // emite esas Leyendas, no salen del pozo de nadie.
+  motivoLogro,
   usuarios = "users",
   catalogo = "catalogo",
   items = "items",
@@ -284,35 +287,95 @@ export function crearTienda({
   // ------------------------------------------------------------- otorgar
 
   /**
-   * Le da un artículo sin cobrarlo. Para logros, no para regalos.
+   * Le da un artículo sin cobrarlo, y le paga lo que ese logro valga.
    *
    * NO es una callable y no puede serlo: no hay ningún camino desde el
-   * navegador hasta acá. La llama el servidor cuando una insignia se gana, y
-   * por eso no toca `moverLeyendas` — no se mueve saldo, así que no hay nada
-   * que asentar en el libro mayor.
+   * navegador hasta acá. La llama el servidor cuando una insignia se gana.
    *
-   * Es idempotente por la misma razón que la compra: el id del documento es el
-   * id del artículo. Otorgar dos veces la misma insignia escribe el mismo
-   * documento, no dos.
+   * ───────────────────────────────────────────────────────────────────────
+   * POR QUÉ AHORA ES UNA TRANSACCIÓN
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Porque otorgar dejó de ser una escritura inocente. Antes sólo anotaba la
+   * posesión; ahora las insignias pagan Leyendas, y saldo y posesión tienen
+   * que moverse juntos o no moverse. Con dos escrituras sueltas, un corte en
+   * el medio dejaba al jugador con la insignia y sin las Leyendas —o al
+   * revés, cobrando dos veces la próxima vez que el servidor revisara.
+   *
+   * El orden es el de siempre y no es negociable: primero TODAS las lecturas
+   * —catálogo, posesión—, después `moverLeyendas`, que lee y escribe por
+   * dentro, y recién al final la posesión. Firestore rechaza leer después de
+   * escribir, y el Firestore de mentira de las pruebas también.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * DOS CANDADOS CONTRA EL PAGO DOBLE
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * El documento de posesión se llama como el artículo, así que revisar dos
+   * veces encuentra que ya lo tiene y no vuelve a entrar. Y si igual entrara
+   * —dos servidores a la vez, una posesión borrada a mano desde el panel— la
+   * clave `logro_{uid}_{itemId}` del libro mayor hace que el segundo asiento
+   * no exista. Son dos defensas contra dos cosas distintas, igual que en la
+   * compra.
+   *
+   * @returns leyendas: lo que se acreditó de verdad. Cero si ya lo tenía o si
+   *          el asiento ya estaba: quien avisa en pantalla no tiene que
+   *          adivinar si el pago ocurrió.
    */
-  async function otorgar(uid, itemId, { origen = "logro" } = {}) {
-    const enCatalogo = await refItemCatalogo(itemId).get();
-    if (!enCatalogo.exists) throw error("not-found", "Ese artículo no existe.");
+  async function otorgar(uid, itemId, { origen = "logro", premio = 0 } = {}) {
+    const leyendas = Number.isInteger(premio) && premio > 0 ? premio : 0;
 
-    const item = enCatalogo.data();
-    const ref = refPosesion(uid, itemId);
-    const yaLoTiene = await ref.get();
-    if (yaLoTiene.exists) return { itemId, tipo: item.tipo, nuevo: false };
+    // Sin motivo no se paga.
+    //
+    // `moverLeyendas` no comprueba el motivo, así que una fábrica montada sin
+    // `motivoLogro` escribiría el asiento con `motivo: undefined`. El saldo
+    // quedaría bien y el libro mayor inservible: la gracia de tener motivos es
+    // poder preguntarle de dónde salió cada Leyenda, y un asiento sin motivo
+    // no se puede clasificar después.
+    if (leyendas > 0 && !motivoLogro) {
+      throw error("internal", "Falta el motivo contable para pagar un logro.");
+    }
 
-    await ref.set({
-      tipo: item.tipo,
-      nombre: item.nombre ?? itemId,
-      precioPagado: 0,
-      origen,
-      compradoEn: marcaDeTiempo(),
+    return db.runTransaction(async (tx) => {
+      // ---- lecturas ----
+      const enCatalogo = await tx.get(refItemCatalogo(itemId));
+      if (!enCatalogo.exists) throw error("not-found", "Ese artículo no existe.");
+
+      const item = enCatalogo.data();
+      const ref = refPosesion(uid, itemId);
+      const yaLoTiene = await tx.get(ref);
+      const nombre = item.nombre ?? itemId;
+      if (yaLoTiene.exists) return { itemId, nombre, tipo: item.tipo, nuevo: false, leyendas: 0 };
+
+      // ---- el saldo, que lee y escribe por dentro ----
+      let acreditado = 0;
+      if (leyendas > 0) {
+        const movimiento = await moverLeyendas(tx, {
+          uid,
+          delta: leyendas,
+          motivo: motivoLogro,
+          referencia: itemId,
+          idempotencia: `logro_${uid}_${itemId}`,
+        });
+        if (movimiento.aplicado) acreditado = leyendas;
+      }
+
+      // ---- escrituras ----
+      tx.set(ref, {
+        tipo: item.tipo,
+        nombre,
+        precioPagado: 0,
+        origen,
+        // Lo que pagó el logro queda anotado en la posesión además de en el
+        // libro mayor. El asiento es la verdad contable; esto es para poder
+        // mirar un inventario y entender de dónde salió cada cosa sin cruzar
+        // dos colecciones.
+        leyendasPagadas: acreditado,
+        compradoEn: marcaDeTiempo(),
+      });
+
+      return { itemId, nombre, tipo: item.tipo, nuevo: true, leyendas: acreditado };
     });
-
-    return { itemId, tipo: item.tipo, nuevo: true };
   }
 
   // ---------------------------------------------------------- lo que tengo

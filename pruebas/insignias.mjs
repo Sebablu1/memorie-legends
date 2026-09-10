@@ -40,10 +40,13 @@ import {
   conPartida,
   conPuestoMensual,
   condicionDe,
+  leyendasDeInsignia,
+  PUESTO_MENSUAL_CON_INSIGNIA,
   ESTADISTICAS_VACIAS,
 } from "../public/js/reglas/insignias.js";
 import { crearInsignias } from "../functions/insignias.js";
 import { crearTienda } from "../functions/tienda.js";
+import { crearMoverLeyendas } from "../functions/leyendas.js";
 import { CATALOGO_INICIAL, TIPOS } from "../public/js/reglas/catalogo.js";
 
 let fallos = 0;
@@ -71,12 +74,12 @@ console.log("\n=== 1. Las condiciones son las que se acordaron ===");
   // Escritas a mano y no derivadas del módulo: si se derivaran, esta prueba
   // diría "las condiciones son las que dice el archivo", que es una tautología.
   const ACORDADO = {
-    novato: { campo: "partidasJugadas", minimo: 10 },
-    aventurero: { campo: "partidasGanadas", minimo: 50 },
-    estratega: { campo: "partidasGanadas", minimo: 100 },
-    heroe: { campo: "partidasGanadas", minimo: 250 },
-    campeon: { campo: "torneosGanados", minimo: 5 },
-    leyenda: { campo: "mejorPuestoMensual", maximo: 5 },
+    novato: { campo: "partidasJugadas", minimo: 1, leyendas: 20 },
+    aventurero: { campo: "partidasGanadas", minimo: 5, leyendas: 30 },
+    estratega: { campo: "partidasGanadas", minimo: 10, leyendas: 40 },
+    heroe: { campo: "partidasGanadas", minimo: 25, leyendas: 60 },
+    campeon: { campo: "torneosGanados", minimo: 1, leyendas: 50 },
+    leyenda: { campo: "mejorPuestoMensual", maximo: 10, leyendas: 100 },
   };
 
   ok(IDS_INSIGNIAS.length === 6, "son seis", IDS_INSIGNIAS.length);
@@ -86,6 +89,8 @@ console.log("\n=== 1. Las condiciones son las que se acordaron ===");
     ok(Boolean(c), `existe la condición de ${id}`);
     if (!c) continue;
     ok(c.campo === esperado.campo, `  ${id} mira ${esperado.campo}`, c.campo);
+    ok(c.leyendas === esperado.leyendas, `  ${id} paga ${esperado.leyendas}`, c.leyendas);
+    ok(leyendasDeInsignia(id) === esperado.leyendas, `  y \`leyendasDeInsignia\` coincide`);
     if (esperado.minimo !== undefined) {
       ok(c.minimo === esperado.minimo, `  ${id} pide ${esperado.minimo}`, c.minimo);
     } else {
@@ -111,7 +116,7 @@ console.log("\n=== 2. Un perfil vacío no gana nada ===");
   ok(insigniasMerecidas(null).length === 0, "ni un perfil que no existe");
 
   // La trampa del cero: si `mejorPuestoMensual` arrancara en 0 en vez de null,
-  // "puesto menor o igual a 5" sería cierto y quien nunca jugó sería Leyenda.
+  // "puesto menor o igual a 10" sería cierto y quien nunca jugó sería Leyenda.
   ok(
     !cumple(condicionDe("leyenda"), ESTADISTICAS_VACIAS),
     "y NO se regala la más difícil por no tener puesto",
@@ -138,9 +143,15 @@ console.log("\n=== 3. Cada umbral se cruza donde dice, ni antes ni después ==="
   }
 
   const leyenda = condicionDe("leyenda");
-  ok(cumple(leyenda, { mejorPuestoMensual: 5 }), "leyenda: el puesto 5 entra");
+  ok(cumple(leyenda, { mejorPuestoMensual: 10 }), "leyenda: el puesto 10 entra");
   ok(cumple(leyenda, { mejorPuestoMensual: 1 }), "leyenda: y el 1 también");
-  ok(!cumple(leyenda, { mejorPuestoMensual: 6 }), "leyenda: el 6 no");
+  ok(!cumple(leyenda, { mejorPuestoMensual: 11 }), "leyenda: el 11 no");
+
+  // El corte que mira el servidor sale de esta misma condición. Con dos
+  // copias, mover una dejaba a los puestos 6 a 10 mereciendo la insignia sin
+  // que nadie les anotara el puesto que la justifica.
+  ok(PUESTO_MENSUAL_CON_INSIGNIA === leyenda.maximo,
+     "y el corte que exporta el módulo es el mismo", PUESTO_MENSUAL_CON_INSIGNIA);
 }
 
 // =====================================================================
@@ -151,6 +162,7 @@ console.log("\n=== 4. Las de victorias se acumulan: ganar 250 gana las tres ==="
   // No son excluyentes. Quien llega a 250 victorias pasó por 50 y por 100, y
   // tiene que quedarse con las tres: son hitos, no niveles que se reemplazan.
   const veterano = { ...ESTADISTICAS_VACIAS, partidasJugadas: 400, partidasGanadas: 250 };
+  // 250 victorias pasa los cuatro umbrales de partidas con holgura.
   const ganadas = insigniasMerecidas(veterano);
 
   ok(ganadas.includes("novato"), "novato");
@@ -158,7 +170,7 @@ console.log("\n=== 4. Las de victorias se acumulan: ganar 250 gana las tres ==="
   ok(ganadas.includes("estratega"), "estratega");
   ok(ganadas.includes("heroe"), "heroe");
   ok(!ganadas.includes("campeon"), "pero no campeón: no ganó torneos");
-  ok(!ganadas.includes("leyenda"), "ni leyenda: nunca entró al top 5");
+  ok(!ganadas.includes("leyenda"), "ni leyenda: nunca entró al top 10");
 
   // Y sólo las que faltan, que es lo que hace barato revisar cada partida.
   const faltan = insigniasNuevas(veterano, ["novato", "aventurero"]);
@@ -178,7 +190,12 @@ console.log("\n=== 5. Contar partidas y mejores puestos ===");
 
   ok(e.partidasJugadas === 10, "cuenta las jugadas", e.partidasJugadas);
   ok(e.partidasGanadas === 3, "y las ganadas aparte", e.partidasGanadas);
-  ok(insigniasMerecidas(e).includes("novato"), "a las 10 llega el novato");
+  ok(insigniasMerecidas(e).includes("novato"), "el novato ya está");
+  // Y llega en la primera, no en la décima: es el umbral nuevo.
+  ok(insigniasMerecidas(conPartida(ESTADISTICAS_VACIAS, false)).includes("novato"),
+     "con UNA partida jugada, aunque se pierda");
+  ok(!insigniasMerecidas(ESTADISTICAS_VACIAS).includes("novato"),
+     "pero no antes de jugar ninguna");
 
   // El mejor puesto no empeora nunca.
   let r = conPuestoMensual(ESTADISTICAS_VACIAS, 12);
@@ -195,10 +212,10 @@ console.log("\n=== 6. El progreso sirve para dibujar una barra honesta ===");
 // =====================================================================
 
 {
-  const c = condicionDe("aventurero"); // ganar 50
+  const c = condicionDe("estratega"); // ganar 10
   ok(progreso(c, { partidasGanadas: 0 }) === 0, "en cero, cero");
-  ok(progreso(c, { partidasGanadas: 25 }) === 0.5, "a la mitad, la mitad");
-  ok(progreso(c, { partidasGanadas: 50 }) === 1, "cumplida, entera");
+  ok(progreso(c, { partidasGanadas: 5 }) === 0.5, "a la mitad, la mitad");
+  ok(progreso(c, { partidasGanadas: 10 }) === 1, "cumplida, entera");
   ok(progreso(c, { partidasGanadas: 900 }) === 1, "y nunca pasa de 1");
 
   // Las de techo no tienen barra: entre "puesto 40" y "puesto 6" no hay una
@@ -253,47 +270,170 @@ function crearFirestore(inicial = {}) {
       return r;
     },
     _leer: (r) => docs.get(r),
+    _borrar: (r) => docs.delete(r),
     _rutas: () => [...docs.keys()],
   };
 }
 
+/**
+ * El `moverLeyendas` de VERDAD, no uno de mentira.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * POR QUÉ IMPORTA QUE SEA EL DE VERDAD
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Porque otorgar dejó de ser gratis. Antes esto era una escritura sin saldo y
+ * un doble se podía usar sin perder nada; ahora cada insignia acredita
+ * Leyendas, y lo que hay que probar es justamente lo que un doble se saltea:
+ * que el asiento quede en el libro mayor, que la clave de idempotencia frene
+ * el segundo pago, y que el saldo termine donde tiene que terminar.
+ *
+ * Un `async () => ({ aplicado: true })` habría dicho que sí a todo.
+ */
 function montar(perfil = {}) {
   const inicial = { "users/ana": { credits: 0, username: "Ana", ...perfil } };
   for (const item of CATALOGO_INICIAL) inicial[`catalogo/${item.id}`] = { ...item };
 
   const db = crearFirestore(inicial);
+  const moverLeyendas = crearMoverLeyendas({
+    db,
+    usuarios: "users",
+    campoSaldo: "credits",
+    movimientos: "movimientos",
+    marcaDeTiempo: () => "T",
+    error,
+  });
   const tienda = crearTienda({
     db,
-    moverLeyendas: async () => ({ aplicado: true, saldo: 0 }),
+    moverLeyendas,
     marcaDeTiempo: () => "T",
     error,
     motivoCompra: "compra_personalizacion",
+    motivoLogro: "premio_logro",
     administradores: { exigir: async () => ({ uid: "admin" }) },
   });
   const insignias = crearInsignias({ db, tienda });
   return { db, tienda, insignias };
 }
 
+/** El saldo de Ana, para no repetir la ruta en cada aserción. */
+const saldoDe = (db) => db._leer("users/ana")?.credits ?? 0;
+
+/** Los asientos del libro mayor, que ahora sí tiene que haber. */
+const asientosDe = (db) => db._rutas().filter((r) => r.startsWith("movimientos/"));
+
 {
-  const { db, insignias } = montar({ gamesPlayed: 9, wins: 4 });
+  const { db, insignias } = montar({ gamesPlayed: 0, wins: 0 });
   const otorgadas = await insignias.otorgarInsignias("ana");
-  ok(otorgadas.length === 0, "con 9 partidas todavía no otorga nada", otorgadas);
+  ok(otorgadas.length === 0, "sin haber jugado, no otorga nada", otorgadas);
   ok(!db._leer("users/ana/items/novato"), "y no anota nada");
+  ok(asientosDe(db).length === 0, "ni asienta un pago que no ocurrió");
 }
 
 {
-  const { db, insignias } = montar({ gamesPlayed: 10, wins: 4 });
+  const { db, insignias } = montar({ gamesPlayed: 1, wins: 0 });
   const otorgadas = await insignias.otorgarInsignias("ana");
 
-  ok(otorgadas.length === 1 && otorgadas[0] === "novato", "con 10 otorga novato", otorgadas);
+  ok(otorgadas.length === 1 && otorgadas[0].id === "novato",
+     "con la primera partida jugada, otorga novato", otorgadas);
+  ok(otorgadas[0].nombre === "Novato", "y viaja el nombre visible", otorgadas[0].nombre);
   ok(db._leer("users/ana/items/novato").origen === "logro", "marcada como logro");
   ok(db._leer("users/ana/items/novato").precioPagado === 0, "y sin precio pagado");
-  ok(!db._rutas().some((r) => r.startsWith("movimientos/")), "sin tocar el libro mayor");
+
+  /**
+   * Y PAGA.
+   *
+   * Esto antes se probaba al revés —"sin tocar el libro mayor"— porque
+   * otorgar no movía saldo. Ahora sí lo mueve, así que la afirmación se dio
+   * vuelta entera: tiene que haber asiento, con su clave, y el saldo tiene
+   * que haber subido lo que dice la regla.
+   */
+  ok(otorgadas[0].leyendas === 20, "informa lo que acreditó", otorgadas[0].leyendas);
+  ok(saldoDe(db) === 20, "y el saldo sube", saldoDe(db));
+  ok(db._leer("users/ana/items/novato").leyendasPagadas === 20,
+     "la posesión anota lo que pagó el logro");
+
+  const asiento = db._leer("movimientos/logro_ana_novato");
+  ok(Boolean(asiento), "queda el asiento en el libro mayor");
+  ok(asiento?.motivo === "premio_logro", "con su propio motivo", asiento?.motivo);
+  ok(asiento?.delta === 20, "y el delta correcto", asiento?.delta);
+  ok(asientosDe(db).length === 1, "uno solo", asientosDe(db));
 
   // La segunda pasada no otorga de nuevo: es lo que hace barato revisar
-  // después de cada partida.
+  // después de cada partida. Y sobre todo, no vuelve a pagar.
   const otraVez = await insignias.otorgarInsignias("ana");
   ok(otraVez.length === 0, "revisar de nuevo no otorga nada", otraVez);
+  ok(saldoDe(db) === 20, "y NO vuelve a pagar", saldoDe(db));
+  ok(asientosDe(db).length === 1, "sin un segundo asiento", asientosDe(db));
+}
+
+{
+  /**
+   * Sin motivo contable, no se paga.
+   *
+   * `moverLeyendas` no comprueba el motivo. Una fábrica montada sin
+   * `motivoLogro` —un módulo nuevo que arme su propia tienda, una prueba que
+   * copie el montaje viejo— escribiría el asiento con `motivo: undefined`: el
+   * saldo quedaría bien y el libro mayor inservible, porque la gracia de
+   * tener motivos es poder preguntarle de dónde salió cada Leyenda.
+   *
+   * Es un error de programación, no del jugador, así que revienta fuerte en
+   * vez de pagar callado.
+   */
+  const inicial = { "users/ana": { credits: 0, gamesPlayed: 1 } };
+  for (const item of CATALOGO_INICIAL) inicial[`catalogo/${item.id}`] = { ...item };
+  const db = crearFirestore(inicial);
+
+  const tienda = crearTienda({
+    db,
+    moverLeyendas: crearMoverLeyendas({
+      db, usuarios: "users", campoSaldo: "credits", movimientos: "movimientos",
+      marcaDeTiempo: () => "T", error,
+    }),
+    marcaDeTiempo: () => "T",
+    error,
+    motivoCompra: "compra_personalizacion",
+    // motivoLogro, justamente, no se pasa.
+    administradores: { exigir: async () => ({ uid: "admin" }) },
+  });
+
+  let mensaje = null;
+  try {
+    await tienda.otorgar("ana", "novato", { premio: 20 });
+  } catch (e) {
+    mensaje = e.message;
+  }
+
+  ok(/motivo contable/i.test(mensaje ?? ""), "pagar sin motivo contable se rechaza", mensaje);
+  ok(!db._leer("users/ana/items/novato"), "y no queda la posesión a medias");
+  ok((db._leer("users/ana")?.credits ?? 0) === 0, "ni el saldo movido");
+
+  // Sin premio sí se puede: no hay asiento que clasificar.
+  const gratis = await tienda.otorgar("ana", "novato");
+  ok(gratis.nuevo === true, "otorgar sin premio no necesita motivo");
+  ok(gratis.leyendas === 0, "y no acredita nada", gratis.leyendas);
+}
+
+{
+  /**
+   * El segundo candado: la posesión borrada a mano.
+   *
+   * El primero es el documento de posesión —si ya lo tiene, no entra— pero un
+   * administrador puede quitársela desde el panel. Sin la clave de
+   * idempotencia, la próxima revisión le pagaría las 20 Leyendas otra vez, y
+   * quitar y devolver sería una canilla abierta.
+   */
+  const { db, insignias } = montar({ gamesPlayed: 1, wins: 0 });
+  await insignias.otorgarInsignias("ana");
+  ok(saldoDe(db) === 20, "cobró la primera vez");
+
+  db._borrar("users/ana/items/novato");
+  const otraVez = await insignias.otorgarInsignias("ana");
+
+  ok(otraVez.length === 1, "se le vuelve a otorgar la insignia", otraVez);
+  ok(otraVez[0].leyendas === 0, "pero informa que no se pagó nada", otraVez[0].leyendas);
+  ok(saldoDe(db) === 20, "y el saldo no se mueve", saldoDe(db));
+  ok(asientosDe(db).length === 1, "el libro mayor sigue con un asiento", asientosDe(db));
 }
 
 {

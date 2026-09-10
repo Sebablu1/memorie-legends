@@ -147,12 +147,29 @@ export function calcularReparto({ apuesta, jugadores, ganadorId, politica = POLI
 
 // --------------------------------------------------- premios de ranking
 
+/**
+ * Lo que paga el ranking por puesto.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ESTOS TRAMOS PAGAN LEYENDAS Y NADA MÁS
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Cada tramo traía su propia insignia —`dorada`, `plateada`, `bronce`,
+ * `top10`— y ninguna de las cuatro existía: no estaban en `CONDICIONES`, no
+ * estaban en el catálogo, y el servidor las escribía con `arrayUnion` en un
+ * campo del perfil que no lee nadie. Cuatro promesas sin destinatario.
+ *
+ * El ranking sigue pagando por puesto. La única insignia que reparte es
+ * `leyenda`, por entrar al top 10 del mes, y la otorga
+ * `registrarPuestoMensual` por el mismo camino que las demás:
+ * `users/{uid}/items/`.
+ */
 export const PREMIOS_RANKING = [
-  { hasta: 1, leyendas: 500, insignia: "dorada", etiqueta: "🏆 Insignia Dorada" },
-  { hasta: 2, leyendas: 300, insignia: "plateada", etiqueta: "🥈 Insignia Plateada" },
-  { hasta: 3, leyendas: 100, insignia: "bronce", etiqueta: "🥉 Insignia Bronce" },
-  { hasta: 10, leyendas: 50, insignia: "top10", etiqueta: "Insignia Top 10" },
-  { hasta: 50, leyendas: 20, insignia: null, etiqueta: "Top 50" },
+  { hasta: 1, leyendas: 500, etiqueta: "🏆 Campeón del período" },
+  { hasta: 2, leyendas: 300, etiqueta: "🥈 Segundo puesto" },
+  { hasta: 3, leyendas: 100, etiqueta: "🥉 Tercer puesto" },
+  { hasta: 10, leyendas: 50, etiqueta: "Top 10" },
+  { hasta: 50, leyendas: 20, etiqueta: "Top 50" },
 ];
 
 /**
@@ -161,7 +178,7 @@ export const PREMIOS_RANKING = [
  */
 export function premioPorPuesto(puesto) {
   const tramo = PREMIOS_RANKING.find((p) => puesto <= p.hasta);
-  return tramo ? { leyendas: tramo.leyendas, insignia: tramo.insignia, etiqueta: tramo.etiqueta } : null;
+  return tramo ? { leyendas: tramo.leyendas, etiqueta: tramo.etiqueta } : null;
 }
 
 // ------------------------------------------------------------- paquetes
@@ -172,13 +189,23 @@ export const PAQUETES = [
   { id: "basico", nombre: "Pack Básico", leyendas: 100, bonificacion: 0, precio: 100 },
   { id: "popular", nombre: "Pack Popular", leyendas: 300, bonificacion: 50, precio: 250 },
   { id: "premium", nombre: "Pack Premium", leyendas: 600, bonificacion: 150, precio: 450 },
+  /**
+   * El Élite prometía una insignia y no la entregaba.
+   *
+   * `insignia: "comprador-elite"` se escribía con `arrayUnion` en
+   * `users/{uid}.insignias`, un campo que ninguna función ni pantalla lee, y
+   * el id no existía ni en `CONDICIONES` ni en el catálogo. La tienda decía
+   * «Incluye insignia» y el jugador pagaba por algo que no aparecía en
+   * ningún lado.
+   *
+   * Los paquetes dan Leyendas. Las insignias se ganan jugando.
+   */
   {
     id: "elite",
     nombre: "Pack Élite",
     leyendas: 1500,
     bonificacion: 500,
     precio: 1000,
-    insignia: "comprador-elite",
   },
 ];
 
@@ -247,4 +274,15 @@ export const MOTIVOS = {
    * bien ni mal; le sacaron algo.
    */
   DEVOLUCION_ARTICULO: "devolucion_articulo",
+
+  /**
+   * Las Leyendas que paga una insignia al ganarse.
+   *
+   * Es su propio motivo y no `PREMIO_PARTIDA`: el premio de una partida sale
+   * del pozo que pusieron los jugadores —redistribuye— y esto lo emite la
+   * casa —crea—. Con un motivo compartido, el libro mayor no podría
+   * responder cuántas Leyendas se emitieron, que es justo lo que hay que
+   * poder vigilar cuando las Leyendas también se compran con dinero.
+   */
+  PREMIO_LOGRO: "premio_logro",
 };

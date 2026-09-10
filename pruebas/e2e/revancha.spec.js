@@ -150,6 +150,20 @@ const vistaFinal = `
   export const cerrarMirada = async () => {};
   export const avanzarPartida = async () => {};
 
+  // Lo que falta del módulo real, para que el doble no le deba ningún
+  // export: pruebas/dobles-de-partida.mjs compara las dos listas.
+  //
+  // Un undefined acá revienta a mitad de arrancarModoLeyendas y deja la mesa
+  // sin latido, con todas las pruebas en verde. Y ojo con las comillas
+  // invertidas: este doble ES un template literal, así que una sola en un
+  // comentario lo cierra y el archivo entero deja de parsear.
+  export const MS_ENTRE_GOLPES = 900;
+  export const MS_ENTRE_LATIDOS = 5000;
+
+  // Esta partida no gana ninguna insignia: el doble no llama al callback.
+  // Que exista alcanza, que es de lo que se trata.
+  export const escucharMisLogros = () => () => {};
+
   export function escucharMiVista(codigo, uid, alRecibir) {
     alRecibir({
       version: 9, fase: "finPartida", ronda: 4, yo: 0, indiceMano: 0, indiceTurno: 0,

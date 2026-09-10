@@ -197,10 +197,19 @@ console.log("\n=== Ninguna callable lee el código sin validarlo ===");
   ok(crudas.length === 0,
      `ninguna lee data.codigo a mano (${crudas.length} encontradas)`);
 
-  const validadas = [...fuente.matchAll(/validar\(EsquemaDeSala, data, errorHttp\)\.codigo/g)];
-  // Nueve y no once: `intentarDescarte` y `accionDePartida` llevan más datos
+  // Se cuenta la LLAMADA al validador, no `….codigo` pegado atrás.
+  //
+  // La forma de sacar el código del objeto validado no es lo que esta
+  // auditoría vigila: hay quien escribe `validar(…).codigo` y quien
+  // desestructura `const { codigo } = validar(…)` porque necesita el nombre
+  // dos veces. Con el patrón atado al sufijo, cambiar de una forma a la otra
+  // hacía caer la cuenta y la prueba se leía como si una callable se hubiera
+  // quedado sin validar, que es exactamente lo contrario de lo que había
+  // pasado.
+  const validadas = [...fuente.matchAll(/validar\(EsquemaDeSala, data, errorHttp\)/g)];
+  // Diez y no doce: `intentarDescarte` y `accionDePartida` llevan más datos
   // que el código, así que usan su propio esquema. Se comprueban abajo.
-  ok(validadas.length === 9,
+  ok(validadas.length === 10,
      `y ${validadas.length} pasan por el esquema de sala`, validadas.length);
 
   // Las dos que llevan más datos usan el suyo, no el de sala a secas.

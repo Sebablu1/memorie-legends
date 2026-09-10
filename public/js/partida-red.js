@@ -112,6 +112,44 @@ export function escucharMiVista(codigo, miUid, alCambiar, alFallar) {
   );
 }
 
+/**
+ * Escucha las insignias que uno ganó al cerrarse esta partida.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * POR QUÉ ESCUCHAR Y NO PREGUNTAR
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Porque las insignias se otorgan DESPUÉS de la transacción que cierra —hay
+ * que leer contadores que ella acaba de escribir— mientras que el modal del
+ * final lo abre esa misma transacción. Preguntar al abrirlo es una carrera
+ * que se pierde la mitad de las veces, y preguntar en un bucle hasta que
+ * conteste es peor.
+ *
+ * Un `onSnapshot` no tiene ese problema: si el documento ya está, lo entrega
+ * al suscribirse; si todavía no, lo entrega cuando aparece. No hay caso en el
+ * que el aviso se pierda por llegar a destiempo.
+ *
+ * Nadie se entera de lo ajeno: las reglas sólo dejan leer `logros/{uid}` a su
+ * dueño, y acá sólo se pide el propio.
+ *
+ * @returns función para dejar de escuchar
+ */
+export function escucharMisLogros(codigo, miUid, alGanar) {
+  if (!codigo || !miUid) throw new Error("Hace falta el código de la partida y el uid propio.");
+
+  return onSnapshot(
+    doc(db, "partidas", codigo, "logros", miUid),
+    (snap) => {
+      if (!snap.exists()) return;
+      const ganadas = snap.data()?.insignias;
+      if (Array.isArray(ganadas) && ganadas.length) alGanar(ganadas);
+    },
+    // Un aviso que no llega no rompe nada: la insignia ya está otorgada y se
+    // ve en la vitrina del panel. No vale la pena molestar al jugador.
+    (error) => console.warn("No se pudo escuchar el aviso de insignias:", error),
+  );
+}
+
 // ------------------------------------------------------------ acciones
 
 /**

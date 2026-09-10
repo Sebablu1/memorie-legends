@@ -3132,6 +3132,44 @@ async function irALaRevancha(entrada) {
   }
 }
 
+/**
+ * Lo que uno ganó al cerrarse esta partida, si es que ganó algo.
+ *
+ * Se guarda en el módulo y no en el modal porque las dos cosas pasan en
+ * cualquier orden: el modal lo abre la transacción que cierra, y las
+ * insignias se otorgan después de ella. Con esto, el que llegue segundo
+ * encuentra al primero esperando.
+ */
+let logrosGanados = [];
+let dejarDeEscucharLogros = null;
+
+/**
+ * Anuncia las insignias recién ganadas dentro del modal del final.
+ *
+ * No hace nada si el modal no está abierto o si no se ganó nada: es un
+ * añadido, y una partida normal no gana ninguna. La vitrina del panel sigue
+ * siendo el lugar donde están todas; esto es el aviso de que hay una nueva,
+ * en el único momento en que el jugador la está esperando.
+ */
+function pintarLogros() {
+  const caja = document.getElementById("panelLogros");
+  if (!caja || !logrosGanados.length) return;
+
+  caja.innerHTML = logrosGanados
+    .map((l) => {
+      // Las Leyendas sólo se anuncian si de verdad se acreditaron. El
+      // servidor manda cero cuando la clave de idempotencia frenó el pago
+      // —un reintento, una posesión borrada a mano— y prometer un saldo que
+      // no llegó es peor que no decir nada.
+      const paga = Number(l.leyendas) > 0
+        ? `<span class="logro-paga">+${Number(l.leyendas)} Leyendas</span>`
+        : "";
+      return `<p class="logro-nuevo">🏆 ¡Ganaste la insignia ${escapar(l.nombre ?? l.id)}! ${paga}</p>`;
+    })
+    .join("");
+  caja.hidden = false;
+}
+
 /** Resultado de la ronda o de la partida, con lo que publicó el servidor. */
 function abrirModalFinDeRed(vista) {
   const filas = vista.jugadores
@@ -3153,7 +3191,12 @@ function abrirModalFinDeRed(vista) {
   if (vista.fase === "finPartida") {
     const gane = vista.jugadores[YO] && !vista.jugadores[YO].eliminado;
     abrirModal(`<h2>${gane ? "🏆 ¡Ganaste!" : "Partida terminada"}</h2>${tabla}
+      <div class="logros-ganados" id="panelLogros" hidden></div>
       <div class="revancha" id="panelRevancha">${panelDeRevancha()}</div>`);
+
+    // Si el aviso de insignias llegó antes que el modal, acá lo encuentra
+    // esperando; si llega después, lo pinta el escuchador.
+    pintarLogros();
 
     // Y desde acá se mira la sala, por si la revancha la abre otro.
     escucharLaSala();
@@ -3590,6 +3633,13 @@ async function arrancarModoLeyendas(sala, uid) {
     (vista) => pintarVista(vista),
     () => pista("⚠️ Se cortó la conexión con la partida. Reintentando…"),
   );
+  // El aviso de insignias se escucha desde el arranque y no al abrir el
+  // modal: el documento puede aparecer en cualquier momento después del
+  // cierre, y suscribirse tarde es cómo se pierde el que ya estaba.
+  dejarDeEscucharLogros = Red.escucharMisLogros(salaPedida, uid, (ganadas) => {
+    logrosGanados = ganadas;
+    pintarLogros();
+  });
   dejarDeLatir = Red.mantenerVivo(salaPedida);
   // Todos los jugadores golpean la puerta. Si dependiera de uno solo, su
   // desconexión congelaría la mesa para los demás.
@@ -3606,6 +3656,7 @@ async function arrancarModoLeyendas(sala, uid) {
 
   window.addEventListener("pagehide", () => {
     dejarDeEscuchar?.();
+    dejarDeEscucharLogros?.();
     dejarDeLatir?.();
     dejarDeAvanzar?.();
     dejarDeRescatar?.();

@@ -191,6 +191,16 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Las insignias que ganó al cerrarse esta partida, para poder avisarle
+      // en la mesa. También una por jugador y también sólo para su dueño: en
+      // un solo documento compartido, cada uno se enteraría de lo que ganaron
+      // los otros. No lleva cartas —id, nombre y Leyendas— pero igual se
+      // escribe sólo desde el servidor.
+      match /logros/{uid} {
+        allow read: if esDuenio(uid);
+        allow write: if false;
+      }
+
       // Cualquier otra subcolección que aparezca queda negada por omisión.
       match /{resto=**} {
         allow read, write: if false;

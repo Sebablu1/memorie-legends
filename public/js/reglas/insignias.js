@@ -15,15 +15,19 @@
  * qué se ganó. Eso se puede probar sin levantar nada.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * LO QUE UNA INSIGNIA NO ES
+ * UNA INSIGNIA NO SE COMPRA, PERO PAGA
  * ─────────────────────────────────────────────────────────────────────────
  *
- * No es saldo. Otorgarla no mueve una sola Leyenda, así que no pasa por
- * `moverLeyendas` ni deja asiento en el libro mayor. Y no es un artículo de
- * tienda: `TIPOS_VENDIBLES`, en `reglas/catalogo.js`, no incluye este tipo, y
- * el servidor rechaza la compra aunque sobre el saldo. La lista está en el
- * código y no en la base de datos a propósito: un precio se puede editar mal
- * desde el panel, una constante no.
+ * No es un artículo de tienda: `TIPOS_VENDIBLES`, en `reglas/catalogo.js`, no
+ * incluye este tipo, y el servidor rechaza la compra aunque sobre el saldo. La
+ * lista está en el código y no en la base de datos a propósito: un precio se
+ * puede editar mal desde el panel, una constante no.
+ *
+ * Lo que SÍ hace es pagar. Cada insignia trae un `leyendas` que se acredita al
+ * ganarla, así que otorgar dejó de ser una escritura inocente: mueve saldo, y
+ * por lo tanto pasa por `moverLeyendas` —la única puerta que escribe
+ * `credits`— con su asiento en el libro mayor y su clave de idempotencia.
+ * Este módulo sigue sin saber nada de eso: dice CUÁNTO, no cómo se paga.
  *
  * Sí se guarda donde se guarda todo lo demás que un jugador posee
  * —`users/{uid}/items/{id}`— para que equiparla use el mismo `equiparItem`
@@ -44,40 +48,71 @@ export const CONDICIONES = Object.freeze([
   {
     id: "novato",
     campo: "partidasJugadas",
-    minimo: 10,
-    texto: "Jugar 10 partidas",
+    minimo: 1,
+    texto: "Jugar 1 partida",
+    leyendas: 20,
   },
   {
     id: "aventurero",
     campo: "partidasGanadas",
-    minimo: 50,
-    texto: "Ganar 50 partidas",
+    minimo: 5,
+    texto: "Ganar 5 partidas",
+    leyendas: 30,
   },
   {
     id: "estratega",
     campo: "partidasGanadas",
-    minimo: 100,
-    texto: "Ganar 100 partidas",
+    minimo: 10,
+    texto: "Ganar 10 partidas",
+    leyendas: 40,
   },
   {
     id: "heroe",
     campo: "partidasGanadas",
-    minimo: 250,
-    texto: "Ganar 250 partidas",
+    minimo: 25,
+    texto: "Ganar 25 partidas",
+    leyendas: 60,
   },
   {
     id: "campeon",
     campo: "torneosGanados",
-    minimo: 5,
-    texto: "Ganar 5 torneos",
+    minimo: 1,
+    texto: "Ganar 1 torneo",
+    leyendas: 50,
   },
   {
     id: "leyenda",
     campo: "mejorPuestoMensual",
-    maximo: 5,
-    texto: "Entrar al top 5 del ranking mensual",
+    maximo: 10,
+    texto: "Entrar al top 10 del ranking mensual",
+    leyendas: 100,
   },
 ]);
+
+/**
+ * Cuántas Leyendas paga una insignia. Cero si el id no existe.
+ *
+ * Cero y no `null` porque quien llama esto va a sumarlo a un saldo, y un id
+ * desconocido tiene que costar una acreditación de nada, no un `NaN` que se
+ * lleve puesto el `credits` de alguien.
+ */
+export function leyendasDeInsignia(id) {
+  const c = condicionDe(id);
+  const n = Number(c?.leyendas);
+  return Number.isInteger(n) && n > 0 ? n : 0;
+}
+
+/**
+ * Hasta qué puesto del ranking mensual se lleva insignia.
+ *
+ * Sale de la condición en vez de estar escrito al lado, porque el servidor
+ * necesita el número ANTES de otorgar —para saber a quién vale la pena
+ * anotarle el puesto— y `cumple()` lo necesita DESPUÉS, para decidir. Con dos
+ * copias, mover el corte de 5 a 10 en un solo lado dejaba a la mitad de la
+ * tabla con el puesto anotado y sin la insignia.
+ */
+export const PUESTO_MENSUAL_CON_INSIGNIA =
+  CONDICIONES.find((c) => c.campo === "mejorPuestoMensual")?.maximo ?? 0;
 
 /** Los seis ids, en orden de dificultad, para dibujar la vitrina. */
 export const IDS_INSIGNIAS = Object.freeze(CONDICIONES.map((c) => c.id));

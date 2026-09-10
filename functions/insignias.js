@@ -31,6 +31,7 @@
 import {
   insigniasNuevas,
   conPuestoMensual,
+  leyendasDeInsignia,
   ESTADISTICAS_VACIAS,
 } from "./reglas/insignias.js";
 
@@ -78,7 +79,10 @@ export function crearInsignias({ db, usuarios = "users", items = "items", tienda
   }
 
   /**
-   * Revisa y otorga lo que corresponda. Devuelve sólo lo que otorgó.
+   * Revisa y otorga lo que corresponda. Devuelve sólo lo que otorgó, como
+   * `[{ id, nombre, leyendas }]`: la mesa lo usa para avisar en pantalla, y
+   * necesita el nombre visible y cuánto se pagó DE VERDAD —no cuánto promete
+   * la regla— para no anunciar un pago que la idempotencia frenó.
    *
    * No lanza: una insignia que no se puede otorgar —porque el catálogo todavía
    * no está sembrado, por ejemplo— no puede tumbar el cierre de una partida
@@ -96,11 +100,17 @@ export function crearInsignias({ db, usuarios = "users", items = "items", tienda
       const pendientes = insigniasNuevas(estadisticas, yaTiene);
       if (!pendientes.length) return [];
 
+      // Una transacción por insignia, y el bucle POR FUERA. Cada una es
+      // independiente y trae su propia clave de idempotencia, así que si la
+      // segunda falla la primera queda firme y un reintento termina el
+      // trabajo. Meter el bucle adentro de una sola transacción además
+      // violaría lecturas-antes-de-escrituras: lo audita
+      // `pruebas/transacciones.mjs`.
       const otorgadas = [];
       for (const id of pendientes) {
         try {
-          const r = await tienda.otorgar(uid, id);
-          if (r.nuevo) otorgadas.push(id);
+          const r = await tienda.otorgar(uid, id, { premio: leyendasDeInsignia(id) });
+          if (r.nuevo) otorgadas.push({ id, nombre: r.nombre ?? id, leyendas: r.leyendas ?? 0 });
         } catch (e) {
           logger?.warn?.("No se pudo otorgar una insignia", { uid, insignia: id, error: e.message });
         }

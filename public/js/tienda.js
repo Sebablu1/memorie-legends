@@ -19,7 +19,6 @@ $("paquetes").innerHTML = PAQUETES.map((p) => {
       <h2>${p.nombre}</h2>
       <div class="cantidad">${total.toLocaleString("es-UY")}<small>Leyendas</small></div>
       ${p.bonificacion ? `<div class="bonus">${p.leyendas.toLocaleString("es-UY")} + ${p.bonificacion} de regalo</div>` : "<div class=\"bonus\">&nbsp;</div>"}
-      ${p.insignia ? '<div class="bonus">🏆 Incluye insignia</div>' : ""}
       <div class="precio">${precio(p.precio)} <small style="font-size:.7rem;color:var(--texto-tenue)">${MONEDA}</small></div>
       <div class="unitario">${precioPorLeyenda(p).toFixed(2)} $U por Leyenda</div>
       <button class="accion" data-paquete="${p.id}" type="button" disabled>Comprar</button>
