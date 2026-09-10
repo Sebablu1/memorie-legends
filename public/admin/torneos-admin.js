@@ -92,26 +92,26 @@ function accionesDe(estado) {
   if (estado === ESTADOS.BORRADOR) {
     return [
       { accion: "abrir", texto: "Abrir inscripciones" },
-      ...renombrar,
+      ...editar,
       { accion: "cancelar", texto: "Cancelar", clase: "peligro" },
     ];
   }
   if (estado === ESTADOS.INSCRIPCIONES_ABIERTAS) {
     return [
       { accion: "cerrar", texto: "Cerrar inscripciones" },
-      ...renombrar,
+      ...editar,
       { accion: "cancelar", texto: "Cancelar y devolver", clase: "peligro" },
     ];
   }
   if (estado === ESTADOS.COMPLETO) {
     return [
       { accion: "iniciar", texto: "Armar mesas y empezar" },
-      ...renombrar,
+      ...editar,
       { accion: "cancelar", texto: "Cancelar y devolver", clase: "peligro" },
     ];
   }
   if (estado === ESTADOS.EN_CURSO) {
-    return [{ accion: "finalizar", texto: "Cargar ganadores y pagar" }, ...renombrar];
+    return [{ accion: "finalizar", texto: "Cargar ganadores y pagar" }, ...editar];
   }
   return [];
 }
