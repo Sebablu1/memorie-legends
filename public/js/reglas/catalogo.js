@@ -157,6 +157,46 @@ export const CAMPO_EQUIPADO = {
   [TIPOS.MAZO]: "mazo",
 };
 
+/**
+ * Cómo se llama cada tipo en pantalla.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ ACÁ Y NO EN CADA PANTALLA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque hay DOS vistas de lo mismo —la tienda y Mi colección— y tenían cada
+ * una su lista de títulos. Dos listas de nombres para los mismos cuatro tipos
+ * es una que un día dice «Dorsos» mientras la otra dice «Dorso de cartas», y
+ * el jugador no tiene forma de saber si son la misma cosa.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LO QUE SE GUARDA NO CAMBIA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `dorso` sigue siendo `dorso` y `mazo` sigue siendo `mazo` en Firestore.
+ * Sólo cambia cómo se muestran, y es a propósito: el tipo está copiado en
+ * CADA documento de posesión de CADA jugador, y los campos del perfil salen
+ * de `CAMPO_EQUIPADO`. Renombrar los valores obligaría a migrar todas las
+ * compras de todo el mundo para conseguir un cambio de etiqueta.
+ *
+ * `mazo` se muestra como «dorso de mazo central» porque eso es: el reverso
+ * de la pila del medio. Que sea un artículo aparte del dorso de la mano
+ * queda explicado arriba, en `TIPOS`.
+ */
+export const ETIQUETA_TIPO = Object.freeze({
+  [TIPOS.AVATAR]: { tienda: "Avatares", mios: "Mis avatares" },
+  [TIPOS.DORSO]: { tienda: "Dorso de cartas", mios: "Mis dorsos de cartas" },
+  [TIPOS.MAZO]: { tienda: "Dorso de mazo central", mios: "Mis dorsos de mazo central" },
+  [TIPOS.FONDO]: { tienda: "Paños de mesa", mios: "Mis paños de mesa" },
+  [TIPOS.INSIGNIA]: { tienda: "Insignias", mios: "Mis insignias" },
+});
+
+/** Cómo se llama un tipo en la tienda. */
+export const enLaTienda = (tipo) => ETIQUETA_TIPO[tipo]?.tienda ?? tipo;
+
+/** Cómo se llama un tipo en Mi colección. */
+export const enMiColeccion = (tipo) => ETIQUETA_TIPO[tipo]?.mios ?? tipo;
+
 /** Subcolección donde se anota qué compró cada jugador. */
 export const COLECCION_CATALOGO = "catalogo";
 export const SUBCOLECCION_ITEMS = "items";

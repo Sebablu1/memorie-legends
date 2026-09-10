@@ -42,6 +42,54 @@
   border-color: var(--oro);
 }
 
+/* La segunda fila: cuál de las cosas del grupo.
+
+   Hereda todo de la primera y se distingue por tamaño, no por color: es la
+   misma clase de control y una diferencia de color se leería como una
+   diferencia de función. Va pegada a la de arriba —el margen de aquélla se
+   anula cuando ésta existe— para que se lean como dos filas de lo mismo y no
+   como dos controles sueltos.
+
+   Sin subpestañas el contenedor va con `hidden` y no ocupa nada, así que en
+   Avatares y en Paños la tienda se ve exactamente como antes. */
+.pestanas-tienda:has(+ .subpestanas-tienda:not([hidden])) {
+  margin-bottom: 8px;
+}
+
+.subpestanas-tienda {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  padding-left: 14px;
+  border-left: 2px solid rgba(212, 168, 67, 0.25);
+}
+
+.subpestanas-tienda button {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--borde);
+  background: transparent;
+  color: var(--texto-tenue);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  min-height: 40px;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+
+.subpestanas-tienda button:hover {
+  color: var(--oro-claro);
+  border-color: rgba(212, 168, 67, 0.45);
+}
+
+.subpestanas-tienda button.activa {
+  color: var(--oro-claro);
+  background: rgba(212, 168, 67, 0.12);
+  border-color: var(--oro);
+}
+
 /* ------------------------------------------------- la ficha de un artículo */
 
 .rejilla-tienda {

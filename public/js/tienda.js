@@ -35,5 +35,8 @@ if (sesion) {
   // Se monta desde acá y no con un `<script>` propio para pedir la sesión UNA
   // vez. Dos módulos llamando a `exigirSesion` en la misma carga son dos
   // lecturas del perfil y, peor, dos saldos que pueden diferir por un instante.
-  montarPersonalizacion({ saldoInicial: sesion.perfil.saldo });
+  // El uid viaja para poder recordar en ESTE navegador lo que el jugador se
+  // pone, y que la mesa abra ya vestida en vez de corregirse a los medio
+  // segundo. Ver `modulos/vestuario.js`.
+  montarPersonalizacion({ saldoInicial: sesion.perfil.saldo, uid: sesion.usuario.uid });
 }

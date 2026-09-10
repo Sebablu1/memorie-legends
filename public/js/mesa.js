@@ -47,6 +47,7 @@ import {
 } from "./modulos/cartas.js";
 import { retratoDe, usarRetratoPropio, RETRATO_INICIAL } from "./modulos/retratos.js";
 import { esRutaDelSitio } from "./reglas/catalogo.js";
+import { guardarVestuario, vestuarioGuardado } from "./modulos/vestuario.js";
 import { LIMITE_ELIMINACION, puntosMano } from "./reglas/puntaje.js";
 import * as IA from "./reglas/ia.js";
 import { MODOS, ENTRADAS, ESTADOS_SALA, costoDeAbandonar } from "./reglas/salas.js";
@@ -93,9 +94,39 @@ const miSesion = await exigirSesionEnMesa();
  * `await` lo resuelve y la mesa se dibuja con los dorsos y las caras de
  * siempre, que es justo lo que esas pruebas esperan ver.
  */
-let miDorso = null;
-let miRetrato = null;
-let miPano = null;
+/**
+ * Sólo rutas de este sitio tocan un `src`.
+ *
+ * `equipadoEnMesa` valida con `imagenEsArchivo`, que es la regla de la TIENDA
+ * y deja pasar una URL de otro dominio: allá está bien, porque la tienda
+ * muestra lo que el panel haya cargado. Acá no, y por la misma razón por la
+ * que la vista en red filtra los retratos ajenos — una ruta de afuera haría
+ * que el navegador le pida la imagen a ese servidor cada vez que alguien se
+ * sienta a jugar.
+ *
+ * Vale también para lo que viene del caché local, que lo escribe cualquiera
+ * que abra la consola del navegador.
+ *
+ * Lo que no pasa el filtro queda en `null`, que es «usá lo de la casa».
+ */
+const propio = (ruta) => (esRutaDelSitio(ruta) ? ruta : null);
+
+/**
+ * Lo que el navegador recuerda de la última vez, aplicado YA.
+ *
+ * Sin esto la mesa se dibujaba con las caras y los dorsos de la casa y lo
+ * comprado aparecía medio segundo después, cuando volvían las tres lecturas
+ * de Firestore. El salto se veía.
+ *
+ * Es una pista y no la verdad: puede estar vieja, y la lectura de abajo la
+ * pisa igual. Lo que se gana es que el primer dibujo ya sea el correcto en
+ * el caso normal —el jugador que vuelve a jugar con lo mismo puesto—.
+ */
+const recordado = vestuarioGuardado(miSesion?.uid);
+let miDorso = propio(recordado?.dorso);
+let miRetrato = propio(recordado?.retrato);
+let miPano = propio(recordado?.pano);
+let miMazo = propio(recordado?.mazo);
 
 /**
  * Le dice a la capa de dibujo qué asiento lleva el dorso comprado.
@@ -113,43 +144,26 @@ function aplicarDorsoPropio() {
   usarRetratoPropio({ asiento: YO, ruta: miRetrato ?? RETRATO_INICIAL });
 }
 
-(async () => {
-  const equipo = (await Guardia.equipadoEnMesa?.(miSesion?.uid)) ?? null;
-
-  /**
-   * Las cuatro pasan por el mismo filtro antes de tocar un `src`.
-   *
-   * `equipadoEnMesa` valida con `imagenEsArchivo`, que es la regla de la
-   * TIENDA y deja pasar una URL de otro dominio: allá está bien, porque la
-   * tienda muestra lo que el panel haya cargado. Acá no, y por la misma
-   * razón por la que la vista en red filtra los retratos ajenos — una ruta
-   * de afuera haría que el navegador le pida la imagen a ese servidor cada
-   * vez que alguien se sienta a jugar.
-   *
-   * Lo que no pasa el filtro queda en `null`, que es «usá lo de la casa».
-   */
-  const propio = (ruta) => (esRutaDelSitio(ruta) ? ruta : null);
-  miDorso = propio(equipo?.dorso);
-  miRetrato = propio(equipo?.retrato);
-  miPano = propio(equipo?.pano);
-
-  // El dorso del mazo del centro: su propio artículo, aparte del de la mano.
-  const miMazo = propio(equipo?.mazo);
-  if (miMazo) {
-    usarMazoCentral(miMazo);
-    if (estado) dibujar();
-  }
+/**
+ * Pone en la pantalla lo que dicen `miDorso`, `miRetrato`, `miPano` y
+ * `miMazo`.
+ *
+ * Se llama DOS veces: una con lo que recordaba el navegador, antes de que
+ * la mesa se dibuje, y otra cuando el servidor contesta. La segunda casi
+ * siempre pone lo mismo que la primera, y por eso no se nota.
+ */
+function vestirLaMesa() {
+  if (miMazo) usarMazoCentral(miMazo);
 
   /**
    * El paño comprado se pone con una variable, no repintando nada.
    *
    * Es una capa de fondo que ya está declarada en `.mesa` y que hasta acá
    * valía `none`. Escribir la variable la enciende: no hay que redibujar la
-   * mesa ni esperar a la próxima jugada, y si el jugador no compró ninguno
-   * esta línea no corre y el paño sigue siendo el de siempre.
+   * mesa ni esperar a la próxima jugada.
    *
    * Termina dentro de un `url()` de CSS, que a estos efectos es un `src`:
-   * de ahí que la ruta venga filtrada de arriba y no directa de `equipo`.
+   * de ahí que la ruta venga filtrada por `propio`.
    */
   if (miPano) {
     document.querySelector(".mesa")?.style.setProperty(
@@ -158,9 +172,32 @@ function aplicarDorsoPropio() {
     );
   }
 
-  if (!miDorso && !miRetrato) return;
   aplicarDorsoPropio();
-  // Si la mesa ya se dibujó, se repinta para que lo comprado aparezca sin que
+}
+
+(async () => {
+  const equipo = (await Guardia.equipadoEnMesa?.(miSesion?.uid)) ?? null;
+
+  // La verdad, que puede confirmar lo que ya estaba puesto o corregirlo.
+  const antes = `${miDorso}|${miRetrato}|${miPano}|${miMazo}`;
+  miDorso = propio(equipo?.dorso);
+  miRetrato = propio(equipo?.retrato);
+  miPano = propio(equipo?.pano);
+  miMazo = propio(equipo?.mazo);
+
+  // Y se recuerda para la próxima. Se guarda lo que dijo el SERVIDOR, no
+  // lo que había en el caché: si no, un caché envenenado se perpetuaría.
+  guardarVestuario(miSesion?.uid, {
+    retrato: miRetrato,
+    dorso: miDorso,
+    pano: miPano,
+    mazo: miMazo,
+  });
+
+  if (`${miDorso}|${miRetrato}|${miPano}|${miMazo}` === antes) return;
+
+  vestirLaMesa();
+  // Si la mesa ya se dibujó, se repinta para que el cambio aparezca sin que
   // el jugador tenga que esperar a la próxima jugada.
   if (estado) dibujar();
 })();
@@ -319,7 +356,12 @@ let YO = 0;
 // Y va DESPUÉS de `YO`, no junto a la lectura de Firestore que está más
 // arriba: allá `YO` todavía está en su zona muerta y leerla es un
 // ReferenceError que impide cargar la mesa entera.
-aplicarDorsoPropio();
+//
+// Se viste la mesa entera y no sólo el dorso: acá se aplica lo que el
+// navegador recordaba de la última vez, ANTES de que se dibuje una sola
+// carta. Ésa es la línea que saca el salto — la mesa abre ya vestida y la
+// lectura de Firestore, cuando llega, casi siempre confirma lo mismo.
+vestirLaMesa();
 
 /**
  * Cómo corre esta mesa.

@@ -28,6 +28,7 @@
 
 import { db, collection, getDocs, query, orderBy } from "./firebase.js";
 import { escapar } from "./modulos/texto.js";
+import { guardarVestuario, rutasDeLoEquipado } from "./modulos/vestuario.js";
 import { mostrarSaldo } from "./sesion.js";
 import {
   comprarItem,
@@ -45,6 +46,7 @@ import {
   precioDePack,
   MAXIMO_POR_PACK,
   COLECCION_CATALOGO,
+  enLaTienda,
 } from "./reglas/catalogo.js";
 
 const $ = (id) => document.getElementById(id);
@@ -69,17 +71,43 @@ const $ = (id) => document.getElementById(id);
  * de la transacción: esta lista es la cara visible de aquella decisión, no la
  * decisión.
  */
+/**
+ * Cada categoría dice a qué GRUPO pertenece.
+ *
+ * Los dos dorsos se venden por separado —son dos artículos y dos campos del
+ * perfil— pero el jugador que viene a buscar «un dorso» no sabe de antemano
+ * cuál de los dos quiere. Ponerlos como dos pestañas hermanas de Avatares
+ * obligaba a saberlo antes de mirar.
+ *
+ * Así que las pestañas son dos filas: arriba el grupo, y abajo —sólo cuando
+ * el grupo tiene más de una— cuál de las dos. Un grupo de una sola categoría
+ * no dibuja la segunda fila y se ve exactamente como antes.
+ *
+ * Los títulos salen de `ETIQUETA_TIPO`, que es de donde los saca también Mi
+ * colección: son dos vistas de lo mismo y no pueden llamarlo distinto.
+ */
 const CATEGORIAS = [
-  { tipo: TIPOS.AVATAR, titulo: "Avatares", vacio: "Todavía no hay avatares a la venta." },
-  { tipo: TIPOS.DORSO, titulo: "Dorsos", vacio: "Todavía no hay dorsos a la venta." },
-  { tipo: TIPOS.FONDO, titulo: "Paños de mesa", vacio: "Todavía no hay paños a la venta." },
-  { tipo: TIPOS.MAZO, titulo: "Mazos", vacio: "Todavía no hay mazos a la venta." },
-];
+  { tipo: TIPOS.AVATAR, grupo: "Avatares", vacio: "Todavía no hay avatares a la venta." },
+  { tipo: TIPOS.DORSO, grupo: "Dorsos", vacio: "Todavía no hay dorsos de cartas a la venta." },
+  { tipo: TIPOS.MAZO, grupo: "Dorsos", vacio: "Todavía no hay dorsos de mazo central a la venta." },
+  { tipo: TIPOS.FONDO, grupo: "Paños de mesa", vacio: "Todavía no hay paños a la venta." },
+].map((c) => ({ ...c, titulo: enLaTienda(c.tipo) }));
+
+/** Los grupos, en el orden en que aparecen sus categorías. */
+const GRUPOS = [...new Set(CATEGORIAS.map((c) => c.grupo))];
+
+/** Las categorías de un grupo. Una sola significa que no hay segunda fila. */
+const categoriasDe = (grupo) => CATEGORIAS.filter((c) => c.grupo === grupo);
+
+/** A qué grupo pertenece lo que está mirando ahora. */
+const grupoDe = (tipo) => CATEGORIAS.find((c) => c.tipo === tipo)?.grupo ?? GRUPOS[0];
 
 /** Estado de la pantalla. Se guarda para no volver a pedir todo en cada clic. */
 let catalogo = [];
 let tengo = new Set();
 let equipado = {};
+/** De quién es la sesión. Sólo para recordarle su vestuario a él. */
+let miUid = null;
 let saldo = 0;
 let categoriaActual = CATEGORIAS[0].tipo;
 
@@ -191,11 +219,43 @@ function dibujar() {
 
   dibujarPack();
 
-  for (const boton of document.querySelectorAll("#pestanasPersonalizacion [data-categoria]")) {
-    const activa = boton.dataset.categoria === categoriaActual;
+  // La fila de arriba se marca por GRUPO: estando en «Dorso de mazo
+  // central», la pestaña encendida arriba es «Dorsos».
+  const grupoActual = grupoDe(categoriaActual);
+  for (const boton of document.querySelectorAll("#pestanasPersonalizacion [data-grupo]")) {
+    const activa = boton.dataset.grupo === grupoActual;
     boton.classList.toggle("activa", activa);
     boton.setAttribute("aria-selected", String(activa));
   }
+
+  dibujarSubpestanas(grupoActual);
+}
+
+/**
+ * La segunda fila: cuál de las cosas del grupo se está mirando.
+ *
+ * Con una sola categoría adentro no se dibuja NADA y el contenedor queda
+ * escondido: en Avatares y en Paños la tienda se ve exactamente como antes.
+ * Una fila de una sola pestaña no informa de nada y ocupa lo mismo.
+ */
+function dibujarSubpestanas(grupo) {
+  const caja = $("subpestanasPersonalizacion");
+  if (!caja) return;
+
+  const hermanas = categoriasDe(grupo);
+  caja.hidden = hermanas.length < 2;
+  if (caja.hidden) {
+    caja.innerHTML = "";
+    return;
+  }
+
+  caja.innerHTML = hermanas
+    .map(
+      (c) => `<button type="button" role="tab" data-categoria="${c.tipo}"
+                aria-selected="${c.tipo === categoriaActual}"
+                class="${c.tipo === categoriaActual ? "activa" : ""}">${escapar(c.titulo)}</button>`,
+    )
+    .join("");
 }
 
 /**
@@ -332,16 +392,38 @@ async function equipar(itemId, boton) {
   await conBotonApagado(boton, async () => {
     const r = await equiparItem(itemId);
     equipado[r.tipo] = itemId;
-    avisar("Listo, te lo pusiste.", "bien");
+    recordarVestuario();
+    // «Equipado» y «Desequipado»: el par, con la misma palabra que dicen los
+    // dos botones. Antes eran «te lo pusiste» y «te lo sacaste», que son otras
+    // dos palabras para las mismas dos acciones, a un centímetro del botón.
+    avisar("Listo, equipado.", "bien");
     dibujar();
   });
+}
+
+/**
+ * Deja anotado en el navegador lo que quedó puesto.
+ *
+ * Para que la mesa abra ya vestida en vez de arrancar con lo de la casa y
+ * corregirse medio segundo después. Es una pista: la mesa la pisa con lo
+ * que diga el servidor.
+ */
+function recordarVestuario() {
+  guardarVestuario(
+    miUid,
+    rutasDeLoEquipado(equipado, (id) => catalogo.find((i) => i.id === id)?.imagen ?? null),
+  );
 }
 
 async function desequipar(tipo, boton) {
   await conBotonApagado(boton, async () => {
     await desequiparItem(tipo);
     equipado[tipo] = null;
-    avisar("Listo, te lo sacaste.", "bien");
+    recordarVestuario();
+    // «Desequipado», la misma palabra que dice el botón que se acaba de tocar.
+    // Antes decía «te lo sacaste», y el botón «Desequipar»: dos palabras para
+    // la misma acción, a un centímetro de distancia.
+    avisar("Listo, desequipado.", "bien");
     dibujar();
   });
 }
@@ -354,21 +436,36 @@ async function desequipar(tipo, boton) {
  * Recibe el saldo de quien ya pidió la sesión —`tienda.js` lo hace para pintar
  * los paquetes— para no pedir el perfil dos veces en la misma carga.
  */
-export async function montarPersonalizacion({ saldoInicial = 0 } = {}) {
+export async function montarPersonalizacion({ saldoInicial = 0, uid = null } = {}) {
   const caja = $("rejillaPersonalizacion");
   if (!caja) return;
 
   saldo = saldoInicial;
+  miUid = uid;
 
   // Las pestañas se dibujan desde la lista: agregar una categoría es agregar
   // una línea en CATEGORIAS, no tocar el HTML.
+  //
+  // Arriba van los GRUPOS. Tocar uno lleva a su primera categoría, que en un
+  // grupo de una sola es la única y en «Dorsos» es el de las cartas.
   const pestanas = $("pestanasPersonalizacion");
   if (pestanas) {
-    pestanas.innerHTML = CATEGORIAS.map(
-      (c) => `<button type="button" role="tab" data-categoria="${c.tipo}"
-                aria-selected="${c.tipo === categoriaActual}">${escapar(c.titulo)}</button>`,
+    pestanas.innerHTML = GRUPOS.map(
+      (g) => `<button type="button" role="tab" data-grupo="${escapar(g)}"
+                aria-selected="${g === grupoDe(categoriaActual)}">${escapar(g)}</button>`,
     ).join("");
     pestanas.addEventListener("click", (evento) => {
+      const boton = evento.target.closest("[data-grupo]");
+      if (!boton) return;
+      categoriaActual = categoriasDe(boton.dataset.grupo)[0]?.tipo ?? categoriaActual;
+      dibujar();
+    });
+  }
+
+  // Y la de abajo, cuál de las del grupo.
+  const subpestanas = $("subpestanasPersonalizacion");
+  if (subpestanas) {
+    subpestanas.addEventListener("click", (evento) => {
       const boton = evento.target.closest("[data-categoria]");
       if (!boton) return;
       categoriaActual = boton.dataset.categoria;

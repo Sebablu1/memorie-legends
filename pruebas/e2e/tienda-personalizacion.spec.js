@@ -47,6 +47,8 @@ const CATALOGO = [
   // verdad —el catálogo de Firestore las tiene, porque el perfil las muestra.
   { id: "insignia-corona", tipo: "insignia", nombre: "Corona de Laurel", descripcion: "La del que manda.", precio: 1800, imagen: "🏆", activo: true, orden: 10 },
   { id: "dorso-prueba", tipo: "dorso", nombre: "Dorso de prueba", descripcion: "El de atrás.", precio: 80, imagen: "🂠", activo: true, orden: 10 },
+  // Un dorso de mazo central, para poder mirar la segunda pestaña del grupo.
+  { id: "mazo-prueba", tipo: "mazo", nombre: "Mazo de prueba", descripcion: "El del medio.", precio: 90, imagen: "🎴", activo: true, orden: 10 },
 ];
 
 const firebaseFalso = (catalogo) => `
@@ -202,7 +204,8 @@ test("cada tipo vive en su pestaña, y no se mezclan", async ({ page }) => {
 
   await expect(page.locator("#rejillaPersonalizacion")).not.toContainText("Dorso de prueba");
 
-  await page.locator('#pestanasPersonalizacion [data-categoria="dorso"]').click();
+  // Los dorsos están un nivel más adentro: primero el grupo, después cuál.
+  await page.locator('#pestanasPersonalizacion [data-grupo="Dorsos"]').click();
 
   await expect(page.locator("#rejillaPersonalizacion")).toContainText("Dorso de prueba");
   await expect(page.locator("#rejillaPersonalizacion")).not.toContainText("El Dragón");
@@ -221,7 +224,39 @@ test("las pestañas salen de la lista de categorías, no del HTML", async ({ pag
   // Y que las insignias NO estén es la mitad importante de esta prueba: son
   // logros, no mercadería. Si un día vuelven a aparecer acá, esto lo dice.
   const pestanas = page.locator("#pestanasPersonalizacion button");
-  await expect(pestanas).toHaveText(["Avatares", "Dorsos", "Paños de mesa", "Mazos"]);
+  await expect(pestanas).toHaveText(["Avatares", "Dorsos", "Paños de mesa"]);
+});
+
+test("«Dorsos» abre dos: el de las cartas y el del mazo central", async ({ page }) => {
+  /**
+   * Son dos artículos distintos —dos campos del perfil, dos compras— pero el
+   * que viene a buscar «un dorso» no sabe de antemano cuál quiere. Por eso van
+   * agrupados: arriba el grupo, abajo cuál de los dos.
+   */
+  await abrirTienda(page);
+
+  const sub = page.locator("#subpestanasPersonalizacion");
+
+  // En Avatares no hay segunda fila, y eso importa: una fila de una sola
+  // pestaña no informa de nada y ocupa lo mismo.
+  await expect(sub).toBeHidden();
+
+  await page.locator('#pestanasPersonalizacion [data-grupo="Dorsos"]').click();
+  await expect(sub).toBeVisible();
+  await expect(sub.locator("button")).toHaveText([
+    "Dorso de cartas",
+    "Dorso de mazo central",
+  ]);
+
+  // Al entrar al grupo se abre la primera, no ninguna.
+  await expect(sub.locator('[data-categoria="dorso"]')).toHaveClass(/activa/);
+
+  // Y la de arriba queda marcada por GRUPO aunque lo que se mire sea el mazo.
+  await sub.locator('[data-categoria="mazo"]').click();
+  await expect(page.locator('#pestanasPersonalizacion [data-grupo="Dorsos"]')).toHaveClass(/activa/);
+
+  await page.locator('#pestanasPersonalizacion [data-grupo="Avatares"]').click();
+  await expect(sub).toBeHidden();
 });
 
 test("las insignias no se ofrecen en la tienda", async ({ page }) => {

@@ -154,7 +154,24 @@ test("las insignias NO están acá: viven en la vitrina de logros", async ({ pag
   // dos listas de lo mismo en la misma página no le sirven a nadie.
   await expect(page.locator("#miInventario")).not.toContainText("Novato");
   await expect(page.locator("#miInventario")).toContainText("Mis avatares");
-  await expect(page.locator("#miInventario")).toContainText("Mis dorsos");
+  await expect(page.locator("#miInventario")).toContainText("Mis dorsos de cartas");
+});
+
+test("se llama Mi colección, y los grupos como en la tienda", async ({ page }) => {
+  /**
+   * Los títulos salen de `ETIQUETA_TIPO`, el mismo lugar del que los saca la
+   * tienda. Son dos vistas de lo mismo: si una dijera «Dorsos» y la otra
+   * «Dorso de cartas», el jugador no tendría forma de saber si son lo mismo.
+   */
+  await abrirPanel(page);
+
+  await expect(page.locator("#miInventario h2")).toHaveText("🎒 Mi colección");
+
+  // «Mis dorsos de cartas» y no «Mis dorsos»: el otro dorso —el del mazo
+  // central— es un artículo aparte, y el título tiene que decir cuál es cuál.
+  const grupos = page.locator("#miInventario .titulo-grupo");
+  await expect(grupos.first()).toHaveText("Mis avatares");
+  await expect(page.locator("#miInventario")).toContainText("Mis dorsos de cartas");
 });
 
 test("el estado dice cuál está puesto, y es uno solo por tipo", async ({ page }) => {

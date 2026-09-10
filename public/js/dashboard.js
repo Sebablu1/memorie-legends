@@ -129,7 +129,9 @@ if (sesion) {
   // muestra — pero nadie se queda sin poder entrar a jugar por eso.
   // La foto de Google viaja para que, al sacarse el avatar, la cabecera
   // vuelva a mostrarla sin recargar la página.
-  montarInventario({ foto: usuario.photoURL });
+  // El uid viaja para poder recordar en ESTE navegador lo que el jugador se
+  // pone, y que la mesa abra ya vestida. Ver `modulos/vestuario.js`.
+  montarInventario({ foto: usuario.photoURL, uid: usuario.uid });
   montarLogros();
   montarCarteleraTorneos();
 

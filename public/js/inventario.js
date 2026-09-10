@@ -1,5 +1,5 @@
 /**
- * Mi inventario: lo que tengo, y qué me pongo.
+ * Mi colección: lo que tengo, y qué me pongo.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * POR QUÉ HACÍA FALTA
@@ -13,7 +13,7 @@
  * Las insignias ya tenían las dos mitades en la vitrina de logros, que además
  * muestra las que faltan y cuánto falta para cada una. Por eso acá NO se
  * repiten: dos listas de lo mismo en la misma página no le sirven a nadie.
- * Este inventario es de lo que se compra; aquélla, de lo que se gana.
+ * Esta colección es de lo que se compra; aquélla, de lo que se gana.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * EL CATÁLOGO SE LEE DE FIRESTORE, NO DE LA SEMILLA
@@ -27,8 +27,9 @@
 
 import { misItems, equiparItem, desequiparItem, ErrorDeServidor } from "./servidor.js";
 import { db, collection, getDocs, query, orderBy } from "./firebase.js";
-import { COLECCION_CATALOGO, TIPOS, imagenEsArchivo } from "./reglas/catalogo.js";
+import { COLECCION_CATALOGO, TIPOS, imagenEsArchivo, enMiColeccion } from "./reglas/catalogo.js";
 import { pintarAvatarCabecera } from "./equipado.js";
+import { guardarVestuario, rutasDeLoEquipado } from "./modulos/vestuario.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -36,17 +37,20 @@ const escapar = (t) =>
   String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 /**
- * Los grupos del inventario, en orden.
+ * Los grupos de la colección, en orden.
+ *
+ * Los títulos salen de `ETIQUETA_TIPO`, que es el mismo lugar del que los
+ * saca la tienda: son dos vistas de lo mismo y no pueden llamarlo distinto.
  *
  * Las insignias no están: viven en la vitrina de logros, que ya las equipa y
  * las desequipa. Ver la nota de la cabecera.
  */
 const GRUPOS = [
-  { tipo: TIPOS.AVATAR, titulo: "Mis avatares", vacio: "Todavía no tenés ningún avatar." },
-  { tipo: TIPOS.DORSO, titulo: "Mis dorsos", vacio: "Todavía no tenés ningún dorso." },
-  { tipo: TIPOS.FONDO, titulo: "Mis paños de mesa", vacio: "Todavía no tenés ningún paño." },
-  { tipo: TIPOS.MAZO, titulo: "Mis mazos", vacio: "Todavía no tenés ningún mazo." },
-];
+  { tipo: TIPOS.AVATAR, vacio: "Todavía no tenés ningún avatar." },
+  { tipo: TIPOS.DORSO, vacio: "Todavía no tenés ningún dorso de cartas." },
+  { tipo: TIPOS.MAZO, vacio: "Todavía no tenés ningún dorso de mazo central." },
+  { tipo: TIPOS.FONDO, vacio: "Todavía no tenés ningún paño." },
+].map((g) => ({ ...g, titulo: enMiColeccion(g.tipo) }));
 
 /**
  * Cómo se dice cada rareza, y de qué color.
@@ -72,6 +76,8 @@ const rarezaDe = (item) =>
 let catalogo = new Map();
 let tengo = [];
 let equipado = {};
+/** De quién es la sesión. Sólo para recordarle su vestuario a él. */
+let miUid = null;
 
 /**
  * La foto de Google, para cuando el jugador se saca el avatar.
@@ -165,6 +171,13 @@ async function cambiar(boton, trabajo) {
   try {
     await trabajo();
     await cargarLoMio();
+    // Lo que quedó puesto se anota en el navegador, para que la mesa abra
+    // ya vestida. Va DESPUÉS de `cargarLoMio`, que es cuando `equipado`
+    // dice lo que el servidor confirmó y no lo que se pidió.
+    guardarVestuario(
+      miUid,
+      rutasDeLoEquipado(equipado, (id) => catalogo.get(id)?.imagen ?? null),
+    );
     dibujar();
     sincronizarCabecera();
   } catch (e) {
@@ -212,11 +225,12 @@ async function cargarCatalogo() {
  * Si algo falla, la sección se queda oculta y el panel sigue funcionando. Un
  * inventario roto no es motivo para que alguien no pueda entrar a jugar.
  */
-export async function montarInventario({ foto = null } = {}) {
+export async function montarInventario({ foto = null, uid = null } = {}) {
   const seccion = $("miInventario");
   if (!seccion) return;
 
   fotoDeGoogle = foto;
+  miUid = uid;
 
   try {
     await Promise.all([cargarCatalogo(), cargarLoMio()]);
