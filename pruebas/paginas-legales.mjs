@@ -121,7 +121,11 @@ console.log("\n=== 2. Lo que dicen sobre los pagos coincide con el código ===")
   const tienda = leer("public/js/tienda.js");
   const servidor = leer("functions/index.js");
 
-  const compraDeshabilitada = /data-paquete="\$\{p\.id\}"[^>]*\bdisabled\b/.test(tienda);
+  // El valor del atributo no importa: lo que se vigila es que el botón nazca
+  // apagado. Atado a `${p.id}` exacto, la prueba se cayó el día que ese id pasó
+  // a escaparse —`${escapar(p.id)}`— y dijo que la compra estaba habilitada
+  // cuando lo único que había cambiado era cómo se escribe el atributo.
+  const compraDeshabilitada = /data-paquete="[^"]*"[^>]*\bdisabled\b/.test(tienda);
   const integracionPendiente = /INTEGRACIÓN PENDIENTE/.test(servidor);
 
   ok(compraDeshabilitada, "el botón de comprar Leyendas sigue deshabilitado en la tienda");

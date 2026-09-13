@@ -3472,3 +3472,52 @@ button.accion.con-poder {
 .carta.apagada {
   cursor: not-allowed;
 }
+
+/* ------------------------------------------- el marco y el titulo comprados
+
+   El MARCO va encima de la cara, en posición absoluta, y no como `border`.
+
+   Un borde de verdad empujaría la cara hacia adentro y cambiaría el tamaño de
+   la caja, así que los cuatro asientos dejarían de medir lo mismo según quién
+   tenga marco puesto. Superpuesto ocupa el mismo lugar y no mueve nada.
+
+   Sale un poco por fuera —el `inset` negativo— porque un marco dibujado justo
+   al borde de la cara se lee como parte de la foto y no como un marco. */
+.jugador .retrato .marco-avatar {
+  position: absolute;
+  inset: calc(var(--aro) * -1.5);
+  width: auto;
+  height: auto;
+  pointer-events: none;
+  /* Encima de la cara y del aro, debajo de la cuenta del asiento. */
+  z-index: 2;
+}
+
+/* La cuenta del asiento tiene que seguir viéndose por encima del marco: es
+   información de la partida y el marco es decoración. */
+.jugador .retrato .cuenta-asiento {
+  z-index: 3;
+}
+
+/* El TÍTULO, al lado del nombre.
+
+   En voz más baja que el nombre y sin envolver: en una mesa de cuatro el
+   asiento es angosto, y un título de dos líneas empuja los puntos fuera de
+   la cabecera. El servidor ya lo recorta a 24 caracteres; esto es el segundo
+   cinturón, visual. */
+.jugador .nombre .titulo-jugador {
+  display: inline-block;
+  max-width: 11ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(212, 168, 67, 0.45);
+  background: rgba(212, 168, 67, 0.12);
+  color: var(--oro-claro, #fcf0c4);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}

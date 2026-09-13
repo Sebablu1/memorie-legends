@@ -34,6 +34,8 @@ import {
   precioEnEscala,
   escalaDe,
   RAREZA_DE_PRECIO,
+  esExclusivoDePack,
+  seCompraConLeyendas,
 } from "../public/js/reglas/catalogo.js";
 import { EsquemaTipo } from "../functions/esquemas.js";
 
@@ -44,7 +46,30 @@ const ok = (c, m, x) => {
 };
 
 const RAIZ = new URL("..", import.meta.url);
-const PANOS = itemsDeTipo(CATALOGO_INICIAL, TIPOS.FONDO);
+
+/**
+ * Los paños QUE SE VENDEN.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * POR QUÉ SE EXCLUYEN LOS DE PACK
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Todo lo que sigue habla de la tienda: que haya cuatro, que uno solo sea
+ * gratis, que los precios entren en la escala de su tipo y que la rareza diga
+ * lo mismo que el precio.
+ *
+ * Un paño que viene con un pack no cumple nada de eso ni tiene por qué: no se
+ * vende, cuesta 0 obligatoriamente —lo exige `problemasDelItem`— y su rareza
+ * mide lo caro que salió el pack, no su precio en Leyendas. Medirlo con la
+ * regla de la tienda diría que hay tres paños gratis y dos con la rareza
+ * torcida, y las dos cosas serían mentira.
+ *
+ * Se los mira aparte, más abajo, con la regla que SÍ les corresponde.
+ */
+const PANOS = itemsDeTipo(CATALOGO_INICIAL, TIPOS.FONDO).filter((p) => !esExclusivoDePack(p));
+
+/** Y los que vienen con un pack, que se miden con otra vara. */
+const PANOS_DE_PACK = itemsDeTipo(CATALOGO_INICIAL, TIPOS.FONDO).filter(esExclusivoDePack);
 
 // =====================================================================
 
@@ -221,7 +246,9 @@ console.log("\n=== El mazo del centro es su propio artículo ===");
    * del medio, que no es de nadie y se mira la partida entera. Son dos campos
    * del perfil, dos categorías de la tienda y dos compras.
    */
-  const MAZOS = itemsDeTipo(CATALOGO_INICIAL, TIPOS.MAZO);
+  // Igual que con los paños: lo que sigue es la regla de la TIENDA, y el mazo
+  // que viene con el Pack Élite no se vende. Se mira aparte, más abajo.
+  const MAZOS = itemsDeTipo(CATALOGO_INICIAL, TIPOS.MAZO).filter((m) => !esExclusivoDePack(m));
 
   ok(TIPOS.MAZO === "mazo", "el tipo existe", TIPOS.MAZO);
   ok(esVendible(TIPOS.MAZO), "se vende");
@@ -314,6 +341,44 @@ console.log("\n=== El centro mide lo mismo que una carta de la mesa ===");
     !/\.levantada-caja \.carta \{[^}]*--carta-alto:\s*clamp/.test(css),
     "la levantada tampoco",
   );
+}
+
+
+// =====================================================================
+console.log("\n=== Lo que viene con un pack se mide con otra vara ===");
+// =====================================================================
+
+{
+  /**
+   * Los artículos de pack no entran en la escala de precios, y no es un
+   * descuido: no tienen precio. `problemasDelItem` los obliga a costar 0
+   * porque no se venden sueltos, así que medirlos con la vara de la tienda
+   * diría que son todos "iniciales" y que hay cinco paños gratis.
+   *
+   * Lo que SÍ hay que comprobarles es lo otro: que existan, que no se puedan
+   * comprar, y que su rareza no mienta.
+   */
+  const DE_PACK = CATALOGO_INICIAL.filter(esExclusivoDePack);
+
+  ok(DE_PACK.length > 0, `hay artículos de pack en la semilla (${DE_PACK.length})`);
+
+  const conPrecio = DE_PACK.filter((i) => i.precio !== 0);
+  ok(conPrecio.length === 0, "ninguno lleva precio", conPrecio.map((i) => `${i.id}: ${i.precio}`));
+
+  const comprables = DE_PACK.filter(seCompraConLeyendas);
+  ok(comprables.length === 0,
+     "ninguno se puede comprar con Leyendas",
+     comprables.map((i) => i.id));
+
+  // Y los paños y mazos de pack existen de verdad, que es lo que la parte de
+  // arriba dejó de mirar al excluirlos.
+  ok(PANOS_DE_PACK.length === 2, "los dos paños de pack están", PANOS_DE_PACK.map((p) => p.id));
+  ok(PANOS_DE_PACK.every((p) => problemasDelItem(p).length === 0),
+     "y son artículos bien formados",
+     PANOS_DE_PACK.flatMap((p) => problemasDelItem(p)));
+
+  const MAZOS_DE_PACK = itemsDeTipo(CATALOGO_INICIAL, TIPOS.MAZO).filter(esExclusivoDePack);
+  ok(MAZOS_DE_PACK.length === 1, "y el mazo de pack también", MAZOS_DE_PACK.map((m) => m.id));
 }
 
 console.log(fallos === 0 ? "\n✅ TODO OK" : `\n❌ ${fallos} fallos`);

@@ -39,6 +39,7 @@ import {
   CAMPO_EQUIPADO,
   esTipoValido,
   esVendible,
+  esExclusivoDePack,
   problemasDelItem,
   normalizarItem,
   ordenarItems,
@@ -123,11 +124,29 @@ export function crearTienda({
 
         const item = enCatalogo[i].data();
 
-        // Las insignias son logros. No se venden ni con saldo de sobra: la
+        // Las insignias son logros y no se venden ni con saldo de sobra. La
         // comprobación está acá, en el servidor, porque esconder el botón en
         // la tienda no impide la llamada.
         if (!esVendible(item.tipo)) {
           throw error("failed-precondition", "Ese artículo no está a la venta: se gana jugando.");
+        }
+
+        /**
+         * Y lo que viene con un pack tampoco se compra suelto.
+         *
+         * Es una comprobación aparte de la de arriba porque filtra otra cosa.
+         * `esVendible` mira el TIPO y saca familias enteras; el avatar del
+         * Pack Élite es de tipo `avatar`, así que pasa esa puerta sin
+         * problema. Lo que lo detiene es que sea de un pack.
+         *
+         * Sin esto, quien no pagó el pack se compraba su avatar exclusivo con
+         * Leyendas y el pack dejaba de tener nada exclusivo.
+         */
+        if (esExclusivoDePack(item)) {
+          throw error(
+            "failed-precondition",
+            "Ese artículo viene con un pack: no se vende suelto.",
+          );
         }
 
         // Un artículo desactivado se deja de vender pero NO se le quita a
@@ -552,6 +571,20 @@ export function crearTienda({
       const d = doc.data();
       if (d.activo === false) return; // ya apagado: no hay nada que hacer
       if (imagenEsArchivo(d.imagen)) return; // tiene dibujo de verdad
+
+      /**
+       * Lo que viene con un pack no es un resto de la demostración.
+       *
+       * El criterio de arriba —"su imagen es un emoji"— es un indicio de
+       * artículo de mentira, no una definición. Los doce artículos que trae
+       * un pack también son emoji mientras no exista el arte definitivo, y
+       * apagarlos dejaría a los packs vendiendo cosas que no se pueden
+       * otorgar: `tienda.otorgar` los busca en el catálogo.
+       *
+       * Un resto de la demostración es un artículo que no referencia nadie.
+       * Éstos los referencia un pack, así que se quedan.
+       */
+      if (esExclusivoDePack(d)) return;
       candidatos.push({ id: doc.id, nombre: d.nombre ?? doc.id, imagen: d.imagen ?? "" });
     });
 

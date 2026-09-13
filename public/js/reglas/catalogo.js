@@ -60,6 +60,40 @@ export const TIPOS = {
    * separado, se compran por separado, y ponerse uno no cambia el otro.
    */
   MAZO: "mazo",
+
+  /**
+   * El marco del avatar: el borde que lo rodea en el ranking, el lobby y la
+   * mesa.
+   *
+   * Se equipa como un avatar y por separado de él, porque el avatar dice
+   * quién sos y el marco de dónde venís. Cambiar uno no tiene por qué
+   * cambiar el otro.
+   */
+  MARCO: "marco",
+
+  /**
+   * El título: el texto que va al lado del nombre.
+   *
+   * No es el nombre y no lo reemplaza. Se equipa, así que se puede tener
+   * varios y mostrar uno.
+   */
+  TITULO: "titulo",
+
+  /**
+   * El sello: una marca permanente del perfil.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * EL ÚNICO QUE NO SE EQUIPA
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Los demás tipos son cosas que uno se pone y se saca. Un sello no: es una
+   * constancia de algo que pasó —haber estado desde el principio, por
+   * ejemplo— y una constancia que se puede apagar no constata nada.
+   *
+   * Por eso NO tiene entrada en `CAMPO_EQUIPADO`. Se posee y se muestra; no
+   * hay nada que elegir. Si alguna vez hubiera dos, se muestran los dos.
+   */
+  SELLO: "sello",
 };
 
 export const TIPOS_VALIDOS = Object.values(TIPOS);
@@ -82,6 +116,48 @@ export const esTipoValido = (tipo) => TIPOS_VALIDOS.includes(tipo);
 export const TIPOS_VENDIBLES = Object.freeze([TIPOS.AVATAR, TIPOS.DORSO, TIPOS.FONDO, TIPOS.MAZO]);
 
 export const esVendible = (tipo) => TIPOS_VENDIBLES.includes(tipo);
+
+/**
+ * Lo que viene con un pack y no se consigue de ninguna otra forma.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * POR QUÉ ES UN CAMPO DEL ARTÍCULO Y NO UN TIPO
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Porque un avatar exclusivo sigue siendo un avatar: se equipa igual, se
+ * dibuja igual y ocupa el mismo campo del perfil. Lo único distinto es cómo
+ * se consigue. Un tipo aparte obligaría a duplicar `CAMPO_EQUIPADO`, la
+ * vitrina y el dibujado, para conseguir una diferencia que no es de forma
+ * sino de origen.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * VENDIBLE POR TIPO, EXCLUSIVO POR ARTÍCULO
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Son dos filtros distintos y hacen falta los dos.
+ *
+ * `TIPOS_VENDIBLES` saca familias enteras de la tienda: ninguna insignia,
+ * ningún marco, ningún título y ningún sello se compran con Leyendas, nunca.
+ *
+ * `packExclusivo` saca artículos sueltos de una familia que SÍ se vende: el
+ * avatar del Pack Élite es de tipo `avatar`, y sin esta marca estaría a la
+ * venta como cualquier otro. Filtrar sólo por tipo lo dejaba comprable con
+ * Leyendas por quien no pagó el pack.
+ */
+export const esExclusivoDePack = (item) =>
+  typeof item?.packExclusivo === "string" && item.packExclusivo.trim().length > 0;
+
+/** De qué pack es exclusivo, o `null` si se consigue por las vías normales. */
+export const packDe = (item) => (esExclusivoDePack(item) ? String(item.packExclusivo) : null);
+
+/**
+ * ¿Se puede comprar este artículo con Leyendas?
+ *
+ * Las dos condiciones juntas, que es como hay que preguntarlo siempre: el
+ * tipo tiene que venderse Y el artículo no puede ser de un pack.
+ */
+export const seCompraConLeyendas = (item) =>
+  esVendible(item?.tipo) && !esExclusivoDePack(item);
 
 /**
  * Piso de precio para los avatares.
@@ -155,6 +231,16 @@ export const CAMPO_EQUIPADO = {
   // de haberla escrito como lista de lo permitido y no de lo negado.
   [TIPOS.FONDO]: "fondo",
   [TIPOS.MAZO]: "mazo",
+
+  // El marco y el título se equipan como todo lo demás. Los campos nacen
+  // cerrados al navegador sin tocar `firestore.rules` por lo mismo que
+  // `fondo`: la regla del perfil es una lista blanca.
+  [TIPOS.MARCO]: "marco",
+  [TIPOS.TITULO]: "titulo",
+
+  // El SELLO no está , y su ausencia es la regla: no se equipa ni se quita.
+  // `equiparItem` mira esta tabla, así que un sello no puede equiparse ni
+  // por error ni desde la consola.
 };
 
 /**
@@ -189,6 +275,9 @@ export const ETIQUETA_TIPO = Object.freeze({
   [TIPOS.MAZO]: { tienda: "Dorso de mazo central", mios: "Mis dorsos de mazo central" },
   [TIPOS.FONDO]: { tienda: "Paños de mesa", mios: "Mis paños de mesa" },
   [TIPOS.INSIGNIA]: { tienda: "Insignias", mios: "Mis insignias" },
+  [TIPOS.MARCO]: { tienda: "Marcos de avatar", mios: "Mis marcos" },
+  [TIPOS.TITULO]: { tienda: "Títulos", mios: "Mis títulos" },
+  [TIPOS.SELLO]: { tienda: "Sellos", mios: "Mis sellos" },
 });
 
 /** Cómo se llama un tipo en la tienda. */
@@ -359,6 +448,52 @@ export function problemasDelItem(item) {
     problemas.push(
       "Las insignias son logros: se ganan jugando, no se venden. Su precio tiene que ser 0.",
     );
+  }
+
+  /**
+   * Lo que viene con un pack.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * UNA INSIGNIA NO PUEDE SER EXCLUSIVA DE UN PACK
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Es la regla más importante de las tres, y existe porque ya se rompió una
+   * vez. El Pack Élite prometía la insignia `comprador-elite`: la tienda
+   * anunciaba «Incluye insignia» y el comprador pagaba $1000 por algo que
+   * nunca recibía, porque el id no existía en ningún catálogo.
+   *
+   * Se sacó, y la decisión fue explícita: los paquetes dan Leyendas e
+   * ítems visuales, y las insignias se ganan jugando. Marcar una insignia
+   * como exclusiva de un pack la volvería comprable con dinero por la puerta
+   * de atrás, que es exactamente lo que se decidió que no.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * Y NO LLEVA PRECIO
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Un artículo de pack no se compra con Leyendas —`seCompraConLeyendas` lo
+   * excluye y `comprarVarios` lo rechaza— así que un precio ahí no significa
+   * nada y se lee como si estuviera a la venta. Es el mismo razonamiento que
+   * el de las insignias, por el mismo motivo.
+   */
+  if (esExclusivoDePack(item)) {
+    if (!/^[a-z0-9_-]{2,64}$/.test(String(item.packExclusivo))) {
+      problemas.push(
+        "El pack del artículo sólo admite minúsculas, números, guiones y guiones bajos (2 a 64).",
+      );
+    }
+
+    if (item?.tipo === TIPOS.INSIGNIA) {
+      problemas.push(
+        "Una insignia no puede venir con un pack: los logros se ganan jugando, no se compran.",
+      );
+    }
+
+    if (Number(item?.precio) !== 0) {
+      problemas.push(
+        "Un artículo exclusivo de un pack no se vende suelto. Su precio tiene que ser 0.",
+      );
+    }
   }
 
   if (!texto(item?.imagen)) problemas.push("Falta la imagen.");
@@ -543,6 +678,45 @@ export const CATALOGO_INICIAL = [
   { id: "mazo_real", tipo: TIPOS.MAZO, nombre: "Mazo Real", descripcion: "Azul de medianoche, brújula en oro.", precio: 150, imagen: "/img/mazos/real.svg", activo: true, orden: 20, metadata: { rareza: "poco_comun" } },
   { id: "mazo_esmeralda", tipo: TIPOS.MAZO, nombre: "Mazo Esmeralda", descripcion: "Verde profundo y plata verdosa.", precio: 300, imagen: "/img/mazos/esmeralda.svg", activo: true, orden: 30, metadata: { rareza: "raro" } },
   { id: "mazo_carmesi", tipo: TIPOS.MAZO, nombre: "Mazo Carmesí", descripcion: "El de las mesas donde se juega en serio.", precio: 450, imagen: "/img/mazos/carmesi.svg", activo: true, orden: 40, metadata: { rareza: "epico" } },
+  // ------------------------------------------------- lo que viene con un pack
+  //
+  // ─────────────────────────────────────────────────────────────────────
+  // POR QUÉ ESTÁN EN EL CATÁLOGO SI NO SE VENDEN
+  // ─────────────────────────────────────────────────────────────────────
+  //
+  // Porque `tienda.otorgar` los busca acá por id, y lo que no está en el
+  // catálogo no se puede otorgar: tira `not-found`. Es exactamente la piedra
+  // con la que ya se tropezó el Pack Élite, que prometía una insignia
+  // `comprador-elite` que no existía en ningún lado.
+  //
+  // No aparecen en la tienda porque llevan `packExclusivo`, no porque falten
+  // del catálogo. Son dos cosas distintas y hay que hacer las dos.
+  //
+  // ─────────────────────────────────────────────────────────────────────
+  // LAS IMÁGENES SON EMOJI A PROPÓSITO
+  // ─────────────────────────────────────────────────────────────────────
+  //
+  // El arte definitivo no existe todavía. Un emoji se dibuja igual en la
+  // tienda y en la vitrina, y no miente sobre un archivo que no está: apuntar
+  // a `/img/packs/algo.webp` antes de tener el archivo deja la imagen rota en
+  // producción y en verde en las pruebas.
+
+  { id: "avatar_iniciado", tipo: TIPOS.AVATAR, nombre: "El Iniciado", descripcion: "Viene con el Pack Básico.", precio: 0, imagen: "🎓", activo: true, orden: 200, packExclusivo: "basico", metadata: { rareza: "poco_comun" } },
+
+  { id: "dorso_viajero", tipo: TIPOS.DORSO, nombre: "Dorso del Viajero", descripcion: "Viene con el Pack Popular.", precio: 0, imagen: "🂠", activo: true, orden: 210, packExclusivo: "popular", metadata: { rareza: "raro" } },
+
+  { id: "avatar_erudito", tipo: TIPOS.AVATAR, nombre: "El Erudito", descripcion: "Viene con el Pack Premium.", precio: 0, imagen: "🧙", activo: true, orden: 220, packExclusivo: "premium", metadata: { rareza: "epico" } },
+  { id: "pano_terciopelo", tipo: TIPOS.FONDO, nombre: "Paño de Terciopelo", descripcion: "Viene con el Pack Premium.", precio: 0, imagen: "🟪", activo: true, orden: 221, packExclusivo: "premium", metadata: { rareza: "epico" } },
+
+  { id: "avatar_soberano", tipo: TIPOS.AVATAR, nombre: "El Soberano", descripcion: "Viene con el Pack Élite.", precio: 0, imagen: "👑", activo: true, orden: 230, packExclusivo: "elite", metadata: { rareza: "legendario" } },
+  { id: "dorso_soberano", tipo: TIPOS.DORSO, nombre: "Dorso del Soberano", descripcion: "Viene con el Pack Élite.", precio: 0, imagen: "🂡", activo: true, orden: 231, packExclusivo: "elite", metadata: { rareza: "legendario" } },
+  { id: "mazo_soberano", tipo: TIPOS.MAZO, nombre: "Mazo del Soberano", descripcion: "Viene con el Pack Élite.", precio: 0, imagen: "🎴", activo: true, orden: 232, packExclusivo: "elite", metadata: { rareza: "legendario" } },
+  { id: "pano_soberano", tipo: TIPOS.FONDO, nombre: "Paño del Soberano", descripcion: "Viene con el Pack Élite.", precio: 0, imagen: "🟦", activo: true, orden: 233, packExclusivo: "elite", metadata: { rareza: "legendario" } },
+  { id: "marco_dorado", tipo: TIPOS.MARCO, nombre: "Marco Dorado", descripcion: "Rodea tu avatar. Viene con el Pack Élite.", precio: 0, imagen: "🖼️", activo: true, orden: 234, packExclusivo: "elite", metadata: { rareza: "legendario" } },
+  { id: "titulo_elite", tipo: TIPOS.TITULO, nombre: "Élite", descripcion: "Se muestra al lado de tu nombre. Viene con el Pack Élite.", precio: 0, imagen: "🏷️", activo: true, orden: 235, packExclusivo: "elite", metadata: { rareza: "legendario" } },
+
+  { id: "sello_fundador", tipo: TIPOS.SELLO, nombre: "Fundador", descripcion: "Queda en tu perfil para siempre. Viene con el Pack Memorie Legends.", precio: 0, imagen: "🛡️", activo: true, orden: 240, packExclusivo: "ml", metadata: { rareza: "legendario" } },
+  { id: "avatar_leyenda_viva", tipo: TIPOS.AVATAR, nombre: "Leyenda Viva", descripcion: "Viene con el Pack Memorie Legends.", precio: 0, imagen: "✨", activo: true, orden: 241, packExclusivo: "ml", metadata: { rareza: "legendario" } },
 ];
 
 /**

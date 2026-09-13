@@ -617,6 +617,40 @@ const reversoDe = (jugador, i) =>
   esRutaDelSitio(jugador?.dorso) ? jugador.dorso : dorsoDe(i);
 
 /**
+ * El marco que rodea la cara, si compró uno.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ES UNA CAPA ENCIMA, NO UN BORDE
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Un `border` en el retrato empujaría la cara hacia adentro y cambiaría su
+ * tamaño, así que los cuatro asientos dejarían de medir lo mismo según quién
+ * tenga marco. Va como imagen superpuesta y en posición absoluta: ocupa el
+ * mismo lugar que la cara y no mueve nada.
+ *
+ * `esRutaDelSitio` otra vez, como con el retrato y el dorso: lo que viene en
+ * la vista lo escribió el servidor, pero un `src` que apunte afuera del sitio
+ * es una filtración de que este jugador está mirando la mesa.
+ */
+function marcoDe(jugador) {
+  if (!esRutaDelSitio(jugador?.marco)) return "";
+  return `<img class="marco-avatar" src="${escapar(jugador.marco)}" alt="" aria-hidden="true" />`;
+}
+
+/**
+ * El título que eligió mostrar, al lado del nombre.
+ *
+ * A diferencia del resto de lo que se luce, esto es TEXTO escrito por un
+ * administrador en el catálogo. Va escapado, y el servidor ya lo recortó a 24
+ * caracteres para que no empuje el nombre fuera del asiento.
+ */
+function tituloDe(jugador) {
+  const titulo = String(jugador?.titulo ?? "").trim();
+  if (!titulo) return "";
+  return `<span class="titulo-jugador">${escapar(titulo)}</span>`;
+}
+
+/**
  * La insignia que el jugador eligió mostrar, o la dificultad de la IA.
  *
  * Son dos cosas distintas ocupando el mismo lugar, y está bien: las dos
@@ -665,6 +699,8 @@ function dibujarJugador(jugador, i) {
     .join("");
 
   const insignia = marcaDe(jugador);
+  const marco = marcoDe(jugador);
+  const titulo = tituloDe(jugador);
 
   /**
    * "Ronda" es lo que se anotó en la ronda ANTERIOR, no un marcador en vivo.
@@ -684,12 +720,13 @@ function dibujarJugador(jugador, i) {
     <div class="jugador ${claseAsiento(i)} ${enTurno ? "en-turno" : ""} ${propio ? "propio" : ""} ${jugador.eliminado ? "eliminado" : ""}"
          data-jugador="${i}">
       <div class="cabecera-jugador">
-        <span class="retrato ${claseAsiento(i)}" data-asiento="${i}">
+        <span class="retrato ${claseAsiento(i)} ${marco ? "con-marco" : ""}" data-asiento="${i}">
           <span class="cara"><img src="${escapar(caraDe(jugador, i))}" alt="" /></span>
+          ${marco}
           <b class="cuenta-asiento" aria-hidden="true"></b>
         </span>
         <div class="datos">
-          <div class="nombre">${escapar(jugador.nombre)} ${insignia}</div>
+          <div class="nombre">${escapar(jugador.nombre)} ${titulo} ${insignia}</div>
           <div class="puntos">
             <span class="parcial">Ronda <b>${jugador.puntosRonda ?? 0}</b></span>
             <span class="acumulado">Total <b>${jugador.puntos}</b></span>

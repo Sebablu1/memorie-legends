@@ -38,9 +38,16 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { PAQUETES, PREMIOS_RANKING, premioPorPuesto, MOTIVOS } from "../public/js/reglas/economia.js";
+import {
+  PAQUETES,
+  PREMIOS_RANKING,
+  premioPorPuesto,
+  leyendasDePaquete,
+  precioPorLeyenda,
+  MOTIVOS,
+} from "../public/js/reglas/economia.js";
 import { CONDICIONES, IDS_INSIGNIAS, leyendasDeInsignia } from "../public/js/reglas/insignias.js";
-import { CATALOGO_INICIAL, TIPOS } from "../public/js/reglas/catalogo.js";
+import { CATALOGO_INICIAL, TIPOS, seCompraConLeyendas } from "../public/js/reglas/catalogo.js";
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), "..");
 const leer = (...partes) => readFileSync(join(raiz, ...partes), "utf8");
@@ -66,13 +73,89 @@ console.log("\n=== 1. Los paquetes dan Leyendas, y nada más ===");
      conInsignia.map((p) => `${p.id}→${p.insignia}`));
 
   // Y siguen siendo paquetes: esto no los vació de contenido.
-  ok(PAQUETES.length === 4, "los cuatro paquetes siguen ahí", PAQUETES.length);
-  ok(PAQUETES.every((p) => p.leyendas > 0 && p.precio > 0),
+  ok(PAQUETES.length === 5, "los cinco paquetes están", PAQUETES.length);
+  ok(PAQUETES.every((p) => p.leyendasBase > 0 && p.precioUYU > 0),
      "todos con sus Leyendas y su precio");
+}
 
-  const elite = PAQUETES.find((p) => p.id === "elite");
-  ok(elite?.leyendas === 1500 && elite?.bonificacion === 500,
-     "el Élite conserva sus 1500 + 500 de regalo");
+{
+  /**
+   * La tabla acordada, escrita a mano.
+   *
+   * A mano y no derivada del módulo: derivada diría "los paquetes son los que
+   * dice el archivo", que es una tautología. Esto es un precio de venta al
+   * público y un cero de más se cobra de verdad.
+   */
+  const ACORDADO = {
+    basico:  { precioUYU: 250,  leyendasBase: 300,   leyendasRegalo: 50,   items: 1 },
+    popular: { precioUYU: 450,  leyendasBase: 600,   leyendasRegalo: 150,  items: 1 },
+    premium: { precioUYU: 1000, leyendasBase: 1500,  leyendasRegalo: 500,  items: 2 },
+    elite:   { precioUYU: 2500, leyendasBase: 5000,  leyendasRegalo: 2000, items: 6 },
+    ml:      { precioUYU: 5000, leyendasBase: 12000, leyendasRegalo: 3000, items: 8 },
+  };
+
+  for (const [id, esperado] of Object.entries(ACORDADO)) {
+    const p = PAQUETES.find((x) => x.id === id);
+    ok(Boolean(p), `existe el pack ${id}`);
+    if (!p) continue;
+    ok(p.precioUYU === esperado.precioUYU, `  ${id} cuesta ${esperado.precioUYU}`, p.precioUYU);
+    ok(p.leyendasBase === esperado.leyendasBase, `  y da ${esperado.leyendasBase} de base`, p.leyendasBase);
+    ok(p.leyendasRegalo === esperado.leyendasRegalo, `  más ${esperado.leyendasRegalo} de regalo`, p.leyendasRegalo);
+    ok(p.itemsExclusivos.length === esperado.items, `  y trae ${esperado.items} artículos`, p.itemsExclusivos.length);
+  }
+
+  ok(!PAQUETES.some((p) => p.precioUYU === 100), "el Básico viejo de $100 ya no está");
+
+  // El total se calcula, nunca se lee de un campo guardado: dos campos que
+  // dicen lo mismo terminan discrepando, y el que discrepa se acredita.
+  for (const p of PAQUETES) {
+    ok(leyendasDePaquete(p) === p.leyendasBase + p.leyendasRegalo,
+       `  el total de ${p.id} sale de la suma`, leyendasDePaquete(p));
+  }
+
+  /**
+   * Y cada escalón rinde mejor que el anterior.
+   *
+   * Si un pack más caro diera peor precio por Leyenda, el cartel de "mejor
+   * valor" caería en uno del medio y el más caro no tendría razón de existir.
+   * Es la clase de error que se cuela al retocar un precio suelto.
+   */
+  const porPrecio = PAQUETES.slice().sort((a, b) => a.precioUYU - b.precioUYU);
+  const torcidos = [];
+  for (let i = 1; i < porPrecio.length; i++) {
+    if (precioPorLeyenda(porPrecio[i]) >= precioPorLeyenda(porPrecio[i - 1])) {
+      torcidos.push(`${porPrecio[i].id} no mejora a ${porPrecio[i - 1].id}`);
+    }
+  }
+  ok(torcidos.length === 0, "cada pack más caro rinde mejor por Leyenda", torcidos);
+}
+
+{
+  /**
+   * Lo que promete un pack tiene que existir en el catálogo.
+   *
+   * Es LA regla que se rompió con `comprador-elite`: el pack prometía un id
+   * que no estaba en ningún catálogo, así que nadie lo recibía nunca y nada
+   * fallaba. `tienda.otorgar` tira `not-found` sobre un id que no existe, y eso
+   * pasaría DESPUÉS del pago.
+   */
+  const enCatalogo = new Set(CATALOGO_INICIAL.map((i) => i.id));
+
+  for (const p of PAQUETES) {
+    const faltan = p.itemsExclusivos.filter((id) => !enCatalogo.has(id));
+    ok(faltan.length === 0, `todo lo que promete ${p.id} está en el catálogo`, faltan);
+  }
+
+  // Y nada de lo que trae un pack se puede comprar suelto con Leyendas.
+  const prometidos = new Set(PAQUETES.flatMap((p) => p.itemsExclusivos));
+  const comprables = CATALOGO_INICIAL.filter((i) => prometidos.has(i.id) && seCompraConLeyendas(i));
+  ok(comprables.length === 0,
+     "y nada de eso se vende suelto en la tienda",
+     comprables.map((i) => i.id));
+
+  // Ninguna insignia entre lo que trae un pack: los logros se ganan jugando.
+  const insignias = CATALOGO_INICIAL.filter((i) => prometidos.has(i.id) && i.tipo === TIPOS.INSIGNIA);
+  ok(insignias.length === 0, "y ningún pack reparte insignias", insignias.map((i) => i.id));
 }
 
 {

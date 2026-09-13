@@ -38,6 +38,9 @@ const escapar = (t) =>
 /** Lo último que dijo el servidor. Se guarda para no volver a pedirlo por clic. */
 let insigniasDelCatalogo = new Map();
 let tengo = new Set();
+/** Los sellos que el jugador tiene. No se equipan: se tienen. */
+let sellos = [];
+let sellosDelCatalogo = new Map();
 let equipada = null;
 let estadisticas = {};
 
@@ -103,10 +106,60 @@ function dibujarTarjeta(condicion) {
     </article>`;
 }
 
+/**
+ * La tira de sellos, arriba de las insignias.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * POR QUÉ NO SON TARJETAS COMO LAS INSIGNIAS
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Una tarjeta de insignia muestra la condición —"Ganar 25 partidas"— y una
+ * barra de progreso, porque su gracia es que se puede ir a buscar. Un sello no
+ * se persigue: o se estaba cuando se repartió, o no. Dibujarlo con una barra
+ * al 0% sería invitar a algo que no se puede conseguir.
+ *
+ * Y no lleva botón: un sello no se equipa ni se saca. Está en el perfil y
+ * punto — es una constancia, y una constancia que se puede apagar no constata
+ * nada.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * NO SE MUESTRA LO QUE NO SE TIENE
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Las insignias se dibujan todas, ganadas o no, porque la condición es
+ * pública y sirve de meta. Los sellos que no se tienen no se muestran: la
+ * mayoría vienen con un pack, y una fila de sellos grises con candado es una
+ * publicidad, no una vitrina.
+ */
+function dibujarSellos() {
+  const caja = $("tiraSellos");
+  if (!caja) return;
+
+  if (!sellos.length) {
+    caja.hidden = true;
+    caja.innerHTML = "";
+    return;
+  }
+
+  caja.innerHTML = sellos
+    .map((id) => {
+      const item = sellosDelCatalogo.get(id);
+      const nombre = item?.nombre ?? id;
+      return `
+        <span class="sello" title="${escapar(item?.descripcion ?? nombre)}">
+          ${dibujarFigura(item)}
+          <b>${escapar(nombre)}</b>
+        </span>`;
+    })
+    .join("");
+  caja.hidden = false;
+}
+
 function dibujar() {
   const caja = $("rejillaLogros");
   if (!caja) return;
   caja.innerHTML = CONDICIONES.map(dibujarTarjeta).join("");
+  dibujarSellos();
 }
 
 /** Poner o sacar. Las dos recargan lo mismo, así que comparten el camino. */
@@ -133,17 +186,24 @@ async function cambiar(boton, accion) {
 async function cargarLoMio() {
   const r = await misInsignias();
   tengo = new Set(r.tengo ?? []);
+  sellos = r.sellos ?? [];
   equipada = r.equipada ?? null;
   estadisticas = r.estadisticas ?? {};
 }
 
 async function cargarCatalogo() {
   const snap = await getDocs(query(collection(db, COLECCION_CATALOGO), orderBy("orden")));
+  const todos = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
   insigniasDelCatalogo = new Map(
-    snap.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
-      .filter((i) => i.tipo === TIPOS.INSIGNIA)
-      .map((i) => [i.id, i]),
+    todos.filter((i) => i.tipo === TIPOS.INSIGNIA).map((i) => [i.id, i]),
+  );
+
+  // Los sellos salen del mismo viaje. Son del mismo catálogo y la vitrina los
+  // dibuja juntos; pedirlos aparte sería una segunda lectura de la misma
+  // colección.
+  sellosDelCatalogo = new Map(
+    todos.filter((i) => i.tipo === TIPOS.SELLO).map((i) => [i.id, i]),
   );
 }
 

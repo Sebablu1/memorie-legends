@@ -385,5 +385,124 @@ console.log("\n=== La mesa prefiere lo que trae la vista ===");
   );
 }
 
+console.log("\n=== El marco y el título del pack viajan igual que el dorso ===");
+{
+  /**
+   * Los dos únicos artículos del Pack Élite que se ven en la MESA.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * POR QUÉ TIENEN QUE VIAJAR Y NO ALCANZA CON QUE EL DUEÑO LOS SEPA
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Por lo mismo que el dorso, y acá pesa más todavía: alguien pagó $2.500
+   * por el Pack Élite. Si el marco sólo se dibujara en su propia pantalla,
+   * habría pagado por algo que ningún rival ve, que es lo contrario de
+   * comprarse algo para que se vea.
+   *
+   * Y no hay forma de que el navegador lo resuelva por su cuenta: las reglas
+   * de Firestore no dejan leer el perfil ajeno. O viaja en la vista, o no
+   * existe para los demás.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * EL TÍTULO ES TEXTO, NO UNA RUTA
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Es la única cosa de las cinco que se luce que no es una imagen. Se
+   * comprueba aparte porque un `esRutaDelSitio` aplicado por error a un
+   * título lo borraría entero, y en silencio.
+   */
+  const LUCE = [
+    {
+      retrato: "/img/avatar/a.webp",
+      dorso: "/img/dorsos/dorso-rojo.png",
+      insignia: "/img/insignias/heroe.webp",
+      marco: "/img/marcos/dorado.webp",
+      titulo: "Élite",
+    },
+    { marco: "/img/marcos/dorado.webp", titulo: null },
+    { marco: null, titulo: "Fundador" },
+    {},
+  ];
+  const jugadores = await repartirCon(LUCE);
+
+  ok(jugadores[0].marco === "/img/marcos/dorado.webp", "el marco llega a la mesa", jugadores[0].marco);
+  ok(jugadores[0].titulo === "Élite", "y el título también", jugadores[0].titulo);
+  ok(jugadores[3].marco === null && jugadores[3].titulo === null, "quien no tiene, en null");
+
+  // Independientes entre sí: se puede tener marco sin título y al revés.
+  ok(jugadores[1].marco && jugadores[1].titulo === null, "marco sin título", jugadores[1]);
+  ok(jugadores[2].marco === null && jugadores[2].titulo === "Fundador", "y título sin marco", jugadores[2]);
+
+  /**
+   * Y los cuatro navegadores ven lo mismo, que es la mitad que importa.
+   *
+   * Se arma una partida de verdad con el motor en vez de un objeto a mano:
+   * `vistaDe` lee el mazo y el descarte, y un estado incompleto revienta por
+   * una razón que no tiene nada que ver con lo que se está probando.
+   */
+  const estadoConMarcos = motor.empezarRonda(
+    motor.crearPartida(
+      ["ana", "beto", "caro", "dani"].map((id, i) => ({
+        id,
+        nombre: id,
+        marco: LUCE[i].marco ?? null,
+        titulo: LUCE[i].titulo ?? null,
+      })),
+      { semilla: 11 },
+    ),
+  );
+
+  for (let yo = 0; yo < 4; yo++) {
+    const vista = vistaDe(estadoConMarcos, yo);
+    ok(
+      vista.jugadores[0].marco === "/img/marcos/dorado.webp",
+      `  el asiento ${yo} ve el marco del 0`,
+      vista.jugadores[0].marco,
+    );
+    ok(vista.jugadores[0].titulo === "Élite", `  y su título`, vista.jugadores[0].titulo);
+  }
+
+  // Y ninguno de los dos campos nuevos arrastra una carta.
+  const fugas = filtracionesEn(vistaDe(estadoConMarcos, 0), estadoConMarcos);
+  ok(fugas.length === 0, "  sin filtrar ninguna carta", fugas);
+}
+
+console.log("\n=== La mesa los dibuja, y no de cualquier forma ===");
+{
+  const mesa = readFileSync(new URL("../public/js/mesa.js", import.meta.url), "utf8");
+
+  ok(/function marcoDe\(/.test(mesa), "hay un ayudante para el marco");
+  ok(/function tituloDe\(/.test(mesa), "y otro para el título");
+
+  /**
+   * El marco pasa por `esRutaDelSitio`, como el retrato y el dorso.
+   *
+   * Lo que trae la vista lo escribió el servidor, pero un `src` que apunte
+   * afuera del sitio le avisa a ese dominio que este jugador está mirando la
+   * mesa. Es el mismo filtro que ya tienen los otros tres.
+   */
+  const cuerpoMarco = mesa.slice(mesa.indexOf("function marcoDe("), mesa.indexOf("function tituloDe("));
+  ok(/esRutaDelSitio\(jugador\?\.marco\)/.test(cuerpoMarco), "el marco se filtra por ruta del sitio");
+
+  /**
+   * Y el título se ESCAPA, porque es texto que teclea un administrador.
+   *
+   * Es la diferencia que justifica que sean dos ayudantes y no uno: al marco
+   * se le comprueba la ruta, al título se le escapa el contenido. Aplicarle a
+   * uno el tratamiento del otro rompe en silencio — `esRutaDelSitio("Élite")`
+   * es falso, y el título desaparecería sin que nada avise.
+   */
+  const cuerpoTitulo = mesa.slice(mesa.indexOf("function tituloDe("));
+  const hastaElFinal = cuerpoTitulo.slice(0, cuerpoTitulo.indexOf("\n}"));
+  ok(/escapar\(titulo\)/.test(hastaElFinal), "el título se escapa");
+  ok(!/esRutaDelSitio/.test(hastaElFinal), "y NO se le aplica el filtro de rutas");
+
+  // El marco va superpuesto y no como borde: un `border` cambiaría el tamaño
+  // del retrato y los cuatro asientos dejarían de medir lo mismo.
+  const css = readFileSync(new URL("../public/css/mesa.css", import.meta.url), "utf8");
+  const regla = css.slice(css.indexOf(".marco-avatar {"));
+  ok(/position: absolute/.test(regla.slice(0, 300)), "el marco se dibuja superpuesto");
+}
+
 console.log(fallos === 0 ? "\n✅ TODO OK" : `\n❌ ${fallos} fallos`);
 process.exit(fallos === 0 ? 0 : 1);

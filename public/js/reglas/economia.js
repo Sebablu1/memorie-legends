@@ -185,37 +185,244 @@ export function premioPorPuesto(puesto) {
 
 export const MONEDA = "UYU";
 
+/**
+ * Los paquetes de Leyendas, y lo que trae cada uno.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ESTO ES LA SEMILLA, NO LA VERDAD
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Los paquetes viven en Firestore, en `tienda/packs/items/{id}`, y se
+ * administran desde el panel. Esta lista es de dónde salen la primera vez y a
+ * qué se vuelve si la colección queda vacía: una tienda sin paquetes no puede
+ * cobrar, y "se borró sin querer la colección" no puede ser el fin del
+ * negocio.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * LO QUE SE COBRA Y LO QUE SE ACREDITA
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * `precioUYU` es lo que se cobra y sale SIEMPRE del servidor: si viajara en la
+ * llamada, el pack más caro costaría un peso desde la consola.
+ *
+ * `leyendasTotal` NO se guarda como dato de confianza: se calcula con
+ * `leyendasDePaquete`. Guardado, dos campos pueden discrepar —base + regalo
+ * por un lado, total por otro— y el que discrepa termina acreditándose. Se
+ * deriva siempre, y lo que se le acredita al comprador queda congelado en la
+ * orden en el momento de comprar.
+ */
 export const PAQUETES = [
-  { id: "basico", nombre: "Pack Básico", leyendas: 100, bonificacion: 0, precio: 100 },
-  { id: "popular", nombre: "Pack Popular", leyendas: 300, bonificacion: 50, precio: 250 },
-  { id: "premium", nombre: "Pack Premium", leyendas: 600, bonificacion: 150, precio: 450 },
-  /**
-   * El Élite prometía una insignia y no la entregaba.
-   *
-   * `insignia: "comprador-elite"` se escribía con `arrayUnion` en
-   * `users/{uid}.insignias`, un campo que ninguna función ni pantalla lee, y
-   * el id no existía ni en `CONDICIONES` ni en el catálogo. La tienda decía
-   * «Incluye insignia» y el jugador pagaba por algo que no aparecía en
-   * ningún lado.
-   *
-   * Los paquetes dan Leyendas. Las insignias se ganan jugando.
-   */
+  {
+    id: "basico",
+    nombre: "Pack Básico",
+    precioUYU: 250,
+    leyendasBase: 300,
+    leyendasRegalo: 50,
+    itemsExclusivos: ["avatar_iniciado"],
+    orden: 10,
+    activo: true,
+  },
+  {
+    id: "popular",
+    nombre: "Pack Popular",
+    precioUYU: 450,
+    leyendasBase: 600,
+    leyendasRegalo: 150,
+    itemsExclusivos: ["dorso_viajero"],
+    orden: 20,
+    activo: true,
+  },
+  {
+    id: "premium",
+    nombre: "Pack Premium",
+    precioUYU: 1000,
+    leyendasBase: 1500,
+    leyendasRegalo: 500,
+    itemsExclusivos: ["avatar_erudito", "pano_terciopelo"],
+    orden: 30,
+    activo: true,
+  },
   {
     id: "elite",
     nombre: "Pack Élite",
-    leyendas: 1500,
-    bonificacion: 500,
-    precio: 1000,
+    precioUYU: 2500,
+    leyendasBase: 5000,
+    leyendasRegalo: 2000,
+    itemsExclusivos: [
+      "avatar_soberano",
+      "dorso_soberano",
+      "mazo_soberano",
+      "pano_soberano",
+      "marco_dorado",
+      "titulo_elite",
+    ],
+    orden: 40,
+    activo: true,
+  },
+  {
+    /**
+     * El más alto lleva TODO lo del Élite, y por eso repite sus ids.
+     *
+     * Un artículo tiene un solo `packExclusivo` —de dónde SALIÓ— pero un pack
+     * puede entregar artículos de otro. Son dos cosas distintas: la marca del
+     * artículo dice que no se compra suelto, y la lista del pack dice qué se
+     * otorga al acreditar.
+     *
+     * Sin esa separación, "el ML incluye todo lo del Élite" obligaba a
+     * duplicar los seis artículos con otro id, y quien comprara los dos packs
+     * terminaba con dos avatares idénticos y distintos.
+     */
+    id: "ml",
+    nombre: "Pack Memorie Legends",
+    precioUYU: 5000,
+    leyendasBase: 12000,
+    leyendasRegalo: 3000,
+    itemsExclusivos: [
+      "avatar_soberano",
+      "dorso_soberano",
+      "mazo_soberano",
+      "pano_soberano",
+      "marco_dorado",
+      "titulo_elite",
+      "sello_fundador",
+      "avatar_leyenda_viva",
+    ],
+    orden: 50,
+    activo: true,
   },
 ];
 
 export const paquetePorId = (id) => PAQUETES.find((p) => p.id === id) ?? null;
 
-/** Leyendas totales que entrega un paquete, bonificación incluida. */
-export const leyendasDePaquete = (paquete) => paquete.leyendas + paquete.bonificacion;
+/**
+ * Leyendas totales que entrega un paquete, regalo incluido.
+ *
+ * Se calcula, nunca se lee de un campo guardado. Un `leyendasTotal` escrito
+ * en la base puede discrepar de sus dos sumandos —porque alguien editó uno y
+ * no el otro— y el que discrepa es el que se acredita.
+ */
+export const leyendasDePaquete = (paquete) =>
+  Math.max(0, Number(paquete?.leyendasBase) || 0) +
+  Math.max(0, Number(paquete?.leyendasRegalo) || 0);
 
 /** Precio por Leyenda, para poder mostrar cuál conviene. */
-export const precioPorLeyenda = (paquete) => paquete.precio / leyendasDePaquete(paquete);
+export const precioPorLeyenda = (paquete) => {
+  const total = leyendasDePaquete(paquete);
+  return total > 0 ? Number(paquete?.precioUYU) / total : Infinity;
+};
+
+/**
+ * El rango de precios que se acepta desde el panel.
+ *
+ * ───────────────────────────────────────────────────────────────────
+ * POR QUÉ HAY UN RANGO Y NO SÓLO "mayor que cero"
+ * ───────────────────────────────────────────────────────────────────
+ *
+ * Porque los paquetes pasaron a editarse desde el panel, y el precio es lo
+ * único que cobra dinero de verdad. Un cero de más o de menos no es un error
+ * raro: es EL error de tipeo. Con "mayor que cero" alcanzaba para vender
+ * 15.000 Leyendas a $500 sin que nada se quejara.
+ *
+ * El rango no adivina el precio correcto —no puede— pero descarta el orden
+ * de magnitud imposible, que es donde está el daño.
+ */
+export const PRECIO_MINIMO_PACK = 50;
+export const PRECIO_MAXIMO_PACK = 20000;
+
+/** Techos de Leyendas, por lo mismo: descartan el cero de más. */
+export const LEYENDAS_MAXIMAS_PACK = 200000;
+
+/** Cuántos artículos puede traer un pack. */
+export const MAXIMO_ITEMS_POR_PACK = 20;
+
+/**
+ * Qué tiene de malo este paquete. Lista vacía: nada.
+ *
+ * Corre en los dos lados —en el panel para avisar antes de guardar, y dentro
+ * del guardado para decidir— igual que `problemasDelItem`. El panel manda un
+ * objeto a una Cloud Function, así que validar sólo en pantalla es no validar.
+ */
+export function problemasDelPaquete(paquete) {
+  const problemas = [];
+  const texto = (v) => typeof v === "string" && v.trim().length > 0;
+
+  if (!/^[a-z0-9_-]{2,64}$/.test(String(paquete?.id ?? ""))) {
+    problemas.push("El id sólo admite minúsculas, números, guiones y guiones bajos (2 a 64).");
+  }
+
+  if (!texto(paquete?.nombre)) problemas.push("Falta el nombre.");
+  else if (paquete.nombre.length > 80) problemas.push("El nombre no puede pasar de 80 caracteres.");
+
+  const precio = paquete?.precioUYU;
+  if (!Number.isInteger(precio)) {
+    problemas.push("El precio tiene que ser un número entero de pesos.");
+  } else if (precio < PRECIO_MINIMO_PACK || precio > PRECIO_MAXIMO_PACK) {
+    problemas.push(
+      `El precio tiene que estar entre ${PRECIO_MINIMO_PACK} y ${PRECIO_MAXIMO_PACK} pesos.`,
+    );
+  }
+
+  const base = paquete?.leyendasBase;
+  if (!Number.isInteger(base) || base < 1 || base > LEYENDAS_MAXIMAS_PACK) {
+    problemas.push(`Las Leyendas base tienen que ser un entero de 1 a ${LEYENDAS_MAXIMAS_PACK}.`);
+  }
+
+  const regalo = paquete?.leyendasRegalo;
+  if (!Number.isInteger(regalo) || regalo < 0 || regalo > LEYENDAS_MAXIMAS_PACK) {
+    problemas.push(`El regalo tiene que ser un entero de 0 a ${LEYENDAS_MAXIMAS_PACK}.`);
+  }
+
+  const items = paquete?.itemsExclusivos;
+  if (items != null) {
+    if (!Array.isArray(items)) {
+      problemas.push("Los artículos exclusivos tienen que ser una lista.");
+    } else if (items.length > MAXIMO_ITEMS_POR_PACK) {
+      problemas.push(`Un pack no puede traer más de ${MAXIMO_ITEMS_POR_PACK} artículos.`);
+    } else if (items.some((id) => !/^[a-z0-9_-]{2,64}$/.test(String(id ?? "")))) {
+      problemas.push("Algún id de artículo exclusivo no tiene forma de id.");
+    } else if (new Set(items.map(String)).size !== items.length) {
+      problemas.push("Hay un artículo exclusivo repetido.");
+    }
+  }
+
+  if (paquete?.orden != null && !Number.isInteger(paquete.orden)) {
+    problemas.push("El orden tiene que ser un número entero.");
+  }
+
+  if (paquete?.activo != null && typeof paquete.activo !== "boolean") {
+    problemas.push("El campo `activo` tiene que ser verdadero o falso.");
+  }
+
+  return problemas;
+}
+
+/** Deja un paquete con la forma exacta que se guarda, sin campos de más. */
+export function normalizarPaquete(paquete) {
+  const base = Math.trunc(Number(paquete?.leyendasBase) || 0);
+  const regalo = Math.trunc(Number(paquete?.leyendasRegalo) || 0);
+  return {
+    id: String(paquete?.id ?? "").trim(),
+    nombre: String(paquete?.nombre ?? "").trim(),
+    precioUYU: Math.trunc(Number(paquete?.precioUYU) || 0),
+    leyendasBase: base,
+    leyendasRegalo: regalo,
+    // Se guarda para poder ordenar y mostrar sin recalcular, pero NADIE lo
+    // usa para acreditar: eso siempre pasa por `leyendasDePaquete`.
+    leyendasTotal: base + regalo,
+    itemsExclusivos: Array.isArray(paquete?.itemsExclusivos)
+      ? [...new Set(paquete.itemsExclusivos.map((i) => String(i).trim()).filter(Boolean))]
+      : [],
+    orden: Number.isInteger(paquete?.orden) ? paquete.orden : 0,
+    activo: paquete?.activo !== false,
+  };
+}
+
+/** Los que se muestran en la tienda, en su orden. */
+export const paquetesVisibles = (paquetes) =>
+  (paquetes ?? [])
+    .filter((p) => p?.activo !== false)
+    .slice()
+    .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0) || String(a.id).localeCompare(String(b.id)));
 
 // ---------------------------------------------------------- movimientos
 

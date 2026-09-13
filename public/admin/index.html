@@ -213,6 +213,83 @@
       <!-- Revisión de nombres. Existe porque el escapado tapa la SALIDA, pero
            lo que se guardó antes del arreglo sigue guardado tal cual. -->
       <section>
+        <h2>Paquetes de Leyendas</h2>
+        <p class="nota">
+          Lo que se compra con <b>dinero de verdad</b>. El precio que se cobra
+          sale de acá: un cero de más o de menos se cobra igual, así que
+          revisá antes de guardar. Editar un pack <b>no cambia ninguna compra
+          ya hecha</b> — cada orden se queda con el precio y las Leyendas que
+          tenía cuando se hizo.
+        </p>
+        <div class="acciones">
+          <button class="btn sobrio" id="btnSembrarPacks" type="button">
+            Sembrar paquetes
+          </button>
+          <button class="btn sobrio" id="btnRefrescarPacks" type="button">
+            Ver paquetes
+          </button>
+          <button class="btn sobrio" id="btnNuevoPack" type="button">Paquete nuevo</button>
+        </div>
+        <p class="aviso" id="avisoPacks"></p>
+
+        <!-- El formulario nace escondido: se abre con «Paquete nuevo» o con
+             «Editar», que es el mismo formulario con los campos llenos. -->
+        <div class="formulario" id="formPack" hidden>
+          <div class="campos">
+            <label>
+              <span>Id</span>
+              <input id="packId" type="text" placeholder="premium" autocomplete="off" />
+              <small class="nota-campo">Minúsculas, números, guiones. No se puede cambiar después.</small>
+            </label>
+            <label>
+              <span>Nombre</span>
+              <input id="packNombre" type="text" placeholder="Pack Premium" autocomplete="off" />
+            </label>
+            <label>
+              <span>Precio en pesos</span>
+              <input id="packPrecio" type="number" min="0" step="1" value="0" />
+            </label>
+            <label>
+              <span>Leyendas base</span>
+              <input id="packBase" type="number" min="0" step="1" value="0" />
+            </label>
+            <label>
+              <span>Leyendas de regalo</span>
+              <input id="packRegalo" type="number" min="0" step="1" value="0" />
+            </label>
+            <label>
+              <span>Orden</span>
+              <input id="packOrden" type="number" step="1" value="0" />
+            </label>
+            <label class="ancho">
+              <span>Artículos exclusivos</span>
+              <!-- Selector múltiple y no un campo de texto: los ids tienen que
+                   existir en el catálogo o el comprador paga y no recibe. El
+                   servidor lo vuelve a comprobar al guardar. -->
+              <select id="packItems" multiple size="8"></select>
+              <small class="nota-campo">
+                Ctrl o Cmd para elegir varios. Sólo aparecen los artículos
+                marcados como exclusivos de un pack.
+              </small>
+            </label>
+            <label class="casilla">
+              <input id="packActivo" type="checkbox" checked />
+              <span>A la venta</span>
+            </label>
+          </div>
+          <!-- El total no se escribe: se calcula. Dos campos que dicen lo
+               mismo terminan discrepando, y el que discrepa se acredita. -->
+          <p class="nota" id="packResumen"></p>
+          <div class="acciones">
+            <button class="btn" id="btnGuardarPack" type="button">Guardar</button>
+            <button class="btn sobrio" id="btnCancelarPack" type="button">Cancelar</button>
+          </div>
+        </div>
+
+        <div id="listaPacks"></div>
+      </section>
+
+      <section>
         <h2>Nombres guardados</h2>
         <p class="nota">
           Busca nombres con caracteres que podrían hacer daño si se dibujaran

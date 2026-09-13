@@ -38,7 +38,6 @@ import crypto from "node:crypto";
 import {
   LEYENDAS_POR_REFERIDO,
   premioPorPuesto,
-  paquetePorId,
   leyendasDePaquete,
   MOTIVOS,
   MONEDA,
@@ -50,6 +49,7 @@ import { crearMoverLeyendas } from "./leyendas.js";
 import { crearAbandonarPartida } from "./abandono.js";
 import { crearMotorEnRed } from "./partida-red.js";
 import { crearCierre } from "./cierre.js";
+import { crearPacks } from "./packs.js";
 import { crearLimiteDeRitmo } from "./limite-de-ritmo.js";
 import { crearTienda } from "./tienda.js";
 import { crearInsignias } from "./insignias.js";
@@ -241,7 +241,15 @@ const azarCodigo = () => crypto.randomInt(0, 2 ** 32) / 2 ** 32;
  * avatar no está en el catálogo o si la lectura falla, se devuelve `null` y
  * la mesa usa las caras de la casa. Un retrato es decoración.
  */
-const SIN_NADA = Object.freeze({ retrato: null, dorso: null, insignia: null });
+const SIN_NADA = Object.freeze({
+  retrato: null,
+  dorso: null,
+  insignia: null,
+  marco: null,
+  // El título es el único que NO es una ruta de imagen: es el nombre del
+  // artículo, tal como se muestra al lado del nombre del jugador.
+  titulo: null,
+});
 
 /**
  * El formato anterior, en que la lista llevaba sólo la cara.
@@ -271,14 +279,37 @@ async function identidadEnSala(uid) {
       return esRutaDelSitio(imagen) ? imagen : null;
     };
 
-    // Las tres juntas: son tres lecturas independientes y esperarlas en fila
-    // triplicaría lo que tarda entrar a una sala.
-    const [retrato, dorso, insignia] = await Promise.all([
+    /**
+     * El título viaja como TEXTO, no como imagen.
+     *
+     * ───────────────────────────────────────────────────────────────────
+     *
+     * Los otros cuatro son dibujos y lo que se manda es su ruta. Un título es
+     * una palabra —«Élite»— que va al lado del nombre, así que lo que se
+     * manda es el `nombre` del artículo del catálogo.
+     *
+     * Se recorta a 24 caracteres acá, en el borde. El límite del catálogo es
+     * 80, que al lado de un nombre en una mesa de cuatro no entra, y recortar
+     * en el navegador dejaría el texto largo viajando igual.
+     */
+    const texto = async (id) => {
+      if (!id) return null;
+      const item = await db.collection(COLECCION_CATALOGO).doc(id).get();
+      if (!item.exists) return null;
+      const nombre = String(item.data().nombre ?? "").trim();
+      return nombre ? nombre.slice(0, 24) : null;
+    };
+
+    // Las cinco juntas: son lecturas independientes y esperarlas en fila
+    // multiplicaría lo que tarda entrar a una sala.
+    const [retrato, dorso, insignia, marco, titulo] = await Promise.all([
       ruta(datos.avatar),
       ruta(datos.dorso),
       ruta(datos.insignia),
+      ruta(datos.marco),
+      texto(datos.titulo),
     ]);
-    return { nombre, luce: { retrato, dorso, insignia } };
+    return { nombre, luce: { retrato, dorso, insignia, marco, titulo } };
   } catch (error) {
     logger.warn("No se pudo leer lo equipado para la sala", { uid, error: error.message });
     return { nombre, luce: { ...SIN_NADA } };
@@ -830,6 +861,21 @@ const tienda = crearTienda({
   administradores,
 });
 
+/**
+ * Los paquetes de Leyendas, que ahora viven en Firestore.
+ *
+ * Se monta después de `tienda` porque entregar lo que trae un pack es
+ * exactamente lo mismo que otorgar un logro —anotar la posesión en
+ * `users/{uid}/items/{id}`— y eso ya lo sabe hacer la tienda.
+ */
+const packs = crearPacks({
+  db,
+  error: errorHttp,
+  marcaDeTiempo,
+  logger,
+  administradores,
+});
+
 // ------------------------------------------------------ tienda: el jugador
 
 /**
@@ -907,6 +953,24 @@ export const misInsignias = functions.https.onCall(async (_data, context) => {
     estadisticas,
     tengo: tengo.filter((i) => i.tipo === "insignia").map((i) => i.id),
     equipada: equipado.insignia ?? null,
+
+    /**
+     * Los sellos, que viajan por acá aunque no sean insignias.
+     *
+     * ─────────────────────────────────────────────────────────────────────
+     * POR QUÉ NO TIENEN SU PROPIA LLAMADA
+     * ─────────────────────────────────────────────────────────────────────
+     *
+     * Porque ya se leyó todo lo que el jugador tiene: `misItems` trae el
+     * inventario entero y acá se filtra. Una callable aparte sería un segundo
+     * viaje al servidor para releer exactamente los mismos documentos, y la
+     * vitrina se dibuja de una sola vez.
+     *
+     * Un sello no se equipa —no está en `CAMPO_EQUIPADO`— así que no hay
+     * ningún "puesto" que informar: se tienen o no se tienen, y se muestran
+     * todos.
+     */
+    sellos: tengo.filter((i) => i.tipo === "sello").map((i) => i.id),
   };
 });
 
@@ -917,6 +981,56 @@ export const misItems = functions.https.onCall(async (_data, context) => {
 });
 
 // --------------------------------------------------- tienda: el catálogo
+
+// --------------------------------------------------- tienda: los paquetes
+
+/**
+ * Los paquetes que se pueden comprar, para dibujar la tienda.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * POR QUÉ UNA CALLABLE Y NO UNA LECTURA DIRECTA DE FIRESTORE
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * El catálogo de artículos sí lo lee el navegador por su cuenta, y está bien:
+ * son nombres, imágenes y precios en Leyendas, y la compra la valida el
+ * servidor igual.
+ *
+ * Los paquetes mueven DINERO. Que el precio salga de una callable y no de una
+ * lectura del cliente no lo hace más seguro por sí mismo —lo que cobra es
+ * `crearOrdenDeCompra`, que lo lee del servidor pase lo que pase— pero deja
+ * una sola puerta por la que salen los paquetes, con el filtro de "apagados no
+ * se muestran" aplicado en un solo lugar. Con lectura directa había que
+ * repetir ese filtro en las reglas de Firestore y acordarse de los dos.
+ */
+export const listarPacks = functions.https.onCall(async (_data, context) => {
+  exigirSesion(context, "listarPacks");
+  return { packs: await packs.listarParaLaTienda() };
+});
+
+/** Todos, encendidos y apagados: el panel necesita ver lo retirado. */
+export const listarPacksAdmin = functions.https.onCall((_data, context) =>
+  packs.listarParaAdmin(context));
+
+/**
+ * Crea o reemplaza un paquete.
+ *
+ * Una sola función para las dos cosas, como `guardarItemAdmin`: "crear" y
+ * "editar" se distinguen sólo en si el id ya existía.
+ */
+export const guardarPackAdmin = functions.https.onCall((data, context) =>
+  packs.guardar(context, data?.pack ?? data));
+
+/** Lo saca de la lista. Las órdenes ya pagadas no se tocan. */
+export const borrarPackAdmin = functions.https.onCall((data, context) =>
+  packs.borrar(context, data?.id));
+
+/** Enciende o apaga sin reenviar el pack entero. */
+export const activarPackAdmin = functions.https.onCall((data, context) =>
+  packs.activar(context, data?.id, data?.activo));
+
+/** Escribe la semilla sin pisar lo que ya esté. */
+export const sembrarPacksAdmin = functions.https.onCall((_data, context) =>
+  packs.sembrar(context));
 
 /**
  * Llena el catálogo con la semilla de demostración.
@@ -1868,7 +1982,15 @@ export const crearOrdenDeCompra = functions
   .https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "crearOrdenDeCompra");
   await limite.exigirRitmoDePlata(uid, "crearOrdenDeCompra");
-  const paquete = paquetePorId(validar(EsquemaCompra, data, errorHttp).paqueteId);
+  /**
+   * El pack se lee del servidor, con el id como única cosa que manda el
+   * cliente.
+   *
+   * `paraCobrar` devuelve `null` tanto si no existe como si está APAGADO.
+   * Las dos cosas tienen que cortar la compra: retirar un pack de la tienda y
+   * que igual se pueda comprar mandando el id a mano no sería retirarlo.
+   */
+  const paquete = await packs.paraCobrar(validar(EsquemaCompra, data, errorHttp).paqueteId);
   if (!paquete) {
     throw new functions.https.HttpsError("invalid-argument", "Paquete inexistente.");
   }
@@ -1906,8 +2028,12 @@ export const crearOrdenDeCompra = functions
     uid,
     paqueteId: paquete.id,
     leyendas: leyendasDePaquete(paquete),
-    importe: paquete.precio, // del catálogo del servidor
+    importe: paquete.precioUYU, // del catálogo del servidor
     moneda: MONEDA,
+    // Qué artículos le tocan, congelados igual que las Leyendas: si alguien
+    // edita el pack entre la compra y el aviso de pago, se entrega lo que se
+    // compró y no lo que el pack dice hoy.
+    itemsExclusivos: Array.isArray(paquete.itemsExclusivos) ? paquete.itemsExclusivos : [],
     estado: "pendiente",
     creada: admin.firestore.FieldValue.serverTimestamp(),
   });
@@ -1940,12 +2066,68 @@ export const crearOrdenDeCompra = functions
 
   return {
     ordenId: refOrden.id,
-    importe: paquete.precio,
+    importe: paquete.precioUYU,
     moneda: MONEDA,
     leyendas: leyendasDePaquete(paquete),
     urlCheckout,
   };
 });
+
+/**
+ * Le da al comprador los artículos que trae su pack.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * POR QUÉ FUERA DE LA TRANSACCIÓN QUE ACREDITA
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Por lo mismo que las insignias al cerrar una partida: `tienda.otorgar` abre
+ * su propia transacción por artículo, y Firestore no admite anidarlas. Meter
+ * los ocho artículos del pack más alto dentro de la transacción del pago
+ * además la volvería enorme y más propensa a abortar por conflicto, con el
+ * cobro adentro.
+ *
+ * Correr después es seguro porque otorgar es idempotente: el documento de
+ * posesión se llama como el artículo. Si el proceso se cae en el medio, Mercado
+ * Pago reintenta el aviso, la acreditación no se repite —clave
+ * `compra_{pago}`— y la entrega termina el trabajo.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * NO PUEDE TUMBAR EL PAGO
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Las Leyendas ya están acreditadas y la orden ya dice `pagado`. Que falle un
+ * artículo —porque alguien lo borró del catálogo entre la compra y el aviso—
+ * no puede hacer que el comprador pierda lo que pagó. Se registra y se sigue.
+ *
+ * Los artículos salen de la ORDEN, no del pack vivo: se congelan al comprar,
+ * igual que las Leyendas. Editar un pack no cambia lo que ya se vendió.
+ */
+async function entregarLoDelPack(ordenId) {
+  try {
+    const snap = await db.collection("ordenes").doc(String(ordenId)).get();
+    const orden = snap.exists ? snap.data() : null;
+    const ids = Array.isArray(orden?.itemsExclusivos) ? orden.itemsExclusivos : [];
+    if (!orden?.uid || !ids.length) return;
+
+    const entregados = [];
+    for (const itemId of ids) {
+      try {
+        const r = await tienda.otorgar(orden.uid, itemId, { origen: "pack" });
+        if (r.nuevo) entregados.push(itemId);
+      } catch (e) {
+        logger.error("No se pudo entregar un artículo del pack", {
+          ordenId, uid: orden.uid, item: itemId, error: e.message,
+        });
+      }
+    }
+
+    if (entregados.length) {
+      logger.info("Artículos de pack entregados", { ordenId, uid: orden.uid, entregados });
+    }
+  } catch (e) {
+    logger.error("No se pudieron entregar los artículos del pack", { ordenId, error: e.message });
+  }
+}
 
 /**
  * Paso 2: el proveedor confirma el pago. Sólo acá se acreditan Leyendas.
@@ -2075,8 +2257,11 @@ export const webhookPago = functions
       // Acá se le escribía al comprador del Pack Élite la insignia
       // `comprador-elite`, en un campo que no lee nadie y con un id que no
       // existía en ningún catálogo. Los paquetes dan Leyendas; las insignias
-      // se ganan jugando.
+      // se ganan jugando. Lo que SÍ trae un pack se entrega abajo, fuera de
+      // esta transacción.
     });
+
+    await entregarLoDelPack(pago.ordenId);
 
     return res.status(200).send("ok");
   } catch (e) {

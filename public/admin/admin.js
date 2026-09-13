@@ -36,6 +36,7 @@ import {
 // siete secciones, y el CRUD trae formulario, lista y estado propio.
 import { montarTiendaAdmin } from "./tienda-admin.js";
 import { montarTorneosAdmin } from "./torneos-admin.js";
+import { montarPacksAdmin } from "./packs-admin.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -251,6 +252,7 @@ onAuthStateChanged(auth, (usuario) => {
   if (esAdmin) {
     montarTiendaAdmin();
     montarTorneosAdmin();
+    montarPacksAdmin();
   }
 
   // Con sesión resuelta, la pantalla del código ya no va: o entró, o hay que

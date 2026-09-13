@@ -330,3 +330,42 @@
     height: 56px;
   }
 }
+
+/* ----------------------------------------------------- la tira de sellos
+
+   Va arriba de las insignias y se lee distinto a propósito: son constancias,
+   no metas. Sin barra de progreso, sin botón y sin las que no se tienen.
+
+   El `display` lleva su excepción para `[hidden]`: una regla de autor con
+   `display` le gana al `[hidden]` de la hoja del navegador, y la tira quedaba
+   visible y vacía con el atributo puesto. */
+.tira-sellos[hidden] {
+  display: none;
+}
+
+.tira-sellos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.tira-sellos .sello {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(212, 168, 67, 0.45);
+  background: rgba(212, 168, 67, 0.1);
+  font-size: 0.86rem;
+}
+
+/* La figura hereda el tamaño de la de una insignia, más chica: acá acompaña
+   al nombre en vez de ser el centro de una tarjeta. */
+.tira-sellos .figura-logro {
+  width: 24px;
+  height: 24px;
+  font-size: 1.2rem;
+  line-height: 1;
+}

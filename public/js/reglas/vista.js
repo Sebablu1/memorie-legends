@@ -154,6 +154,12 @@ export function vistaDe(estado, indiceQuienMira) {
       retrato: jugador.retrato ?? null,
       dorso: jugador.dorso ?? null,
       insignia: jugador.insignia ?? null,
+      // El marco rodea la cara y el título va al lado del nombre. Viajan por
+      // lo mismo que el dorso: si cada navegador los resolviera por su cuenta,
+      // el que los compró los vería sólo en su propia pantalla — y no puede,
+      // porque las reglas de Firestore no lo dejan leer el perfil ajeno.
+      marco: jugador.marco ?? null,
+      titulo: jugador.titulo ?? null,
       puntos: jugador.puntos,
       puntosRonda: jugador.puntosRonda,
       eliminado: jugador.eliminado,

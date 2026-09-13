@@ -86,8 +86,10 @@ const siguienteActivo = (jugadores, desde) => {
 /**
  * Un jugador nuevo.
  *
- * `retrato`, `dorso` e `insignia` son rutas de imagen: la cara, el reverso de
- * sus cartas y el logro que eligió mostrar. Viajan acá al lado de `nombre` por
+ * `retrato`, `dorso`, `insignia` y `marco` son rutas de imagen: la cara, el
+ * reverso de sus cartas, el logro que eligió mostrar y el borde que rodea su
+ * cara. `titulo` es la excepción: es TEXTO, la palabra que va al lado del
+ * nombre. Viajan acá al lado de `nombre` por
  * la misma razón que el nombre: son identidad, y la identidad se fija al
  * repartir. En una partida por Leyendas las elige el servidor cuando el
  * jugador entra a la sala; en entrenamiento no se pasan y quedan en `null`,
@@ -106,12 +108,16 @@ export const crearJugador = ({
   retrato = null,
   dorso = null,
   insignia = null,
+  marco = null,
+  titulo = null,
 }) => ({
   id,
   nombre,
   retrato,
   dorso,
   insignia,
+  marco,
+  titulo,
   esIA,
   dificultad,
   mano: [],

@@ -526,6 +526,8 @@ export function crearMotorEnRed({
       retrato: luce?.[i]?.retrato ?? null,
       dorso: luce?.[i]?.dorso ?? null,
       insignia: luce?.[i]?.insignia ?? null,
+      marco: luce?.[i]?.marco ?? null,
+      titulo: luce?.[i]?.titulo ?? null,
       esIA: false,
     }));
 

@@ -147,6 +147,16 @@ export const equiparItem = (itemId) => llamar("equiparItem", { itemId });
 export const misItems = () => llamar("misItems");
 
 /**
+ * Los paquetes de Leyendas que se pueden comprar.
+ *
+ * Sale por callable y no por lectura directa de Firestore porque acá hay
+ * dinero: una sola puerta, con el filtro de «apagados no se muestran»
+ * aplicado en un solo lugar. Lo que se cobra lo decide igual el servidor
+ * al crear la orden.
+ */
+export const listarPacks = () => llamar("listarPacks");
+
+/**
  * Se saca lo que lleva puesto de un tipo.
  *
  * `equiparItem` no alcanza para esto: el perfil guarda UN id por tipo, así que

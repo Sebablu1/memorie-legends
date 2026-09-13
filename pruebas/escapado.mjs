@@ -64,12 +64,18 @@ console.log("\n=== Ninguna plantilla mete un nombre sin escapar ===");
   const DE_USUARIO = ["nombre", "inicial", "username", "displayName", "motivoCancelacion"];
 
   /**
-   * Lo que NO cuenta: `tienda.js` interpola `p.nombre`, pero ese `p` sale de
-   * `PAQUETES`, una constante del propio código. Escaparlo no haría daño, pero
-   * anotarlo acá es más honesto que ensuciar la plantilla para callar a una
-   * herramienta.
+   * Ya no hay excepciones.
+   *
+   * `tienda.js` estaba eximido porque interpolaba `p.nombre` de `PAQUETES`,
+   * una constante del propio código: no podía traer sorpresas. Desde que los
+   * paquetes se administran desde el panel, ese nombre lo teclea una persona y
+   * viaja por Firestore — es texto de afuera como el de una sala, y el archivo
+   * lo escapa como corresponde.
+   *
+   * El conjunto se deja vacío en vez de borrarse: si mañana aparece otro caso
+   * legítimo, hay dónde anotarlo y por qué.
    */
-  const PERMITIDOS = new Set(["public/js/tienda.js"]);
+  const PERMITIDOS = new Set([]);
 
   const archivos = [];
   (function recorrer(dir) {
