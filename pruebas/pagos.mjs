@@ -243,5 +243,68 @@ console.log("\n=== El webhook no lee el estado del payload ===");
      "y los nombres son los que lee el código");
 }
 
+// =====================================================================
+console.log("\n=== Sin credenciales no se anota ninguna orden ===");
+// =====================================================================
+
+{
+  /**
+   * QUÉ SE ROMPIÓ
+   *
+   * `crearOrdenDeCompra` escribía el documento de la orden ANTES de comprobar
+   * que hubiera token. Con los secretos sin cargar, cada persona que apretaba
+   * «Comprar» dejaba una orden en `pendiente` que nunca iba a existir del lado
+   * de Mercado Pago.
+   *
+   * El daño no es el espacio: es que `ordenes` es la colección que hay que
+   * conciliar a mano cuando algo falla, y esas órdenes fantasma son
+   * indistinguibles a simple vista de un pago real que quedó sin acreditar.
+   *
+   * QUÉ NO CAMBIA
+   *
+   * Si los secretos ESTÁN y la preferencia falla igual, la orden se conserva a
+   * propósito: hubo un intento real y que quede anotado es lo que permite
+   * entender después qué pasó. Lo que se borró de raíz es la orden sin
+   * intento, no la orden sin éxito.
+   *
+   * Se mide por orden en la fuente porque es una función de Cloud Functions:
+   * no se puede instanciar sin `firebase-admin` ni sin entorno.
+   *
+   * Y se mide sobre la fuente SIN COMENTARIOS. Con ellos, el comentario que
+   * explica por qué la comprobación va primero nombra las dos cosas, y la
+   * prueba encontraría el orden correcto en la explicación aunque el código
+   * hiciera lo contrario.
+   */
+  const { readFileSync: leerArchivo } = await import("node:fs");
+  const crudo = leerArchivo(new URL("../functions/index.js", import.meta.url), "utf8");
+  const sinComentarios = crudo.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+
+  const cuerpo = sinComentarios.slice(
+    sinComentarios.indexOf("export const crearOrdenDeCompra"),
+    sinComentarios.indexOf("export const webhookPago"),
+  );
+
+  ok(cuerpo.length > 500, "se encontró el cuerpo de `crearOrdenDeCompra`", cuerpo.length);
+
+  const comprobacion = cuerpo.indexOf("if (!process.env.MP_ACCESS_TOKEN)");
+  const escritura = cuerpo.indexOf('db.collection("ordenes")');
+
+  ok(comprobacion !== -1, "comprueba el token");
+  ok(escritura !== -1, "y escribe la orden");
+  ok(comprobacion < escritura,
+     "el token se comprueba ANTES de escribir la orden",
+     { comprobacion, escritura });
+
+  // El fallo de la preferencia sigue conservando la orden: son dos casos
+  // distintos y sólo uno de los dos tenía que cambiar. Esto sí se busca en el
+  // texto con comentarios, porque es la decisión lo que hay que preservar.
+  const conComentarios = crudo.slice(
+    crudo.indexOf("export const crearOrdenDeCompra"),
+    crudo.indexOf("export const webhookPago"),
+  );
+  ok(/no se borra/.test(conComentarios),
+     "y una preferencia fallida sigue dejando rastro, que es lo que se quiere");
+}
+
 console.log(fallos ? `\n❌ ${fallos} fallos\n` : "\n✅ TODO OK\n");
 process.exit(fallos ? 1 : 0);

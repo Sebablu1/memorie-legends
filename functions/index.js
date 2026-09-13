@@ -1873,6 +1873,33 @@ export const crearOrdenDeCompra = functions
     throw new functions.https.HttpsError("invalid-argument", "Paquete inexistente.");
   }
 
+  /**
+   * Si los pagos no están configurados, no se anota nada.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * POR QUÉ ESTA COMPROBACIÓN VA ANTES DE ESCRIBIR LA ORDEN
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * Estaba después, y cada persona que apretaba «Comprar» con los secretos
+   * sin cargar dejaba una orden en `pendiente` que nunca iba a existir del
+   * lado de Mercado Pago. Basura acumulándose en `ordenes`, y del peor tipo:
+   * indistinguible a simple vista de una orden real que quedó sin acreditar.
+   * Justo la colección que hay que poder conciliar a mano cuando algo falla.
+   *
+   * No es lo mismo que el fallo de más abajo. Ahí la orden SÍ se conserva a
+   * propósito: los secretos estaban, se intentó de verdad, y que el intento
+   * quede anotado es lo que permite entender después qué pasó. Acá no hubo
+   * intento — el sistema no estaba en condiciones de recibir un peso— y una
+   * orden es el registro de un intento, no de un clic.
+   */
+  if (!process.env.MP_ACCESS_TOKEN) {
+    logger.error("Falta MP_ACCESS_TOKEN: no se puede abrir el checkout", { uid });
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "Los pagos todavía no están habilitados. Probá más tarde.",
+    );
+  }
+
   const refOrden = db.collection("ordenes").doc();
   await refOrden.set({
     id: refOrden.id,
@@ -1884,14 +1911,6 @@ export const crearOrdenDeCompra = functions
     estado: "pendiente",
     creada: admin.firestore.FieldValue.serverTimestamp(),
   });
-
-  if (!process.env.MP_ACCESS_TOKEN) {
-    logger.error("Falta MP_ACCESS_TOKEN: no se puede abrir el checkout");
-    throw new functions.https.HttpsError(
-      "failed-precondition",
-      "Los pagos todavía no están habilitados. Probá más tarde.",
-    );
-  }
 
   let checkout;
   try {
@@ -2019,8 +2038,18 @@ export const webhookPago = functions
         throw Object.assign(new Error(coincide.motivo), { noAcreditar: true, pago: pago.id });
       }
 
-      const paquete = paquetePorId(orden.paqueteId);
-
+      /**
+       * Lo que se acredita sale de la ORDEN, no del paquete.
+       *
+       * `orden.leyendas` se congeló cuando se creó la orden, con el precio y
+       * la cantidad de ese momento. Si alguien edita el paquete entre la
+       * compra y el aviso de pago, al comprador se le acredita lo que compró
+       * y no lo que el paquete dice hoy.
+       *
+       * Acá se leía además el paquete vivo, para sacarle la insignia que
+       * prometía. Esa insignia se fue —se escribía en un campo que nadie
+       * lee— y con ella el último motivo para mirar el paquete.
+       */
       await moverLeyendas(tx, {
         uid: orden.uid,
         delta: orden.leyendas,
