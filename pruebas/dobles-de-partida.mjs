@@ -68,39 +68,61 @@ function exportaciones(fuente) {
   return nombres;
 }
 
-// =====================================================================
-console.log("\n=== Todo doble de `partida-red.js` exporta lo que exporta el real ===");
-// =====================================================================
-
-const real = exportaciones(readFileSync(join(raiz, "public", "js", "partida-red.js"), "utf8"));
-
-ok(real.size > 10, `el módulo real exporta ${real.size} cosas`, real.size);
-ok(real.has("escucharMiVista"), "  entre ellas `escucharMiVista`");
-ok(real.has("escucharMisLogros"), "  y `escucharMisLogros`");
+/**
+ * Los módulos que las pruebas reemplazan enteros.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * POR QUÉ SON DOS Y NO UNO
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Esta suite nació mirando sólo `partida-red.js`, y el siguiente agujero salió
+ * por `servidor.js`: la tienda pasó a importar `listarPacks` de ahí, dos
+ * dobles no lo declararon, y el módulo entero de la tienda falló al importar.
+ * Veintiuna pruebas en rojo, ninguna por el motivo que decía su nombre.
+ *
+ * La lista es de MÓDULOS vigilados, no de dobles: quién dobla cuál se descubre
+ * leyendo las pruebas. Agregar un módulo acá alcanza para que todos sus dobles
+ * queden cubiertos.
+ */
+const VIGILADOS = [
+  ["public", "js", "partida-red.js"],
+  ["public", "js", "servidor.js"],
+];
 
 const carpeta = join(raiz, "pruebas", "e2e");
 const specs = readdirSync(carpeta).filter((f) => f.endsWith(".spec.js") || f.endsWith(".js"));
 
-/**
- * Quién dobla el módulo.
- *
- * Se detecta por la ruta que interceptan, no por una lista escrita a mano:
- * una prueba nueva que doble el módulo queda vigilada sin que nadie se
- * acuerde de anotarla acá, que es justo el olvido que produjo el agujero.
- */
-const dobladores = specs.filter((f) =>
-  /page\.route\(\s*["'`]\*\*\/js\/partida-red\.js["'`]/.test(readFileSync(join(carpeta, f), "utf8")),
-);
+for (const ruta of VIGILADOS) {
+  const nombre = ruta[ruta.length - 1];
 
-ok(dobladores.length > 0, `hay ${dobladores.length} pruebas que doblan el módulo`, dobladores);
+  // ===================================================================
+  console.log(`\n=== Todo doble de \`${nombre}\` exporta lo que exporta el real ===`);
+  // ===================================================================
 
-for (const spec of dobladores) {
-  const fuente = readFileSync(join(carpeta, spec), "utf8");
-  const declaradas = exportaciones(fuente);
-  const faltan = [...real].filter((n) => !declaradas.has(n));
+  const real = exportaciones(readFileSync(join(raiz, ...ruta), "utf8"));
+  ok(real.size > 5, `el módulo real exporta ${real.size} cosas`, real.size);
 
-  ok(faltan.length === 0, `${spec} no le debe ningún export al módulo real`, faltan);
+  /**
+   * Quién lo dobla.
+   *
+   * Se detecta por la ruta que interceptan y no por una lista escrita a mano:
+   * una prueba nueva que doble el módulo queda vigilada sin que nadie se
+   * acuerde de anotarla acá, que es justo el olvido que produce el agujero.
+   */
+  const dobladores = specs.filter((f) => {
+    const fuente = readFileSync(join(carpeta, f), "utf8");
+    return fuente.includes(`page.route("**/js/${nombre}"`)
+      || fuente.includes(`page.route('**/js/${nombre}'`)
+      || fuente.includes("page.route(`**/js/" + nombre + "`");
+  });
 
+  ok(dobladores.length > 0, `hay ${dobladores.length} pruebas que lo doblan`, dobladores);
+
+  for (const spec of dobladores) {
+    const declaradas = exportaciones(readFileSync(join(carpeta, spec), "utf8"));
+    const faltan = [...real].filter((n) => !declaradas.has(n));
+    ok(faltan.length === 0, `  ${spec} no le debe ningún export`, faltan);
+  }
 }
 
 // =====================================================================

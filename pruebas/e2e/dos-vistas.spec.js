@@ -101,6 +101,14 @@ const servidorFalso = `
     ESCRIBIR({ ...LEER(), [tipo]: null });
     return { tipo, campo: tipo, equipado: null };
   }
+  // La tienda pide los paquetes al montar. El doble contesta una lista vacía:
+  // dibujarPaquetes no hace nada con eso y deja los de la semilla, que es lo
+  // que esta suite mira. Sin este export, el módulo entero de la tienda falla
+  // al importar y NO SE DIBUJA NADA.
+  //
+  // Sin comillas invertidas: este doble ES un template literal, y una sola en
+  // un comentario lo cierra y el archivo deja de parsear.
+  export const listarPacks = async () => ({ packs: [] });
   export const comprarItem = async () => ({});
   export const comprarPack = async () => ({});
   export const misInsignias = async () => ({ estadisticas: {}, tengo: [], equipada: null });
@@ -109,6 +117,23 @@ const servidorFalso = `
   export const crearSala = async () => ({});
   export const unirseASala = async () => ({});
   export const ErrorDeRed = Error;
+
+  // El resto de la superficie de servidor.js, para que el doble no le deba
+  // ningun export al modulo real.
+  //
+  // No es ceremonia: un import nombrado que no existe rompe el modulo entero
+  // al cargar, aunque nadie lo llame. Asi se cayo la tienda cuando empezo a
+  // importar listarPacks y dos dobles no lo declaraban: veintiuna pruebas en
+  // rojo, ninguna por el motivo que decia su nombre.
+  //
+  // Lo vigila pruebas/dobles-de-partida.mjs.
+  export const revanchaDeSala = async () => ({});
+  export const abandonarPartida = async () => ({});
+  export const marcarListo = async () => ({});
+  export const iniciarPartida = async () => ({});
+  export const salirDeSalaEnEspera = async () => ({});
+  export const reportarJugador = async () => ({});
+
 `;
 
 async function dobles(page) {

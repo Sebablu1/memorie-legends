@@ -192,8 +192,22 @@ test("la separación sale de las reglas, no de una lista escrita en el panel", a
    */
   await abrirCatalogo(page);
 
+  /**
+   * Las cuatro familias que no se venden.
+   *
+   * Eran una sola —la insignia— hasta que llegaron los packs con `marco`,
+   * `titulo` y `sello`. La prueba decía «hoy la única no vendible es la
+   * insignia» y se cayó al agregarlos, que es exactamente lo que tenía que
+   * hacer: el panel las agrupa por `TIPOS_VENDIBLES`, así que un tipo nuevo
+   * aparece del lado correcto solo, pero alguien tiene que MIRAR que así sea.
+   */
   const noVendiblesEsperados = TIPOS_VALIDOS.filter((t) => !esVendible(t));
-  expect(noVendiblesEsperados, "hoy la única no vendible es la insignia").toEqual(["insignia"]);
+  expect(noVendiblesEsperados, "las cuatro familias que no se venden").toEqual([
+    "insignia",
+    "marco",
+    "titulo",
+    "sello",
+  ]);
   expect(TIPOS_VENDIBLES).toContain("avatar");
 
   // El grupo vendible tiene un subtítulo por cada tipo que se vende y tenga

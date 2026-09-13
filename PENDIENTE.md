@@ -135,6 +135,21 @@ curl -s -X POST https://us-central1-memorie-legends.cloudfunctions.net/webhookPa
 Tiene que contestar **`Firma inválida`** (401). Si dice `Sin configurar` (500),
 los secretos siguen sin llegar al runtime.
 
+### ⚠️ El panel no manda sobre el precio todavía
+
+**Hasta que se carguen los secretos de MP, el checkout sigue con la lista vieja
+de packs. No cambiar precios esperando que tengan efecto.**
+
+El motivo: `crearOrdenDeCompra` es la que lee el pack para cobrar, y en el
+cambio del 13 de septiembre pasó a leerlo de Firestore en vez del código. Pero
+esa función **declara los secretos de MP**, así que no se puede desplegar —
+quedó con el código anterior, que usa la constante.
+
+Hoy no tiene consecuencia real, porque esa función no cobra nada: contesta «los
+pagos todavía no están habilitados». Pero significa que editar un precio desde
+el panel **no cambia lo que se cobraría**. Se arregla solo con el
+`firebase deploy --only functions` completo de más arriba.
+
 **Y después, conciliar `ordenes`:** las que quedaron en `pendiente` **con**
 `transaccionId` son pagos reales sin acreditar y hay que resolverlas a mano.
 Las que están en `pendiente` **sin** `transaccionId` son intentos que nunca

@@ -116,6 +116,26 @@ const servidorFalso = `
   export const crearSala = async () => ({});
   export const unirseASala = async () => ({});
   export const ErrorDeRed = Error;
+
+  // El resto de la superficie de servidor.js, para que el doble no le deba
+  // ningun export al modulo real.
+  //
+  // No es ceremonia: un import nombrado que no existe rompe el modulo entero
+  // al cargar, aunque nadie lo llame. Asi se cayo la tienda cuando empezo a
+  // importar listarPacks y dos dobles no lo declaraban: veintiuna pruebas en
+  // rojo, ninguna por el motivo que decia su nombre.
+  //
+  // Lo vigila pruebas/dobles-de-partida.mjs.
+  export const revanchaDeSala = async () => ({});
+  export const abandonarPartida = async () => ({});
+  export const marcarListo = async () => ({});
+  export const iniciarPartida = async () => ({});
+  export const salirDeSalaEnEspera = async () => ({});
+  export const reportarJugador = async () => ({});
+  export const comprarItem = async () => ({});
+  export const listarPacks = async () => ({});
+  export const comprarPack = async () => ({});
+
 `;
 
 async function abrirPanel(page, { catalogo = CATALOGO } = {}) {
