@@ -186,19 +186,39 @@ Los doce: `avatar_iniciado`, `dorso_viajero`, `avatar_erudito`,
 
 ---
 
-## 3d. Dibujar marco, título y sello donde corresponde
+## 3d. Dibujar marco y título en la sala de espera y en el ranking
 
-**Estado:** los tres tipos existen, se poseen y —marco y título— se equipan.
-**Todavía no se dibujan en ningún lado.**
+**Estado: dos de cuatro pantallas hechas.**
 
-Lo que falta es mostrarlos: el marco alrededor del avatar en ranking, lobby y
-mesa; el título al lado del nombre en ranking y lobby; el sello en el perfil.
-Es trabajo de pantalla en cuatro lugares distintos y quedó fuera de esta
-tanda.
+| Pantalla | Qué se muestra | Estado |
+|---|---|---|
+| Perfil | el sello | ✅ hecho |
+| Mesa | marco sobre la cara, título al lado del nombre | ✅ hecho |
+| Sala de espera | marco y título | ❌ falta |
+| Ranking | marco y título | ❌ falta |
 
-Mientras tanto, quien compre el Élite o el ML **recibe** el marco y el título
-—están en su inventario y los puede equipar— pero no los ve puestos. Conviene
-resolverlo antes de vender esos dos packs.
+**Sala de espera (~1–1,5 h).** El dato ya está: `jugadoresLuce` viaja en el
+documento de la sala. Lo que falta es que la sala dibuje un avatar — hoy
+muestra una inicial en un círculo (`avatar-inicial`), así que no hay nada
+alrededor de lo cual poner un marco.
+
+**Ranking (~2–3 h, más una decisión).** Es el caro y el que tiene un problema
+que no es de horas:
+
+- La tabla no tiene avatares: es texto.
+- La fila (`rankings/{clave}/jugadores/{uid}`) no tiene cosméticos, y el
+  cliente **no puede** leerlos por su cuenta — `firestore.rules` sólo deja leer
+  el perfil propio.
+- Habría que escribirlos desde el servidor dentro de la transacción del cierre,
+  y eso los **congela**: quien compre el Élite no vería su marco en el ranking
+  hasta jugar otra partida.
+
+La alternativa —resolver los cosméticos de las 50 filas visibles en cada carga—
+son 50 lecturas de perfil por visita. Esa decisión merece su propia sesión.
+
+**Mientras tanto:** el Élite y el ML no se venden (ver punto 0). Quien los
+comprara recibiría el marco y el título y los vería en la mesa, que es donde
+más se mira, pero no en la sala de espera ni en el ranking.
 
 ---
 
