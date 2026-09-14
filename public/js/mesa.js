@@ -26,6 +26,7 @@ import {
   MS_MIRAR,
   MS_DESCARTE,
   MS_REAPERTURA,
+  cartasMiradasEn,
 } from "./reglas/motor.js";
 
 
@@ -3030,6 +3031,36 @@ function mostrarMiradas(vista) {
   registroAnunciado = registro.length;
 
   for (const linea of nuevas) {
+    /**
+     * EL OJO, PARA TODAS LAS MIRADAS Y EN UN SOLO LUGAR.
+     *
+     * ─────────────────────────────────────────────────────────────────────
+     * POR QUÉ NO UNA RAMA POR PODER
+     * ─────────────────────────────────────────────────────────────────────
+     *
+     * Mirar una carta pasa en cuatro momentos —la mirada inicial, el 7, el 8
+     * y el 10— y cada uno guarda las posiciones a su manera, porque cada uno
+     * mira cosas distintas. Con una rama por caso, agregar un poder nuevo
+     * obliga a acordarse de agregarle también su ojo, y olvidarse no rompe
+     * nada: simplemente no aparece.
+     *
+     * `cartasMiradasEn` contesta «¿qué cartas se miraron en esta línea?» y acá
+     * se pinta un ojo en cada una, sea cual sea el evento. Lo que sigue abajo
+     * es sólo el cartel y el sonido, que sí son distintos en cada caso.
+     */
+    for (const { jugador, posicion } of cartasMiradasEn(linea)) {
+      ojoEn(jugador, posicion);
+    }
+
+    /**
+     * La mirada inicial no lleva cartel ni sonido.
+     *
+     * Los cuatro miran a la vez durante los dos segundos de apertura: cuatro
+     * carteles pisándose y cuatro sonidos encimados no informan de nada. El
+     * ojo, que ya se pintó arriba, dice todo lo que hay que decir.
+     */
+    if (linea?.tipo === "miradaInicial") continue;
+
     // Las miradas de los poderes 7 y 8.
     if (linea?.tipo === "miroCarta") {
       // Quién miró a quién ya viene en la línea, así que el 7 (mirarse una
@@ -3037,9 +3068,6 @@ function mostrarMiradas(vista) {
       cartel(linea.actor === linea.objetivo ? "mirarPropia" : "mirarRival");
       sonidos.voltear();
       marcarManoMirada(linea.objetivo);
-      // Y el ojo sobre la carta exacta, que es lo que hace que los otros tres
-      // se enteren de cuál fue.
-      ojoEn(linea.objetivo, linea.posicion);
       continue;
     }
 
@@ -3055,8 +3083,6 @@ function mostrarMiradas(vista) {
       // pasó; el desenlace lo anuncia `resolvioElDiez` un momento después.
       sonidos.voltear();
       marcarManoMirada(linea.objetivo);
-      ojoEn(linea.actor, linea.posicionPropia);
-      ojoEn(linea.objetivo, linea.posicionRival);
       continue;
     }
     // Y cómo terminó el 10. Que la mesa se entere de si el cambio se hizo o no

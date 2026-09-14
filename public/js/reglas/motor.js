@@ -246,18 +246,88 @@ export function empezarRonda(estado) {
  * Esa diferencia es la que hace falta para que el 9 y el 10 le enseñen algo a
  * quien los sufre.
  */
-export const mirar = (estado, indiceJugador, posicion = 0) => ({
-  ...estado,
-  conocimientos: recordarPropia(estado, {
-    jugador: indiceJugador,
-    posicion,
-    carta: estado.jugadores[indiceJugador]?.mano?.[posicion],
-    origen: "mirada",
-  }),
-  jugadores: estado.jugadores.map((j, i) =>
-    i === indiceJugador ? { ...j, posicionMirada: posicion } : j,
-  ),
-});
+export const mirar = (estado, indiceJugador, posicion = 0) =>
+  anotar(
+    {
+      ...estado,
+      conocimientos: recordarPropia(estado, {
+        jugador: indiceJugador,
+        posicion,
+        carta: estado.jugadores[indiceJugador]?.mano?.[posicion],
+        origen: "mirada",
+      }),
+      jugadores: estado.jugadores.map((j, i) =>
+        i === indiceJugador ? { ...j, posicionMirada: posicion } : j,
+      ),
+    },
+    `${estado.jugadores[indiceJugador]?.nombre ?? "Alguien"} miró una de sus cartas`,
+    /**
+     * La mirada inicial también deja constancia, y también con la posición.
+     *
+     * ───────────────────────────────────────────────────────────────────
+     * POR QUÉ UN EVENTO Y NO `posicionMirada`
+     * ───────────────────────────────────────────────────────────────────
+     *
+     * La posición ya vivía en el jugador, pero no viaja en la vista — y
+     * aunque viajara, sería un dato PERMANENTE: dice "miró la tercera" durante
+     * toda la ronda, y la mesa tendría que compararlo con el anterior para
+     * saber que recién pasó.
+     *
+     * El registro da eso gratis: una línea aparece una vez, en el momento. Es
+     * el mismo canal por el que se anuncian las miradas de los poderes, así
+     * que la mesa las pinta todas con el mismo mecanismo.
+     *
+     * Tipo propio y no `miroCarta` porque el aviso es distinto: cuatro
+     * jugadores mirando a la vez no pueden disparar cuatro carteles y cuatro
+     * sonidos. Lo único que comparten es el ojo.
+     */
+    { tipo: "miradaInicial", actor: indiceJugador, posicion },
+  );
+
+/**
+ * Qué cartas marcó como miradas una línea del registro.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * UNA SOLA FUNCIÓN PARA TODAS LAS MIRADAS
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Mirar una carta pasa en cuatro momentos distintos —la mirada inicial, el 7,
+ * el 8 y el 10— y cada uno guarda las posiciones a su manera, porque cada uno
+ * mira cosas distintas: el 7 una propia, el 8 una ajena, el 10 una de cada.
+ *
+ * La mesa no tiene por qué saber nada de eso. Pregunta "¿qué cartas se
+ * miraron acá?" y pinta un ojo en cada una. Con una rama por poder, agregar
+ * un poder nuevo obligaba a acordarse de agregar también su rama — y olvidarse
+ * no rompe nada: simplemente no aparece el ojo.
+ *
+ * Tolera líneas sin posición. Las partidas que ya estaban en curso cuando esto
+ * se desplegó las tienen, y una posición ausente tiene que ser "ninguna carta",
+ * no un ojo en la posición `undefined`.
+ */
+export function cartasMiradasEn(linea) {
+  const enPosicion = (jugador, posicion) =>
+    Number.isInteger(jugador) && Number.isInteger(posicion) ? [{ jugador, posicion }] : [];
+
+  switch (linea?.tipo) {
+    case "miradaInicial":
+      return enPosicion(linea.actor, linea.posicion);
+
+    // El 7 mira una propia y el 8 una ajena. En los dos, `objetivo` es de
+    // quién es la carta — con el 7, uno mismo.
+    case "miroCarta":
+      return enPosicion(linea.objetivo, linea.posicion);
+
+    // El 10, que mira dos: una de cada mano.
+    case "miroParaCambiar":
+      return [
+        ...enPosicion(linea.actor, linea.posicionPropia),
+        ...enPosicion(linea.objetivo, linea.posicionRival),
+      ];
+
+    default:
+      return [];
+  }
+}
 
 /** Al agotarse los 2 segundos: quien no eligió se queda con la posición 0. */
 export const terminarMirada = (estado) =>

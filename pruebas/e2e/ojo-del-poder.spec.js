@@ -253,3 +253,69 @@ test("una línea sin posición no rompe la mesa", async ({ page }) => {
   await expect(conOjo(page)).toHaveCount(0);
   expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
 });
+
+test("la mirada inicial también deja su ojo", async ({ page }) => {
+  /**
+   * El caso que faltaba, y el más común de todos: al empezar la ronda cada
+   * jugador mira UNA carta suya. Antes eso no dejaba ninguna constancia — la
+   * posición vivía en el jugador y no viajaba en la vista — así que nadie veía
+   * qué carta había mirado nadie.
+   */
+  await abrirMesa(page, {
+    registro: [
+      { ronda: 1, texto: "Caro miró una de sus cartas", tipo: "miradaInicial", actor: 2, posicion: 1 },
+    ],
+  });
+
+  await expect(carta(page, 2, 1)).toHaveClass(/mirada/);
+  await expect(conOjo(page)).toHaveCount(1);
+});
+
+test("los cuatro miran a la vez y se ven los cuatro ojos", async ({ page }) => {
+  // Es lo que pasa de verdad en los dos segundos de apertura. Cada uno mira
+  // una carta distinta de su propia mano.
+  await abrirMesa(page, {
+    registro: [0, 1, 2, 3].map((quien) => ({
+      ronda: 1,
+      texto: "miró una de sus cartas",
+      tipo: "miradaInicial",
+      actor: quien,
+      posicion: quien,
+    })),
+  });
+
+  await expect(conOjo(page)).toHaveCount(4);
+  for (const quien of [0, 1, 2, 3]) {
+    await expect(carta(page, quien, quien)).toHaveClass(/mirada/);
+  }
+});
+
+test("el mecanismo es uno solo: no hay una rama por poder", async ({ page }) => {
+  /**
+   * La afirmación que protege la unificación.
+   *
+   * Las cuatro clases de mirada llegan juntas y las cuatro tienen que pintar
+   * su ojo. Con una rama por evento, agregar un poder nuevo obliga a acordarse
+   * de agregarle también su ojo — y olvidarse no rompe nada, simplemente no
+   * aparece. Acá se comprueban las cuatro de una.
+   */
+  await abrirMesa(page, {
+    registro: [
+      { ronda: 1, texto: "inicial", tipo: "miradaInicial", actor: 0, posicion: 0 },
+      { ronda: 1, texto: "un 7", tipo: "miroCarta", actor: 1, objetivo: 1, posicion: 1 },
+      { ronda: 1, texto: "un 8", tipo: "miroCarta", actor: 1, objetivo: 2, posicion: 2 },
+      {
+        ronda: 1, texto: "un 10", tipo: "miroParaCambiar",
+        actor: 3, objetivo: 2, posicionPropia: 3, posicionRival: 0,
+      },
+    ],
+  });
+
+  // Cinco ojos: uno por cada mirada, y el 10 cuenta por dos.
+  await expect(conOjo(page)).toHaveCount(5);
+  await expect(carta(page, 0, 0)).toHaveClass(/mirada/);
+  await expect(carta(page, 1, 1)).toHaveClass(/mirada/);
+  await expect(carta(page, 2, 2)).toHaveClass(/mirada/);
+  await expect(carta(page, 3, 3)).toHaveClass(/mirada/);
+  await expect(carta(page, 2, 0)).toHaveClass(/mirada/);
+});
