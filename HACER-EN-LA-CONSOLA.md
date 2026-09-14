@@ -39,8 +39,13 @@ servidor.
   con `ReCaptchaV3Provider`**: una clave de Enterprise pasada al proveedor de v3
   no falla al construirse, falla después al pedir el token, y desde afuera se ve
   como "App Check no anda" sin decir por qué.
-- Comprobá que estén autorizados los dominios `memorie-legends.web.app`,
+- Comprobá que estén autorizados los dominios `memorielegends.com`,
+  `www.memorielegends.com`, `memorie-legends.web.app`,
   `memorie-legends.firebaseapp.com` y `localhost`.
+- El dominio propio va **además** del de Firebase, no en lugar de él: los dos
+  sirven el sitio.
+- Y acordate de `public/js/app-check.js`: tiene su propia lista de dominios, y
+  un dominio que falte ahí deja App Check apagado **en silencio**.
 
 ### Antes de encenderlo — esto es lo importante
 

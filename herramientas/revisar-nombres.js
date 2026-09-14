@@ -20,7 +20,7 @@
  * CÓMO SE USA
  *
  * Se pega ENTERO en la consola del navegador, estando con sesión iniciada en
- * https://memorie-legends.web.app (por ejemplo en el tablero). No hay que
+ * https://memorielegends.com (por ejemplo en el tablero). No hay que
  * instalar nada.
  *
  * POR QUÉ ASÍ Y NO DESDE UN SCRIPT

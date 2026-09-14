@@ -24,7 +24,18 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
-const SITIO = "https://memorie-legends.web.app";
+/**
+ * El dominio con el que el sitio se presenta al mundo.
+ *
+ * No es donde Firebase publica —`memorie-legends.web.app` sigue sirviendo y
+ * sigue siendo válido— sino el que va en `canonical` y en las etiquetas de
+ * compartir: el que se copia, se pega y aparece en la vista previa.
+ *
+ * Está en una constante y no repetido en cada afirmación justamente para que
+ * una mudanza de dominio sea una línea, y para que esta suite falle en bloque
+ * si alguien cambia los metadatos de una página y se olvida de las otras.
+ */
+const SITIO = "https://memorielegends.com";
 const TARJETA = `${SITIO}/img/compartir.jpg`;
 
 /** Las páginas que alguien podría llegar a compartir. */

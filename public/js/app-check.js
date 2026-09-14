@@ -65,7 +65,33 @@ const CLAVE_RECAPTCHA = "6Lcd56UtAAAAAME1Ckf4zKXIY_CC8OaZ_t3Kffm-";
  * cableado en el repositorio: quien lo tenga puede hacerse pasar por la
  * aplicación desde cualquier lado.
  */
-const DOMINIOS = ["memorie-legends.web.app", "memorie-legends.firebaseapp.com"];
+/**
+ * Los dominios donde App Check se enciende.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ES UNA LISTA DE INCLUIDOS, Y POR ESO HAY QUE ACORDARSE DE ELLA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `encenderAppCheck` devuelve `false` en cualquier hostname que no esté acá,
+ * y lo hace EN SILENCIO — que es lo correcto para `localhost`, donde no hay
+ * clave de reCAPTCHA que valga.
+ *
+ * El costo es que un dominio nuevo nace sin App Check y nada avisa. Pasó con
+ * `memorielegends.com`: el sitio ya servía desde ahí y App Check estaba
+ * apagado, invisible, hasta que alguien mirara esta lista. El día que App
+ * Check pase a modo obligatorio, un dominio olvidado acá deja de funcionar
+ * entero.
+ *
+ * Si se agrega un dominio al sitio, va también en la consola de Firebase —
+ * ver `HACER-EN-LA-CONSOLA.md`.
+ */
+const DOMINIOS = [
+  "memorielegends.com",
+  "www.memorielegends.com",
+  // El de Firebase sigue sirviendo el sitio y sigue siendo válido.
+  "memorie-legends.web.app",
+  "memorie-legends.firebaseapp.com",
+];
 
 /**
  * Las páginas que NO necesitan App Check.

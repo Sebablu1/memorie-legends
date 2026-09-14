@@ -104,7 +104,7 @@ const PLANTILLA = `<!doctype html>
     <img class="logo" src="${LOGO}" alt="" />
     <p class="lema">Memoria, reflejos y estrategia</p>
     <p class="bajada">Cuatro cartas boca abajo. Mirás una sola. Lo demás depende de lo que puedas recordar.</p>
-    <p class="sello"><i></i>memorie-legends.web.app<i></i></p>
+    <p class="sello"><i></i>memorielegends.com<i></i></p>
   </div>
 </body></html>`;
 

@@ -791,8 +791,25 @@ const mercadoPago = () =>
  */
 const SECRETOS_MP = ["MP_ACCESS_TOKEN", "MP_WEBHOOK_SECRET"];
 
+/**
+ * Adónde avisa Mercado Pago, y adónde vuelve el comprador. No son lo mismo.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * EL WEBHOOK NO SE MUDA CON EL SITIO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `URL_WEBHOOK` es una Cloud Function, no una página: vive en
+ * `cloudfunctions.net` y ahí se queda. Además está registrada del lado de
+ * Mercado Pago, así que cambiarla acá sin cambiarla allá corta los avisos de
+ * pago — y un aviso perdido es una compra cobrada que nunca se acredita.
+ *
+ * `URL_VUELTA` sí es una página del sitio: es adonde el comprador aterriza
+ * después de pagar. Va al dominio propio, que es el que la gente reconoce.
+ * El de Firebase sigue sirviendo el sitio igual, así que esto es cosmético
+ * para el comprador y no cambia ningún cobro.
+ */
 const URL_WEBHOOK = "https://us-central1-memorie-legends.cloudfunctions.net/webhookPago";
-const URL_VUELTA = "https://memorie-legends.web.app/tienda.html";
+const URL_VUELTA = "https://memorielegends.com/tienda.html";
 
 /**
  * Quién puede administrar.
