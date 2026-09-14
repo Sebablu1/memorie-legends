@@ -815,9 +815,25 @@ export function usarPoderMirar(estado, indiceObjetivo, posicion) {
     estado: anotar(
       { ...estado, fase: "postLevantada", poderPendiente: null, conocimientos },
       texto,
-      // Sin la posición ni el número: sólo quién miró a quién. Alcanza para
-      // que la interfaz pinte la marca y para que la mesa sepa que pasó.
-      { tipo: "miroCarta", actor: poder.indiceJugador, objetivo: indiceObjetivo },
+      /**
+       * Con la posición, y SIN el número.
+       *
+       * ───────────────────────────────────────────────────────────────────
+       * ESTO ES UNA DECISIÓN DE DISEÑO, NO UN DESCUIDO
+       * ───────────────────────────────────────────────────────────────────
+       *
+       * Acá no viajaba la posición, y el argumento era bueno: decir «miró la
+       * segunda de Bruno» convierte el poder en un anuncio público de dónde
+       * está lo que se vio.
+       *
+       * Se decidió al revés a propósito: que la información sea pública. Saber
+       * qué carta conoce un rival pasa a ser parte de la estrategia — el juego
+       * se vuelve más sobre leer al otro y menos sobre esconder.
+       *
+       * El NÚMERO sigue sin viajar, y eso no es negociable: es la carta. Lo
+       * que se hace público es DÓNDE miró, no QUÉ vio.
+       */
+      { tipo: "miroCarta", actor: poder.indiceJugador, objetivo: indiceObjetivo, posicion },
     ),
     revelada: { indiceJugador: indiceObjetivo, posicion, carta },
   };
@@ -854,7 +870,15 @@ export function usarPoderCambio(estado, posicionPropia, indiceRival, posicionRiv
           cambioPendiente: { indiceJugador: yo, posicionPropia, indiceRival, posicionRival },
         },
         `${estado.jugadores[yo].nombre} mira su carta y una de ${estado.jugadores[indiceRival].nombre}`,
-        { tipo: "miroParaCambiar", actor: yo, objetivo: indiceRival },
+        // Las DOS posiciones, por lo mismo que en `usarPoderMirar`: la mesa
+        // entera ve dónde miró. Los números no van — ésos son las cartas.
+        {
+          tipo: "miroParaCambiar",
+          actor: yo,
+          objetivo: indiceRival,
+          posicionPropia,
+          posicionRival,
+        },
       ),
       revelada: { propia: miMano[posicionPropia], rival: manoRival[posicionRival] },
     };
@@ -1002,10 +1026,17 @@ export function resolverCambioConVista(estado, cambiar) {
       ),
     },
     `${estado.jugadores[yo].nombre} cambió una carta con ${estado.jugadores[indiceRival].nombre}`,
-    // Las posiciones SÍ podrían decirse —dos cartas cambiaron de mano y eso se
-    // ve en la mesa— pero no hacen falta para nada y el resto de los avisos no
-    // las dice. Se deja fuera por la misma razón que en los poderes 7 y 8.
-    { tipo: "resolvioElDiez", actor: yo, objetivo: indiceRival, cambio: true },
+    // Con las posiciones: son las que le permiten a los cuatro navegadores
+    // dibujar el intercambio, no sólo al que lo hizo. Dos cartas cambiaron de
+    // mano y eso se ve en la mesa de todos modos.
+    {
+      tipo: "resolvioElDiez",
+      actor: yo,
+      objetivo: indiceRival,
+      cambio: true,
+      posicionPropia,
+      posicionRival,
+    },
   );
 
   return supo ? anotarLoQueSupo(conElCambio, indiceRival, yo) : conElCambio;

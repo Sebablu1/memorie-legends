@@ -226,8 +226,48 @@ test("al que le toca se lo distingue por un halo, no por un contorno", async ({
       .locator(`.jugador[data-jugador="${jugador}"]`)
       .evaluate((el) => Number(getComputedStyle(el, "::before").opacity));
 
-  expect(await halo(0), "el asiento en turno no se enciende").toBe(1);
+  /**
+   * En el asiento PROPIO el halo está apagado, y es a propósito.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * ESTA PRUEBA AFIRMABA LO CONTRARIO
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Decía que el asiento en turno se enciende, y el asiento en turno acá es
+   * el propio. Se apagó para uno mismo: el halo contesta QUIÉN juega, y esa
+   * pregunta uno no se la hace sobre sí mismo — ya lo sabe por los botones,
+   * por el aro del retrato y por el cartel. Lo único que aportaba era un
+   * resplandor debajo de las cartas grandes, justo donde hay que mirar.
+   */
+  expect(await halo(0), "el halo sigue encendido en el asiento propio").toBe(0);
   expect(await halo(1), "un asiento que no juega también está encendido").toBe(0);
+
+  /**
+   * Pero el mecanismo sigue vivo: los rivales SÍ lo ven.
+   *
+   * Se comprueba sacándole la clase `propio` al asiento en turno, en vez de
+   * esperar a que le toque a un rival. Es la misma pregunta —¿un asiento en
+   * turno que no es el mío se enciende?— y se responde sin depender de cuánto
+   * tarde la IA en jugar.
+   *
+   * Sin esto, apagar el halo para TODOS pasaría esta prueba igual.
+   */
+  const asiento = page.locator('.jugador[data-jugador="0"]');
+  await asiento.evaluate((el) => el.classList.remove("propio"));
+
+  // Con `expect.poll` y no leyendo una sola vez: el halo entra con una
+  // transición de 0,35 s, así que medirlo apenas cambia la clase devuelve el
+  // valor de partida —cero— y la prueba fallaría por el reloj, no por el CSS.
+  // Un `sleep` calibrado a mano haría lo mismo peor: anda en esta máquina y
+  // falla en la de al lado.
+  await expect
+    .poll(
+      () => asiento.evaluate((el) => Number(getComputedStyle(el, "::before").opacity)),
+      { message: "un asiento en turno que no es el mío no se enciende" },
+    )
+    .toBe(1);
+
+  await asiento.evaluate((el) => el.classList.add("propio"));
 
   // Y sigue siendo un resplandor y no un borde.
   const borde = await page

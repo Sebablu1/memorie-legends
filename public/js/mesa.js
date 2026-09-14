@@ -679,19 +679,62 @@ function dibujarJugador(jugador, i) {
   const rondaTerminada =
     estado.fase === "finRonda" || estado.fase === "finPartida";
 
-  const geometria = geometriaAbanico(jugador.mano.length, propio);
-  const manoHTML = jugador.mano
-    .map((carta, pos) => {
-      // La carta destapada se muestra dos segundos y se vuelve a tapar. La
-      // del que llegó tarde ya salió de la mano, así que se dibuja en su
-      // hueco: se la ve un momento y después desaparece.
+  /**
+   * La mano se dibuja SIN los huecos, pero cada carta conserva su posición.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * DE DÓNDE SALÍAN LOS HUECOS
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Cuando a alguien le comen, le descartan o le cambian una carta, el motor
+   * deja un `null` en ese lugar del arreglo — y tiene que dejarlo, porque las
+   * posiciones son la dirección de cada carta. Pero el abanico se dibujaba
+   * recorriendo el arreglo entero, así que el `null` ocupába su lugar: una
+   * mano de cuatro a la que le sacaron la segunda se veía con un agujero en el
+   * medio y repartida como si todavía fueran cuatro.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * LA TRAMPA: HAY DOS POSICIONES Y NO SON LA MISMA
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * `data-posicion` es el PROTOCOLO. El motor y el servidor direccionan las
+   * cartas por su lugar original, y toda la mesa —descartar, entregar, los
+   * poderes— lee ese atributo para saber de qué carta habla. Si se compactara
+   * también eso, tocar la tercera carta jugaría la cuarta.
+   *
+   * El índice del abanico es DIBUJO. Es el que hay que compactar, y el que se
+   * le pasa a `estiloAbanico` junto con la cuenta de las que quedan, para que
+   * la mano se reparta entre las que hay y no entre las que hubo.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * LA CARTA REVELADA SIGUE OCUPANDO SU LUGAR
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * La del que llegó tarde ya salió de la mano y se dibuja un momento en su
+   * hueco. Mientras dure esa revelación cuenta como carta —por eso el filtro
+   * la incluye— y cuando se apaga, la mano se cierra sola en el dibujado
+   * siguiente. Sin eso, la carta aparecería y desaparecería corriendo a las
+   * demás dos veces.
+   */
+  const enLaMano = jugador.mano
+    .map((carta, pos) => ({ carta, pos }))
+    .filter(({ carta, pos }) => carta || revelaciones.has(clave(i, pos)));
+
+  const geometria = geometriaAbanico(enLaMano.length, propio);
+  const manoHTML = enLaMano
+    .map(({ carta, pos }, enElAbanico) => {
+      // La carta destapada se muestra dos segundos y se vuelve a tapar.
       const llave = clave(i, pos);
       const destapada = revelaciones.has(llave);
       return dibujarCarta(carta ?? revelaciones.get(llave), {
         visible: rondaTerminada || destapada,
         asiento: i,
+        // La de siempre: es como la nombra el motor.
         posicion: pos,
-        estilo: estiloAbanico(pos, jugador.mano.length, geometria),
+        // La compactada: es dónde se dibuja.
+        estilo: estiloAbanico(enElAbanico, enLaMano.length, geometria),
+        // El ojo de un poder que acaba de mirar esta carta.
+        clases: miradas.has(llave) ? "mirada" : "",
         // El dorso que compró ESTE jugador, no el que le tocaría al asiento.
         dorso: reversoDe(jugador, i),
       });
@@ -1644,6 +1687,9 @@ async function trasPonerMuestra() {
  */
 function faseDescarte(alCerrar, duracion = MS_DESCARTE) {
   return new Promise((listo) => {
+    // Ventana nueva, nada mandado todavía. Sin esto, la carta que se tocó en
+    // la ventana anterior aparece resaltada en ésta.
+    posicionEnviada = null;
     // "DESCARTE" y nada más. Antes explicaba la regla entera —sólo el primero
     // se salva, equivocarse suma una carta— y son cinco segundos en los que
     // nadie lee tres renglones: se mira la muestra y se toca. La regla se
@@ -1973,6 +2019,22 @@ let manejadorDescarte = null;
  * ventana, y debe poder. Con los poderes 8 y 10 uno sabe QUÉ carta tiene el
  * rival pero no DÓNDE, así que equivocarse de posición y volver a probar
  * —pagando un castigo por cada error— es parte de la mecánica.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * VIVE UNA VENTANA, Y HAY QUE APAGARLA AL FINAL
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Se ponía y no se apagaba nunca: no había una sola vuelta a `null` en todo
+ * el archivo. Como el resaltado sólo se dibuja en fase `descarte`, el error no
+ * se veía en la ventana en la que se tocó — se veía en la SIGUIENTE, y en
+ * todas las de la ronda, con una carta marcada que nadie había mandado esta
+ * vez.
+ *
+ * Se apaga en las dos transiciones que cierran una ventana, una por modo: al
+ * abrir la de entrenamiento, y al salir de `descarte` en red. No alcanza con
+ * borrar la clase del DOM: `dibujar()` reconstruye los asientos enteros en
+ * cada pasada y `marcarCartasJugables` la vuelve a poner, porque el dato
+ * seguía ahí.
  */
 let posicionEnviada = null;
 
@@ -2910,6 +2972,57 @@ let registroAnunciado = 0;
  * servidor no manda la posición —y hace bien, porque decirla convertiría el
  * poder en un anuncio público de dónde está lo que se vio.
  */
+/**
+ * Las cartas con un ojo encima, y cuándo se apaga cada uno.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * POR QUÉ UN MAPA Y NO UNA CLASE EN EL DOM
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Porque `dibujar()` reconstruye los cuatro asientos enteros en cada pasada:
+ * una clase puesta a mano desaparece con el primer redibujado, que en una
+ * ventana de descarte son varios por segundo. El dato tiene que vivir acá y
+ * que el dibujado lo lea, igual que `revelaciones`.
+ *
+ * El valor es el `setTimeout` que lo apaga, para poder cancelarlo si la misma
+ * carta vuelve a mirarse antes de que se cumpla.
+ */
+const miradas = new Map();
+
+/** Cuánto dura el ojo. Suficiente para verlo, poco para no estorbar. */
+const MS_OJO = 1500;
+
+/**
+ * Pone el ojo sobre una carta y lo saca solo.
+ *
+ * ───────────────────────────────────────────────────────────────────
+ * ESTO LO VEN LOS CUATRO, Y ES EL PUNTO
+ * ───────────────────────────────────────────────────────────────────
+ *
+ * Antes, cuando alguien usaba un poder para mirar, el único que veía algo era
+ * quien lo usaba: los otros tres no se enteraban de nada. Ahora la posición
+ * viaja en el registro —una decisión de diseño: qué carta conoce un rival es
+ * información pública y parte de la estrategia— y esto corre en cada
+ * navegador con la misma línea del registro.
+ *
+ * El ojo va sobre el DORSO. Marca que esa carta se miró, no qué decía: el
+ * número sigue sin viajar.
+ */
+function ojoEn(indiceJugador, posicion) {
+  if (!Number.isInteger(posicion)) return;
+  const llave = clave(indiceJugador, posicion);
+
+  clearTimeout(miradas.get(llave));
+  miradas.set(
+    llave,
+    setTimeout(() => {
+      miradas.delete(llave);
+      dibujar();
+    }, MS_OJO),
+  );
+  dibujar();
+}
+
 function mostrarMiradas(vista) {
   const registro = vista.registro ?? [];
   if (registro.length < registroAnunciado) registroAnunciado = 0; // ronda nueva
@@ -2924,6 +3037,26 @@ function mostrarMiradas(vista) {
       cartel(linea.actor === linea.objetivo ? "mirarPropia" : "mirarRival");
       sonidos.voltear();
       marcarManoMirada(linea.objetivo);
+      // Y el ojo sobre la carta exacta, que es lo que hace que los otros tres
+      // se enteren de cuál fue.
+      ojoEn(linea.objetivo, linea.posicion);
+      continue;
+    }
+
+    // El 10, primera mitad: miró su carta y una del rival, y todavía no
+    // decidió. Dos ojos, uno en cada mano.
+    if (linea?.tipo === "miroParaCambiar") {
+      // Sin cartel: `CARTELES` no tiene una entrada para esto y `cartel()`
+      // devuelve sin hacer nada ante un nombre que no conoce — habría quedado
+      // una llamada muerta que se lee como si mostrara algo.
+      //
+      // Tampoco hace falta. Al que usó el poder ya le abre el modal de
+      // decidir, y a los otros tres los ojos les dicen exactamente lo que
+      // pasó; el desenlace lo anuncia `resolvioElDiez` un momento después.
+      sonidos.voltear();
+      marcarManoMirada(linea.objetivo);
+      ojoEn(linea.actor, linea.posicionPropia);
+      ojoEn(linea.objetivo, linea.posicionRival);
       continue;
     }
     // Y cómo terminó el 10. Que la mesa se entere de si el cambio se hizo o no
@@ -2932,7 +3065,20 @@ function mostrarMiradas(vista) {
     if (linea?.tipo === "resolvioElDiez") {
       cartel(linea.cambio ? "cambio" : "sinCambio");
       sonidos[linea.cambio ? "whoosh" : "clic"]();
-      if (linea.cambio) marcarManoMirada(linea.objetivo);
+      if (linea.cambio) {
+        marcarManoMirada(linea.objetivo);
+        // La MISMA transición que ya usábamos para el que hizo el cambio, pero
+        // corrida en los cuatro navegadores: las posiciones ahora viajan, así
+        // que cada uno puede dibujar el intercambio en vez de ver las cartas
+        // aparecer cambiadas de golpe.
+        efectoCambio(
+          "cambioConVista",
+          linea.actor,
+          linea.posicionPropia,
+          linea.objetivo,
+          linea.posicionRival,
+        );
+      }
       continue;
     }
   }
@@ -2958,6 +3104,11 @@ function pintarVista(vista) {
   // Si la fase dejó de ser la del poder —porque se resolvió, o porque a un
   // ausente se lo saltearon— la elección en curso ya no tiene sentido.
   if (vista.fase !== "poder" && eligiendoPoder) eligiendoPoder = null;
+
+  // Y lo mismo con la carta que se mandó a descartar: vale mientras dure SU
+  // ventana. Entre una ventana y la siguiente la fase pasa por turno o por
+  // postLevantada, así que salir de `descarte` es el momento exacto.
+  if (vista.fase !== "descarte" && posicionEnviada != null) posicionEnviada = null;
   estado = comoEstado(vista);
   // Antes de dibujar: si algo se expuso, tiene que verse en este mismo pintado.
   mostrarRevelaciones(vista);

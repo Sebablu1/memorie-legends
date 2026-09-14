@@ -579,6 +579,27 @@ body::before {
 .jugador.en-turno { transform: translateY(-3px); }
 .jugador.en-turno::before { opacity: 1; }
 
+/* Menos en el asiento propio.
+
+   ─────────────────────────────────────────────────────────────────────────
+   POR QUÉ UNO NO NECESITA QUE LE AVISEN
+   ─────────────────────────────────────────────────────────────────────────
+
+   El halo dice QUIÉN juega, y esa pregunta uno no se la hace sobre sí mismo:
+   ya lo sabe por los botones encendidos, por el aro que cuenta alrededor de
+   su retrato y por el cartel de arriba. Lo único que aporta en el propio
+   asiento es un resplandor debajo de las cartas grandes —las de uno se
+   dibujan más grandes que las de los rivales— justo donde hay que mirar.
+
+   Los rivales SÍ lo siguen viendo: cada navegador pone `propio` sobre su
+   propio asiento, así que apagarlo acá lo apaga sólo para su dueño. El de al
+   lado sigue viendo el halo sobre el mío cuando me toca, que es para lo que
+   está.
+
+   El `translateY` se queda: mueve tres píxeles, no tapa nada, y es la parte
+   del aviso que se lee de reojo sin estorbar. */
+.jugador.propio.en-turno::before { opacity: 0; }
+
 /* Sin caja detrás, el texto se apoya en el paño y necesita su propia
    sombra: el nombre en blanco sobre el roble claro se borraba. La sombra no
    se ve sobre los paños oscuros y salva a los claros, igual que en los
@@ -3520,4 +3541,47 @@ button.accion.con-poder {
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.3px;
+}
+
+/* ------------------------------------------- el ojo de un poder que miró
+
+   Marca que ESTA carta fue mirada con un 7, un 8 o un 10, y lo ven los
+   cuatro jugadores: la posición viaja en el registro a propósito, porque qué
+   carta conoce un rival es información pública y parte de la estrategia.
+
+   Va sobre el DORSO y no sobre la cara. Lo que se anuncia es que se miró,
+   nunca qué decía: el número no viaja a nadie más que a quien usó el poder.
+
+   Se usa `::before` porque `::after` del dorso ya está tomado por el dibujo
+   del reverso. Y va en el dorso y no en `.carta` para que desaparezca solo
+   cuando la carta se da vuelta al final de la ronda. */
+.carta.mirada .dorso::before {
+  content: "👁️";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  /* Encima del dibujo del dorso, debajo de cualquier cosa que la mesa ponga
+     sobre la carta entera. */
+  z-index: 2;
+  /* Un velo detrás del ojo: sobre un dorso claro, el emoji solo se pierde. */
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: inherit;
+  animation: aparecerOjo 0.18s ease-out;
+  pointer-events: none;
+}
+
+/* La mano propia se dibuja más grande, así que su ojo también. */
+.jugador.propio .carta.mirada .dorso::before { font-size: 1.9rem; }
+
+@keyframes aparecerOjo {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Quien pidió menos movimiento ve el ojo, pero sin el salto de entrada. */
+@media (prefers-reduced-motion: reduce) {
+  .carta.mirada .dorso::before { animation: none; }
 }

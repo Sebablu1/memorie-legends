@@ -113,24 +113,25 @@ export function vistaDe(estado, indiceQuienMira) {
     /**
      * El 10, entre que muestra las dos cartas y que su dueño decide.
      *
-     * A la mesa le llega QUIÉN está decidiendo y sobre quién, que es lo mismo
-     * que se cuenta de los poderes 7 y 8. Las POSICIONES sólo van al que usó
-     * el poder: decirle a todos "está mirando la segunda de Bruno" convierte
-     * el poder en un anuncio público de dónde está lo que se vio, y encima
-     * serviría igual si después decide no cambiar.
+     * ───────────────────────────────────────────────────────────────────
+     * LAS POSICIONES SON PÚBLICAS, Y ES UNA DECISIÓN
+     * ───────────────────────────────────────────────────────────────────
      *
-     * Al dueño sí le viajan enteras, y no por comodidad: si recarga la página
-     * en mitad de la decisión, su navegador no tiene otra forma de saber qué
-     * eligió.
+     * Acá se redactaban: a la mesa le llegaba quién decide y sobre quién, y
+     * las posiciones sólo al dueño. El argumento era que decir "está mirando
+     * la segunda de Bruno" convierte el poder en un anuncio público de dónde
+     * está lo que se vio.
+     *
+     * Se decidió al revés. La mesa ve el ojo sobre la carta exacta, y saber
+     * qué carta conoce un rival pasa a ser parte de la estrategia: el juego se
+     * vuelve más sobre leer al otro.
+     *
+     * Lo que sigue sin viajar son las CARTAS. `cambioPendiente` guarda
+     * posiciones y nada más — está dicho en `usarPoderCambio` y lo comprueba
+     * `filtracionesEn` en cada publicación. Hacer público dónde miró no es lo
+     * mismo que hacer público qué vio.
      */
-    cambioPendiente: estado.cambioPendiente
-      ? estado.cambioPendiente.indiceJugador === indiceQuienMira
-        ? estado.cambioPendiente
-        : {
-            indiceJugador: estado.cambioPendiente.indiceJugador,
-            indiceRival: estado.cambioPendiente.indiceRival,
-          }
-      : null,
+    cambioPendiente: estado.cambioPendiente ?? null,
 
     // A quién puede atacar QUIEN MIRA, y nada más.
     //

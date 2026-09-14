@@ -153,22 +153,49 @@ console.log("\n=== 2. El 10 muestra, espera, y deja saber según lo que se decid
      "y lo que sabe es la carta de Y, no la suya", { sabe: c2?.numero, deY: suCarta.numero });
   ok(c2?.origen === "poder10", "también anotado como poder10", c2?.origen);
 
-  // Mientras dura la decisión, la mesa NO puede enterarse de qué posiciones
-  // se están mirando. Decir "está mirando la segunda de Bruno" convierte el
-  // poder en un anuncio público de dónde está lo que se vio, y serviría igual
-  // si después decide no cambiar.
+  /**
+   * Las posiciones son PÚBLICAS, y es una decisión de diseño.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * ESTA PRUEBA AFIRMABA LO CONTRARIO
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Decía que la mesa no podía enterarse de qué posiciones se estaban
+   * mirando, y el argumento era bueno: decir «está mirando la segunda de
+   * Bruno» convierte el poder en un anuncio público de dónde está lo que se
+   * vio.
+   *
+   * Se decidió al revés, a propósito. La mesa ve el ojo sobre la carta
+   * exacta, y saber qué carta conoce un rival pasa a ser parte de la
+   * estrategia: el juego se vuelve más sobre leer al otro y menos sobre
+   * esconder.
+   *
+   * Lo que sigue sin viajar son las CARTAS, y eso no cambió: `cambioPendiente`
+   * guarda posiciones y nada más. Hacer público DÓNDE miró no es lo mismo que
+   * hacer público QUÉ vio, y la segunda mitad de este bloque es la que lo
+   * vigila.
+   */
   {
     const V = await import("../public/js/reglas/vista.js");
-    const paraElDuenio = V.vistaDe(visto.estado, 0).cambioPendiente;
-    ok(paraElDuenio?.posicionPropia === 2 && paraElDuenio?.posicionRival === 0,
-       "el dueño sí ve las posiciones: si recarga, no tiene otra forma de saberlas");
 
-    for (const espectador of [1, 2]) {
-      const v = V.vistaDe(visto.estado, espectador).cambioPendiente;
+    for (const quien of [0, 1, 2]) {
+      const v = V.vistaDe(visto.estado, quien).cambioPendiente;
       ok(v?.indiceJugador === 0 && v?.indiceRival === 1,
-         `el jugador ${espectador} ve quién decide y sobre quién`);
-      ok(!("posicionPropia" in (v ?? {})) && !("posicionRival" in (v ?? {})),
-         `pero el jugador ${espectador} NO ve las posiciones`, v);
+         `el jugador ${quien} ve quién decide y sobre quién`);
+      ok(v?.posicionPropia === 2 && v?.posicionRival === 0,
+         `y el jugador ${quien} TAMBIÉN ve las posiciones`, v);
+    }
+
+    // Pero ninguna carta, para nadie. Es el límite que no se movió.
+    for (const quien of [0, 1, 2]) {
+      const v = V.vistaDe(visto.estado, quien).cambioPendiente;
+      const campos = Object.keys(v ?? {}).sort();
+      ok(
+        JSON.stringify(campos) ===
+          JSON.stringify(["indiceJugador", "indiceRival", "posicionPropia", "posicionRival"]),
+        `el jugador ${quien} ve las cuatro posiciones y NADA más`,
+        campos,
+      );
     }
   }
 
