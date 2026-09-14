@@ -1986,13 +1986,25 @@ export const cerrarRankingAnual = functions.pubsub
 // ----------------------------------------------------------------- pagos
 
 /**
- * Paso 1 de la compra: se registra la orden y se devuelve lo necesario para
- * abrir el checkout alojado del proveedor.
+ * Paso 1 de la compra: se registra la orden y se devuelve el checkout abierto.
  *
- * ⚠️ INTEGRACIÓN PENDIENTE. La llamada al SDK de Xsolla / Mercado Pago va
- * marcada abajo: hace falta la credencial y el endpoint exacto de tu cuenta.
- * El importe SIEMPRE se toma del catálogo del servidor, nunca del cliente:
- * si viniera del navegador, cualquiera compraría el Pack Élite por $U 1.
+ * La integración con Mercado Pago está hecha: más abajo se llama de verdad a
+ * `mercadoPago().crearPreferencia(...)` y lo que se devuelve al navegador es
+ * la URL del checkout alojado. Con credenciales de prueba, `mercadopago.js`
+ * elige `sandbox_init_point` y la orden queda marcada con `esSandbox`.
+ *
+ * El importe SIEMPRE se toma del catálogo del servidor, nunca del cliente: si
+ * viniera del navegador, cualquiera compraría el Pack Élite por $U 1.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Y ESTA FUNCIÓN NO ACREDITA NADA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Deja la orden en `pendiente` y termina. Quien mueve el saldo es
+ * `webhookPago`, y sólo después de preguntarle a la API de Mercado Pago cómo
+ * salió el pago. Acá no hay forma de saberlo: que el comprador haya llegado
+ * al checkout no dice que haya pagado, y volver de la pantalla de pago
+ * tampoco —el navegador puede cerrarse antes, o mentir—.
  */
 export const crearOrdenDeCompra = functions
   .runWith({ secrets: SECRETOS_MP })
