@@ -47,6 +47,7 @@ import {
   MAXIMO_POR_PACK,
   COLECCION_CATALOGO,
   enLaTienda,
+  seCompraConLeyendas,
 } from "./reglas/catalogo.js";
 
 const $ = (id) => document.getElementById(id);
@@ -130,7 +131,30 @@ async function leerCatalogo() {
   // alfabético: Firestore no sabe ordenar por dos criterios sin un índice, y
   // no vale la pena crear uno para una colección de veinte documentos.
   const snap = await getDocs(query(collection(db, COLECCION_CATALOGO), orderBy("orden")));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const todos = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+  /**
+   * Lo que viene con un pack no se ofrece acá.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * POR QUÉ SE FILTRA AL LEER Y NO AL DIBUJAR
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Porque este módulo es LA TIENDA: todo lo que hace —las pestañas, el pack
+   * de tres, la cuenta del descuento, el botón de comprar— habla de cosas que
+   * se compran con Leyendas. Filtrar en `dibujar()` dejaría un artículo de
+   * pack fuera de la vista pero dentro del catálogo, y la próxima cuenta que
+   * alguien escriba sobre `catalogo` lo volvería a contar.
+   *
+   * `seCompraConLeyendas` es la misma pregunta que hace el servidor al cobrar,
+   * no una copia: el tipo tiene que venderse Y el artículo no puede ser de un
+   * pack.
+   *
+   * Quien YA tiene uno de estos lo ve en Mi colección —`inventario.js`, que
+   * lee el catálogo por su cuenta y sin este filtro— y lo equipa desde ahí.
+   * Acá no tiene nada que hacer: ya lo tiene y no se vende.
+   */
+  return todos.filter(seCompraConLeyendas);
 }
 
 /** Qué compré y qué llevo puesto. Una sola llamada al servidor. */

@@ -527,6 +527,34 @@ export function normalizarItem(item) {
     imagen: String(item.imagen).trim(),
     activo: item.activo !== false,
     orden: Number.isInteger(item.orden) ? item.orden : 0,
+    /**
+     * De qué pack viene, o `null` si se consigue por las vías normales.
+     *
+     * ─────────────────────────────────────────────────────────────────────
+     * ESTA LÍNEA FALTABA, Y ES EL BUG ENTERO
+     * ─────────────────────────────────────────────────────────────────────
+     *
+     * Esta función es una LISTA BLANCA: devuelve un objeto nuevo con los
+     * campos nombrados acá y descarta todo lo demás. Sin esta línea,
+     * `packExclusivo` se perdía en silencio en los dos caminos de escritura
+     * —sembrar el catálogo y guardar desde el panel— y nunca llegaba a
+     * Firestore.
+     *
+     * El daño no fue que faltara el campo: fue que las defensas que SÍ lo
+     * miran —`seCompraConLeyendas`, el bloqueo de `comprarVarios`, el filtro
+     * de la tienda— quedaron inertes. Nueve artículos de pack, de tipo
+     * vendible y precio 0, comprables gratis por cualquiera. El servidor los
+     * defendía de un campo que él mismo había tirado.
+     *
+     * Se normaliza a `null` y no se deja pasar `undefined`: Firestore rechaza
+     * `undefined`, y un campo ausente y uno en `null` se leen distinto al
+     * migrar.
+     */
+    packExclusivo:
+      typeof item.packExclusivo === "string" && item.packExclusivo.trim()
+        ? item.packExclusivo.trim()
+        : null,
+
     // Bolsa para lo que venga después —una rareza, un color, un requisito—
     // sin tener que migrar la colección ni tocar este archivo.
     metadata: item.metadata && typeof item.metadata === "object" ? item.metadata : {},
@@ -705,13 +733,13 @@ export const CATALOGO_INICIAL = [
 
   { id: "dorso_viajero", tipo: TIPOS.DORSO, nombre: "Dorso del Viajero", descripcion: "Viene con el Pack Popular.", precio: 0, imagen: "🂠", activo: true, orden: 210, packExclusivo: "popular", metadata: { rareza: "raro" } },
 
-  { id: "avatar_erudito", tipo: TIPOS.AVATAR, nombre: "El Erudito", descripcion: "Viene con el Pack Premium.", precio: 0, imagen: "🧙", activo: true, orden: 220, packExclusivo: "premium", metadata: { rareza: "epico" } },
-  { id: "pano_terciopelo", tipo: TIPOS.FONDO, nombre: "Paño de Terciopelo", descripcion: "Viene con el Pack Premium.", precio: 0, imagen: "🟪", activo: true, orden: 221, packExclusivo: "premium", metadata: { rareza: "epico" } },
+  { id: "avatar_erudito", tipo: TIPOS.AVATAR, nombre: "El Erudito", descripcion: "Viene con el Pack Premium.", precio: 0, imagen: "🧙", activo: true, orden: 220, packExclusivo: "popular", metadata: { rareza: "epico" } },
+  { id: "pano_terciopelo", tipo: TIPOS.FONDO, nombre: "Paño de Terciopelo", descripcion: "Viene con el Pack Premium.", precio: 0, imagen: "🟪", activo: true, orden: 221, packExclusivo: "elite", metadata: { rareza: "epico" } },
 
-  { id: "avatar_soberano", tipo: TIPOS.AVATAR, nombre: "El Soberano", descripcion: "Viene con el Pack Élite.", precio: 0, imagen: "👑", activo: true, orden: 230, packExclusivo: "elite", metadata: { rareza: "legendario" } },
-  { id: "dorso_soberano", tipo: TIPOS.DORSO, nombre: "Dorso del Soberano", descripcion: "Viene con el Pack Élite.", precio: 0, imagen: "🂡", activo: true, orden: 231, packExclusivo: "elite", metadata: { rareza: "legendario" } },
-  { id: "mazo_soberano", tipo: TIPOS.MAZO, nombre: "Mazo del Soberano", descripcion: "Viene con el Pack Élite.", precio: 0, imagen: "🎴", activo: true, orden: 232, packExclusivo: "elite", metadata: { rareza: "legendario" } },
-  { id: "pano_soberano", tipo: TIPOS.FONDO, nombre: "Paño del Soberano", descripcion: "Viene con el Pack Élite.", precio: 0, imagen: "🟦", activo: true, orden: 233, packExclusivo: "elite", metadata: { rareza: "legendario" } },
+  { id: "avatar_soberano", tipo: TIPOS.AVATAR, nombre: "El Soberano", descripcion: "Viene con el Pack Élite.", precio: 0, imagen: "👑", activo: true, orden: 230, packExclusivo: "premium", metadata: { rareza: "legendario" } },
+  { id: "dorso_soberano", tipo: TIPOS.DORSO, nombre: "Dorso del Soberano", descripcion: "Viene con el Pack Élite.", precio: 0, imagen: "🂡", activo: true, orden: 231, packExclusivo: "premium", metadata: { rareza: "legendario" } },
+  { id: "mazo_soberano", tipo: TIPOS.MAZO, nombre: "Mazo del Soberano", descripcion: "Viene con el Pack Élite.", precio: 0, imagen: "🎴", activo: true, orden: 232, packExclusivo: "ml", metadata: { rareza: "legendario" } },
+  { id: "pano_soberano", tipo: TIPOS.FONDO, nombre: "Paño del Soberano", descripcion: "Viene con el Pack Élite.", precio: 0, imagen: "🟦", activo: true, orden: 233, packExclusivo: "ml", metadata: { rareza: "legendario" } },
   { id: "marco_dorado", tipo: TIPOS.MARCO, nombre: "Marco Dorado", descripcion: "Rodea tu avatar. Viene con el Pack Élite.", precio: 0, imagen: "🖼️", activo: true, orden: 234, packExclusivo: "elite", metadata: { rareza: "legendario" } },
   { id: "titulo_elite", tipo: TIPOS.TITULO, nombre: "Élite", descripcion: "Se muestra al lado de tu nombre. Viene con el Pack Élite.", precio: 0, imagen: "🏷️", activo: true, orden: 235, packExclusivo: "elite", metadata: { rareza: "legendario" } },
 

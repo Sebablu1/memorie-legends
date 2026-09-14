@@ -47,7 +47,12 @@ import {
   MOTIVOS,
 } from "../public/js/reglas/economia.js";
 import { CONDICIONES, IDS_INSIGNIAS, leyendasDeInsignia } from "../public/js/reglas/insignias.js";
-import { CATALOGO_INICIAL, TIPOS, seCompraConLeyendas } from "../public/js/reglas/catalogo.js";
+import {
+  CATALOGO_INICIAL,
+  TIPOS,
+  seCompraConLeyendas,
+  normalizarItem,
+} from "../public/js/reglas/catalogo.js";
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), "..");
 const leer = (...partes) => readFileSync(join(raiz, ...partes), "utf8");
@@ -88,8 +93,8 @@ console.log("\n=== 1. Los paquetes dan Leyendas, y nada más ===");
    */
   const ACORDADO = {
     basico:  { precioUYU: 250,  leyendasBase: 300,   leyendasRegalo: 50,   items: 1 },
-    popular: { precioUYU: 450,  leyendasBase: 600,   leyendasRegalo: 150,  items: 1 },
-    premium: { precioUYU: 1000, leyendasBase: 1500,  leyendasRegalo: 500,  items: 2 },
+    popular: { precioUYU: 450,  leyendasBase: 600,   leyendasRegalo: 150,  items: 2 },
+    premium: { precioUYU: 1000, leyendasBase: 1500,  leyendasRegalo: 500,  items: 3 },
     elite:   { precioUYU: 2500, leyendasBase: 5000,  leyendasRegalo: 2000, items: 6 },
     ml:      { precioUYU: 5000, leyendasBase: 12000, leyendasRegalo: 3000, items: 8 },
   };
@@ -358,6 +363,60 @@ console.log("\n=== 6. Lo ganado llega a la mesa, y sólo a su dueño ===");
   const red = leer("public", "js", "partida-red.js");
   ok(/onSnapshot\(\s*doc\(db, "partidas", codigo, "logros", miUid\)/.test(red),
      "por un escuchador y no preguntando, que sería una carrera");
+}
+
+// =====================================================================
+console.log("\n=== 7. La marca sobrevive al normalizador ===");
+// =====================================================================
+
+{
+  /**
+   * LA PRUEBA DEL BUG.
+   *
+   * `normalizarItem` es una lista blanca: arma un objeto nuevo con los campos
+   * que nombra y descarta el resto. No incluía `packExclusivo`, así que el
+   * campo se perdía en silencio en los DOS caminos de escritura — sembrar el
+   * catálogo y guardar desde el panel.
+   *
+   * Lo grave no fue que faltara el campo. Fue que las defensas que sí lo miran
+   * —`seCompraConLeyendas`, el bloqueo de la compra, el filtro de la tienda—
+   * quedaron inertes: nueve artículos de tipo vendible y precio 0, gratis para
+   * cualquiera. El servidor los defendía de un campo que él mismo había
+   * tirado.
+   *
+   * No se prueba mirando la semilla: hay que pasarla POR el normalizador, que
+   * es lo que hace el servidor antes de escribir.
+   */
+  const conMarca = normalizarItem({
+    id: "avatar_soberano", tipo: "avatar", nombre: "X", precio: 0, imagen: "x",
+    packExclusivo: "premium",
+  });
+  ok(conMarca.packExclusivo === "premium", "el normalizador conserva la marca", conMarca.packExclusivo);
+
+  const sinMarca = normalizarItem({ id: "aa", tipo: "avatar", nombre: "X", precio: 0, imagen: "x" });
+  ok(sinMarca.packExclusivo === null, "sin marca queda en null, no en undefined", sinMarca.packExclusivo);
+  ok("packExclusivo" in sinMarca, "y el campo existe: Firestore rechaza undefined");
+
+  const vacia = normalizarItem({
+    id: "aa", tipo: "avatar", nombre: "X", precio: 0, imagen: "x", packExclusivo: "   ",
+  });
+  ok(vacia.packExclusivo === null, "el «ninguno» del formulario llega como null", vacia.packExclusivo);
+
+  /**
+   * Y la semilla entera sobrevive al viaje.
+   *
+   * Sembrar pasa cada artículo por el normalizador, así que lo que importa no
+   * es lo que dice `CATALOGO_INICIAL` sino lo que queda DESPUÉS de
+   * normalizarlo. Ahí se perdieron los doce.
+   */
+  const normalizada = CATALOGO_INICIAL.map(normalizarItem);
+  const marcados = normalizada.filter((i) => i.packExclusivo);
+  ok(marcados.length === 12, "los doce artículos de pack sobreviven a sembrar", marcados.length);
+
+  // Y ninguno de ellos queda comprable, que es la consecuencia que se había
+  // perdido cuando el campo se caía.
+  const comprables = normalizada.filter(seCompraConLeyendas).filter((i) => i.packExclusivo);
+  ok(comprables.length === 0, "y ninguno queda comprable", comprables.map((i) => i.id));
 }
 
 console.log(fallos ? `\n❌ ${fallos} fallos` : "\n✅ TODO OK");

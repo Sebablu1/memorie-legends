@@ -192,6 +192,19 @@
             <span>Orden</span>
             <input id="itemOrden" type="number" step="1" value="0" />
           </label>
+          <label id="campoPackExclusivo">
+            <span>Exclusivo de pack</span>
+            <!-- Las opciones se arman con los packs que existen de verdad, no
+                 con una lista escrita acá: los packs se administran más abajo
+                 en esta misma página y pueden crearse nuevos. -->
+            <select id="itemPack">
+              <option value="">ninguno</option>
+            </select>
+            <small class="nota-campo">
+              Un artículo de pack no se vende suelto: no aparece en la tienda,
+              su precio queda en 0, y sólo lo recibe quien compra el pack.
+            </small>
+          </label>
           <label class="casilla" id="campoActivo">
             <input id="itemActivo" type="checkbox" checked />
             <!-- La palabra cambia con el tipo: un producto se pone «a la

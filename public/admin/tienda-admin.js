@@ -29,6 +29,7 @@ import {
   TIPOS_VALIDOS,
   TIPOS_VENDIBLES,
   esVendible,
+  esExclusivoDePack,
   problemasDelItem,
   imagenEsArchivo,
   ETIQUETA_TIPO,
@@ -106,7 +107,77 @@ function dibujarLista() {
     return;
   }
 
-  caja.innerHTML = GRUPOS_DEL_CATALOGO.map((grupo) => dibujarGrupo(grupo, catalogo)).join("");
+  // Los de pack salen PRIMERO y de su propia lista: son los que hay que poder
+  // revisar de un vistazo, y los que se cuelan en el grupo equivocado cuando
+  // les falta la marca.
+  const dePack = catalogo.filter(esExclusivoDePack);
+  const resto = catalogo.filter((i) => !esExclusivoDePack(i));
+
+  caja.innerHTML =
+    dibujarExclusivos(dePack) +
+    GRUPOS_DEL_CATALOGO.map((grupo) => dibujarGrupo(grupo, resto)).join("");
+}
+
+/**
+ * Los artículos que vienen con un pack, agrupados por pack.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * POR QUÉ TIENEN SECCIÓN PROPIA Y NO VAN CON LOS DE SU TIPO
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Porque la pregunta que uno le hace a esta lista no es «qué avatares hay»
+ * sino «qué se lleva el que compra el Élite». Repartidos entre Avatares,
+ * Dorsos y Paños, comprobar que un pack entrega lo que promete obliga a
+ * recorrer cuatro pestañas y acordarse.
+ *
+ * Y porque es donde se nota el error que ya pasó: doce artículos que
+ * aparecían «a la venta» a precio 0 porque habían perdido su marca. Con la
+ * sección vacía o con menos de los que debería, se ve enseguida.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * LA MARCA DICE DE DÓNDE VIENE, NO QUIÉN LO ENTREGA
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Un pack superior puede entregar artículos de uno inferior —el ML entrega
+ * todo lo del Élite— así que agrupar por `packExclusivo` NO es la lista de lo
+ * que reparte cada pack. Eso vive en `itemsExclusivos`, en la sección de
+ * paquetes. Acá se agrupa por origen, que es lo único que un artículo puede
+ * tener una sola vez.
+ */
+function dibujarExclusivos(items) {
+  if (!items.length) {
+    return `
+      <section class="grupo-catalogo no-vendible de-pack">
+        <h3>Exclusivos de packs <span class="cuenta">(0)</span></h3>
+        <p class="nota">
+          ⚠️ Ningún artículo tiene <code>packExclusivo</code>. Si los packs
+          prometen artículos, esta lista debería tenerlos: vacía significa que
+          están a la venta como cualquier otro.
+        </p>
+      </section>`;
+  }
+
+  const packs = [...new Set(items.map((i) => i.packExclusivo))].sort();
+
+  const porPack = packs
+    .map((pack) => {
+      const suyos = items.filter((i) => i.packExclusivo === pack);
+      return `
+        <h4 class="titulo-tipo">${limpio(pack)} <span class="cuenta">(${suyos.length})</span></h4>
+        ${suyos.map((i) => dibujarFila(i, false)).join("")}`;
+    })
+    .join("");
+
+  return `
+    <section class="grupo-catalogo no-vendible de-pack">
+      <h3>Exclusivos de packs <span class="cuenta">(${items.length})</span></h3>
+      <p class="nota">
+        Vienen con un pack y no se venden sueltos: no aparecen en la tienda, su
+        precio es 0, y sólo los recibe quien compra el pack. Agrupados por
+        <b>origen</b> — qué entrega cada pack se ve más abajo, en Paquetes.
+      </p>
+      ${porPack}
+    </section>`;
 }
 
 /** Un grupo del catálogo, con sus tipos adentro y su cuenta. */
@@ -194,16 +265,70 @@ function dibujarFila(item, vende) {
  * Es la misma división que el resto del panel: la pantalla explica, el
  * servidor manda.
  */
+/**
+ * Llena el desplegable de packs con los que existen de verdad.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * POR QUÉ NO ES UNA LISTA FIJA
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Los cinco packs de hoy salieron del código y ahora viven en Firestore: se
+ * crean, se editan y se borran desde esta misma página. Una lista escrita a
+ * mano acá quedaría vieja el día que alguien agregue el sexto, y lo peor no
+ * sería que faltara la opción: sería que un artículo marcado para un pack que
+ * el desplegable no conoce se guardaría como "ninguno" al abrir y guardar la
+ * ficha, sin que nadie lo note.
+ *
+ * Si el servidor no contesta, el desplegable se queda con lo que ya tenía. Es
+ * preferible a vaciarlo: vacío, editar cualquier artículo le borraría su pack.
+ */
+async function llenarPacks() {
+  const sel = $("itemPack");
+  if (!sel) return;
+
+  try {
+    const r = await llamar("listarPacksAdmin")();
+    const packs = r.data?.packs ?? [];
+    if (!packs.length) return;
+
+    sel.innerHTML =
+      '<option value="">ninguno</option>' +
+      packs
+        .map((p) => `<option value="${limpio(p.id)}">${limpio(p.nombre)} (${limpio(p.id)})</option>`)
+        .join("");
+  } catch (e) {
+    console.warn("No se pudieron leer los packs para el desplegable:", e);
+  }
+}
+
 function ajustarFormularioAlTipo() {
   const tipo = $("itemTipo").value;
-  const vende = esVendible(tipo);
+
+  /**
+   * Dos razones distintas para no llevar precio, y las dos bloquean el campo.
+   *
+   * Por TIPO: una insignia, un marco, un título o un sello no se venden nunca,
+   * sea cual sea el artículo.
+   *
+   * Por PACK: un avatar sí se vende, pero el avatar del Élite no — viene con
+   * el pack y no se compra suelto. Es la distinción que el servidor ya hace en
+   * `seCompraConLeyendas`, y el formulario tiene que hacer la misma o pedirá
+   * un precio que `problemasDelItem` va a rechazar.
+   */
+  const deUnPack = Boolean($("itemPack")?.value);
+  const vende = esVendible(tipo) && !deUnPack;
 
   const precio = $("itemPrecio");
   precio.disabled = !vende;
   if (!vende) precio.value = "0";
 
   const aviso = $("avisoNoVendible");
-  if (aviso) aviso.hidden = vende;
+  if (aviso) {
+    aviso.hidden = vende;
+    aviso.textContent = deUnPack
+      ? "Viene con un pack. No se vende suelto."
+      : "Las insignias son logros. No se venden.";
+  }
 
   // El campo no se esconde: se explica. Un logro también se ofrece y se
   // retira —es el mismo `activo`— y esconder la casilla dejaría al
@@ -222,6 +347,7 @@ function limpiarFormulario() {
   $("itemPrecio").value = "0";
   $("itemImagen").value = "";
   $("itemOrden").value = "0";
+  $("itemPack").value = "";
   $("itemActivo").checked = true;
   ajustarFormularioAlTipo();
   decir($("avisoItem"), "");
@@ -246,6 +372,17 @@ function editar(id) {
   $("itemPrecio").value = String(item.precio ?? 0);
   $("itemImagen").value = item.imagen ?? "";
   $("itemOrden").value = String(item.orden ?? 0);
+  // Si el artículo apunta a un pack que ya no existe, el desplegable no
+  // tiene esa opción y el navegador deja el select en vacío. Se agrega al
+  // vuelo para no perder la marca al guardar sin haberla tocado.
+  const suPack = item.packExclusivo ?? "";
+  if (suPack && !$("itemPack").querySelector(`[value="${CSS.escape(suPack)}"]`)) {
+    $("itemPack").insertAdjacentHTML(
+      "beforeend",
+      `<option value="${limpio(suPack)}">${limpio(suPack)} (ya no existe)</option>`,
+    );
+  }
+  $("itemPack").value = suPack;
   $("itemActivo").checked = item.activo !== false;
   ajustarFormularioAlTipo();
 
@@ -261,6 +398,7 @@ const delFormulario = () => ({
   precio: Number($("itemPrecio").value),
   imagen: $("itemImagen").value.trim(),
   orden: Number($("itemOrden").value),
+  packExclusivo: $("itemPack").value || null,
   activo: $("itemActivo").checked,
 });
 
@@ -541,6 +679,8 @@ export function montarTiendaAdmin() {
   // guardar: enterarse de que una insignia no lleva precio DESPUÉS de
   // escribirlo es enterarse tarde.
   $("itemTipo").addEventListener("change", ajustarFormularioAlTipo);
+  llenarPacks();
+  $("itemPack")?.addEventListener("change", ajustarFormularioAlTipo);
   ajustarFormularioAlTipo();
 
   $("btnGuardarItem").addEventListener("click", guardar);

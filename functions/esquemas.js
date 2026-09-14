@@ -312,6 +312,31 @@ export const EsquemaItemAdmin = z.object({
   imagen: z.string().min(1).max(500),
   activo: z.coerce.boolean().optional().default(true),
   orden: z.coerce.number().int().optional().default(0),
+
+  /**
+   * De qué pack es exclusivo. Vacío o ausente significa que no lo es.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * POR QUÉ NO ES UN `z.enum` CON LOS CINCO PACKS
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Porque los packs dejaron de vivir en el código. Se administran desde el
+   * panel y se guardan en `tienda/packs/items/{id}`, así que un enum con
+   * `["basico","popular","premium","elite","ml"]` rechazaría el primer pack
+   * nuevo que alguien cree — y lo rechazaría en la puerta, con un "los datos
+   * no son válidos" que no explica nada.
+   *
+   * El esquema comprueba la FORMA, que es lo suyo: que sea un id. Que el pack
+   * EXISTA es una regla, y las reglas viven en `catalogo.js`.
+   *
+   * Se acepta la cadena vacía porque es lo que manda un `<select>` cuando el
+   * administrador elige "ninguno"; `normalizarItem` la convierte en `null`.
+   */
+  packExclusivo: z
+    .union([z.string().max(64), z.null()])
+    .optional()
+    .default(null),
+
   metadata: z.record(z.string(), z.unknown()).optional().default({}),
 });
 

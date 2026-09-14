@@ -277,9 +277,30 @@ export function crearTienda({
         throw error("failed-precondition", "Ese artículo no tiene un tipo válido.");
       }
 
-      tx.set(refPerfil(uid), { [CAMPO_EQUIPADO[tipo]]: itemId }, { merge: true });
+      /**
+       * Un tipo válido no es lo mismo que un tipo que se equipa.
+       *
+       * ─────────────────────────────────────────────────────────────────
+       * QUÉ PASABA SIN ESTA COMPROBACIÓN
+       * ─────────────────────────────────────────────────────────────────
+       *
+       * El SELLO es un tipo válido del catálogo y a propósito NO tiene
+       * entrada en `CAMPO_EQUIPADO`: es una constancia, no algo que uno se
+       * pone y se saca. Pero `esTipoValido` decía que sí, y la línea de
+       * abajo hacía `{ [undefined]: itemId }` — que en JavaScript no falla:
+       * escribe un campo llamado literalmente «undefined» en el perfil.
+       *
+       * Basura en el documento del jugador, sin error y sin registro. Y la
+       * ausencia en `CAMPO_EQUIPADO`, que era la regla, no protegía nada.
+       */
+      const campo = CAMPO_EQUIPADO[tipo];
+      if (!campo) {
+        throw error("failed-precondition", "Ese artículo no se equipa: se tiene y ya está.");
+      }
 
-      return { itemId, tipo, campo: CAMPO_EQUIPADO[tipo] };
+      tx.set(refPerfil(uid), { [campo]: itemId }, { merge: true });
+
+      return { itemId, tipo, campo };
     });
   }
 

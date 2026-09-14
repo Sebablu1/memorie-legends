@@ -102,10 +102,16 @@ const filaDe = (page, id) =>
 test("el catálogo se dibuja en dos grupos, y sin errores", async ({ page }) => {
   const errores = await abrirCatalogo(page);
 
+  // Tres grupos: los de pack primero, y después vendibles y logros.
+  //
+  // Los de pack van arriba porque son los que hay que poder revisar de un
+  // vistazo — y los que se cuelan en el grupo equivocado cuando pierden su
+  // marca, que es como llegaron a estar «a la venta» a precio 0.
   const grupos = page.locator("#listaCatalogo .grupo-catalogo h3");
-  await expect(grupos).toHaveCount(2);
-  await expect(grupos.first()).toContainText("Vendibles");
-  await expect(grupos.last()).toContainText("No vendibles");
+  await expect(grupos).toHaveCount(3);
+  await expect(grupos.nth(0)).toContainText("Exclusivos de packs");
+  await expect(grupos.nth(1)).toContainText("Vendibles");
+  await expect(grupos.nth(2)).toContainText("No vendibles");
 
   expect(errores, `la página tiró errores: ${errores.join(" | ")}`).toEqual([]);
 });
@@ -113,7 +119,11 @@ test("el catálogo se dibuja en dos grupos, y sin errores", async ({ page }) => 
 test("las insignias caen del lado de los logros, y los demás del otro", async ({ page }) => {
   await abrirCatalogo(page);
 
-  const noVendible = page.locator("#listaCatalogo .grupo-catalogo.no-vendible");
+  // `:not(.de-pack)` porque los exclusivos de pack también son «no
+  // vendibles» y comparten el estilo; lo que se mira acá son los logros.
+  const noVendible = page.locator(
+    "#listaCatalogo .grupo-catalogo.no-vendible:not(.de-pack)",
+  );
 
   await expect(noVendible).toContainText("Novato");
   await expect(noVendible).toContainText("Leyenda");
