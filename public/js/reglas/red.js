@@ -472,3 +472,70 @@ export function resolverVentana(estado, ventana, indiceDe, intentarDescarte, int
 
   return { estado: siguiente, orden: aplicados };
 }
+// ------------------------------------------------ el reloj para decidir
+
+/**
+ * Cuánto tiene un jugador para decidir qué hace con lo que ya tiene en la mano.
+ *
+ * ───────────────────────────────────────────────────────────────────────
+ * POR QUÉ ESTAS TRES FASES NO TENÍAN RELOJ
+ * ───────────────────────────────────────────────────────────────────────
+ *
+ * Porque el que levantó una carta o usó un poder TIENE la carta: no deja a la
+ * mesa esperando por descuido, va a hacer algo con ella. Ese razonamiento vale
+ * en una mesa de living, donde los cuatro se miran. En red no: quien se
+ * levanta a atender el timbre con una carta en la mano congela la partida de
+ * los otros tres, y `saltarAusente` no lo rescata porque exige quince segundos
+ * de SILENCIO — una pestaña abierta sigue latiendo.
+ *
+ * ───────────────────────────────────────────────────────────────────────
+ * POR QUÉ SALTAR Y NO DESCARTAR, SALVO EN UN CASO
+ * ───────────────────────────────────────────────────────────────────────
+ *
+ * Descartar automáticamente es jugar por otro, y sólo se hace cuando hay una
+ * sola jugada posible. Con una carta levantada la hay: se la queda o la tira, y
+ * tirarla es lo único que no le cambia la mano sin que él lo pida.
+ *
+ * Con un poder no la hay. ¿Con qué carta cambia el 9? ¿Mira la propia o la del
+ * rival con el 7 y el 8? Y el 10 es el peor: ya vio las dos cartas, así que
+ * cualquier cosa que el servidor elija por él usa información que él tiene y
+ * el servidor no puede interpretar. Ahí no se decide: se salta.
+ *
+ * ───────────────────────────────────────────────────────────────────────
+ * ESTO NO DECIDE CUÁNDO VENCE, SÓLO QUÉ PASA AL VENCER
+ * ───────────────────────────────────────────────────────────────────────
+ *
+ * El vencimiento lo calcula el servidor con su reloj, en `plazoDe`. Acá vive
+ * la tabla —qué fase merece reloj y qué hacer cuando se agota— que es la parte
+ * que se puede leer, discutir y probar sin levantar nada.
+ */
+export const MS_PARA_DECIDIR = 10_000;
+
+/**
+ * Qué hace el servidor cuando se agotan los diez segundos, por fase.
+ *
+ * Las cuatro cartas con poder —7, 8, 9 y 10— comparten la fase `poder`: el
+ * número está en `poderPendiente`, no en la fase. Por eso la tabla tiene tres
+ * entradas y no cinco, y por eso no hace falta distinguirlas: a las cuatro les
+ * toca lo mismo.
+ *
+ * `cambioConVista` es la segunda mitad del 10, cuando ya vio las dos cartas y
+ * le falta decir si cambia.
+ */
+export const AL_VENCER_LA_DECISION = Object.freeze({
+  levantada: "descartarPorTiempo",
+  poder: "saltarPorTiempo",
+  cambioConVista: "saltarPorTiempo",
+});
+
+/**
+ * Qué corresponde hacer en esta fase al vencer el plazo, o `null` si esta fase
+ * no tiene reloj de decisión.
+ *
+ * Devolver `null` es lo normal: `turno`, `mirar`, `descarte`, `finRonda` y las
+ * demás tienen sus propios plazos, más viejos y con otras duraciones.
+ */
+export const decisionQueVence = (fase) => AL_VENCER_LA_DECISION[fase] ?? null;
+
+/** ¿Esta fase tiene reloj para decidir? */
+export const esperaUnaDecision = (fase) => decisionQueVence(fase) !== null;

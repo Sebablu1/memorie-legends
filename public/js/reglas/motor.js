@@ -621,7 +621,7 @@ export function cambiarCarta(estado, posicion) {
  * tirar un 3, pero sólo en un caso los demás podían aprovecharlo. Ahora la
  * mesa siempre tiene sus dos segundos, y recién después el poder se decide.
  */
-export function tirarCarta(estado) {
+export function tirarCarta(estado, { porTiempo = false } = {}) {
   if (estado.fase !== "levantada" || !estado.levantada) return estado;
   const carta = estado.levantada;
   const conLaMuestraNueva = {
@@ -630,10 +630,34 @@ export function tirarCarta(estado) {
     levantada: null,
   };
 
+  /**
+   * `porTiempo` cambia lo que dice el registro, no lo que pasa.
+   *
+   * ───────────────────────────────────────────────────────────────────
+   *
+   * La jugada es la misma: la carta va al descarte y se abre la ventana de
+   * reflejos. Lo que cambia es de quién fue la decisión, y eso tiene que
+   * quedar escrito. Es la primera vez que el servidor tira una carta que
+   * nadie tocó, y pasa en partidas que cobran entrada: si después alguien
+   * pregunta por qué perdió esa mano, el registro tiene que poder contestar.
+   *
+   * Va con `tipo` además del texto por lo mismo que la mirada de los poderes
+   * 7 y 8: reconocer el evento buscando palabras en el mensaje se rompe con
+   * sólo cambiarle una coma.
+   *
+   * No revela nada nuevo. El número ya estaba a la vista —la carta quedó
+   * arriba del descarte, boca arriba— así que el texto dice lo que la mesa
+   * ya ve.
+   */
+  const nombre = estado.jugadores[estado.indiceTurno].nombre;
+
   return anotar(
     // Con poder: es la carta que se acaba de levantar del mazo.
     abrirReflejos(conLaMuestraNueva, carta, estado.indiceTurno, { conPoder: true }),
-    `${estado.jugadores[estado.indiceTurno].nombre} tiró un ${carta.numero}`,
+    porTiempo
+      ? `A ${nombre} se le acabó el tiempo y se tiró el ${carta.numero}`
+      : `${nombre} tiró un ${carta.numero}`,
+    porTiempo ? { tipo: "tiroPorTiempo", actor: estado.indiceTurno } : null,
   );
 }
 

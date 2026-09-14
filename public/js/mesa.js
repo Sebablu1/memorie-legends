@@ -52,7 +52,7 @@ import { LIMITE_ELIMINACION, puntosMano } from "./reglas/puntaje.js";
 import * as IA from "./reglas/ia.js";
 import { MODOS, ENTRADAS, ESTADOS_SALA, costoDeAbandonar } from "./reglas/salas.js";
 import * as Red from "./partida-red.js";
-import { elegibleParaPoder, pasoDelPoder } from "./reglas/red.js";
+import { elegibleParaPoder, pasoDelPoder, esperaUnaDecision } from "./reglas/red.js";
 import { MS_REVELACION } from "./reglas/vista.js";
 import { abandonarPartida, ErrorDeServidor } from "./servidor.js";
 import { sonidos, alternarSilencio } from "./sonidos.js";
@@ -1206,6 +1206,49 @@ function relojDeLaFase() {
     if (!enRed()) return { ms: MS_PASO_AUTOMATICO, alVencer: pasarPorTiempo };
 
     const plazo = miVista?.plazo?.fase === "postLevantada" ? miVista.plazo : null;
+    if (!plazo) return null;
+
+    const restante = plazo.hasta - Red.ahoraDelServidor();
+    if (restante <= 0) return null;
+    return { ms: restante, alVencer: () => {} };
+  }
+
+  /**
+   * Los diez segundos para decidir qué hacer con lo que ya se tiene en la mano.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * SÓLO EN RED, Y A PROPÓSITO
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * En entrenamiento estas fases no tienen reloj: el motor local no las vence.
+   * Dibujar una cuenta que no va a pasar nada al llegar a cero es peor que no
+   * dibujarla — el jugador apura una decisión por un plazo inventado.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * Y SIN EL `=== YO` DE ARRIBA
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * El reloj de `postLevantada` sólo lo ve quien decide, y para eso está bien:
+   * es una decisión privada entre cortar y pasar.
+   *
+   * Éste lo ven los cuatro. `iniciarRelojTurno` pinta el aro sobre el asiento
+   * de `indice`, así que cada navegador lo dibuja sobre el jugador que está
+   * decidiendo — no sobre el suyo. Que los rivales vean el reloj correr es
+   * justamente lo que evita la mesa muda: se sabe que alguien está por actuar
+   * y cuánto le queda, en vez de esperar sin saber si se fue.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * AL LLEGAR A CERO NO HACE NADA
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * `alVencer` vacío, igual que en `postLevantada`. Quien tira la carta o salta
+   * el turno es el SERVIDOR, con su propio reloj. Este número es un espejo de
+   * `plazo.hasta`, y un espejo no decide.
+   */
+  if (esperaUnaDecision(estado.fase)) {
+    if (!enRed()) return null;
+
+    const plazo = miVista?.plazo?.fase === estado.fase ? miVista.plazo : null;
     if (!plazo) return null;
 
     const restante = plazo.hasta - Red.ahoraDelServidor();

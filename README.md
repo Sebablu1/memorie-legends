@@ -41,7 +41,7 @@ de 8 núcleos y 8 GB.
 | `npm run test:file -- <archivo>` | un solo archivo de navegador | ~14 s |
 | `npm run test:node` | las 52 suites de Node | ~27 s |
 | `npm run test:fast` | 6 suites de navegador, 50 pruebas | ~55 s |
-| `npm run test:full` | las 253 pruebas de navegador | ~8 min |
+| `npm run test:full` | las 259 pruebas de navegador | ~13 min |
 
 ```bash
 npm run test:file -- pruebas/e2e/marco-y-titulo.spec.js
@@ -60,22 +60,30 @@ y competir por CPU con las suites de Node hace que pruebas sanas fallen por
 tiempo de espera. Si `test:full` se pone lento o intermitente, lo primero que
 hay que mirar es qué más está corriendo.
 
-### Los cuatro trabajadores
+### Los dos trabajadores
 
-`playwright.config.js` corre con `workers: 4`, y el número está medido — no
-elegido. La razón larga está en el archivo; en corto:
+`playwright.config.js` corre con `workers: 2`, y el número está medido — dos
+veces, porque la primera medición se equivocó.
 
-| Trabajadores | `test:fast` |
-|---|---|
-| 1 | 90 s |
-| 2 | 61 s |
-| 4 | 54 s |
+Se subió de 1 a 4 midiendo el subconjunto rápido, que bajó de 90 a 54
+segundos. Pero medir el subconjunto no alcanzó: al crecer la suite,
+`menu.spec.js` empezó a fallar por tiempo de espera. Con `--repeat-each=4`
+sobre esa suite sola:
 
-La ganancia se aplana porque estas pruebas pasan el tiempo **esperando
-relojes**, no calculando. Y cada trabajador es un Chromium, así que en una
-máquina de 8 GB subir más compra poco y arriesga fallos por memoria, que se
-leen igual que intermitencias.
+| Trabajadores | Resultado | Tarda |
+|---|---|---|
+| 4 | **62 de 64** | 2,2 min |
+| 3 | 64 de 64 | 1,0 min |
+| 2 | 64 de 64 | 1,0 min |
+| 1 | 64 de 64 | 1,3 min |
 
-Antes de subirlo de 1 se corrieron las cinco suites más cargadas de
-temporizadores dos veces cada una: 60 pruebas, ninguna intermitente. En otra
-máquina, `--workers=N` manda sobre el archivo sin tocarlo.
+En esta máquina cuatro trabajadores no sólo son frágiles: son **más lentos que
+dos**. Ocho núcleos, pero 8 GB de RAM con 2,5 libres, y cada trabajador es un
+Chromium entero — pasado cierto punto se compite por memoria y todos esperan.
+
+Estas pruebas pasan el tiempo **esperando relojes**, no calculando, así que el
+paralelismo rinde poco y se agota rápido. Antes de volver a subirlo hay que
+medirlo con `--repeat-each` y **sobre la suite completa**, no sobre un
+subconjunto: ése fue el error.
+
+En otra máquina, `--workers=N` manda sobre el archivo sin tocarlo.

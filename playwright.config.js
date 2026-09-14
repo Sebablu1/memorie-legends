@@ -34,44 +34,48 @@ export default defineConfig({
   expect: { timeout: 15_000 },
 
   /**
-   * Cuatro a la vez, y el número está medido.
+   * Dos a la vez, y el número está medido — dos veces.
    *
    * ───────────────────────────────────────────────────────────────────────
-   * POR QUÉ ESTABA EN 1
+   * PRIMERO SE SUBIÓ A CUATRO, Y ESTUVO MAL
    * ───────────────────────────────────────────────────────────────────────
    *
-   * Porque las cuatro IA corren con temporizadores REALES —dos segundos de
-   * ventana, dos de revelación, el ritmo entre jugadas— y el miedo era que
-   * varias mesas a la vez se pisaran por CPU y aparecieran pruebas
-   * intermitentes. Es un miedo razonable y resultó infundado en esta máquina.
+   * Estaba en 1 porque las cuatro IA corren con temporizadores REALES y el
+   * miedo era que varias mesas a la vez se pisaran por CPU. Se subió a cuatro
+   * después de medir: el subconjunto rápido bajó de 90 a 54 segundos y las
+   * cinco suites más cargadas de relojes pasaron dos veces cada una sin
+   * intermitencias.
+   *
+   * Esa medición no alcanzó. La suite entera creció seis pruebas y
+   * `menu.spec.js` empezó a fallar por tiempo de espera al hacer clic. Con
+   * `--repeat-each=4`:
+   *
+   *     workers=4 → 62 de 64, y tardó 2,2 min
+   *     workers=3 → 64 de 64, 1,0 min
+   *     workers=2 → 64 de 64, 1,0 min
+   *     workers=1 → 64 de 64, 1,3 min
+   *
+   * O sea que en esta máquina cuatro trabajadores no sólo son frágiles: son
+   * MÁS LENTOS que dos. Ocho núcleos pero 8 GB de RAM con 2,5 libres, y cada
+   * trabajador es un Chromium entero; pasado cierto punto se compite por
+   * memoria y todo el mundo espera.
    *
    * ───────────────────────────────────────────────────────────────────────
-   * QUÉ SE MIDIÓ ANTES DE SUBIRLO
+   * POR QUÉ DOS Y NO TRES
    * ───────────────────────────────────────────────────────────────────────
    *
-   * Las cinco pruebas más cargadas de temporizadores —`carteles`,
-   * `partida-completa`, `poder10`, `descarte`, `entrenamiento-ux`— corridas
-   * DOS VECES cada una con cuatro trabajadores: 60 pruebas, ninguna
-   * intermitente. Y después la suite entera, en verde.
+   * Los dos midieron igual y los dos pasaron. Dos deja más aire para la
+   * máquina que corra esto — puede no ser ésta — y el margen se paga con nada,
+   * porque el tiempo es el mismo.
    *
-   * ───────────────────────────────────────────────────────────────────────
-   * Y POR QUÉ NO MÁS DE CUATRO
-   * ───────────────────────────────────────────────────────────────────────
+   * La lección de fondo: estas pruebas pasan el tiempo ESPERANDO relojes, no
+   * calculando, así que el paralelismo rinde poco y se acaba rápido. Antes de
+   * volver a subirlo hay que medirlo con `--repeat-each`, y sobre la suite
+   * completa, no sobre un subconjunto.
    *
-   * Porque no rinde. De 1 a 2 trabajadores el subconjunto rápido bajó de 90 a
-   * 61 segundos; de 2 a 4, sólo a 54. La ganancia se aplana porque estas
-   * pruebas pasan el tiempo ESPERANDO relojes, no calculando: paralelizar
-   * superpone esperas, y las esperas ya se superponen casi todas con cuatro.
-   *
-   * Del otro lado, cada trabajador es un Chromium. Esta máquina tiene 8 GB y
-   * anda con 2,5 libres, así que el sexto o el séptimo empiezan a competir por
-   * memoria — y una prueba que falla por falta de memoria se lee igual que una
-   * intermitente.
-   *
-   * Si en otra máquina hicieran falta menos, `--workers=N` en la línea de
-   * comandos manda sobre esto sin tocar el archivo.
+   * En otra máquina, `--workers=N` manda sobre esto sin tocar el archivo.
    */
-  workers: 4,
+  workers: 2,
 
   /**
    * Pero NO en paralelo dentro de un archivo.

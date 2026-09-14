@@ -37,6 +37,8 @@ import {
   resolverVentana,
   venceEn,
   yaVencio,
+  MS_PARA_DECIDIR,
+  decisionQueVence,
 } from "./reglas/red.js";
 
 /** Sin señales durante este tiempo, se considera que el jugador se cayó. */
@@ -354,13 +356,48 @@ export function crearMotorEnRed({
         return nuevo("postLevantada", `t${estado.turnosRonda}-${estado.indiceTurno}`,
                      ahoraMs + MS_PASO_AUTOMATICO, "pasarPorTiempo");
 
-      // Levantada y poder siguen sin reloj, igual que en la mesa local: esas
-      // decisiones se toman sin apuro y no dejan a la mesa esperando —el que
-      // levantó tiene la carta en la mano y va a hacer algo con ella. Si el
-      // jugador desaparece del todo, lo resuelve `saltarAusente`, que exige
-      // 15 segundos de silencio.
-      default:
-        return null;
+      /**
+       * Levantada y poderes: diez segundos para decidir.
+       *
+       * ───────────────────────────────────────────────────────────────────
+       * ESTAS FASES NO TENÍAN RELOJ, Y ERA UN ERROR
+       * ───────────────────────────────────────────────────────────────────
+       *
+       * El razonamiento viejo era que el que levantó una carta o usó un poder
+       * TIENE la carta y va a hacer algo con ella, así que no deja a nadie
+       * esperando. Eso vale en una mesa de living. En red no: quien se levanta
+       * con una carta en la mano congela la partida de los otros tres, y
+       * `saltarAusente` no lo rescata —aquél mide SILENCIO, quince segundos
+       * sin latidos, y una pestaña abierta late igual.
+       *
+       * ───────────────────────────────────────────────────────────────────
+       * LA MARCA LLEVA EL TURNO, NO LA RONDA
+       * ───────────────────────────────────────────────────────────────────
+       *
+       * Es el mismo error que ya documenta `postLevantada` unas líneas arriba:
+       * en una ronda me toca decidir varias veces, y con `r${estado.ronda}` la
+       * segunda heredaría el vencimiento de la primera y pasaría de inmediato.
+       *
+       * ───────────────────────────────────────────────────────────────────
+       * Y ARRANCA CUANDO LEVANTA, NO CUANDO EMPEZÓ EL TURNO
+       * ───────────────────────────────────────────────────────────────────
+       *
+       * `ahoraMs + MS_PARA_DECIDIR`, contado desde este golpe. El turno dura
+       * ocho segundos y esto dura diez, así que levantar con dos segundos de
+       * turno restante NO deja dos segundos para decidir: deja diez. El plazo
+       * es de la decisión, no lo que sobra del turno.
+       *
+       * Qué pasa al vencer sale de `decisionQueVence`, en `reglas/red.js`: con
+       * una carta levantada se descarta —es la única jugada posible— y con un
+       * poder se salta, porque elegir con qué carta cambia el 9 sería jugar por
+       * otro.
+       */
+      default: {
+        const decision = decisionQueVence(estado.fase);
+        if (!decision) return null;
+        return nuevo(estado.fase, `t${estado.turnosRonda}-${estado.indiceTurno}`,
+                     ahoraMs + MS_PARA_DECIDIR, decision);
+      }
     }
   }
 
@@ -1096,6 +1133,48 @@ export function crearMotorEnRed({
       // que no contestó podría eliminarlo; pasar no le cuesta nada.
       case "pasarPorTiempo":
         return { ...partida, estado: motor.pasarTurno(partida.estado) };
+
+      /**
+       * Se acabaron los diez segundos con la carta levantada: se tira.
+       *
+       * Es el ÚNICO caso en que el servidor juega una carta que nadie tocó, y
+       * se banca porque no hay nada que elegir: o se la queda o la tira, y
+       * tirarla es lo único que no le cambia la mano sin que él lo pida.
+       *
+       * Queda anotado como automático en el registro —ver `tirarCarta`— para
+       * que después se pueda explicar.
+       */
+      case "descartarPorTiempo":
+        return { ...partida, estado: motor.tirarCarta(partida.estado, { porTiempo: true }) };
+
+      /**
+       * Se acabaron los diez segundos con un poder pendiente: se salta.
+       *
+       * ───────────────────────────────────────────────────────────────────
+       * POR QUÉ SON DOS PASOS Y NO UNO
+       * ───────────────────────────────────────────────────────────────────
+       *
+       * `saltarTurno` no sirve acá: exige fase `turno` y sin carta levantada,
+       * así que desde `poder` devuelve el estado sin tocarlo — la partida se
+       * quedaría colgada exactamente igual, con el plazo venciendo una y otra
+       * vez.
+       *
+       * Lo que corresponde es lo que hace el jugador cuando declina: soltar el
+       * poder, que lo deja en `postLevantada`, y de ahí pasar el turno. Son
+       * las dos funciones del motor que ya existen y ya están probadas.
+       *
+       * El 10 a medio resolver es su propio caso: ya vio las dos cartas, así
+       * que lo que se declina no es el poder sino el cambio. `false` es "no
+       * cambio", que es lo único honesto — cambiar por él usaría información
+       * que él tiene y el servidor no puede interpretar.
+       */
+      case "saltarPorTiempo": {
+        const sinPendiente =
+          partida.estado.fase === "cambioConVista"
+            ? motor.resolverCambioConVista(partida.estado, false)
+            : motor.saltarPoder(partida.estado);
+        return { ...partida, estado: motor.pasarTurno(sinPendiente) };
+      }
 
       case "siguienteRonda": {
         // Si la partida terminó, no hay ronda siguiente que repartir.
