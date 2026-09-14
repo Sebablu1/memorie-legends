@@ -27,6 +27,7 @@ import {
   MS_DESCARTE,
   MS_REAPERTURA,
   cartasMiradasEn,
+  posicionesAtacablesDe,
 } from "./reglas/motor.js";
 
 
@@ -1036,6 +1037,29 @@ function marcarCartasJugables() {
         )
         .forEach((el) => el.classList.add("jugable", "atacable"));
     }
+
+    /**
+     * Y las cartas sueltas que alguien falló, que son por POSICIÓN.
+     *
+     * ─────────────────────────────────────────────────────────────────────
+     * POR QUÉ ACÁ SÍ SE MARCA UNA POSICIÓN
+     * ─────────────────────────────────────────────────────────────────────
+     *
+     * Arriba se marca la mano entera porque el derecho de un poder es sobre la
+     * mano: se supo un número, no un lugar, y señalar una carta sería
+     * inventarse un dato.
+     *
+     * Acá el dato existe y es público. Cuando alguien falla un descarte, los
+     * cuatro ven la carta Y dónde estaba; el permiso es sobre esa posición y
+     * marcarla no regala nada que la mesa no haya visto.
+     */
+    for (const { objetivo, posicion } of quePosicionesPuedoAtacar()) {
+      document
+        .querySelector(
+          `.jugador[data-jugador="${objetivo}"] .carta[data-posicion="${posicion}"]`,
+        )
+        ?.classList.add("jugable", "atacable");
+    }
   }
 
   // Ataque a medio armar: ya se apuntó a una carta ajena y falta decir cuál
@@ -1063,6 +1087,18 @@ function marcarCartasJugables() {
   miMano
     .querySelectorAll(".carta")
     .forEach((el) => el.classList.add("jugable"));
+}
+
+/**
+ * Qué cartas sueltas se pueden atacar por un fallo ajeno, en los dos modos.
+ *
+ * En red lo decide el servidor y viaja en la vista; en entrenamiento se
+ * calcula del estado local con la misma función del motor. Es el mismo reparto
+ * que hace `aQuienPuedoAtacar` para el derecho de mano entera.
+ */
+function quePosicionesPuedoAtacar() {
+  if (enRed()) return miVista?.puedeAtacarEn ?? [];
+  return posicionesAtacablesDe(estado, YO);
 }
 
 /**

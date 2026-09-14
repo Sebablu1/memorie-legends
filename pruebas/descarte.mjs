@@ -58,11 +58,33 @@ ok(cuenta(s, 0) === 3, "A queda con 3: se sacó la carta de encima", cuenta(s, 0
 ok(s.jugadores[0].mano[0] === null, "su posición 0 queda vacía");
 ok(s.descarte[0].id === "Basto-6", "su 6 quedó arriba del descarte", s.descarte[0].id);
 
+/**
+ * B acierta, pero tarde. Y sólo el primero se salva.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ESTA PARTE AFIRMABA LO CONTRARIO, Y CAMBIÓ LA REGLA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Antes el acierto tarde también sacaba la carta de la mano y la apilaba en
+ * el descarte; el beneficio se compensaba con una de castigo, así que quedaba
+ * neto cero. Tenía dos problemas.
+ *
+ * Uno visible: la muestra crecía con una carta que nadie ganó, y la muestra
+ * es lo que decide qué se puede descartar después.
+ *
+ * Uno de fondo: llegar tarde cambiaba una carta conocida por una desconocida
+ * sin costo neto, así que intentar siempre convenía.
+ *
+ * Ahora B se queda con su carta Y recibe una: neto +1, igual que fallar. Lo
+ * que sigue distinguiendo al que falla es que su carta le da a los rivales el
+ * derecho de descartársela — ver `pruebas/fallo-da-derecho.mjs`.
+ */
 s = M.intentarDescarte(s, 1, 0);
 ok(s.ventanaDescarte.intentos.at(-1).resultado === "tarde", "B llega tarde");
-ok(s.jugadores[1].mano[0] === null, "B también se saca la carta de encima");
-ok(cuenta(s, 1) === 4, "B queda con 4: se fue una y entró la de castigo", cuenta(s, 1));
-ok(s.descarte[0].id === "Espada-6", "su 6 sí llegó al descarte", s.descarte[0].id);
+ok(s.jugadores[1].mano[0]?.id === "Espada-6", "B CONSERVA su carta: sólo el primero se salva");
+ok(cuenta(s, 1) === 5, "B queda con 5: la suya más la de castigo", cuenta(s, 1));
+ok(s.descarte[0].id === "Basto-6", "y la muestra sigue siendo la de A", s.descarte[0].id);
+ok(s.descarte.length === 2, "la muestra no creció con el descarte tardío", s.descarte.length);
 
 s = M.intentarDescarte(s, 2, 0);
 ok(s.ventanaDescarte.intentos.at(-1).resultado === "error", "C se equivoca");
@@ -79,7 +101,7 @@ ok(!reveladas.some((r) => r.indiceJugador === 0), "la de A no se destapa: ya est
 for (const quien of [0, 1, 2]) {
   const v = V.vistaDe(s, quien);
   ok(v.jugadores[1].mano[0]?.id === "Espada-6",
-     `el jugador ${quien} ve la carta de B en su hueco`, v.jugadores[1].mano[0]);
+     `el jugador ${quien} ve la carta de B, que sigue en su mano`, v.jugadores[1].mano[0]);
   ok(v.jugadores[2].mano[0]?.id === "Oro-3",
      `el jugador ${quien} ve la carta de C`, v.jugadores[2].mano[0]);
   ok(V.filtracionesEn(v, s).length === 0, `y sin filtrar nada más (jugador ${quien})`);
@@ -91,15 +113,19 @@ ok(V.revelacionesDe(cerrado).length === 0, "no queda ninguna revelación");
 for (const quien of [0, 1, 2]) {
   const v = V.vistaDe(cerrado, quien);
   ok(v.revelaciones.length === 0, `la vista del jugador ${quien} no trae revelaciones`);
-  ok(v.jugadores[1].mano[0] === null, "el lugar de B vuelve a ser un hueco");
+  // B llegó tarde, así que conserva su carta: al taparse vuelve a ser un
+  // dorso, no un hueco. Antes acá quedaba `null` porque el acierto tarde se
+  // llevaba la carta; ahora sólo el primero se salva.
+  ok(v.jugadores[1].mano[0]?.oculta === true,
+     "la carta de B vuelve a estar tapada, y sigue en su mano", v.jugadores[1].mano[0]);
   ok(v.jugadores[2].mano[0]?.oculta === true, "la carta de C vuelve a estar tapada");
   ok(V.filtracionesEn(v, cerrado).length === 0, `sin filtraciones (jugador ${quien})`);
 }
 
 console.log("\n  jugador | resultado | cartas | conserva su carta");
 console.log(`     A    | primero   |   ${cuenta(s, 0)}    | no, se descartó`);
-console.log(`     B    | tarde     |   ${cuenta(s, 1)}    | no, pero recibe una de castigo`);
-console.log(`     C    | error     |   ${cuenta(s, 2)}    | sí, más una de castigo`);
+console.log(`     B    | tarde     |   ${cuenta(s, 1)}    | sí, más una de castigo`);
+console.log(`     C    | error     |   ${cuenta(s, 2)}    | sí, más una de castigo, y queda expuesta`);
 
 console.log("\n=== Sólo hay un primero por ronda ===");
 let t = mesaDePrueba();

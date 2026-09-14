@@ -387,24 +387,63 @@ export function intentarDescarte(estado, indiceJugador, posicion) {
   const mano = [...jugador.mano];
   const cartaCastigo = () => (mazo.length ? mazo.shift() : null);
 
-  if (correcto) {
-    // Acertó: la carta se va, haya llegado primero o no.
+  if (correcto && fuePrimero) {
+    // Llegó primero: la carta se va y pasa a ser la muestra.
     mano[posicion] = null;
     descarte.unshift({ ...carta, visible: true });
-    // Pero si no fue el primero, el beneficio se compensa con una carta más.
-    if (!fuePrimero) mano.push(cartaCastigo());
   } else {
-    // Se equivocó: la carta se queda donde estaba y encima recibe otra.
+    /**
+     * Todo lo demás: la carta se queda y encima recibe otra.
+     *
+     * ───────────────────────────────────────────────────────────────────
+     * SÓLO EL PRIMERO SE SALVA, Y AHORA DE VERDAD
+     * ───────────────────────────────────────────────────────────────────
+     *
+     * Antes el acierto TARDE también sacaba la carta de la mano y la
+     * apilaba en la muestra; el beneficio se compensaba con una carta de
+     * castigo, así que quedaba neto cero. Eso tenía dos problemas.
+     *
+     * Uno visible: la muestra crecía con una carta que nadie ganó. Dos
+     * jugadores descartando el mismo número dejaban las dos arriba, y lo
+     * que se ve como muestra es lo que decide qué se puede descartar
+     * después.
+     *
+     * Uno de fondo: llegar tarde cambiaba una carta conocida por una
+     * desconocida sin costo neto, así que intentar siempre convenía.
+     *
+     * Ahora el escalón es parejo: ser primero saca la carta, llegar tarde
+     * la deja y suma una, y fallar hace lo mismo Y ADEMÁS le regala a los
+     * rivales el derecho a descartársela — ver `recordarFallo`.
+     */
     mano.push(cartaCastigo());
   }
 
   const resultado = correcto ? (fuePrimero ? "primero" : "tarde") : "error";
+
+  /**
+   * Un fallo le muestra a la mesa la carta Y dónde estaba.
+   *
+   * ───────────────────────────────────────────────────────────────────
+   *
+   * Hasta ahora eso no servía de nada: la carta se exponía dos segundos, los
+   * rivales la veían, y no podían hacer nada con ella — `puedeAtacarA` exige un
+   * conocimiento, y los conocimientos sólo los daban los poderes 8 y 10.
+   *
+   * SÓLO el error, nunca el acierto tarde. Los dos exponen la carta, pero sólo
+   * el error regala el derecho: así fallar sigue siendo peor que llegar tarde,
+   * y llegar tarde peor que ser primero.
+   */
+  const conocimientos =
+    resultado === "error"
+      ? recordarFallo(estado, { objetivo: indiceJugador, posicion, carta })
+      : (estado.conocimientos ?? []);
 
   return anotar(
     {
       ...estado,
       mazo,
       descarte,
+      conocimientos,
       jugadores: estado.jugadores.map((j, i) => (i === indiceJugador ? { ...j, mano } : j)),
       ventanaDescarte: {
         // El spread NO es decorativo: la ventana lleva `volverA`, que dice
@@ -439,13 +478,127 @@ export function intentarDescarte(estado, indiceJugador, posicion) {
 export const puedeAtacarA = (estado, actor, objetivo) =>
   actor !== objetivo &&
   !estado.jugadores[objetivo]?.eliminado &&
-  (estado.conocimientos ?? []).some((c) => c.actor === actor && c.objetivo === objetivo);
+  (estado.conocimientos ?? []).some(
+    (c) =>
+      c.actor === actor &&
+      c.objetivo === objetivo &&
+      /**
+       * Menos lo que dejó un fallo ajeno, que da derecho por POSICIÓN.
+       *
+       * Sin este filtro, el conocimiento del fallo satisfacía la condición de
+       * arriba y habilitaba la mano entera — que es exactamente lo que no
+       * corresponde: la mesa vio dónde estaba esa carta, no las otras tres.
+       *
+       * Ese derecho lo contesta `puedeAtacarEn`, que además compara el `id` de
+       * la carta contra la que hay ahí ahora.
+       */
+      c.origen !== "fallo",
+  );
 
 /** A quién puede atacar cada jugador. Es lo ÚNICO de esto que puede viajar. */
 export const objetivosDe = (estado, actor) =>
   estado.jugadores
     .map((_, i) => i)
     .filter((i) => puedeAtacarA(estado, actor, i));
+
+/**
+ * El otro derecho: el que deja un descarte FALLIDO, y que es por POSICIÓN.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * POR QUÉ ÉSTE NO ES SOBRE LA MANO ENTERA
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * El de los poderes sí lo es, y con razón: quien usa un 8 se lleva un NÚMERO,
+ * no una posición, así que limitarlo al lugar donde lo vio volvería el poder
+ * un acierto garantizado y no habría nada que recordar.
+ *
+ * Acá al revés. Cuando alguien falla un descarte, la mesa entera ve la carta
+ * Y dónde estaba: los dos datos, a la vez y sin esfuerzo. Darle derecho sobre
+ * la mano entera regalaría un permiso que nadie se ganó.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * Y POR QUÉ NO HACE FALTA INVALIDARLO NUNCA
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Porque se guarda el `id` de la carta y acá se compara contra la que HAY en
+ * esa posición. Si se la cambiaron con un 9, se la descartaron, o volvió a
+ * fallar y ahora hay otra, el recuerdo deja de valer solo.
+ *
+ * La alternativa era borrarlo a mano en las funciones que mueven cartas de una
+ * mano —`usarPoderCambio`, `intentarDescarteRival`, `intentarDescarte`— y
+ * olvidarse de una sola le daría a alguien derecho sobre una carta que ya no
+ * está donde él cree. Es el mismo truco que `loQueSabeDeSuCarta`, y por el
+ * mismo motivo.
+ */
+export const puedeAtacarEn = (estado, actor, objetivo, posicion) => {
+  if (actor === objetivo || estado.jugadores[objetivo]?.eliminado) return false;
+
+  const memo = (estado.conocimientos ?? []).find(
+    (c) =>
+      c.actor === actor &&
+      c.objetivo === objetivo &&
+      c.posicion === posicion &&
+      c.origen === "fallo",
+  );
+  if (!memo) return false;
+
+  const actual = estado.jugadores[objetivo]?.mano?.[posicion];
+  return Boolean(actual) && actual.id === memo.idCarta;
+};
+
+/**
+ * Las posiciones sueltas que `actor` puede atacar, por un fallo ajeno.
+ *
+ * Esto SÍ puede viajar, y no filtra nada: la carta y su posición se
+ * expusieron a los cuatro cuando el fallo ocurrió. Lo que viaja es el
+ * permiso —quién y dónde— nunca el número.
+ */
+export const posicionesAtacablesDe = (estado, actor) => {
+  const salida = [];
+  for (const c of estado.conocimientos ?? []) {
+    if (c.actor !== actor || c.origen !== "fallo") continue;
+    if (puedeAtacarEn(estado, actor, c.objetivo, c.posicion)) {
+      salida.push({ objetivo: c.objetivo, posicion: c.posicion });
+    }
+  }
+  return salida;
+};
+
+/**
+ * Anota que TODA la mesa vio dónde estaba la carta que alguien falló.
+ *
+ * Sólo el error, nunca el acierto tarde. Los dos exponen la carta dos segundos
+ * —eso no cambió— pero sólo el error regala el derecho a atacarla. Es lo que
+ * mantiene el escalón: fallar es peor que llegar tarde, y llegar tarde es peor
+ * que ser primero.
+ */
+function recordarFallo(estado, { objetivo, posicion, carta }) {
+  if (!carta) return estado.conocimientos ?? [];
+
+  let conocimientos = estado.conocimientos ?? [];
+  for (let actor = 0; actor < estado.jugadores.length; actor++) {
+    if (actor === objetivo || estado.jugadores[actor]?.eliminado) continue;
+
+    // Una creencia por actor y posición: si esa posición vuelve a fallar con
+    // otra carta, lo que vale es lo último que se vio.
+    conocimientos = conocimientos.filter(
+      (c) => !(c.actor === actor && c.objetivo === objetivo && c.posicion === posicion && c.origen === "fallo"),
+    );
+    conocimientos = [
+      ...conocimientos,
+      {
+        actor,
+        objetivo,
+        numero: carta.numero,
+        posicion,
+        idCarta: carta.id,
+        origen: "fallo",
+        ronda: estado.ronda,
+      },
+    ];
+  }
+  return conocimientos;
+}
 
 /**
  * Intento de descarte sobre la mano de OTRO, habilitado por un poder 8 o 10.
@@ -467,7 +620,26 @@ export function intentarDescarteRival(
   estado, actor, objetivo, posicionObjetivo, posicionEntrega,
 ) {
   if (estado.fase !== "descarte" || !estado.ventanaDescarte) return estado;
-  if (!puedeAtacarA(estado, actor, objetivo)) return estado;
+  /**
+   * Dos derechos distintos, y alcanza con cualquiera.
+   *
+   * ───────────────────────────────────────────────────────────────────
+   *
+   * `puedeAtacarA` es el de los poderes: vale sobre la mano ENTERA, porque lo
+   * que se supo fue un número y no un lugar.
+   *
+   * `puedeAtacarEn` es el que deja un fallo ajeno: vale sobre ESA posición y
+   * ninguna otra, porque la mesa vio exactamente dónde estaba.
+   *
+   * Se comprueban los dos y no uno: quien tiene el derecho de un poder puede
+   * atacar donde quiera, y quien sólo vio un fallo, sólo ahí.
+   */
+  if (
+    !puedeAtacarA(estado, actor, objetivo) &&
+    !puedeAtacarEn(estado, actor, objetivo, posicionObjetivo)
+  ) {
+    return estado;
+  }
 
   const manoObjetivo = [...estado.jugadores[objetivo].mano];
   const manoActor = [...estado.jugadores[actor].mano];

@@ -302,9 +302,17 @@ console.log("\n=== Las reglas A/B/C no cambian ===");
      "se aplican por reacción, no por llegada", orden.map((o) => o.uid));
   ok(orden[0].resultado === "primero", "A: primer acierto");
   ok(cuenta(0) === 3, "A queda con 3: se sacó la carta", cuenta(0));
+  /**
+   * B acierta segundo, y sólo el primero se salva.
+   *
+   * Antes acá decía que la carta de B se iba al descarte y quedaba neto cero.
+   * La regla cambió: el acierto tarde conserva la carta Y recibe una de
+   * castigo, así que la muestra no crece con una carta que nadie ganó. Ver
+   * `pruebas/descarte.mjs`, que lo prueba sobre el motor.
+   */
   ok(orden[1].resultado === "tarde", "B: segundo acierto");
-  ok(cuenta(1) === 4, "B queda con 4: se fue una y entró la de castigo", cuenta(1));
-  ok(final.jugadores[1].mano[0] === null, "la de B se fue al descarte");
+  ok(cuenta(1) === 5, "B queda con 5: conserva la suya y suma la de castigo", cuenta(1));
+  ok(final.jugadores[1].mano[0] !== null, "la de B NO se fue al descarte");
   ok(orden[2].resultado === "error", "C: error");
   ok(cuenta(2) === 5, "C queda con 5", cuenta(2));
   ok(final.jugadores[2].mano[0]?.id === "Oro-3", "C conserva su carta en su posición");

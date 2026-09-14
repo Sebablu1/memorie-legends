@@ -15,7 +15,7 @@
  */
 
 import { puntosCarta } from "./baraja.js";
-import { objetivosDe } from "./motor.js";
+import { objetivosDe, posicionesAtacablesDe } from "./motor.js";
 
 /** Marcador de carta tapada. No lleva palo, número ni imagen. */
 export const CARTA_OCULTA = { oculta: true };
@@ -132,6 +132,23 @@ export function vistaDe(estado, indiceQuienMira) {
      * mismo que hacer público qué vio.
      */
     cambioPendiente: estado.cambioPendiente ?? null,
+
+    /**
+     * Las posiciones sueltas que puede atacar por un fallo ajeno.
+     *
+     * ─────────────────────────────────────────────────────────────────────
+     * ESTO NO FILTRA NADA, Y CONVIENE ENTENDER POR QUÉ
+     * ─────────────────────────────────────────────────────────────────────
+     *
+     * Mandar "podés atacarle la posición 2 a Bruno" suena a estar regalando
+     * dónde mirar. No lo es: ese permiso existe JUSTAMENTE porque Bruno falló
+     * un descarte y la mesa entera vio su carta y su lugar. Lo que viaja es
+     * una consecuencia de algo que ya fue público para los cuatro.
+     *
+     * Lo que sigue sin viajar es el NÚMERO. Va el permiso —quién y dónde— y
+     * quien lo usa tiene que acordarse de qué carta era.
+     */
+    puedeAtacarEn: posicionesAtacablesDe(estado, indiceQuienMira),
 
     // A quién puede atacar QUIEN MIRA, y nada más.
     //
