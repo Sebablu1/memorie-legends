@@ -33,9 +33,54 @@ export default defineConfig({
   timeout: 90_000,
   expect: { timeout: 15_000 },
 
-  // En serie: las cuatro IA corren con temporizadores reales y varias mesas a
-  // la vez se pisan por CPU, que es la receta para una prueba intermitente.
-  workers: 1,
+  /**
+   * Cuatro a la vez, y el número está medido.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * POR QUÉ ESTABA EN 1
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Porque las cuatro IA corren con temporizadores REALES —dos segundos de
+   * ventana, dos de revelación, el ritmo entre jugadas— y el miedo era que
+   * varias mesas a la vez se pisaran por CPU y aparecieran pruebas
+   * intermitentes. Es un miedo razonable y resultó infundado en esta máquina.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * QUÉ SE MIDIÓ ANTES DE SUBIRLO
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Las cinco pruebas más cargadas de temporizadores —`carteles`,
+   * `partida-completa`, `poder10`, `descarte`, `entrenamiento-ux`— corridas
+   * DOS VECES cada una con cuatro trabajadores: 60 pruebas, ninguna
+   * intermitente. Y después la suite entera, en verde.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * Y POR QUÉ NO MÁS DE CUATRO
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Porque no rinde. De 1 a 2 trabajadores el subconjunto rápido bajó de 90 a
+   * 61 segundos; de 2 a 4, sólo a 54. La ganancia se aplana porque estas
+   * pruebas pasan el tiempo ESPERANDO relojes, no calculando: paralelizar
+   * superpone esperas, y las esperas ya se superponen casi todas con cuatro.
+   *
+   * Del otro lado, cada trabajador es un Chromium. Esta máquina tiene 8 GB y
+   * anda con 2,5 libres, así que el sexto o el séptimo empiezan a competir por
+   * memoria — y una prueba que falla por falta de memoria se lee igual que una
+   * intermitente.
+   *
+   * Si en otra máquina hicieran falta menos, `--workers=N` en la línea de
+   * comandos manda sobre esto sin tocar el archivo.
+   */
+  workers: 4,
+
+  /**
+   * Pero NO en paralelo dentro de un archivo.
+   *
+   * `fullyParallel` repartiría también las pruebas de un mismo archivo, y
+   * varias de éstas comparten estado del navegador a propósito —
+   * `sessionStorage` entre pasos, por ejemplo en `dos-vistas`. El paralelismo
+   * queda entre archivos, que es donde no hay nada compartido.
+   */
   fullyParallel: false,
 
   // Sólo en CI. En local, un reintento esconde justo lo que se vino a buscar.
