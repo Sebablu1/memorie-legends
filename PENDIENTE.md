@@ -289,6 +289,55 @@ la facturación de Artifact Registry deja de crecer.
 
 ---
 
+## 7. El guardián de dobles no mira `firebase.js`
+
+**Estado:** `pruebas/dobles-de-partida.mjs` vigila los dobles de
+`partida-red.js` y de `servidor.js`, y comprueba que cada doble exporte todo lo
+que exporta el módulo real. `firebase.js` no está en esa lista, y sí lo doblan
+diecinueve pruebas de navegador.
+
+**Qué se pierde:** un `import` con nombre de algo que el doble no exporta no
+da `undefined`: rompe el módulo entero al enlazarlo, y con él a todo el que lo
+importa. Pasó al escribir `sala-vestida.spec.js`: el doble traía tres exports,
+`servidor.js` pedía `funciones` y `httpsCallable` del mismo archivo, y la sala
+no se dibujaba nunca. Se ve como una espera hasta que vence el plazo, no como
+un error.
+
+**Por qué no se arregló en el momento:** la regla de los otros dos no sirve
+acá. `firebase.js` es un mostrador que reexporta treinta y dos nombres y cada
+pantalla usa un puñado distinto; exigirle a cada doble los treinta y dos
+pondría en rojo a las diecinueve pruebas que hoy andan bien. La comprobación
+correcta es otra: qué importa, en cadena, la página que la prueba abre.
+
+**Mientras tanto:** los dobles nuevos de `firebase.js` copian el de
+`sala-vestida.spec.js`, que los lleva todos, y ese archivo explica por qué.
+
+---
+
+## 8. El marco de la MESA tiene el mismo `width: auto`
+
+**Estado:** `.jugador .retrato .marco-avatar`, en `public/css/mesa.css`, va en
+posición absoluta con `width: auto; height: auto`. Una imagen reemplazada en
+absoluto no se estira hasta los `inset`: se pinta al tamaño del archivo.
+
+**Qué pasaría:** con un marco de 512 píxeles, el asiento queda tapado por el
+marco. No mueve la caja del retrato —así que las pruebas que comparan tamaños
+de asiento siguen en verde—, simplemente se pinta encima de todo. Se vio en la
+sala de espera, que copiaba el mismo CSS, y ahí se arregló con un alto y un
+ancho escritos más `object-fit: contain`.
+
+**Por qué no urge:** hoy el único marco del catálogo es `marco_dorado` con
+`imagen: "🖼️"`, un emoji. `esRutaDelSitio` lo rechaza y no se dibuja ningún
+marco en ninguna pantalla. El problema aparece el día que se suba el arte de
+verdad —el mismo día del punto de las imágenes de los packs—.
+
+**Cómo:** copiar las tres líneas de `.marco-sala` en `public/css/sala.css`, y
+una prueba que mida el marco pintado y no la caja que lo contiene; está escrita
+en `pruebas/e2e/sala-vestida.spec.js` («el marco se achica a la ficha aunque el
+archivo sea enorme») y se traduce derecho a `marco-y-titulo.spec.js`.
+
+---
+
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del

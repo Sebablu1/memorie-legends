@@ -12,6 +12,7 @@ import { exigirSesion, mostrarSaldo } from "./sesion.js";
 import { iniciarPartida, salirDeSalaEnEspera, marcarListo, reportarJugador, ErrorDeServidor } from "./servidor.js";
 import { ESTADOS_SALA, MIN_JUGADORES, MAX_JUGADORES } from "./reglas/salas.js";
 import { escapar } from "./modulos/texto.js";
+import { esRutaDelSitio } from "./reglas/catalogo.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -42,6 +43,90 @@ function mostrarFinal(icono, titulo, texto, revancha = null) {
   if (!enlace) return;
   enlace.hidden = !revancha?.codigo;
   if (revancha?.codigo) enlace.href = `room.html?code=${encodeURIComponent(revancha.codigo)}`;
+}
+
+/**
+ * La cara, el marco y el título de cada jugador en la sala de espera.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * EL DATO YA ESTABA; LO QUE FALTABA ERA DIBUJARLO
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * `jugadoresLuce` viaja en el documento de la sala desde que se armaron los
+ * dorsos y las insignias: lo escribe `identidadEnSala` cuando cada uno entra.
+ * La sala lo ignoraba y pintaba una inicial en un círculo, así que quien
+ * compraba un avatar lo veía recién al empezar la partida.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * Y POR QUÉ IMPORTA MÁS QUE EN LA MESA
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Porque la sala de espera es donde se mira a los demás. En la mesa uno mira
+ * las cartas; acá no hay nada que hacer salvo ver quién llegó. Es el momento
+ * en que un marco o un título comprado se ven de verdad.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * Y POR QUÉ ESTÁN ACÁ ARRIBA Y NO AL LADO DE `pintar`
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Porque el arranque de este archivo tiene un `await` de nivel superior, y
+ * eso PARTE la evaluación del módulo en dos: todo lo que está escrito debajo
+ * del `await` no existe todavía cuando `arrancar()` engancha el `onSnapshot`.
+ * Si la primera foto de la sala llega en el acto —una respuesta de caché, o
+ * un doble en una prueba— `pintar` corre antes de que `luceDe` esté
+ * inicializado y tira un ReferenceError en vez de dibujar la sala.
+ *
+ * Con Firestore de verdad la foto tarda lo suficiente como para que no se
+ * note nunca, que es justo lo que lo vuelve peligroso. Arriba del `await` no
+ * hay forma de que pase.
+ */
+
+/** El formato viejo por si queda alguna sala abierta de antes. */
+const luceDe = (sala, i) => {
+  const nuevo = sala.jugadoresLuce?.[i];
+  if (nuevo) return nuevo;
+  const retrato = sala.jugadoresRetratos?.[i] ?? null;
+  return { retrato, dorso: null, insignia: null, marco: null, titulo: null };
+};
+
+/**
+ * La cara: la comprada, o la inicial de siempre.
+ *
+ * `esRutaDelSitio` otra vez, igual que en la mesa. Lo que hay en la sala lo
+ * escribió el servidor, pero un `src` que apunte afuera del sitio le avisa a
+ * ese dominio quién está mirando esta sala y desde dónde.
+ *
+ * La inicial llega YA escapada, y no como nombre crudo, a propósito:
+ * `pruebas/escapado.mjs` recorre los archivos y exige ver el `escapar(` en la
+ * misma interpolación que mete el dato en el HTML. Escondiéndolo adentro de
+ * esta función el código quedaría igual de seguro y la auditoría dejaría de
+ * poder comprobarlo, que es peor que el riesgo que tapa.
+ */
+function caraEnLaSala(luce, inicialEscapada) {
+  if (!esRutaDelSitio(luce?.retrato)) {
+    return `<span class="avatar-inicial" aria-hidden="true">${inicialEscapada}</span>`;
+  }
+  return `<span class="avatar-inicial con-cara" aria-hidden="true">
+      <img src="${escapar(luce.retrato)}" alt="" loading="lazy" />
+    </span>`;
+}
+
+/**
+ * El marco, superpuesto y no como borde.
+ *
+ * Por lo mismo que en la mesa: un `border` cambiaría el tamaño del círculo y
+ * las filas de la lista dejarían de alinearse según quién tenga marco.
+ */
+function marcoEnLaSala(luce) {
+  if (!esRutaDelSitio(luce?.marco)) return "";
+  return `<img class="marco-sala" src="${escapar(luce.marco)}" alt="" aria-hidden="true" />`;
+}
+
+/** El título, al lado del nombre. Es texto de un administrador: va escapado. */
+function tituloEnLaSala(luce) {
+  const titulo = String(luce?.titulo ?? "").trim();
+  if (!titulo) return "";
+  return `<span class="titulo-jugador">${escapar(titulo)}</span>`;
 }
 
 // ------------------------------------------------------------ arranque
@@ -142,7 +227,6 @@ function pintar(sala, uid) {
   // quisiera en la pantalla de los demás, con la sesión de ellos abierta.
   const filas = jugadores.map((jugadorUid, i) => {
     const nombre = nombres[i] ?? "Jugador";
-    const inicial = nombre.trim().charAt(0).toUpperCase() || "?";
     const estaListo = listos.has(jugadorUid);
     const etiquetas = [
       jugadorUid === sala.creador ? '<span class="insignia">Creador</span>' : "",
@@ -161,10 +245,17 @@ function pintar(sala, uid) {
              title="Reportar a ${escapar(nombre)}"
              aria-label="Reportar a ${escapar(nombre)}">⚑</button>`;
 
+    const luce = luceDe(sala, i);
+    const inicial = nombre.trim().charAt(0).toUpperCase() || "?";
+
     return `
       <li class="jugador-fila ${jugadorUid === uid ? "es-mio" : ""}">
-        <span class="avatar-inicial" aria-hidden="true">${escapar(inicial)}</span>
+        <span class="ficha-jugador">
+          ${caraEnLaSala(luce, escapar(inicial))}
+          ${marcoEnLaSala(luce)}
+        </span>
         <span class="nombre-jugador">${escapar(nombre)}</span>
+        ${tituloEnLaSala(luce)}
         ${etiquetas}
         <span class="marca-listo ${estaListo ? "si" : "no"}">
           ${estaListo ? "✅ Listo" : "esperando"}

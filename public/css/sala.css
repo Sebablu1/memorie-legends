@@ -164,6 +164,83 @@
   background: linear-gradient(145deg, var(--oro-claro), var(--oro));
 }
 
+/* ------------------------------------- la cara, el marco y el título
+
+   La sala de espera es donde se mira a los demás: en la mesa uno mira las
+   cartas, acá no hay nada que hacer salvo ver quién llegó. Es el momento en
+   que un avatar o un marco comprado se ven de verdad. */
+
+/* El envoltorio existe SÓLO para poder superponer el marco.
+
+   Un `border` sobre el círculo cambiaría su tamaño, y las filas de la lista
+   dejarían de alinearse según quién tenga marco puesto. Es la misma razón
+   por la que en la mesa el marco va en posición absoluta. */
+.ficha-jugador {
+  position: relative;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: block;
+}
+
+/* La cara comprada llena el círculo y lo recorta; sin `overflow` una imagen
+   cuadrada dejaría las esquinas afuera del redondeo. */
+.avatar-inicial.con-cara {
+  overflow: hidden;
+  background: none;
+  padding: 0;
+}
+
+.avatar-inicial.con-cara img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* El marco, por fuera del borde de la cara: pegado justo al borde se lee como
+   parte de la foto y no como un marco.
+
+   El alto y el ancho van ESCRITOS, y no en `auto`.
+
+   Es la diferencia entre un marco y un desastre. Una imagen posicionada en
+   absoluto con `width: auto` no se estira hasta los cuatro `inset`: se pinta
+   a su tamaño natural, porque para un elemento reemplazado `auto` significa
+   «lo que mide el archivo». Con un PNG de 512 píxeles el marco sale del
+   círculo y tapa la lista entera —se vio en una foto de prueba, con media
+   sala debajo de un escudo dorado—.
+
+   Hoy el único marco del catálogo es un emoji y no se dibuja ninguno, así que
+   esto no se nota. Se nota el día que se suba el arte de verdad, que es
+   exactamente cuando nadie va a estar mirando este archivo. El tamaño lo
+   manda la ficha; lo que traiga el archivo se acomoda con `contain`. */
+.marco-sala {
+  position: absolute;
+  inset: -3px;
+  width: calc(100% + 6px);
+  height: calc(100% + 6px);
+  object-fit: contain;
+  pointer-events: none;
+}
+
+/* El título, en voz más baja que el nombre y sin envolver: la fila es angosta
+   y un título de dos líneas empuja la marca de «listo» fuera de lugar. El
+   servidor ya lo recorta a 24 caracteres; esto es el segundo cinturón. */
+.titulo-jugador {
+  max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(212, 168, 67, 0.45);
+  background: rgba(212, 168, 67, 0.12);
+  color: var(--oro-claro);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
 .nombre-jugador { font-weight: 600; }
 
 .jugador-fila.vacia { opacity: 0.4; }
