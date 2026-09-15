@@ -3504,11 +3504,27 @@ button.accion.con-poder {
 
    Sale un poco por fuera —el `inset` negativo— porque un marco dibujado justo
    al borde de la cara se lee como parte de la foto y no como un marco. */
+/* El alto y el ancho van ESCRITOS, y no en `auto`.
+
+   Una imagen posicionada en absoluto con `width: auto` no se estira hasta los
+   cuatro `inset`: se pinta a su tamaño natural, porque para un elemento
+   reemplazado `auto` significa «lo que mide el archivo». Con un PNG de 512
+   píxeles el marco sale del retrato y tapa la mesa entera.
+
+   No lo tapa hoy porque el único marco del catálogo es un emoji y
+   `esRutaDelSitio` lo rechaza, así que no se dibuja ninguno. Se va a notar el
+   día que se suba el arte de verdad, que es exactamente cuando nadie va a
+   estar mirando este archivo.
+
+   El `3` sale del `inset`: crece 1,5 aros por lado, o sea tres en total. Va
+   en función de `--aro` y no en píxeles para que cambiar el grosor del aro no
+   descuadre el marco en silencio. */
 .jugador .retrato .marco-avatar {
   position: absolute;
   inset: calc(var(--aro) * -1.5);
-  width: auto;
-  height: auto;
+  width: calc(100% + var(--aro) * 3);
+  height: calc(100% + var(--aro) * 3);
+  object-fit: contain;
   pointer-events: none;
   /* Encima de la cara y del aro, debajo de la cuenta del asiento. */
   z-index: 2;

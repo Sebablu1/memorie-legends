@@ -289,7 +289,14 @@ la facturación de Artifact Registry deja de crecer.
 
 ---
 
-## 7. El guardián de dobles no mira `firebase.js`
+## ~~7. El guardián de dobles no mira `firebase.js`~~  ✅ HECHO
+
+**Resuelto.** No con la regla que se propuso —exigirle los 32 exports a cada
+doble— sino con la correcta: cada doble tiene que exportar lo que la PÁGINA
+que la prueba abre le pide, siguiendo la cadena de imports y cortando en los
+módulos que la propia prueba dobla. Está en `pruebas/dobles-de-partida.mjs` y
+cubre 21 pruebas. Comprobado que caza el caso original: quitándole `funciones`
+y `httpsCallable` al doble de `sala-vestida.spec.js`, los nombra.
 
 **Estado:** `pruebas/dobles-de-partida.mjs` vigila los dobles de
 `partida-red.js` y de `servidor.js`, y comprueba que cada doble exporte todo lo
@@ -314,7 +321,11 @@ correcta es otra: qué importa, en cadena, la página que la prueba abre.
 
 ---
 
-## 8. El marco de la MESA tiene el mismo `width: auto`
+## ~~8. El marco de la MESA tiene el mismo `width: auto`~~  ✅ HECHO
+
+**Resuelto.** `mesa.css` lleva alto y ancho escritos en función de `--aro`, más
+`object-fit: contain`. La prueba nueva de `marco-y-titulo.spec.js` mide el marco
+PINTADO y no la caja que lo contiene, y se comprobó que falla con el CSS viejo.
 
 **Estado:** `.jugador .retrato .marco-avatar`, en `public/css/mesa.css`, va en
 posición absoluta con `width: auto; height: auto`. Una imagen reemplazada en

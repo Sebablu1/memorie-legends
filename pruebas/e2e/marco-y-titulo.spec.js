@@ -196,6 +196,39 @@ test("el marco no cambia el tamaño del asiento", async ({ page }) => {
   expect(conMarco.height).toBeCloseTo(sinMarco.height, 0);
 });
 
+test("el marco se achica al retrato aunque el archivo sea enorme", async ({ page }) => {
+  /**
+   * La prueba que faltaba cuando la de arriba ya estaba en verde.
+   *
+   * Medir `.retrato` no alcanza: el marco va en posición absoluta, así que
+   * puede pintarse del tamaño de una pantalla sin mover ni un píxel la caja
+   * que la prueba anterior compara. Con `width: auto` eso es justo lo que
+   * pasaba —una imagen reemplazada en absoluto no se estira hasta los `inset`,
+   * se pinta al tamaño del archivo— y el asiento quedaba debajo de un escudo.
+   *
+   * Se vio primero en la sala de espera, que copiaba este mismo CSS. Acá la
+   * mesa tenía el defecto intacto y todas las pruebas en verde.
+   *
+   * Se mide entonces lo que se pinta, y no lo que lo contiene.
+   */
+  await abrirMesa(page, [{}, { marco: MARCO }, {}, {}]);
+
+  const marco = page.locator('.jugador[data-jugador="1"] .marco-avatar');
+  await expect(marco).toHaveCount(1);
+
+  // Primero: que el archivo de prueba SEA grande. Si algún día se cambia por
+  // un icono de 40px, esta prueba dejaría de probar nada y en silencio.
+  const natural = await marco.evaluate((img) => img.naturalWidth);
+  expect(natural, `${MARCO} tiene que ser mucho más grande que el retrato`).toBeGreaterThan(200);
+
+  const caja = await marco.boundingBox();
+  const retrato = await page.locator('.jugador[data-jugador="1"] .retrato').boundingBox();
+
+  // Y que igual se pinte del tamaño del retrato, con el desborde de adorno.
+  expect(caja.width).toBeLessThan(retrato.width + 20);
+  expect(caja.height).toBeLessThan(retrato.height + 20);
+});
+
 test("el título se muestra al lado del nombre", async ({ page }) => {
   await abrirMesa(page, [{ titulo: "Élite" }, {}, {}, {}]);
 
