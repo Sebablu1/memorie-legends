@@ -338,6 +338,37 @@ archivo sea enorme») y se traduce derecho a `marco-y-titulo.spec.js`.
 
 ---
 
+## 9. Alcance (b): los identificadores internos siguen diciendo «apuesta»
+
+**Estado:** se cambió lo que se ve y lo que se escribe —el botón de la
+revancha, su `aria-label`, y el motivo del libro mayor, que pasó de
+`"apuesta"` a `"entrada_partida"`—. Los NOMBRES del código no:
+`BONOS_APUESTA`, `bonoDeApuesta`, `dobleApuesta`, `apuestaDeLaMesa`,
+`panelDeApuesta`, `calcularReparto({ apuesta })`, `partida.apuesta`,
+`#apuestaRevancha`, `.apuesta-revancha`, y los comentarios de `ia.js`,
+`motor.js`, `esquemas.js`, `admin.js`, `cierre.js` y `ranking.js`.
+
+**Por qué no urge:** no los lee nadie de afuera. Un jugador no ve el nombre de
+una función ni una clase de CSS, y los términos y condiciones hablan de lo que
+el producto dice y hace, no de cómo se llaman sus variables.
+
+**Por qué igual conviene:** el vocabulario del código es el que termina en la
+pantalla cuando alguien agrega una función apurado. Mientras el motor diga
+«apuesta», la próxima etiqueta nueva va a decir «apuesta».
+
+**Cuándo hacerlo:** en una sesión propia y sin nada más encima. Toca
+`mesa.js`, `economia.js`, `ranking.js` y el motor —los cuatro archivos más
+delicados del proyecto— y es un renombrado grande sin ningún cambio de
+comportamiento, que es exactamente el tipo de cambio que conviene no mezclar
+con otro.
+
+**Lo que NO se toca, nunca:** la frase del reglamento, «No son juegos de azar
+ni apuestas». Es la que niega que esto sean apuestas y la que protege
+legalmente; cambiarla debilita la defensa. Es la única vez que la palabra
+aparece en todo el HTML.
+
+---
+
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del

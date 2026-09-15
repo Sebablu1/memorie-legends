@@ -38,6 +38,7 @@ import crypto from "node:crypto";
 import {
   LEYENDAS_POR_REFERIDO,
   premioPorPuesto,
+  multiplicadorDePeriodo,
   leyendasDePaquete,
   MOTIVOS,
   MONEDA,
@@ -347,7 +348,7 @@ async function abrirSalaEn(tx, { codigo, uid, entrada, nombre, nombreJugador, lu
   const r = await moverLeyendas(tx, {
     uid,
     delta: -entrada,
-    motivo: MOTIVOS.APUESTA,
+    motivo: MOTIVOS.ENTRADA_PARTIDA,
     referencia: codigo,
     idempotencia: `entrada_${codigo}_${uid}`,
   });
@@ -590,7 +591,7 @@ export const unirseASala = functions.https.onCall(async (data, context) => {
     const r = await moverLeyendas(tx, {
       uid,
       delta: -Number(sala.entrada),
-      motivo: MOTIVOS.APUESTA,
+      motivo: MOTIVOS.ENTRADA_PARTIDA,
       referencia: codigo,
       idempotencia: `entrada_${codigo}_${uid}`,
     });
@@ -740,7 +741,7 @@ const salida = crearSalirDeSalaEnEspera({
   db,
   salas: SALAS,
   moverLeyendas,
-  motivo: MOTIVOS.APUESTA,
+  motivo: MOTIVOS.ENTRADA_PARTIDA,
   marcaDeTiempo,
   error: errorHttp,
   estados: ESTADOS_SALA,
@@ -838,7 +839,7 @@ const panel = crearAdmin({
   // Una cancelación devuelve la entrada: mismo motivo que cualquier otra
   // devolución, y la misma clave de idempotencia que usa `salida.js`, para que
   // a nadie se le pague dos veces por la misma sala.
-  motivo: MOTIVOS.APUESTA,
+  motivo: MOTIVOS.ENTRADA_PARTIDA,
   marcaDeTiempo,
   error: errorHttp,
   estados: ESTADOS_SALA,
@@ -1270,7 +1271,7 @@ const cierre = crearCierre({
   // puso. En el libro mayor eso es la apuesta que regresa, igual que la
   // devolución de una sala cancelada: mismo motivo, para que todas las
   // devoluciones de sala se lean iguales.
-  motivoDevolucion: MOTIVOS.APUESTA,
+  motivoDevolucion: MOTIVOS.ENTRADA_PARTIDA,
   marcaDeTiempo,
   error: errorHttp,
   estados: ESTADOS_SALA,
@@ -1744,11 +1745,21 @@ async function cerrarPeriodo(periodo, fechaDelPeriodoQueCierra) {
     .limit(50)
     .get();
 
+  // El período se valida ANTES de pagarle a nadie.
+  //
+  // `premioPorPuesto` se rompe con un período que no conoce, y hace bien. Pero
+  // si se rompiera adentro del bucle lo haría con veinte jugadores ya
+  // cobrados y treinta sin cobrar, y un cierre a medias es peor que uno que no
+  // arrancó: el período queda sin marcar como cerrado, así que el próximo
+  // intento vuelve a pasar por los que ya cobraron —los salva la idempotencia—
+  // pero nadie sabe, mirando, en qué estado quedó.
+  multiplicadorDePeriodo(periodo);
+
   let premiados = 0;
   for (let i = 0; i < tabla.docs.length; i++) {
     const fila = tabla.docs[i];
     const puesto = i + 1;
-    const premio = premioPorPuesto(puesto);
+    const premio = premioPorPuesto(puesto, periodo);
     if (!premio) continue;
 
     await db.runTransaction(async (tx) => {

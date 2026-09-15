@@ -3363,7 +3363,7 @@ function panelDeRevancha() {
         Jugar otra · ${apuestaDeLaMesa()} Leyendas
       </button>
       <button class="accion sobria" data-accion="revancha-cambiar" type="button">
-        Cambiar apuesta
+        Cambiar entrada
       </button>
     </div>
     <button class="enlace-modal" data-accion="revancha-salir" type="button">Salir al tablero</button>`;
@@ -3379,7 +3379,7 @@ function panelDeApuesta() {
   return `
     <p class="aviso-suave">¿Con cuánto?</p>
     <div class="botonera-poder">
-      <select class="apuesta-revancha" id="apuestaRevancha" aria-label="Apuesta de la revancha">
+      <select class="apuesta-revancha" id="apuestaRevancha" aria-label="Entrada de la revancha">
         ${opciones}
       </select>
       <button class="accion" data-accion="revancha-crear" type="button">Abrir sala</button>

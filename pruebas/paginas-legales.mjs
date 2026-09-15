@@ -110,28 +110,39 @@ console.log("\n=== 2. Lo que dicen sobre los pagos coincide con el código ===")
   /**
    * El acoplamiento que importa.
    *
-   * Hoy el botón de comprar Leyendas está deshabilitado en `tienda.js` y la
-   * integración de pago es un esqueleto —`crearOrdenDeCompra` lo dice en su
-   * propia cabecera—, así que las tres páginas llevan un aviso diciendo que la
-   * compra no está habilitada.
+   * Hoy no se puede comprar Leyendas, y las tres páginas llevan un aviso que
+   * lo dice. El día que se pueda, ese aviso pasa a ser mentira. Esta prueba
+   * obliga a que las dos cosas cambien juntas.
    *
-   * El día que se habilite, ese aviso pasa a ser mentira. Esta prueba obliga a
-   * que las dos cosas cambien juntas.
+   * ───────────────────────────────────────────────────────────────────────
+   * QUÉ SE MIRA PARA SABER SI SE PUEDE COMPRAR
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * El CLIENTE, y no el servidor. Acá se miraba además que
+   * `crearOrdenDeCompra` dijera «INTEGRACIÓN PENDIENTE» en su cabecera, y esa
+   * señal era falsa: el servidor está entero y desplegado —escribe la orden,
+   * pide la preferencia a Mercado Pago, valida la firma del webhook y acredita
+   * con idempotencia—. El comentario había quedado de una versión anterior.
+   *
+   * Lo que de verdad impide comprar es que el navegador no tiene con qué
+   * pedirlo: el botón nace apagado y `servidor.js` ni siquiera tiene
+   * envoltorio para esa función. Cualquiera de las dos cosas alcanza para que
+   * el aviso sea cierto, y las dos hay que tocarlas para habilitar la compra.
    */
   const tienda = leer("public/js/tienda.js");
-  const servidor = leer("functions/index.js");
+  const servidor = leer("public/js/servidor.js");
 
   // El valor del atributo no importa: lo que se vigila es que el botón nazca
   // apagado. Atado a `${p.id}` exacto, la prueba se cayó el día que ese id pasó
   // a escaparse —`${escapar(p.id)}`— y dijo que la compra estaba habilitada
   // cuando lo único que había cambiado era cómo se escribe el atributo.
   const compraDeshabilitada = /data-paquete="[^"]*"[^>]*\bdisabled\b/.test(tienda);
-  const integracionPendiente = /INTEGRACIÓN PENDIENTE/.test(servidor);
+  const clientePuedePedirla = /crearOrdenDeCompra/.test(servidor);
 
   ok(compraDeshabilitada, "el botón de comprar Leyendas sigue deshabilitado en la tienda");
-  ok(integracionPendiente, "y la integración de pago sigue marcada como pendiente");
+  ok(!clientePuedePedirla, "y el cliente no tiene por dónde pedir una orden de compra");
 
-  if (compraDeshabilitada || integracionPendiente) {
+  if (compraDeshabilitada || !clientePuedePedirla) {
     for (const p of PAGINAS) {
       ok(
         /todavía no está habilitada/.test(html[p]),

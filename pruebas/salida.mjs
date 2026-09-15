@@ -105,7 +105,7 @@ function montar(jugadores, { estado = ESTADOS_SALA.ESPERANDO, entrada = ENTRADA 
     db, usuarios: "users", campoSaldo: "credits", marcaDeTiempo: () => "T", error,
   });
   const salir = crearSalirDeSalaEnEspera({
-    db, salas: "rooms", moverLeyendas, motivo: "apuesta",
+    db, salas: "rooms", moverLeyendas, motivo: "entrada_partida",
     marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
   });
   return { db, salir };

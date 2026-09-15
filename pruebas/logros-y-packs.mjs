@@ -181,13 +181,14 @@ console.log("\n=== 2. El ranking paga Leyendas; la insignia es una sola ===");
      "ningún tramo del ranking reparte insignias",
      conInsignia.map((p) => `hasta ${p.hasta}→${p.insignia}`));
 
-  // Los premios en Leyendas no se tocaron: era lo único que funcionaba.
-  ok(premioPorPuesto(1)?.leyendas === 500, "el primero sigue cobrando 500");
-  ok(premioPorPuesto(10)?.leyendas === 50, "el décimo, 50");
-  ok(premioPorPuesto(50)?.leyendas === 20, "y el quincuagésimo, 20");
-  ok(premioPorPuesto(51) === null, "del 51 para abajo no hay premio");
+  // Los tramos, en su unidad: lo que paga una semana. Los tres períodos y el
+  // reparto entre ellos se prueban aparte, en `premios-de-ranking.mjs`.
+  ok(premioPorPuesto(1, "semanal")?.leyendas === 100, "el primero de la semana cobra 100");
+  ok(premioPorPuesto(10, "semanal")?.leyendas === 10, "el décimo, 10");
+  ok(premioPorPuesto(50, "semanal")?.leyendas === 5, "y el quincuagésimo, 5");
+  ok(premioPorPuesto(51, "semanal") === null, "del 51 para abajo no hay premio");
 
-  ok(!("insignia" in (premioPorPuesto(1) ?? {})),
+  ok(!("insignia" in (premioPorPuesto(1, "semanal") ?? {})),
      "y el premio ya no devuelve un campo `insignia` que nadie puede honrar");
 }
 

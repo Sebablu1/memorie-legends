@@ -134,7 +134,7 @@ const montar = (datos) => {
   const banco = crearBanco();
   const admin = crearAdmin({
     db, salas: "rooms", partidas: "partidas",
-    moverLeyendas: banco.moverLeyendas, motivo: "apuesta",
+    moverLeyendas: banco.moverLeyendas, motivo: "entrada_partida",
     marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
     administradores: crearAdministradores({ db, error, correoRaiz: ADMIN }),
   });

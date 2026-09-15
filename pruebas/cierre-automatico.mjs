@@ -136,7 +136,7 @@ function montar({ estado = ESTADOS_SALA.JUGANDO, abandonaron = [] } = {}) {
     partidaEnRed: { leer: enRed.leerPartidaParaAbandono, marcar: enRed.marcarAbandonoEn },
   });
   const salir = crearSalirDeSalaEnEspera({
-    db, salas: "rooms", moverLeyendas, motivo: "apuesta",
+    db, salas: "rooms", moverLeyendas, motivo: "entrada_partida",
     marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
   });
   return { db, enRed, cierre, abandonar, salir };

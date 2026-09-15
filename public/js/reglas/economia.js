@@ -45,17 +45,23 @@ export const LEYENDAS_POR_REFERIDO = 25;
  * y nadie los valida contra esta lista al leer.
  */
 
-// ------------------------------------------------------------- apuestas
+// ------------------------------------------------------------- entradas
 
-export const NIVELES_APUESTA = {
-  baja: { apuesta: 10, etiqueta: "Baja", tipo: "Casual", color: "#4caf50" },
-  media: { apuesta: 50, etiqueta: "Media", tipo: "Estándar", color: "#ffc107" },
-  alta: { apuesta: 100, etiqueta: "Alta", tipo: "Premium", color: "#ff9800" },
-  elite: { apuesta: 200, etiqueta: "Élite", tipo: "High Roller", color: "#e94560" },
-};
+/*
+   Acá vivían `NIVELES_APUESTA` y `nivelDeApuesta`: cuatro niveles con nombre
+   —Casual, Estándar, Premium, High Roller— y una función para saber en cuál
+   caía un importe.
 
-export const nivelDeApuesta = (apuesta) =>
-  Object.entries(NIVELES_APUESTA).find(([, n]) => n.apuesta === apuesta)?.[0] ?? null;
+   No los importaba NADIE. Ni una pantalla, ni una función, ni una prueba: se
+   buscó en todo el proyecto. Eran de una versión del juego en que las mesas se
+   elegían por nivel en vez de por importe, y quedaron exportados después de
+   que eso cambiara.
+
+   Se van y no se reemplazan. Lo que hoy decide qué mesas hay es `ENTRADAS`, y
+   dos listas de importes —una viva y otra que nadie mira— son la clase de cosa
+   que alguien encuentra dentro de un año, cree vigente, y usa. «High Roller»
+   además nombra justo lo que los términos y condiciones dicen que esto no es.
+*/
 
 /**
  * Multiplicador de puntos de ranking y experiencia según lo apostado.
@@ -165,20 +171,87 @@ export function calcularReparto({ apuesta, jugadores, ganadorId, politica = POLI
  * `users/{uid}/items/`.
  */
 export const PREMIOS_RANKING = [
-  { hasta: 1, leyendas: 500, etiqueta: "🏆 Campeón del período" },
-  { hasta: 2, leyendas: 300, etiqueta: "🥈 Segundo puesto" },
-  { hasta: 3, leyendas: 100, etiqueta: "🥉 Tercer puesto" },
-  { hasta: 10, leyendas: 50, etiqueta: "Top 10" },
-  { hasta: 50, leyendas: 20, etiqueta: "Top 50" },
+  { hasta: 1, leyendas: 100, etiqueta: "🏆 Campeón del período" },
+  { hasta: 2, leyendas: 60, etiqueta: "🥈 Segundo puesto" },
+  { hasta: 3, leyendas: 30, etiqueta: "🥉 Tercer puesto" },
+  { hasta: 10, leyendas: 10, etiqueta: "Top 10" },
+  { hasta: 50, leyendas: 5, etiqueta: "Top 50" },
 ];
 
 /**
- * Recompensa por puesto. Se cobra sólo el tramo más alto alcanzado:
- * el #1 se lleva 500, no 500+50+20.
+ * Cuánto vale ganar cada ranking, en semanas.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ANTES NO EXISTÍA ESTA DISTINCIÓN, Y ESO ERA EL PROBLEMA
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * `premioPorPuesto` recibía sólo el puesto, y `cerrarPeriodo` la llamaba
+ * igual para los tres períodos. El 1º cobraba 500 en el semanal, 500 en el
+ * mensual y 500 en el anual.
+ *
+ * Suena parejo y es lo contrario. El semanal cierra 52 veces al año y el
+ * anual una: ganar todas las semanas pagaba 26.000 Leyendas y ganar el año
+ * entero, 500. El ranking más difícil del juego era el que menos pagaba, y
+ * el semanal emitía 106.600 Leyendas al año él solo, contra un registro que
+ * da 100.
+ *
+ * Ahora la tabla de arriba son los montos SEMANALES —la unidad— y cada
+ * período los multiplica. El mensual paga cinco semanas y el anual quince,
+ * así que ganar el año es el premio grande y la emisión anual baja de
+ * 133.250 a 58.420.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * POR QUÉ ESTÁ ACÁ Y NO EN ranking.js, QUE ES DONDE VIVE `PERIODOS`
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Porque `ranking.js` ya importa de este archivo —`bonoDeApuesta`— y meter
+ * el import de vuelta sería un ciclo. Que las claves de acá sean exactamente
+ * las de `PERIODOS` lo comprueba `pruebas/premios-de-ranking.mjs`: es una
+ * prueba y no un import, pero falla igual de fuerte si alguien agrega un
+ * período de un lado y se olvida del otro.
  */
-export function premioPorPuesto(puesto) {
+export const MULTIPLICADOR_DE_PERIODO = Object.freeze({
+  semanal: 1,
+  mensual: 5,
+  anual: 15,
+});
+
+/**
+ * El multiplicador de un período, o se rompe.
+ *
+ * No devuelve 1 por defecto a propósito. Un período que esta tabla no conoce
+ * es un error de programación, y el defecto silencioso lo pagaría el jugador:
+ * el campeón del año cobraría la quinceava parte de lo que le toca y nadie se
+ * enteraría, porque un premio que llega no se reclama.
+ */
+export function multiplicadorDePeriodo(periodo) {
+  const multiplicador = MULTIPLICADOR_DE_PERIODO[periodo];
+  if (!multiplicador) {
+    throw new Error(
+      `Período de ranking desconocido: ${JSON.stringify(periodo)}. ` +
+        `Los que pagan son ${Object.keys(MULTIPLICADOR_DE_PERIODO).join(", ")}.`,
+    );
+  }
+  return multiplicador;
+}
+
+/**
+ * Recompensa por puesto en un período. Se cobra sólo el tramo más alto
+ * alcanzado: el #1 se lleva su tramo, no el suyo más el del top 10 y el 50.
+ *
+ * Devuelve también `base` y `multiplicador` para que quien anote el premio
+ * pueda decir de dónde salió el número, en vez de dejar un total sin origen.
+ */
+export function premioPorPuesto(puesto, periodo) {
+  const multiplicador = multiplicadorDePeriodo(periodo);
   const tramo = PREMIOS_RANKING.find((p) => puesto <= p.hasta);
-  return tramo ? { leyendas: tramo.leyendas, etiqueta: tramo.etiqueta } : null;
+  if (!tramo) return null;
+  return {
+    leyendas: tramo.leyendas * multiplicador,
+    etiqueta: tramo.etiqueta,
+    base: tramo.leyendas,
+    multiplicador,
+  };
 }
 
 // ------------------------------------------------------------- paquetes
@@ -439,7 +512,23 @@ export const paquetesVisibles = (paquetes) =>
 export const MOTIVOS = {
   REGISTRO: "registro",
   REFERIDO: "referido",
-  APUESTA: "apuesta",
+
+  /**
+   * Lo que se pone para entrar a una mesa.
+   *
+   * Se llamaba `APUESTA` y escribía `"apuesta"`. Los términos y condiciones
+   * dicen que esto no son apuestas —«No son juegos de azar ni apuestas», en el
+   * reglamento— y el libro mayor decía lo contrario en cada mano jugada.
+   *
+   * Los movimientos ya escritos NO se migraron: un libro mayor se corrige con
+   * asientos nuevos, no reescribiendo los viejos. Así que la colección tiene
+   * las dos palabras, `"apuesta"` hasta septiembre de 2026 y
+   * `"entrada_partida"` de ahí en adelante, y cualquier cosa que agrupe por
+   * motivo tiene que contar las dos. Nada en el código compara contra este
+   * valor —se verificó—, así que el cambio no rompe lógica: sólo cambia lo que
+   * se escribe.
+   */
+  ENTRADA_PARTIDA: "entrada_partida",
   // Sumidero de la casa: no va al pozo ni a otro jugador.
   PENALIZACION_ABANDONO: "penalizacion_abandono",
   PREMIO_PARTIDA: "premio_partida",
@@ -448,11 +537,11 @@ export const MOTIVOS = {
   /**
    * Los tres movimientos de un torneo, separados a propósito.
    *
-   * Podrían reusar `APUESTA` y `PREMIO_PARTIDA`, y sería un error: el libro
-   * mayor existe para poder preguntarle "¿en qué se fue el saldo?" y que la
-   * respuesta sirva. Con motivos compartidos, la entrada de un torneo y una
-   * apuesta de mesa serían indistinguibles, y una devolución de torneo
-   * parecería un premio.
+   * Podrían reusar `ENTRADA_PARTIDA` y `PREMIO_PARTIDA`, y sería un error: el
+   * libro mayor existe para poder preguntarle "¿en qué se fue el saldo?" y que
+   * la respuesta sirva. Con motivos compartidos, la entrada de un torneo y la
+   * de una mesa serían indistinguibles, y una devolución de torneo parecería
+   * un premio.
    *
    * La devolución es su propio motivo y no un premio negativo porque va en la
    * dirección contraria —acredita— y por un motivo distinto: al jugador no le
