@@ -109,6 +109,7 @@ const servidorFalso = `
   // Sin comillas invertidas: este doble ES un template literal, y una sola en
   // un comentario lo cierra y el archivo deja de parsear.
   export const listarPacks = async () => ({ packs: [] });
+  export async function crearOrdenDeCompra() { return { ordenId: "o", urlCheckout: "https://example.test/pago" }; }
   export const comprarItem = async () => ({});
   export const comprarPack = async () => ({});
   export const misInsignias = async () => ({ estadisticas: {}, tengo: [], equipada: null });

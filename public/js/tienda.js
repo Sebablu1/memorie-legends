@@ -1,6 +1,6 @@
 import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
 import { PAQUETES, leyendasDePaquete, precioPorLeyenda, paquetesVisibles, MONEDA } from "./reglas/economia.js";
-import { listarPacks } from "./servidor.js";
+import { listarPacks, crearOrdenDeCompra, ErrorDeServidor } from "./servidor.js";
 import { montarPersonalizacion } from "./personalizacion.js";
 
 const $ = (id) => document.getElementById(id);
@@ -75,6 +75,99 @@ function dibujarPaquetes(lista) {
     .join("");
 }
 
+/**
+ * La compra con dinero, del lado del navegador.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ESTE ARCHIVO NO DECIDE NADA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Ni el precio, ni quién puede comprar, ni a dónde se manda al comprador. Las
+ * tres cosas las contesta el servidor: el importe sale del catálogo, el
+ * permiso viene resuelto en `compra.habilitada`, y la URL del checkout la
+ * devuelve `crearOrdenDeCompra`.
+ *
+ * Lo único que hace acá es no dejar clavar el botón dos veces y contar qué
+ * pasó. Apagar el botón no es la defensa —esa es el límite de ritmo del
+ * servidor— pero es lo que hace que el caso normal no llegue a necesitarla.
+ */
+
+/** Lo que contestó el servidor sobre la compra. Sin sesión, nada. */
+let compra = { habilitada: false, esSandbox: false };
+
+function avisarPaquetes(texto, tipo = "info") {
+  const caja = $("avisoPaquetes");
+  if (!caja) return;
+  caja.textContent = texto;
+  caja.className = `aviso-tienda visible ${tipo}`;
+}
+
+/**
+ * Enciende los botones, o explica por qué no.
+ *
+ * Nacen apagados en el marcado y sólo se encienden acá. Es a propósito: la
+ * primera pintada ocurre ANTES de pedir la sesión —para que la tienda no
+ * nazca en blanco— y en ese momento todavía no se sabe nada. Si el encendido
+ * fuera lo que hay que recordar hacer, olvidarlo dejaría la tienda comprable
+ * por cualquiera.
+ */
+function reflejarEstadoDeCompra() {
+  const cartel = $("cartelSandbox");
+  if (cartel) cartel.hidden = !compra.esSandbox;
+
+  for (const boton of document.querySelectorAll("#paquetes [data-paquete]")) {
+    boton.disabled = !compra.habilitada;
+  }
+
+  if (!compra.habilitada) {
+    avisarPaquetes(
+      "La compra de Leyendas está en pruebas: por ahora sólo puede comprar el equipo.",
+    );
+  }
+}
+
+/**
+ * Compra un paquete: pide la orden y manda al checkout.
+ *
+ * `window.location.href` y no `window.open`: el checkout de Mercado Pago se
+ * abre como navegación y no como ventana nueva, que los bloqueadores de
+ * pop-ups matan sin avisarle a nadie.
+ *
+ * La URL es la que devolvió el servidor, y ninguna otra. No sale del DOM ni de
+ * un atributo: un `data-` con la URL de destino sería un lugar donde escribir
+ * a dónde mandamos a alguien que está por pagar.
+ */
+async function comprarPaquete(paqueteId, boton) {
+  const textoPrevio = boton.textContent;
+  boton.disabled = true;
+  boton.textContent = "…";
+
+  try {
+    const r = await crearOrdenDeCompra(paqueteId);
+    if (!r?.urlCheckout) throw new Error("El servidor no devolvió un checkout.");
+
+    avisarPaquetes("Te llevamos al pago…", "bien");
+    window.location.href = r.urlCheckout;
+  } catch (error) {
+    // En pantalla y no en un `alert`: un alert bloquea, no se puede copiar, y
+    // en el teléfono tapa la página entera.
+    const mensaje =
+      error instanceof ErrorDeServidor ? error.message : "No pudimos abrir el pago.";
+    avisarPaquetes(mensaje, "error");
+    boton.disabled = false;
+    boton.textContent = textoPrevio;
+  }
+}
+
+// Delegado en la rejilla y no en cada botón: las tarjetas se vuelven a dibujar
+// cuando llegan los paquetes del servidor, y los escuchadores se irían con las
+// que se reemplazan.
+$("paquetes")?.addEventListener("click", (evento) => {
+  const boton = evento.target.closest("[data-paquete]");
+  if (!boton || boton.disabled) return;
+  comprarPaquete(boton.dataset.paquete, boton);
+});
+
 // Primero la semilla, para que la pantalla no nazca vacía.
 dibujarPaquetes(PAQUETES);
 
@@ -86,7 +179,14 @@ if (sesion) {
   // que muestra precios viejos es mejor que una tienda vacía, y el precio que
   // se cobra lo pone el servidor de todos modos.
   listarPacks()
-    .then((r) => dibujarPaquetes(r?.packs ?? []))
+    .then((r) => {
+      dibujarPaquetes(r?.packs ?? []);
+      // El estado de la compra viene en el MISMO viaje que los paquetes, así
+      // que se refleja recién cuando las tarjetas ya están dibujadas: al revés
+      // encendería botones que todavía no existen.
+      compra = r?.compra ?? compra;
+      reflejarEstadoDeCompra();
+    })
     .catch((e) => console.warn("No se pudieron leer los paquetes:", e));
 
   // La otra mitad de la tienda: lo que se compra CON Leyendas.

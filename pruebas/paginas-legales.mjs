@@ -132,24 +132,64 @@ console.log("\n=== 2. Lo que dicen sobre los pagos coincide con el código ===")
   const tienda = leer("public/js/tienda.js");
   const servidor = leer("public/js/servidor.js");
 
-  // El valor del atributo no importa: lo que se vigila es que el botón nazca
-  // apagado. Atado a `${p.id}` exacto, la prueba se cayó el día que ese id pasó
-  // a escaparse —`${escapar(p.id)}`— y dijo que la compra estaba habilitada
-  // cuando lo único que había cambiado era cómo se escribe el atributo.
-  const compraDeshabilitada = /data-paquete="[^"]*"[^>]*\bdisabled\b/.test(tienda);
-  const clientePuedePedirla = /crearOrdenDeCompra/.test(servidor);
+  /**
+   * Se mira el camino ENTERO, de punta a punta.
+   *
+   * `servidor.js` con el envoltorio y `tienda.js` llamándolo. Con cualquiera de
+   * los dos cortado no se puede comprar por más que el servidor esté listo —
+   * que fue exactamente la situación durante meses: la mitad del servidor
+   * completa y desplegada, y la del navegador sin escribir.
+   *
+   * Lo que NO se mira es el `disabled` del marcado. Sigue estando y tiene que
+   * seguir: los botones nacen apagados y los enciende `tienda.js` cuando el
+   * servidor contesta quién puede comprar. Mirarlo diría que la compra está
+   * deshabilitada cuando lo que está es bien hecha.
+   */
+  const hayEnvoltorio = /export const crearOrdenDeCompra/.test(servidor);
+  const laTiendaLlama = /crearOrdenDeCompra\(/.test(tienda);
 
-  ok(compraDeshabilitada, "el botón de comprar Leyendas sigue deshabilitado en la tienda");
-  ok(!clientePuedePedirla, "y el cliente no tiene por dónde pedir una orden de compra");
+  ok(hayEnvoltorio, "`servidor.js` tiene el envoltorio de `crearOrdenDeCompra`");
+  ok(laTiendaLlama, "y `tienda.js` lo llama");
 
-  if (compraDeshabilitada || !clientePuedePedirla) {
+  if (hayEnvoltorio && laTiendaLlama) {
     for (const p of PAGINAS) {
       ok(
-        /todavía no está habilitada/.test(html[p]),
-        `${p}: avisa que la compra de Leyendas no está habilitada`,
+        !/todavía no está habilitada/.test(html[p]),
+        `${p}: ya NO dice que la compra está deshabilitada`,
       );
     }
+
+    // Quién procesa el pago va en las tres que describen el proceso. El
+    // reglamento no: habla de cómo se compite, no de cómo se cobra, y pedirle
+    // que nombre al proveedor sería pedirle que hable de algo que no es suyo.
+    for (const p of ["terminos", "privacidad", "seguridad"]) {
+      ok(/Mercado Pago/.test(html[p]), `${p}: nombra a Mercado Pago, que es quien procesa`);
+    }
+
+    // La promesa que el reglamento hace sobre los torneos tiene que estar
+    // respaldada por la tabla de bolsillos. Era falsa hasta que existieron los
+    // dos saldos: `credits` era un número sin memoria de origen.
+    const economia = leer("public/js/reglas/economia.js");
+    ok(
+      /\[MOTIVOS\.TORNEO_ENTRADA\]:\s*REPARTOS\.SOLO_GANADO/.test(economia),
+      "y la entrada de torneo sigue cobrándose SÓLO de las ganadas",
+    );
+    ok(
+      /no pueden usarse en torneos/.test(html["reglamento-torneos"]),
+      "el reglamento lo promete, y el código lo cumple",
+    );
   }
+
+  // Ninguna página puede seguir prometiendo que no se tratan datos de pago:
+  // ahora sí hay pagos. Lo que se sostiene es que la tarjeta no pasa por acá.
+  ok(
+    !/no se trata ning[úu]n dato de pago/.test(html.privacidad),
+    "privacidad ya no dice que no se tratan datos de pago",
+  );
+  ok(
+    /No recibimos ni almacenamos ning[úu]n dato de tarjeta/.test(html.privacidad),
+    "y dice lo que sí es cierto: la tarjeta no pasa por el sitio",
+  );
 }
 
 // =====================================================================

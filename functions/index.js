@@ -793,6 +793,22 @@ const mercadoPago = () =>
 const SECRETOS_MP = ["MP_ACCESS_TOKEN", "MP_WEBHOOK_SECRET"];
 
 /**
+ * Mientras la compra se prueba en sandbox, sólo compran los administradores.
+ *
+ * Una constante con nombre y un solo uso, para que abrir la tienda al público
+ * sea cambiar esto por `false` y desplegar. La alternativa —comentar la línea
+ * del control, o borrarla— deja el cambio invisible en el diff siguiente y sin
+ * forma de encontrarlo buscando.
+ *
+ * `listarPacks` lo devuelve resuelto al navegador, así que la tienda se
+ * adapta sola: no hay una segunda copia de esta decisión del lado del cliente.
+ */
+const SOLO_ADMIN_COMPRA = true;
+
+/** ¿Las credenciales de Mercado Pago son de prueba? Lo dice el prefijo. */
+const esSandboxMP = () => String(process.env.MP_ACCESS_TOKEN ?? "").startsWith("TEST-");
+
+/**
  * Adónde avisa Mercado Pago, y adónde vuelve el comprador. No son lo mismo.
  *
  * ─────────────────────────────────────────────────────────────────────────
@@ -1020,10 +1036,34 @@ export const misItems = functions.https.onCall(async (_data, context) => {
  * se muestran" aplicado en un solo lugar. Con lectura directa había que
  * repetir ese filtro en las reglas de Firestore y acordarse de los dos.
  */
-export const listarPacks = functions.https.onCall(async (_data, context) => {
-  exigirSesion(context, "listarPacks");
-  return { packs: await packs.listarParaLaTienda() };
-});
+export const listarPacks = functions
+  // El secreto va para poder mirar el PREFIJO del token, nunca su valor: un
+  // `TEST-` adelante es lo único que distingue el sandbox de producción.
+  .runWith({ secrets: SECRETOS_MP })
+  .https.onCall(async (_data, context) => {
+    exigirSesion(context, "listarPacks");
+
+    /**
+     * El estado de la compra viaja con los paquetes, en el mismo viaje.
+     *
+     * La tienda ya llama a esta función al cargar, así que el cartel de modo
+     * prueba y el estado del botón salen de acá en vez de pedir otra cosa.
+     *
+     * Y `habilitada` llega RESUELTA. El navegador no compara correos para
+     * decidir si sos administrador: `dashboard.js` lo hace para destapar un
+     * enlace, y su propio comentario aclara que eso no es una comprobación de
+     * seguridad. Dos lugares donde el cliente cree saber quién es admin es uno
+     * de más.
+     */
+    const correo = context?.auth?.token?.email;
+    return {
+      packs: await packs.listarParaLaTienda(),
+      compra: {
+        habilitada: !SOLO_ADMIN_COMPRA || (await administradores.puedeAdministrar(correo)),
+        esSandbox: esSandboxMP(),
+      },
+    };
+  });
 
 /** Todos, encendidos y apagados: el panel necesita ver lo retirado. */
 export const listarPacksAdmin = functions.https.onCall((_data, context) =>
@@ -2021,6 +2061,25 @@ export const crearOrdenDeCompra = functions
   .runWith({ secrets: SECRETOS_MP })
   .https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "crearOrdenDeCompra");
+
+  /**
+   * Mientras la compra se prueba, sólo compran los administradores.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * Y VA ACÁ ARRIBA, ANTES DE TODO
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * Antes de leer el paquete y antes de escribir la orden. Si estuviera más
+   * abajo, cada clic de un curioso dejaría una orden en `pendiente` que nadie
+   * va a pagar nunca, y `ordenes/` es justo la colección que hay que poder
+   * conciliar a mano: llenarla de intentos que el propio sistema rechazó la
+   * vuelve inservible para eso.
+   *
+   * El cliente además apaga el botón, pero eso es cortesía. Esto es el
+   * control: `crearOrdenDeCompra` es llamable por cualquiera con una sesión.
+   */
+  if (SOLO_ADMIN_COMPRA) await administradores.exigir(context);
+
   await limite.exigirRitmoDePlata(uid, "crearOrdenDeCompra");
   /**
    * El pack se lee del servidor, con el id como única cosa que manda el

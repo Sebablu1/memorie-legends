@@ -113,6 +113,7 @@ const servidorFalso = (saldoInicial) => `
   // Sin comillas invertidas: este doble ES un template literal, y una sola en
   // un comentario lo cierra y el archivo deja de parsear.
   export const listarPacks = async () => ({ packs: [] });
+  export async function crearOrdenDeCompra() { return { ordenId: "o", urlCheckout: "https://example.test/pago" }; }
   export async function misItems() {
     window.__llamadas.push(["misItems", null]);
     return { tengo: tengo.map((id) => ({ id, tipo: "avatar" })), equipado: { avatar: null, insignia: null, dorso: null } };

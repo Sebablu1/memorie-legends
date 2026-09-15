@@ -123,6 +123,7 @@ const servidorFalso = `
   // No es ceremonia: un import nombrado que no existe rompe el modulo entero
   // al cargar, aunque nadie lo llame. Asi se cayo la tienda cuando empezo a
   // importar listarPacks y dos dobles no lo declaraban: veintiuna pruebas en
+  export async function crearOrdenDeCompra() { return { ordenId: "o", urlCheckout: "https://example.test/pago" }; }
   // rojo, ninguna por el motivo que decia su nombre.
   //
   // Lo vigila pruebas/dobles-de-partida.mjs.

@@ -157,6 +157,20 @@ export const misItems = () => llamar("misItems");
 export const listarPacks = () => llamar("listarPacks");
 
 /**
+ * Paso 1 de la compra con dinero: registra la orden y devuelve el checkout.
+ *
+ * Lo único que viaja es el id del paquete. El importe lo pone el servidor
+ * leyendo su propio catálogo —si viniera de acá, cualquiera compraría el pack
+ * más caro por un peso— y lo que vuelve es la URL del checkout alojado de
+ * Mercado Pago, que es a donde hay que mandar al comprador.
+ *
+ * @returns {Promise<{ordenId: string, importe: number, moneda: string,
+ *                    leyendas: number, urlCheckout: string}>}
+ */
+export const crearOrdenDeCompra = (paqueteId) =>
+  llamar("crearOrdenDeCompra", { paqueteId });
+
+/**
  * Se saca lo que lleva puesto de un tipo.
  *
  * `equiparItem` no alcanza para esto: el perfil guarda UN id por tipo, así que

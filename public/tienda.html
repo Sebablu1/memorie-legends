@@ -117,13 +117,22 @@
       <h2 class="titulo-pagina" style="font-size: 1.5rem">Comprar Leyendas</h2>
       <p class="subtitulo">Cuanto más grande el paquete, más conviene cada Leyenda.</p>
 
-      <div id="avisoPagos" class="aviso">
-        <b>Los pagos todavía no están conectados.</b> Falta terminar la integración con
-        Xsolla y Mercado Pago, que necesita las credenciales de la cuenta. El catálogo
-        y los precios de abajo ya son los definitivos.
+      <!-- El cartel de modo prueba.
+
+           Oculto por defecto y lo destapa `tienda.js` sólo si el servidor dice
+           que las credenciales son de sandbox —lo sabe por el prefijo `TEST-`
+           del token—. Al pasar a producción desaparece solo, sin tocar código
+           ni acordarse de nada. -->
+      <div id="cartelSandbox" class="aviso" hidden>
+        <b>⚠️ Modo prueba:</b> los pagos no son reales todavía. Cualquier compra
+        acá usa el entorno de pruebas de Mercado Pago.
       </div>
 
       <section class="rejilla" id="paquetes"></section>
+
+      <!-- Los errores de la compra, en pantalla y no en un `alert`: un alert
+           bloquea, no se puede copiar, y en el teléfono tapa la página. -->
+      <p class="aviso-tienda" id="avisoPaquetes" role="status" aria-live="polite"></p>
 
       <section class="panel" style="margin-top: 24px">
         <h2>Cómo funciona la compra</h2>
