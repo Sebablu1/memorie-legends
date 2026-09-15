@@ -591,3 +591,111 @@ export const MOTIVOS = {
    */
   PREMIO_LOGRO: "premio_logro",
 };
+
+// ------------------------------------------- los dos bolsillos del saldo
+
+/**
+ * Las Leyendas compradas y las ganadas no son la misma cosa.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ESTO ES EL PILAR LEGAL, NO UNA COMODIDAD
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * El reglamento dice que las Leyendas compradas no pueden usarse en torneos
+ * ni campeonatos. Mientras `credits` fue un solo número, esa frase era falsa:
+ * el saldo no recordaba de dónde venía, y `torneos.js` cobraba la inscripción
+ * con el mismo movimiento que todo lo demás. Cualquiera compraba un paquete y
+ * se inscribía.
+ *
+ * Un reglamento que promete algo que el código no cumple es peor que uno que
+ * no lo promete: es una afirmación verificable y falsa, en el documento que
+ * sostiene que esto no es una casa de apuestas.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * POR QUÉ EL BOLSILLO SALE DEL MOTIVO Y NO DE UN PARÁMETRO
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Porque hay doce sitios que mueven saldo. Con un parámetro, cada uno podría
+ * mandar el bolsillo equivocado, y el error sería INVISIBLE: el saldo cuadra
+ * igual, el libro mayor cierra igual, y lo único que pasó es que la plata
+ * salió de donde no correspondía. Nadie lo nota hasta que alguien pregunta
+ * por qué un torneo aceptó Leyendas compradas.
+ *
+ * Un motivo, en cambio, ya significa una de estas seis cosas. `PREMIO_RANKING`
+ * no puede acreditar comprado ni por error, porque no existe la forma de
+ * decirlo. Y la regla del reglamento queda escrita en un solo lugar, que se
+ * puede leer entero de una sentada.
+ */
+export const BOLSILLOS = Object.freeze({ COMPRADO: "comprado", GANADO: "ganado" });
+
+/** Dónde vive cada bolsillo dentro del perfil. `total` es el espejo. */
+export const CAMPOS_SALDO = Object.freeze({
+  total: "credits",
+  [BOLSILLOS.COMPRADO]: "creditosComprados",
+  [BOLSILLOS.GANADO]: "creditosGanados",
+});
+
+/** Las seis formas en que un movimiento toca los bolsillos. */
+export const REPARTOS = Object.freeze({
+  A_GANADO: "a_ganado",
+  A_COMPRADO: "a_comprado",
+  SOLO_GANADO: "solo_ganado",
+  COMPRADO_PRIMERO: "comprado_primero",
+  GANADO_PRIMERO: "ganado_primero",
+  AL_ORIGEN: "al_origen",
+});
+
+/**
+ * Qué bolsillo toca cada motivo.
+ *
+ * `TORNEO_ENTRADA: SOLO_GANADO` es la línea que hace cierto el reglamento.
+ *
+ * `PENALIZACION_ABANDONO: GANADO_PRIMERO` va al revés que los otros cobros a
+ * propósito: quien abandona tiene que pagar, pero confiscarle primero
+ * Leyendas que compró con dinero real es harina de otro costal. Se le cobra
+ * de lo ganado, y sólo si no alcanza se toca lo comprado —no queda impune,
+ * pero tampoco se le saca el dinero antes que el juego—.
+ *
+ * Las entradas de partida y las compras de la tienda gastan lo COMPRADO
+ * primero, que es lo que deja libre el bolsillo ganado: es el único que
+ * habilita torneos, así que gastarlo último es lo que conviene al jugador.
+ */
+export const REPARTO_POR_MOTIVO = Object.freeze({
+  [MOTIVOS.REGISTRO]: REPARTOS.A_GANADO,
+  [MOTIVOS.REFERIDO]: REPARTOS.A_GANADO,
+  [MOTIVOS.PREMIO_PARTIDA]: REPARTOS.A_GANADO,
+  [MOTIVOS.PREMIO_RANKING]: REPARTOS.A_GANADO,
+  [MOTIVOS.PREMIO_LOGRO]: REPARTOS.A_GANADO,
+  [MOTIVOS.TORNEO_PREMIO]: REPARTOS.A_GANADO,
+
+  [MOTIVOS.COMPRA]: REPARTOS.A_COMPRADO,
+
+  [MOTIVOS.TORNEO_ENTRADA]: REPARTOS.SOLO_GANADO,
+
+  [MOTIVOS.ENTRADA_PARTIDA]: REPARTOS.COMPRADO_PRIMERO,
+  [MOTIVOS.COMPRA_PERSONALIZACION]: REPARTOS.COMPRADO_PRIMERO,
+
+  [MOTIVOS.PENALIZACION_ABANDONO]: REPARTOS.GANADO_PRIMERO,
+
+  [MOTIVOS.TORNEO_DEVOLUCION]: REPARTOS.AL_ORIGEN,
+  [MOTIVOS.DEVOLUCION_ARTICULO]: REPARTOS.AL_ORIGEN,
+});
+
+/**
+ * El reparto de un motivo, o se rompe.
+ *
+ * No hay valor por defecto. Un motivo nuevo sin fila es alguien agregando una
+ * forma de mover plata sin decidir de qué bolsillo sale, y el defecto
+ * silencioso —mandarlo a ganado, digamos— haría justo lo que el reglamento
+ * prohíbe, en silencio y para siempre.
+ */
+export function repartoDe(motivo) {
+  const reparto = REPARTO_POR_MOTIVO[motivo];
+  if (!reparto) {
+    throw new Error(
+      `Motivo sin regla de bolsillo: ${JSON.stringify(motivo)}. ` +
+        "Agregalo a REPARTO_POR_MOTIVO antes de usarlo.",
+    );
+  }
+  return reparto;
+}

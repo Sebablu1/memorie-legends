@@ -130,8 +130,15 @@ const ADMIN = { auth: { uid: "admin" } };
 
 function montar({ saldos = {} } = {}) {
   const inicial = {};
-  for (const [uid, credits] of Object.entries(saldos)) {
-    inicial[`users/${uid}`] = { credits, username: uid };
+  for (const [uid, saldo] of Object.entries(saldos)) {
+    // Un número siembra el saldo de siempre; un objeto siembra los bolsillos.
+    // Las dos formas conviven porque casi ninguna prueba de torneo necesita
+    // distinguirlos: `moverLeyendas` deriva los bolsillos del espejo cuando no
+    // están. Las que sí lo necesitan son las del reglamento.
+    inicial[`users/${uid}`] =
+      typeof saldo === "number"
+        ? { credits: saldo, username: uid }
+        : { username: uid, ...saldo };
   }
 
   const db = crearFirestore(inicial);
@@ -463,6 +470,60 @@ console.log("\n=== 4. Inscribirse cobra una vez, y una sola ===");
   ok(e?.codigo === "failed-precondition", "sin saldo no se inscribe", e?.codigo);
   ok(db._leer("users/pobre").credits === 50, "el saldo queda intacto");
   ok(!db._leer(`torneos/${id}/inscripciones/pobre`), "y no queda anotado");
+}
+
+{
+  /**
+   * El reglamento, comprobado a través del módulo de torneos de verdad.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * POR QUÉ ACÁ Y NO SÓLO EN saldos-separados.mjs
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Esa suite prueba el BANCO: que `moverLeyendas` rechace un cobro
+   * `SOLO_GANADO` cuando el bolsillo ganado no alcanza. Esto prueba el
+   * CAMINO: que `torneos.inscribir` pase por ese cobro y no por otro, con el
+   * motivo correcto, y que el rechazo llegue hasta quien se quiso inscribir.
+   *
+   * Entre las dos cosas hay lugar para un error entero. `inscribir` podría
+   * cobrar con `MOTIVOS.ENTRADA_PARTIDA` —que gasta de cualquier bolsillo— y
+   * el banco lo aceptaría feliz, porque el banco sólo obedece al motivo que le
+   * mandan. La suite del banco seguiría verde y el reglamento seguiría siendo
+   * mentira.
+   */
+  const { db, torneos } = montar({
+    saldos: { rico: { credits: 5000, creditosComprados: 5000, creditosGanados: 0 } },
+  });
+  const { id } = await torneos.crear(ADMIN, { nombre: "Copa", entrada: 100 });
+  await torneos.abrirInscripciones(ADMIN, id);
+
+  const { error: e } = await capturar(() => torneos.inscribir("rico", id));
+
+  ok(e?.codigo === "failed-precondition",
+     "con 5000 compradas y 0 ganadas, el torneo rechaza la inscripción", e?.codigo);
+  ok(/ganadas jugando/.test(e?.message ?? ""),
+     "y le dice que hacen falta Leyendas ganadas jugando", e?.message);
+
+  const p = db._leer("users/rico");
+  ok(p.creditosComprados === 5000, "no se le tocó una sola Leyenda comprada", p);
+  ok(!db._leer(`torneos/${id}/inscripciones/rico`), "y no quedó anotado");
+}
+
+{
+  // La otra mitad: con ganadas entra, y salen del bolsillo correcto.
+  const { db, torneos } = montar({
+    saldos: { mixto: { credits: 5000, creditosComprados: 4900, creditosGanados: 100 } },
+  });
+  const { id } = await torneos.crear(ADMIN, { nombre: "Copa", entrada: 100 });
+  await torneos.abrirInscripciones(ADMIN, id);
+
+  await torneos.inscribir("mixto", id);
+
+  const p = db._leer("users/mixto");
+  ok(p.creditosGanados === 0, "con 100 ganadas justas, la inscripción entra", p);
+  ok(p.creditosComprados === 4900, "y la entrada sale de las ganadas, no de las compradas", p);
+  ok(p.credits === 4900, "con el espejo al día", p);
+  ok(Boolean(db._leer(`torneos/${id}/inscripciones/mixto`)), "y queda anotado");
 }
 
 {

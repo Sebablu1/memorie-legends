@@ -255,7 +255,22 @@ console.log("\n=== 3. Todo lo que escribe `credits` ===");
   ok(escritores.every((e) => e.archivo === "leyendas.js"),
      "el saldo se escribe SÓLO en leyendas.js",
      escritores.filter((e) => e.archivo !== "leyendas.js"));
-  ok(escritores.length === 2, "y en dos lugares: el movimiento simple y el lote", escritores.length);
+
+  /**
+   * UN solo lugar, y antes eran dos.
+   *
+   * El movimiento simple y el lote armaban cada uno su objeto de escritura.
+   * Con un solo campo era una repetición inofensiva; con tres —los dos
+   * bolsillos y el espejo— habrían sido dos copias de la aritmética del
+   * dinero, y esa es la clase de duplicado donde se arregla una y la otra
+   * queda mal por meses.
+   *
+   * Ahora las dos escriben lo que devuelve `perfilCon`. Si mañana vuelven a
+   * ser dos, esta prueba lo dice.
+   */
+  ok(escritores.length === 1,
+     "y en UN solo lugar: `perfilCon`, que arman los dos caminos",
+     escritores.length);
 }
 
 // ==================================== 4. quién llama a moverLeyendas
