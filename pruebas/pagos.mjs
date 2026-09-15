@@ -22,7 +22,7 @@
 import crypto from "node:crypto";
 import { crearMercadoPago, pagoCoincideConOrden } from "../functions/mercadopago.js";
 import { PAQUETES } from "../public/js/reglas/economia.js";
-import { firmarComoMercadoPago } from "../herramientas/sondear-webhook.mjs";
+import { firmarComoMercadoPago, interpretar } from "../herramientas/sondear-webhook.mjs";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -344,6 +344,64 @@ console.log("\n=== El webhook no lee el estado del payload ===");
   ok(codigo.includes('"MP_ACCESS_TOKEN"') && codigo.includes('"MP_WEBHOOK_SECRET"'),
      "y los nombres son los que lee el código");
 }
+
+// ═══════════════════ la sonda entiende TODO lo que el webhook contesta
+
+console.log("\n=== La sonda sabe leer cada respuesta del webhook ===");
+{
+  /**
+   * La prueba que faltaba, y que se escribió después de que la sonda mintiera.
+   *
+   * La primera versión miraba sólo el código de estado y trataba cualquier 500
+   * como «faltan los secretos». La primera corrida de verdad devolvió
+   * 500 «No se pudo confirmar» —que es el ÉXITO: la firma validó y Mercado Pago
+   * no conoce el pago inventado— y la sonda dijo que los secretos no habían
+   * llegado. Mandó a buscar el problema al lugar equivocado, que es exactamente
+   * lo que venía a evitar.
+   *
+   * Y el comentario del archivo daba por bueno un 200 que nunca ocurre: se
+   * supuso que `consultarPago` devolvería «no aprobado» ante un pago
+   * inexistente. Lo que hace es LANZAR.
+   *
+   * Así que ahora las respuestas no se suponen: se leen del webhook. Si alguien
+   * le agrega una, esta prueba se cae hasta que la sonda aprenda a leerla.
+   */
+  const { readFileSync } = await import("node:fs");
+  const fuente = readFileSync(new URL("../functions/index.js", import.meta.url), "utf8");
+
+  const desde = fuente.indexOf("export const webhookPago");
+  const hasta = fuente.indexOf("export const", desde + 10);
+  const cuerpoWebhook = fuente.slice(desde, hasta === -1 ? undefined : hasta);
+
+  ok(desde !== -1, "se encontró el cuerpo de `webhookPago`");
+
+  const respuestas = [...cuerpoWebhook.matchAll(/res\.status\((\d+)\)\.send\("([^"]*)"\)/g)]
+    .map((m) => ({ status: Number(m[1]), cuerpo: m[2] }));
+
+  ok(respuestas.length >= 8, `el webhook tiene ${respuestas.length} respuestas`, respuestas.length);
+
+  const sinLeer = respuestas.filter((r) => interpretar(r).firmaPaso === null);
+  ok(sinLeer.length === 0, "la sonda sabe leerlas todas", sinLeer);
+
+  // Las tres que deciden el veredicto, uña por uña.
+  ok(interpretar({ status: 401, cuerpo: "Firma inválida" }).firmaPaso === false,
+     "401 significa que la firma NO pasó");
+  ok(interpretar({ status: 500, cuerpo: "Sin configurar" }).firmaPaso === false,
+     "500 «Sin configurar» tampoco: no llegó ni a mirar la firma");
+  ok(interpretar({ status: 500, cuerpo: "No se pudo confirmar" }).firmaPaso === true,
+     "y 500 «No se pudo confirmar» SÍ: es el éxito de la sonda");
+
+  // El orden del webhook es lo que hace válida esa lectura: mira los secretos,
+  // después la firma, y recién entonces el resto. Si eso se invirtiera, un 500
+  // posterior podría ocurrir SIN haber validado la firma.
+  const iSecretos = cuerpoWebhook.indexOf("Sin configurar");
+  const iFirma = cuerpoWebhook.indexOf("Firma inválida");
+  const iConfirmar = cuerpoWebhook.indexOf("No se pudo confirmar");
+  ok(iSecretos < iFirma && iFirma < iConfirmar,
+     "y el webhook sigue comprobando secretos, luego firma, luego el pago",
+     { iSecretos, iFirma, iConfirmar });
+}
+
 
 // =====================================================================
 console.log("\n=== Sin credenciales no se anota ninguna orden ===");
