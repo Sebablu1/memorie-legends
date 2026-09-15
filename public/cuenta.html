@@ -173,6 +173,29 @@
       <h1 class="titulo-pagina">Tu cuenta</h1>
       <p class="subtitulo">Cómo protegés el acceso y tus Leyendas.</p>
 
+      <!-- Los dos bolsillos.
+
+           No son decoración: de los dos, sólo las ganadas sirven para entrar a
+           un torneo. Sin esto, quien compra un paquete y después no puede
+           inscribirse ve un rechazo con el saldo a la vista y no entiende nada.
+           El mensaje de error lo explica, pero llega tarde: aparece recién
+           cuando ya intentó. -->
+      <section class="panel" id="panelBolsillos" hidden>
+        <h2>Tus Leyendas</h2>
+        <div class="bolsillos">
+          <div class="bolsillo">
+            <b id="saldoGanado">—</b>
+            <span>ganadas jugando</span>
+            <small>Sirven para todo, torneos incluidos.</small>
+          </div>
+          <div class="bolsillo">
+            <b id="saldoComprado">—</b>
+            <span>compradas</span>
+            <small>Para partidas privadas y la tienda. No para torneos.</small>
+          </div>
+        </div>
+      </section>
+
       <section class="panel">
         <h2>Verificación en dos pasos</h2>
         <p style="color: var(--texto-tenue); font-size: 0.92rem; line-height: 1.7">

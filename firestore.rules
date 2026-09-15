@@ -48,7 +48,9 @@ service cloud.firestore {
     // Saldo de bienvenida permitido al crear la cuenta. Cualquier otro
     // valor se rechaza, para que nadie se cree el perfil con un millón.
     function saldoDeBienvenidaValido() {
-      return request.resource.data.credits == 100;
+      return request.resource.data.credits == 100
+             && request.resource.data.creditosComprados == 0
+             && request.resource.data.creditosGanados == 100;
     }
 
     // ---------------------------------------------------- perfiles

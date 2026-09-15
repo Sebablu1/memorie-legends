@@ -197,11 +197,36 @@ async function sacar(factor, boton) {
   }
 }
 
+/**
+ * Los dos bolsillos, en la página donde el jugador mira su cuenta.
+ *
+ * El número de la barra sigue siendo el total, que es lo que uno quiere saber
+ * casi siempre. Acá va la parte que importa cuando importa: de esas Leyendas,
+ * sólo las ganadas sirven para entrar a un torneo.
+ *
+ * El panel arranca oculto y se muestra recién con los números puestos. Si
+ * apareciera con un guión y se llenara después, el primer cuadro de la página
+ * sería "0 ganadas" —que para quien tiene saldo es una noticia falsa y
+ * alarmante—.
+ */
+function pintarBolsillos(perfil) {
+  const panel = document.getElementById("panelBolsillos");
+  if (!panel) return;
+
+  const ganado = Number(perfil?.ganado ?? 0);
+  const comprado = Number(perfil?.comprado ?? 0);
+
+  document.getElementById("saldoGanado").textContent = ganado.toLocaleString("es-UY");
+  document.getElementById("saldoComprado").textContent = comprado.toLocaleString("es-UY");
+  panel.hidden = false;
+}
+
 // ------------------------------------------------------------ arranque
 
 const sesion = await exigirSesion();
 if (sesion) {
   mostrarSaldo(sesion.perfil.saldo);
+  pintarBolsillos(sesion.perfil);
   conectarBotonSalir();
 
   // `currentUser` puede traer datos viejos: si alguien acaba de verificar el

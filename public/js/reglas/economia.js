@@ -682,6 +682,34 @@ export const REPARTO_POR_MOTIVO = Object.freeze({
 });
 
 /**
+ * El saldo con el que nace una cuenta, entero.
+ *
+ * ──────────────────────────────────────────────────────────────────
+ * ESTO EXISTE PORQUE YA PASÓ UNA VEZ
+ * ──────────────────────────────────────────────────────────────────
+ *
+ * El perfil nuevo lo escriben TRES lugares —`register.js` por el formulario,
+ * `register.js` otra vez por Google, y `auth.js` para quien entra con Google
+ * sin haber pasado por el formulario— y `firestore.rules` lo valida campo por
+ * campo. Cuando el saldo era un solo número, esos tres lugares tenían cada uno
+ * su 100 escrito a mano mientras la constante decía 50: tres copias, una de
+ * ellas mintiendo, y la que mentía era la que decía ser la oficial.
+ *
+ * Ahora son TRES campos que tienen que cuadrar entre sí y contra la regla. Con
+ * el objeto repetido en tres archivos, la próxima vez no sería un número mal:
+ * sería un perfil que Firestore rechaza al crearse, o peor, uno que nace con
+ * los bolsillos descuadrados del espejo.
+ *
+ * `creditosGanados` arranca con todo: las Leyendas de bienvenida no se
+ * compraron, así que sirven para torneos.
+ */
+export const saldoDeRegistro = () => ({
+  [CAMPOS_SALDO.total]: LEYENDAS_REGISTRO,
+  [CAMPOS_SALDO[BOLSILLOS.COMPRADO]]: 0,
+  [CAMPOS_SALDO[BOLSILLOS.GANADO]]: LEYENDAS_REGISTRO,
+});
+
+/**
  * El reparto de un motivo, o se rompe.
  *
  * No hay valor por defecto. Un motivo nuevo sin fila es alguien agregando una

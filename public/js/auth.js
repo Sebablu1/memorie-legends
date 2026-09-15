@@ -18,7 +18,7 @@ import {
   terminarConCodigo,
 } from "./mfa.js";
 
-import { LEYENDAS_REGISTRO } from "./reglas/economia.js";
+import { saldoDeRegistro } from "./reglas/economia.js";
 
 // ==========================================================
 // EL VELO DE CARGA
@@ -136,7 +136,7 @@ onAuthStateChanged(auth, async (usuario) => {
       await setDoc(doc(db, "users", usuario.uid), {
         username: nombre,
         email: correo,
-        credits: LEYENDAS_REGISTRO,
+        ...saldoDeRegistro(),
         gamesPlayed: 0,
         wins: 0,
         createdAt: new Date().toISOString(),

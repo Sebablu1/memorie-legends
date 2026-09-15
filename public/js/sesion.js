@@ -46,6 +46,21 @@ export async function leerPerfil(uid) {
     uid,
     nombre: datos.username ?? "Jugador",
     saldo: Number(datos[CAMPO_SALDO] ?? 0),
+
+    /**
+     * Los dos bolsillos, con el mismo respaldo que usa el servidor.
+     *
+     * Un perfil de antes de la separacion tiene `credits` y nada mas, y sus
+     * Leyendas son todas ganadas: nadie habia comprado nunca. Derivarlo igual
+     * que `moverLeyendas` es lo que evita que la pantalla diga una cosa y el
+     * servidor cobre otra — que seria peor que no mostrarlo.
+     */
+    comprado: Number(datos.creditosComprados ?? 0),
+    ganado: Number(
+      datos.creditosGanados ??
+        Math.max(0, Number(datos[CAMPO_SALDO] ?? 0) - Number(datos.creditosComprados ?? 0)),
+    ),
+
     partidas: Number(datos.gamesPlayed ?? 0),
     victorias: Number(datos.wins ?? 0),
 

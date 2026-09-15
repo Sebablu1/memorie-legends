@@ -11,7 +11,7 @@ import {
 
 // Un solo número para las dos formas de entrar, y el mismo que exige la regla
 // de Firestore. Antes cada archivo tenía el suyo escrito a mano.
-import { LEYENDAS_REGISTRO } from "./reglas/economia.js";
+import { LEYENDAS_REGISTRO, saldoDeRegistro } from "./reglas/economia.js";
 
 const form = document.getElementById("registerForm");
 const mensaje = document.getElementById("mensaje");
@@ -69,7 +69,7 @@ form.addEventListener("submit", async (e) => {
     await setDoc(doc(db, "users", user.uid), {
       username: username,
       email: email,
-      credits: LEYENDAS_REGISTRO,
+      ...saldoDeRegistro(),
       gamesPlayed: 0,
       wins: 0,
       createdAt: new Date().toISOString(),
@@ -156,7 +156,7 @@ async function crearPerfilSiFalta(usuario) {
   await setDoc(ref, {
     username: nombre,
     email: correo,
-    credits: LEYENDAS_REGISTRO,
+    ...saldoDeRegistro(),
     gamesPlayed: 0,
     wins: 0,
     createdAt: new Date().toISOString(),

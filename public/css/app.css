@@ -1139,3 +1139,53 @@ body.con-menu-abierto {
     transition: none;
   }
 }
+
+/* ------------------------------------------- los dos bolsillos de Leyendas
+
+   Van uno al lado del otro y NO como una lista, porque no son dos datos
+   sueltos: son una comparación. Lo que el jugador necesita leer de un vistazo
+   es cuánto de su saldo sirve para torneos, y eso sólo se ve poniendo los dos
+   números a la misma altura.
+
+   En el teléfono se apilan, que es lo único que entra, y ahí el orden importa:
+   las ganadas van primero porque son las que habilitan todo. */
+.bolsillos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+@media (max-width: 560px) {
+  .bolsillos { grid-template-columns: 1fr; }
+}
+
+.bolsillo {
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--borde-suave);
+}
+
+.bolsillo b {
+  display: block;
+  font-size: 1.6rem;
+  line-height: 1.1;
+  color: var(--oro-claro);
+  font-variant-numeric: tabular-nums;
+}
+
+.bolsillo span {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.82rem;
+  color: var(--texto);
+}
+
+.bolsillo small {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--texto-tenue);
+}

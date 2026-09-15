@@ -32,7 +32,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { LEYENDAS_REGISTRO } from "../public/js/reglas/economia.js";
+import { LEYENDAS_REGISTRO, saldoDeRegistro } from "../public/js/reglas/economia.js";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -88,13 +88,89 @@ for (const archivo of ["public/js/register.js", "public/js/auth.js"]) {
     literales,
   );
 
-  const usos = [...texto.matchAll(/credits:\s*LEYENDAS_REGISTRO/g)].length;
-  ok(usos > 0, `${archivo} usa la constante`, usos);
+  // Ahora son TRES campos que tienen que cuadrar entre si y contra la regla,
+  // asi que los tres caminos escriben el MISMO objeto en vez de armarlo cada
+  // uno. Un literal suelto volveria a poder divergir, y esta vez no seria un
+  // numero mal: seria un perfil que Firestore rechaza al crearse.
+  const usos = [...texto.matchAll(/\.\.\.saldoDeRegistro\(\)/g)].length;
+  ok(usos > 0, `${archivo} usa el ayudante compartido`, usos);
+
+  for (const campo of ["creditosComprados", "creditosGanados"]) {
+    const sueltos = [...texto.matchAll(new RegExp(`${campo}:\\s*\\d+`, "g"))].map((m) => m[0]);
+    ok(sueltos.length === 0, `${archivo} no escribe ${campo} a mano`, sueltos);
+  }
 
   ok(
-    /import \{ LEYENDAS_REGISTRO \}/.test(texto),
-    `${archivo} la importa en vez de redeclararla`,
+    /import \{[^}]*saldoDeRegistro[^}]*\}/.test(texto),
+    `${archivo} lo importa en vez de redeclararlo`,
   );
+}
+
+// =====================================================================
+console.log("\n=== 2b. La regla valida los TRES campos ===");
+// =====================================================================
+
+{
+  /**
+   * Sin esto, un jugador se crea el perfil con `creditosGanados: 999999`.
+   *
+   * El perfil lo escribe el NAVEGADOR: `firestore.rules` es el unico control
+   * que hay sobre lo que llega. Mientras la regla miraba solo `credits`, los
+   * dos bolsillos entraban sin que nadie los mirara — y el que importa es
+   * `creditosGanados`, que es el que habilita torneos.
+   */
+  const reglas = leer("firestore.rules");
+  const esperado = saldoDeRegistro();
+
+  for (const [campo, valor] of Object.entries(esperado)) {
+    const m = reglas.match(
+      new RegExp(`request\\.resource\\.data\\.${campo}\\s*==\\s*(\\d+)`),
+    );
+    ok(Boolean(m), `la regla fija ${campo}`);
+    if (m) {
+      ok(Number(m[1]) === valor,
+         `y lo fija en ${valor}, igual que el codigo`,
+         { enLaRegla: Number(m[1]), enElCodigo: valor });
+    }
+  }
+
+  // Y que el espejo cierre en el perfil que nace: si la regla pidiera
+  // credits 100 con ganados 50, todo perfil nuevo naceria descuadrado.
+  ok(esperado.credits === esperado.creditosComprados + esperado.creditosGanados,
+     "el perfil nuevo nace con el espejo cuadrado", esperado);
+}
+
+// =====================================================================
+console.log("\n=== 2c. Y después de crearlo, el cliente no los toca ===");
+// =====================================================================
+
+{
+  /**
+   * La otra mitad de la puerta.
+   *
+   * `saldoDeBienvenidaValido` cuida el momento de CREAR. Lo que cuida el resto
+   * de la vida del perfil es `soloCamposPropios`, que enumera lo unico que su
+   * dueno puede cambiar. Si alguien agregara los bolsillos a esa lista
+   * —"total, es el saldo del propio usuario"— el saldo entero pasaria a ser
+   * editable desde la consola del navegador.
+   */
+  const reglas = leer("firestore.rules");
+  const m = reglas.match(/hasOnly\(\[([^\]]*)\]\)/);
+  ok(Boolean(m), "la regla de update enumera los campos propios");
+
+  const permitidos = (m?.[1] ?? "").split(",").map((s) => s.trim().replace(/['"]/g, ""));
+  for (const campo of Object.keys(saldoDeRegistro())) {
+    ok(!permitidos.includes(campo), `${campo} NO esta entre los campos que el cliente puede editar`);
+  }
+
+  // Y ningun archivo del navegador escribe los bolsillos por su cuenta: la
+  // regla los rechazaria, pero el intento seria un error silencioso en
+  // produccion y un bug que nadie relaciona con el saldo.
+  for (const archivo of ["public/js/register.js", "public/js/auth.js", "public/js/sesion.js"]) {
+    const texto = leer(archivo);
+    const escrituras = [...texto.matchAll(/creditos(Comprados|Ganados)\s*:/g)].map((x) => x[0]);
+    ok(escrituras.length === 0, `${archivo} no escribe los bolsillos`, escrituras);
+  }
 }
 
 // =====================================================================
