@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "firebase serve",
-    "deploy": "firebase deploy",
+    "deploy": "node herramientas/desplegar.mjs",
     "build": "echo 'No build needed'",
     "_comentario_e2e": "Las de navegador van aparte de `npm test` a proposito: necesitan Chromium descargado y tardan minutos. `npm test` tiene que seguir siendo lo que se corre sin pensarlo.",
     "e2e": "playwright test",
