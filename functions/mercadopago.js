@@ -67,6 +67,33 @@ export function crearMercadoPago({
    * 100.
    */
   async function crearPreferencia({ orden, paquete, moneda, urlWebhook, urlVuelta }) {
+    /**
+     * El precio, comprobado ACÁ y no en Mercado Pago.
+     *
+     * ───────────────────────────────────────────────────────────────────────
+     * QUÉ PASÓ
+     * ───────────────────────────────────────────────────────────────────────
+     *
+     * Esto leía `paquete.precio`, y el campo se llama `precioUYU` en todo el
+     * resto del proyecto. `JSON.stringify` descarta las claves con `undefined`,
+     * así que el item viajaba SIN precio y Mercado Pago contestaba
+     * «unit_price needed»: un mensaje que suena a campo olvidado y que manda a
+     * buscar el error donde no está. El campo estaba; lo que no estaba era el
+     * valor.
+     *
+     * Por eso ahora se valida de este lado. Un paquete sin precio es un error
+     * nuestro —o un documento de Firestore a medio escribir— y merece decirlo
+     * con el id adelante, en vez de convertirse en un 400 remoto que hay que
+     * traducir.
+     */
+    const precio = Number(paquete?.precioUYU);
+    if (!Number.isFinite(precio) || precio <= 0) {
+      throw new Error(
+        `El paquete ${paquete?.id ?? "(sin id)"} no tiene un precio válido para cobrar: ` +
+          `precioUYU = ${JSON.stringify(paquete?.precioUYU)}`,
+      );
+    }
+
     const respuesta = await buscar(`${API}/checkout/preferences`, {
       method: "POST",
       headers: cabeceras(),
@@ -76,7 +103,7 @@ export function crearMercadoPago({
             id: paquete.id,
             title: paquete.nombre,
             quantity: 1,
-            unit_price: paquete.precio,
+            unit_price: precio,
             currency_id: moneda,
           },
         ],

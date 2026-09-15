@@ -21,6 +21,7 @@
 
 import crypto from "node:crypto";
 import { crearMercadoPago, pagoCoincideConOrden } from "../functions/mercadopago.js";
+import { PAQUETES } from "../public/js/reglas/economia.js";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -174,7 +175,26 @@ console.log("\n=== Un pago aprobado todavía tiene que cuadrar ===");
 
 console.log("\n=== El checkout se crea con los datos del servidor ===");
 {
-  const paquete = { id: "chico", nombre: "Paquete chico", precio: 100 };
+  /**
+   * El paquete sale del catálogo DE VERDAD, no de uno inventado acá.
+   *
+   * ────────────────────────────────────────────────────────────────────
+   * ES EL AGUJERO POR EL QUE SE FUE UN BUG A PRODUCCIÓN
+   * ────────────────────────────────────────────────────────────────────
+   *
+   * Acá había `{ id: "chico", nombre: "Paquete chico", precio: 100 }`, escrito
+   * a mano. El campo real se llama `precioUYU`, y el código leía `precio`: el
+   * doble tenía la MISMA equivocación que el código, así que la prueba
+   * confirmaba el error en vez de encontrarlo.
+   *
+   * En producción el item viajaba sin precio —`JSON.stringify` descarta las
+   * claves `undefined`— y Mercado Pago contestaba «unit_price needed».
+   *
+   * Usando el paquete del catálogo, el día que un campo se renombre esta
+   * prueba se cae sola. Un doble escrito a mano sólo comprueba que el código
+   * coincida consigo mismo.
+   */
+  const paquete = PAQUETES[0];
   const espia = falsoFetch([{ json: { id: "pref-1", init_point: "https://mp/x", sandbox_init_point: "https://mp/sandbox" } }]);
   const mp = crearMercadoPago({ accessToken: TOKEN, webhookSecret: SECRETO, buscar: espia });
 
@@ -186,8 +206,12 @@ console.log("\n=== El checkout se crea con los datos del servidor ===");
   const enviado = JSON.parse(espia.llamadas[0].opciones.body);
   ok(enviado.external_reference === "orden-1",
      "manda el id de NUESTRA orden como referencia, que es lo que permite reconciliar");
-  ok(enviado.items[0].unit_price === 100,
-     "y el precio del catálogo del servidor", enviado.items[0].unit_price);
+  ok(enviado.items[0].unit_price === paquete.precioUYU,
+     `y el precio del catálogo del servidor (${paquete.precioUYU})`, enviado.items[0].unit_price);
+  ok(Number.isFinite(enviado.items[0].unit_price) && enviado.items[0].unit_price > 0,
+     "que es un número de verdad y no `undefined`", enviado.items[0].unit_price);
+  ok(enviado.items[0].currency_id === "UYU", "con su moneda");
+  ok(enviado.items[0].quantity === 1, "y una unidad");
   ok(enviado.notification_url === "https://x/webhook", "con la URL del webhook");
 
   ok(r.url === "https://mp/sandbox" && r.esSandbox === true,
@@ -213,6 +237,44 @@ console.log("\n=== El checkout se crea con los datos del servidor ===");
     await roto.crearPreferencia({ orden: { id: "o" }, paquete, moneda: "UYU", urlWebhook: "w", urlVuelta: "v" });
   } catch { salto = true; }
   ok(salto, "un rechazo de MP al crear la preferencia no pasa en silencio");
+
+  /**
+   * Un paquete sin precio se rompe ANTES de salir a la red.
+   *
+   * Es la mitad que faltaba del bug. Con `unit_price` en `undefined`, la
+   * llamada igual salía y el error llegaba de vuelta como un 400 de Mercado
+   * Pago diciendo «unit_price needed» —que suena a campo olvidado en vez de a
+   * valor ausente, y manda a mirar el lugar equivocado—.
+   *
+   * Un paquete sin precio es un error nuestro: un documento de Firestore a
+   * medio escribir, o un campo renombrado. Decirlo con el id adelante ahorra
+   * el viaje y la traducción.
+   */
+  for (const roto of [
+    { id: "sin-precio", nombre: "Roto" },
+    { id: "precio-cero", nombre: "Roto", precioUYU: 0 },
+    { id: "precio-texto", nombre: "Roto", precioUYU: "doscientos" },
+    { id: "precio-negativo", nombre: "Roto", precioUYU: -100 },
+    // El nombre viejo del campo, que es exactamente lo que estaba pasando.
+    { id: "campo-viejo", nombre: "Roto", precio: 250 },
+  ]) {
+    const espiaRoto = falsoFetch([{ json: { id: "no-deberia-llegar" } }]);
+    const mpRoto = crearMercadoPago({
+      accessToken: TOKEN, webhookSecret: SECRETO, buscar: espiaRoto,
+    });
+    let mensaje = "";
+    try {
+      await mpRoto.crearPreferencia({
+        orden: { id: "o" }, paquete: roto, moneda: "UYU", urlWebhook: "w", urlVuelta: "v",
+      });
+    } catch (e) {
+      mensaje = e.message;
+    }
+    ok(mensaje.includes(roto.id),
+       `un paquete con ${roto.id} se rechaza nombrándolo`, mensaje);
+    ok(espiaRoto.llamadas.length === 0,
+       `  y no se llama a Mercado Pago`, espiaRoto.llamadas.length);
+  }
 }
 
 // ════════════════════════════ auditoría: que el webhook no vuelva a confiar
