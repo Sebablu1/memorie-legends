@@ -963,6 +963,60 @@ body::before {
   z-index: 6;
 }
 
+/* La zona que impide que la carta se escape de su propio cursor.
+
+   ─────────────────────────────────────────────────────────────────────────
+   EL CICLO QUE ARREGLA
+   ─────────────────────────────────────────────────────────────────────────
+
+   El `:hover` está en la carta, y la carta se MUEVE al recibirlo: sube 16 px.
+   Si el cursor estaba cerca del borde de abajo, la carta se le va de encima,
+   se pierde el hover, la carta vuelve, se vuelve a hoverear — y parpadea sin
+   parar.
+
+   No pasa en todas las posiciones porque `transform-origin: 50% 130%` deja el
+   punto de giro DEBAJO de la carta: al rotar `--giro`, cuanto más abierta está
+   en el abanico, más se desplaza su borde por los mismos 16 px. En el medio no
+   alcanza a escaparse; en las de las puntas, sí.
+
+   ─────────────────────────────────────────────────────────────────────────
+   POR QUÉ SE EXTIENDE 26 PX Y NO 16
+   ─────────────────────────────────────────────────────────────────────────
+
+   Porque la transición tiene `cubic-bezier(0.34, 1.4, 0.64, 1)`, y ese 1,4 es
+   un rebote: la carta se PASA de los 16 px antes de acomodarse. Cubrir los 16
+   exactos dejaría el parpadeo vivo justo durante el rebote, que es cuando más
+   lejos está.
+
+   ─────────────────────────────────────────────────────────────────────────
+   POR QUÉ ES UN ELEMENTO Y NO UN `::before`
+   ─────────────────────────────────────────────────────────────────────────
+
+   Porque `::before` ya lo usa `.carta.atacable` para su borde punteado, y
+   `mesa.js` pone las dos clases sobre la misma carta cuando un rival es
+   atacable: el `inset` de la zona le estiraría el borde 26 px hacia abajo.
+
+   La primera versión de este arreglo usaba `::before` con `:not(.atacable)`,
+   y dejaba sin arreglar justamente las cartas de los rivales — que también se
+   levantan, porque también son `.jugable`. El `span` lo cubre todo.
+
+   ─────────────────────────────────────────────────────────────────────────
+   Y POR QUÉ SÓLO SE ENCIENDE AL HOVERearse
+   ─────────────────────────────────────────────────────────────────────────
+
+   Con `pointer-events: auto` desde el principio, una franja de 26 px debajo de
+   cada carta pasaría a levantarla sin que el cursor la toque. El hover ARRANCA
+   por la caja de la carta, como siempre; la zona sólo lo SOSTIENE una vez
+   empezado. */
+.carta .zona-carta {
+  position: absolute;
+  inset: -4px -4px -26px;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.carta.jugable:hover .zona-carta { pointer-events: auto; }
+
 .carta.jugable::after {
   content: "";
   position: absolute;

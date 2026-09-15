@@ -106,6 +106,22 @@ function etiqueta(posicion, cartaVisible) {
   return `${donde}, ${cartaVisible.numero} de ${cartaVisible.palo}`;
 }
 
+/**
+ * `zona-carta`: lo que impide que una carta se escape de su propio cursor.
+ *
+ * El `:hover` de `.carta.jugable` la levanta 16 px. Si el cursor estaba cerca
+ * del borde de abajo, la carta se le va de encima, pierde el hover, vuelve, lo
+ * recupera — y parpadea varias veces por segundo sin que nadie mueva el ratón.
+ *
+ * Este `span` se extiende hacia abajo más de lo que la carta viaja, así que el
+ * puntero nunca se queda sin nada debajo. Es un elemento de verdad y no un
+ * `::before` porque ese pseudo-elemento ya lo usa `.carta.atacable` para su
+ * borde punteado, y `mesa.js` pone las dos clases sobre la misma carta cuando
+ * un rival es atacable: el `inset` de la zona le estiraría el borde.
+ *
+ * Va vacío y `aria-hidden`: no dice nada, no se ve, y sólo captura el puntero
+ * mientras dura el hover. El CSS está en `mesa.css`.
+ */
 export function dibujarCarta(
   carta,
   { visible, asiento = 0, posicion = null, clases = "", estilo = "", dorso: dorsoPedido = null },
@@ -132,6 +148,7 @@ export function dibujarCarta(
         <span class="lados" aria-hidden="true">
           <span class="dorso"><img src="${dorso}" alt="" /></span>
         </span>
+        <span class="zona-carta" aria-hidden="true"></span>
       </button>`;
   }
   return `
@@ -145,6 +162,7 @@ export function dibujarCarta(
         <span class="dorso"><img src="${dorso}" alt="" /></span>
         <span class="cara"><img src="${carta.imagen}" alt="" /></span>
       </span>
+      <span class="zona-carta" aria-hidden="true"></span>
     </button>`;
 }
 

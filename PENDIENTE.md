@@ -372,6 +372,28 @@ aparece en todo el HTML.
 
 ---
 
+## 10. Velocidad con conexión mala
+
+**Estado:** sin mirar. Frente propio, no se mezcla con lo demás.
+
+**Qué se pide:** que el juego se sienta rápido con 1G o con 4G con lag. Cuatro
+frentes posibles, ninguno investigado todavía:
+
+- **Actualizaciones optimistas.** Mostrar el resultado esperado antes de que el
+  servidor confirme. Es el que más cambia la sensación y el más delicado: la
+  mesa tiene que poder desandar lo que mostró si el servidor dice otra cosa, y
+  eso toca el modelo entero de la vista.
+- **Cargas chicas.** Mandar sólo lo que cambió en vez de la vista completa.
+- **Reconexión rápida y silenciosa.**
+- **Revisar los escuchas de Firestore.** ¿Escuchan de más? ¿Traen lo que nadie
+  usa? Es el más barato de averiguar y probablemente el primero que conviene.
+
+**Por qué va en su propia sesión:** los cuatro tocan cómo viaja el estado de la
+partida. Mezclarlos con arreglos de pantalla es cómo se rompen los turnos sin
+que nadie sepa cuál de los dos cambios fue.
+
+---
+
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del

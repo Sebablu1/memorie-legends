@@ -2361,6 +2361,7 @@ function manoParaElegir(i, { soloVacias = false } = {}) {
             <span class="dorso"><img src="${dorsoDe(i)}" alt="" /></span>
             <span class="cara"></span>
           </span>
+          <span class="zona-carta" aria-hidden="true"></span>
         </button>`;
     })
     .join("");
