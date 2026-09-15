@@ -4,12 +4,76 @@ import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
 import { escapar } from "./modulos/texto.js";
 import { db, collection, getDocs, query, orderBy, limit } from "./firebase.js";
 import { clavesDePeriodos } from "./reglas/ranking.js";
+import { esRutaDelSitio } from "./reglas/catalogo.js";
 
 const $ = (id) => document.getElementById(id);
 
 conectarBotonSalir();
 
 const NOMBRES = { semanal: "esta semana", mensual: "este mes", anual: "este año" };
+
+/**
+ * El nombre, la cara, el marco y el título de una fila del ranking.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * TODO SALE DE LA FILA, Y NO DEL PERFIL
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * No es una preferencia: el navegador NO PUEDE leer el perfil de otro
+ * jugador. `users/{uid}` es de lectura sólo para su dueño —se cerró para que
+ * nadie viera el saldo ajeno— y esta tabla se lee directo de Firestore.
+ *
+ * Así que lo que se ve acá es lo que el servidor congeló en la fila al
+ * puntuar. Una fila del ranking es un registro histórico, y muestra al
+ * jugador como era cuando ganó ese puesto.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Y LAS FILAS VIEJAS NO TRAEN NADA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Ninguna fila anterior a este cambio tiene nombre. Durante meses la tabla
+ * pintó `f.nombre ?? f.uid` sin que nadie escribiera `nombre`, así que lo que
+ * se veía era el uid crudo de cada jugador — en la pantalla de mayor alcance
+ * del sitio.
+ *
+ * Por eso el respaldo no es el uid. Un uid no le dice nada a nadie y es de
+ * quien lo tiene; «Jugador» al menos no expone a la persona. Las filas viejas
+ * se arreglan solas la primera vez que ese jugador vuelva a puntuar.
+ */
+const nombreDe = (f) => {
+  const nombre = String(f?.nombre ?? "").trim();
+  return nombre || "Jugador";
+};
+
+/**
+ * La cara: la que tenía puesta, o la inicial.
+ *
+ * `esRutaDelSitio` otra vez, igual que en la mesa y en la sala. Lo que hay en
+ * la fila lo escribió el servidor, pero un `src` que apunte afuera del sitio
+ * le avisaría a ese dominio quién está mirando el ranking y desde dónde.
+ */
+function caraEnLaTabla(f) {
+  const inicial = nombreDe(f).charAt(0).toUpperCase() || "?";
+  if (!esRutaDelSitio(f?.retrato)) {
+    return `<span class="avatar-inicial" aria-hidden="true">${escapar(inicial)}</span>`;
+  }
+  return `<span class="avatar-inicial con-cara" aria-hidden="true">
+      <img src="${escapar(f.retrato)}" alt="" loading="lazy" />
+    </span>`;
+}
+
+/** El marco, superpuesto: un `border` cambiaría el alto de la fila. */
+function marcoEnLaTabla(f) {
+  if (!esRutaDelSitio(f?.marco)) return "";
+  return `<img class="marco-ranking" src="${escapar(f.marco)}" alt="" aria-hidden="true" />`;
+}
+
+/** El título, al lado del nombre. Es texto de un administrador: va escapado. */
+function tituloEnLaTabla(f) {
+  const titulo = String(f?.titulo ?? "").trim();
+  if (!titulo) return "";
+  return `<span class="titulo-jugador">${escapar(titulo)}</span>`;
+}
 
 const sesion = await exigirSesion();
 if (sesion) {
@@ -52,7 +116,14 @@ if (sesion) {
               (f) => `
             <tr class="${f.uid === miUid ? "yo" : ""} podio-${f.puesto <= 3 ? f.puesto : ""}">
               <td class="puesto">${f.puesto <= 3 ? ["🥇", "🥈", "🥉"][f.puesto - 1] : f.puesto}</td>
-              <td>${escapar(f.nombre ?? f.uid ?? "Jugador")}</td>
+              <td class="jugador-ranking">
+                <span class="ficha-ranking">
+                  ${caraEnLaTabla(f)}
+                  ${marcoEnLaTabla(f)}
+                </span>
+                <span class="nombre-ranking">${escapar(nombreDe(f))}</span>
+                ${tituloEnLaTabla(f)}
+              </td>
               <td class="num puntos">${(f.puntos ?? 0).toLocaleString("es-UY")}</td>
               <td class="num">${f.partidasGanadas ?? 0}</td>
               <td class="num">${f.partidasJugadas ?? 0}</td>

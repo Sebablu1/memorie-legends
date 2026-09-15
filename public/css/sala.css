@@ -152,17 +152,7 @@
    desalineada respecto a las demás. */
 .jugador-fila .reportar { margin-left: 6px; }
 
-.avatar-inicial {
-  width: 38px;
-  height: 38px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  font-weight: 800;
-  color: var(--negro);
-  background: linear-gradient(145deg, var(--oro-claro), var(--oro));
-}
+/* `.avatar-inicial` vive ahora en `app.css`: lo usan tres pantallas. */
 
 /* ------------------------------------- la cara, el marco y el título
 
@@ -183,20 +173,6 @@
   display: block;
 }
 
-/* La cara comprada llena el círculo y lo recorta; sin `overflow` una imagen
-   cuadrada dejaría las esquinas afuera del redondeo. */
-.avatar-inicial.con-cara {
-  overflow: hidden;
-  background: none;
-  padding: 0;
-}
-
-.avatar-inicial.con-cara img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
 
 /* El marco, por fuera del borde de la cara: pegado justo al borde se lee como
    parte de la foto y no como un marco.

@@ -101,12 +101,13 @@ function crearFirestore(inicial = {}) {
 const FECHA = new Date("2026-09-07T15:00:00Z");
 const CLAVES = clavesDePeriodos(FECHA, ZONA_POR_DEFECTO);
 
-function montar(inicial = {}) {
+function montar(inicial = {}, { identidadDe } = {}) {
   const db = crearFirestore(inicial);
   const ranking = crearRankingDePartidas({
     db,
     marcaDeTiempo: () => "T",
     ahora: () => FECHA,
+    ...(identidadDe ? { identidadDe } : {}),
   });
   return { db, ranking };
 }
@@ -544,6 +545,131 @@ console.log("\n=== 10. Los premios físicos del cierre de mes ===");
 
   const vacio = umbralesValidos(undefined);
   ok(vacio[0].minimoPuntos === 20000, "sin configuración guardada, los de fábrica");
+}
+
+// =====================================================================
+console.log("\n=== 9. La fila congela quién era el jugador ===");
+// =====================================================================
+
+{
+  /**
+   * Por qué la fila tiene que guardar el nombre.
+   *
+   * Porque el navegador no puede averiguarlo. La tabla se lee directo de
+   * Firestore y `users/{uid}` es de lectura sólo para su dueño. Sin esto la
+   * pantalla no tiene de dónde sacar el nombre de nadie — y no lo tenía:
+   * `ranking-ui.js` pintaba `f.nombre ?? f.uid`, nadie escribía `nombre`, y la
+   * tabla mostraba el uid crudo de cada jugador.
+   */
+  const { db, ranking } = montar(
+    {},
+    {
+      identidadDe: async (uid) => ({
+        nombre: `Nombre de ${uid}`,
+        retrato: `/img/avatar/${uid}.webp`,
+        marco: uid === "ana" ? "/img/marcos/oro.webp" : null,
+        titulo: uid === "ana" ? "Leyenda" : null,
+      }),
+    },
+  );
+
+  await ranking.registrarPartida({
+    codigo: "IDENT",
+    estado: estadoFinal({ jugadores: CUATRO, ganadorId: "ana" }),
+    entrada: 50,
+  });
+
+  const ana = db._leer(`rankings/${CLAVES.semanal}/jugadores/ana`);
+  ok(ana.nombre === "Nombre de ana", "la fila guarda el nombre", ana.nombre);
+  ok(ana.retrato === "/img/avatar/ana.webp", "y la cara que tenía puesta", ana.retrato);
+  ok(ana.marco === "/img/marcos/oro.webp", "y el marco", ana.marco);
+  ok(ana.titulo === "Leyenda", "y el título", ana.titulo);
+
+  // El uid sigue viajando: la tabla lo usa para marcar tu propia fila. Se
+  // conserva y no se muestra.
+  ok(ana.uid === "ana", "y el uid sigue en la fila, para reconocer la propia");
+
+  // Quien no tiene nada comprado guarda `null`, no `undefined`: un campo
+  // ausente y uno vacío se leen igual en la pantalla, pero sólo el explícito
+  // dice "se miró y no había".
+  const beto = db._leer(`rankings/${CLAVES.semanal}/jugadores/beto`);
+  ok(beto.marco === null && beto.titulo === null, "y sin marco ni título queda en null", beto);
+
+  // En los TRES períodos, no sólo en el semanal.
+  for (const periodo of PERIODOS) {
+    const f = db._leer(`rankings/${CLAVES[periodo]}/jugadores/ana`);
+    ok(f.nombre === "Nombre de ana", `  y también en el ${periodo}`);
+  }
+}
+
+{
+  /**
+   * Un perfil que no se puede leer NO corta el puntaje.
+   *
+   * Los puntos son el dato; el nombre es la decoración. Una partida ya jugada
+   * no puede quedar sin puntuar porque falló una lectura de adorno — y menos
+   * todavía porque el jugador ni se enteraría: vería que su partida no sumó.
+   */
+  const { db, ranking } = montar(
+    {},
+    {
+      identidadDe: async () => {
+        throw new Error("Firestore dijo que no");
+      },
+    },
+  );
+
+  const r = await ranking.registrarPartida({
+    codigo: "SIN-IDENT",
+    estado: estadoFinal({ jugadores: CUATRO, ganadorId: "ana" }),
+    entrada: 50,
+  });
+
+  ok(r.length === 4, "puntúa igual a los cuatro", r.length);
+
+  const ana = db._leer(`rankings/${CLAVES.semanal}/jugadores/ana`);
+  ok(ana.puntos > 0, "con sus puntos", ana.puntos);
+  ok(!("nombre" in ana), "y sin nombre, en vez de con uno inventado", Object.keys(ana));
+}
+
+{
+  /**
+   * Y un fallo posterior no BORRA el nombre que la fila ya tenía.
+   *
+   * Es el caso que justifica el `...(quien ? {...} : {})` en `ranking.js`. Con
+   * `merge: true`, escribir `nombre: null` pisa lo que había. Una lectura que
+   * falla una vez dejaría la fila peor que antes, y en silencio: el jugador
+   * pasaría a llamarse «Jugador» en la tabla porque una vez falló un `get`.
+   */
+  let falla = false;
+  const { db, ranking } = montar(
+    {},
+    {
+      identidadDe: async (uid) => {
+        if (falla) throw new Error("ahora no");
+        return { nombre: `Nombre de ${uid}`, retrato: null, marco: null, titulo: null };
+      },
+    },
+  );
+
+  await ranking.registrarPartida({
+    codigo: "UNO",
+    estado: estadoFinal({ jugadores: CUATRO, ganadorId: "ana" }),
+    entrada: 50,
+  });
+  ok(db._leer(`rankings/${CLAVES.semanal}/jugadores/ana`).nombre === "Nombre de ana",
+     "la primera partida deja el nombre");
+
+  falla = true;
+  await ranking.registrarPartida({
+    codigo: "DOS",
+    estado: estadoFinal({ jugadores: CUATRO, ganadorId: "ana" }),
+    entrada: 50,
+  });
+
+  const ana = db._leer(`rankings/${CLAVES.semanal}/jugadores/ana`);
+  ok(ana.nombre === "Nombre de ana", "y la segunda, que falla, NO lo borra", ana.nombre);
+  ok(ana.partidasJugadas === 2, "aunque sí suma la partida", ana.partidasJugadas);
 }
 
 console.log(fallos ? `\n❌ ${fallos} fallos` : "\n✅ TODO OK");

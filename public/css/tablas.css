@@ -129,3 +129,64 @@
 }
 
 .paquete .accion { margin-top: auto; width: 100%; }
+
+/* ------------------------------------ la identidad en la fila del ranking
+
+   La celda del jugador pasó de ser un texto a ser cara + nombre + título.
+   Va en flex y no en línea porque el marco se superpone a la cara, y para
+   superponer hace falta una caja con posición propia. */
+.jugador-ranking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* El envoltorio existe SÓLO para poder superponer el marco.
+
+   Un `border` sobre el círculo cambiaría su tamaño y las filas de la tabla
+   medirían distinto según quién tenga marco puesto — en una tabla eso se ve
+   más que en ningún otro lado, porque las filas están una arriba de la otra. */
+.ficha-ranking {
+  position: relative;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: block;
+}
+
+/* Más chico que en la sala: en una tabla las filas van una pegada a la otra y
+   38 px las separa de más. El círculo es el mismo, definido en `app.css`. */
+.ficha-ranking .avatar-inicial {
+  --lado-avatar: 30px;
+  font-size: 0.78rem;
+}
+
+/* El marco, con alto y ancho ESCRITOS.
+
+   Nunca en `auto`: una imagen en posición absoluta con `width: auto` se pinta
+   al tamaño del archivo, no al de su caja. Con un PNG grande el marco taparía
+   la tabla entera. Ya pasó en la sala de espera y en la mesa. */
+.marco-ranking {
+  position: absolute;
+  inset: -3px;
+  width: calc(100% + 6px);
+  height: calc(100% + 6px);
+  object-fit: contain;
+  pointer-events: none;
+}
+
+/* El nombre no envuelve y se recorta: una tabla con filas de distinta altura
+   según el largo del nombre se lee mucho peor que un nombre cortado. */
+.nombre-ranking {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 14ch;
+}
+
+/* En el teléfono la columna es angosta y el título es lo primero que sobra:
+   el puesto, el nombre y los puntos son lo que se viene a mirar. */
+@media (max-width: 560px) {
+  .jugador-ranking .titulo-jugador { display: none; }
+  .nombre-ranking { max-width: 10ch; }
+}

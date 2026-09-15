@@ -1337,7 +1337,26 @@ const insignias = crearInsignias({ db, usuarios: USUARIOS, tienda, logger });
  * sirve para una tabla atada a un premio: con la consola abierta, cualquiera
  * se escribía los puntos que quisiera.
  */
-const rankingDePartidas = crearRankingDePartidas({ db, marcaDeTiempo, logger, zona: ZONA });
+const rankingDePartidas = crearRankingDePartidas({
+  db,
+  marcaDeTiempo,
+  logger,
+  zona: ZONA,
+
+  /**
+   * La identidad para congelar en la fila, de `identidadEnSala`.
+   *
+   * Es la MISMA función que visten la sala de espera y la mesa, y eso es lo
+   * que importa: si el ranking armara su propia versión, un jugador podría
+   * verse de una forma en la mesa y de otra en la tabla, y nadie sabría cuál
+   * está mal. Acá se aplana porque la fila del ranking es un documento chato
+   * —no anida `luce`— y sólo necesita tres de los cinco.
+   */
+  identidadDe: async (uid) => {
+    const { nombre, luce } = await identidadEnSala(uid);
+    return { nombre, retrato: luce.retrato, marco: luce.marco, titulo: luce.titulo };
+  },
+});
 
 /**
  * Lo que pasa DESPUÉS de cerrar una partida, fuera de la transacción.

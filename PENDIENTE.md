@@ -201,39 +201,31 @@ Los doce: `avatar_iniciado`, `dorso_viajero`, `avatar_erudito`,
 
 ---
 
-## 3d. Dibujar marco y título en la sala de espera y en el ranking
+## ~~3d. Dibujar marco y título en la sala de espera y en el ranking~~  ✅ HECHO
 
-**Estado: dos de cuatro pantallas hechas.**
+Las cuatro pantallas: perfil, mesa, sala de espera y ranking.
 
-| Pantalla | Qué se muestra | Estado |
-|---|---|---|
-| Perfil | el sello | ✅ hecho |
-| Mesa | marco sobre la cara, título al lado del nombre | ✅ hecho |
-| Sala de espera | marco y título | ❌ falta |
-| Ranking | marco y título | ❌ falta |
+**El ranking traía un bug que esta nota no mencionaba.** La tabla pintaba
+`f.nombre ?? f.uid ?? "Jugador"` y nadie escribía nunca `nombre` en la fila,
+así que durante meses mostró el uid crudo de cada jugador — en la pantalla que
+su propio comentario llama «la de mayor alcance del sitio». Se arregló con el
+mismo cambio, porque es el mismo problema: la fila no tenía identidad.
 
-**Sala de espera (~1–1,5 h).** El dato ya está: `jugadoresLuce` viaja en el
-documento de la sala. Lo que falta es que la sala dibuje un avatar — hoy
-muestra una inicial en un círculo (`avatar-inicial`), así que no hay nada
-alrededor de lo cual poner un marco.
+**La decisión que la nota dejaba abierta la había cerrado la privacidad.** El
+navegador no puede leer el perfil de otro jugador (`users/{uid}` es de lectura
+sólo para su dueño), así que congelar en la fila no era una de dos opciones:
+era la única. La alternativa de 50 lecturas por visita ni siquiera es posible.
 
-**Ranking (~2–3 h, más una decisión).** Es el caro y el que tiene un problema
-que no es de horas:
+Se congela `nombre`, `retrato`, `marco` y `titulo` al puntuar, desde
+`identidadEnSala` —la misma función que visten la sala y la mesa—. Las filas
+viejas dicen «Jugador» y se completan solas la primera vez que ese jugador
+vuelve a puntuar.
 
-- La tabla no tiene avatares: es texto.
-- La fila (`rankings/{clave}/jugadores/{uid}`) no tiene cosméticos, y el
-  cliente **no puede** leerlos por su cuenta — `firestore.rules` sólo deja leer
-  el perfil propio.
-- Habría que escribirlos desde el servidor dentro de la transacción del cierre,
-  y eso los **congela**: quien compre el Élite no vería su marco en el ranking
-  hasta jugar otra partida.
+Sí queda cierto lo que la nota advertía: quien compre un marco no lo ve en el
+ranking hasta jugar otra partida. Es lo correcto para un registro histórico —
+la fila dice cómo lucía cuando ganó ese puesto— pero conviene saberlo si
+alguien pregunta.
 
-La alternativa —resolver los cosméticos de las 50 filas visibles en cada carga—
-son 50 lecturas de perfil por visita. Esa decisión merece su propia sesión.
-
-**Mientras tanto:** el Élite y el ML no se venden (ver punto 0). Quien los
-comprara recibiría el marco y el título y los vería en la mesa, que es donde
-más se mira, pero no en la sala de espera ni en el ranking.
 
 ---
 

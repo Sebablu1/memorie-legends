@@ -81,12 +81,64 @@ export function crearRankingDePartidas({
   puntuadas = "partidasPuntuadas",
   zona = ZONA_POR_DEFECTO,
   ahora = () => new Date(),
+
+  /**
+   * Quién es cada jugador, para CONGELARLO en la fila.
+   *
+   * ────────────────────────────────────────────────────────────────
+   * POR QUÉ LA FILA GUARDA EL NOMBRE Y EL ASPECTO
+   * ────────────────────────────────────────────────────────────────
+   *
+   * Porque el navegador NO PUEDE averiguarlo. La tabla se lee directo de
+   * Firestore —`rankings/{clave}/jugadores` es de lectura pública— y
+   * `users/{uid}` sólo lo lee su dueño, que fue una decisión deliberada para
+   * que nadie viera el saldo ajeno.
+   *
+   * Sin esto, la tabla no tiene de dónde sacar el nombre de nadie. Y no lo
+   * tenía: `ranking-ui.js` pintaba `f.nombre ?? f.uid`, nadie escribía
+   * `nombre`, y la pantalla de mayor alcance del sitio mostraba el uid crudo
+   * de cada jugador.
+   *
+   * ────────────────────────────────────────────────────────────────
+   * Y POR QUÉ CONGELADO Y NO EN VIVO
+   * ────────────────────────────────────────────────────────────────
+   *
+   * Una fila del ranking es un registro histórico: dice que en la semana del 8
+   * de septiembre alguien salió tercero. Leer el perfil en vivo haría que las
+   * tablas de meses pasados cambiaran cada vez que alguien se cambia el avatar.
+   *
+   * Devuelve `{ nombre, retrato, marco, titulo }` o `null`. Nada de esto puede
+   * impedir que se puntúe: si falla, la fila se escribe sin identidad y se
+   * completa sola la próxima vez que ese jugador sume.
+   */
+  identidadDe = async () => null,
 }) {
   const refFila = (clave, uid) =>
     db.collection(rankings).doc(clave).collection(filasDeTabla).doc(uid);
   const refRaya = (uid) =>
     db.collection(perfilesDeRacha).doc(uid).collection("rachas").doc("actual");
   const refGuardian = (codigo) => db.collection(puntuadas).doc(codigo);
+
+  /**
+   * La identidad de cada uno, o nada. Nunca tira.
+   *
+   * Un perfil que no se pudo leer no puede cortar el puntaje de una partida ya
+   * jugada: los puntos son el dato, el nombre es la decoración. Se escribe la
+   * fila sin identidad y se completa sola la próxima vez.
+   */
+  async function identidadesDe(uids) {
+    const pares = await Promise.all(
+      uids.map(async (uid) => {
+        try {
+          return [uid, (await identidadDe(uid)) ?? null];
+        } catch (e) {
+          logger?.warn?.("No se pudo leer la identidad para el ranking", { uid, error: e.message });
+          return [uid, null];
+        }
+      }),
+    );
+    return Object.fromEntries(pares);
+  }
 
   /** La raya de victorias que traía cada uno. Lectura suelta, antes de todo. */
   async function rayasDe(uids) {
@@ -128,6 +180,11 @@ export function crearRankingDePartidas({
 
     const claves = clavesDePeriodos(ahora(), zona);
     const rayas = await rayasDe(elegibles);
+
+    // Antes de abrir la transacción, igual que las rayas. Adentro serían
+    // lecturas de más en una transacción que ya lee tres filas por jugador, y
+    // encima lecturas de una colección que no se escribe acá.
+    const identidades = await identidadesDe(elegibles);
 
     const resultados = elegibles
       .map((uid) =>
@@ -184,12 +241,35 @@ export function crearRankingDePartidas({
       });
 
       for (const { ref, r, previo } of objetivos) {
+        const quien = identidades[r.jugadorId];
+
         tx.set(
           ref,
           {
             uid: r.jugadorId,
             jugadorId: r.jugadorId,
             ...acumularFila(previo, r),
+
+            /**
+             * La identidad, congelada, y sólo si se pudo leer.
+             *
+             * El `...(quien ? {...} : {})` no es adorno: con `merge: true`,
+             * escribir `nombre: undefined` no borra nada, pero escribir
+             * `nombre: null` SÍ pisa el nombre que la fila ya tenía. Un
+             * perfil que no se pudo leer una vez dejaría la fila peor que
+             * antes, y encima en silencio.
+             *
+             * Así, la fila conserva lo último que se supo del jugador.
+             */
+            ...(quien
+              ? {
+                  nombre: quien.nombre ?? null,
+                  retrato: quien.retrato ?? null,
+                  marco: quien.marco ?? null,
+                  titulo: quien.titulo ?? null,
+                }
+              : {}),
+
             actualizada: marcaDeTiempo(),
           },
           { merge: true },
