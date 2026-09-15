@@ -22,6 +22,7 @@
 import crypto from "node:crypto";
 import { crearMercadoPago, pagoCoincideConOrden } from "../functions/mercadopago.js";
 import { PAQUETES } from "../public/js/reglas/economia.js";
+import { firmarComoMercadoPago } from "../herramientas/sondear-webhook.mjs";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -102,6 +103,45 @@ console.log("\n=== La firma se verifica con el esquema de Mercado Pago ===");
   const sinSecreto = crearMercadoPago({ accessToken: TOKEN, webhookSecret: "", ahora: () => ahora });
   const rs = sinSecreto.verificarFirma({ firma: buena, requestId: "req-1", dataId: "123456", crypto });
   ok(!rs.valida && rs.motivo === "sin_secreto", "sin secreto configurado, nada se acepta", rs.motivo);
+}
+
+// ═══════════════════════ la sonda y el servidor firman igual
+
+console.log("\n=== La sonda y el servidor llegan al mismo HMAC ===");
+{
+  /**
+   * Dos implementaciones independientes, a propósito.
+   *
+   * `herramientas/sondear-webhook.mjs` arma el manifiesto por su cuenta en vez
+   * de importar el del servidor. Si lo importara, un error en esa función daría
+   * verde en la sonda y rojo en producción: estaría comprobando que el código
+   * coincide consigo mismo, que es justo el agujero por el que se fue el bug
+   * de `unit_price`.
+   *
+   * El precio de tener dos es que se pueden separar. Esto es lo que cobra ese
+   * precio.
+   */
+  const mp = crearMercadoPago({ accessToken: TOKEN, webhookSecret: SECRETO });
+  const ts = Math.floor(Date.now() / 1000);
+
+  for (const dataId of ["Sonda123", "123456789", "abc-DEF-999"]) {
+    const requestId = `req-${dataId}`;
+    const { cabecera } = firmarComoMercadoPago({ dataId, requestId, ts, secreto: SECRETO });
+    const r = mp.verificarFirma({ firma: cabecera, requestId, dataId, crypto });
+    ok(r.valida, `el servidor acepta la firma de la sonda para ${dataId}`, r);
+  }
+
+  // Y con OTRO secreto no pasa: si pasara, la sonda no probaría nada sobre
+  // cuál es el secreto desplegado, que es la mitad de para qué existe.
+  const requestId = "req-x";
+  const { cabecera } = firmarComoMercadoPago({
+    dataId: "Sonda123",
+    requestId,
+    ts,
+    secreto: "otro-secreto",
+  });
+  const r = mp.verificarFirma({ firma: cabecera, requestId, dataId: "Sonda123", crypto });
+  ok(!r.valida && r.motivo === "no_coincide", "y rechaza una firmada con otro secreto", r);
 }
 
 // ═════════════════════════════════ el estado sale de la API, no del payload
