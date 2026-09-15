@@ -134,8 +134,33 @@ export function crearMoverLeyendas({
       return { dComprado: -deComprado, dGanado: -deGanado };
     }
 
-    // COMPRADO_PRIMERO, y también A_GANADO/A_COMPRADO en negativo, que no se
-    // usan hoy pero no pueden quedar sin definir.
+    /**
+     * `A_GANADO` y `A_COMPRADO` nombran UN bolsillo, en las dos direcciones.
+     *
+     * Antes caían en el reparto de abajo cuando el delta era negativo, así que
+     * un movimiento «a ganado» de −10 salía de lo COMPRADO. Ningún motivo los
+     * usaba en negativo, así que no rompía nada — hasta que el ajuste de
+     * administrador los estrenó y habría movido el bolsillo equivocado sin
+     * decir una palabra.
+     *
+     * Un movimiento que dice a qué bolsillo va tiene que salir de ese mismo
+     * bolsillo cuando resta. Si no alcanza, se rechaza: completarlo con el
+     * otro sería exactamente el silencio que se quiere evitar.
+     */
+    if (regla === REPARTOS.A_GANADO || regla === REPARTOS.A_COMPRADO) {
+      const esGanado = regla === REPARTOS.A_GANADO;
+      const hay = esGanado ? ganado : comprado;
+      if (hay < falta) {
+        throw error(
+          "failed-precondition",
+          `No alcanzan las Leyendas ${esGanado ? "ganadas" : "compradas"}: ` +
+            `hay ${hay} y hacen falta ${falta}.`,
+        );
+      }
+      return esGanado ? { dComprado: 0, dGanado: delta } : { dComprado: delta, dGanado: 0 };
+    }
+
+    // COMPRADO_PRIMERO.
     const [deComprado, deGanado] = tomarDe(comprado, ganado, falta);
     return { dComprado: -deComprado, dGanado: -deGanado };
   }

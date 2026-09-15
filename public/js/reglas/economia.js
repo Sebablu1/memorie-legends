@@ -590,6 +590,22 @@ export const MOTIVOS = {
    * poder vigilar cuando las Leyendas también se compran con dinero.
    */
   PREMIO_LOGRO: "premio_logro",
+
+  /**
+   * El ajuste a mano de un administrador, uno por bolsillo.
+   *
+   * Son DOS motivos y no uno porque el bolsillo se deriva del motivo: con uno
+   * solo no habría forma de decir cuál de los dos se está tocando. Los dos
+   * valores empiezan con `ajuste_admin`, así que el libro mayor se puede
+   * filtrar por ese prefijo y salen los dos juntos.
+   *
+   * Existen para preparar cuentas de prueba antes de abrir la compra. Un
+   * ajuste es la única forma de mover saldo que no responde a nada que haya
+   * pasado en el juego, y por eso su asiento guarda además QUIÉN lo hizo: es
+   * lo primero que uno quiere saber cuando encuentra un saldo raro.
+   */
+  AJUSTE_ADMIN_GANADO: "ajuste_admin_ganado",
+  AJUSTE_ADMIN_COMPRADO: "ajuste_admin_comprado",
 };
 
 // ------------------------------------------- los dos bolsillos del saldo
@@ -669,6 +685,11 @@ export const REPARTO_POR_MOTIVO = Object.freeze({
   [MOTIVOS.TORNEO_PREMIO]: REPARTOS.A_GANADO,
 
   [MOTIVOS.COMPRA]: REPARTOS.A_COMPRADO,
+
+  // Cada ajuste nombra su bolsillo, y en las dos direcciones: un ajuste "a
+  // ganado" de -10 saca de ganado, no completa con lo comprado.
+  [MOTIVOS.AJUSTE_ADMIN_GANADO]: REPARTOS.A_GANADO,
+  [MOTIVOS.AJUSTE_ADMIN_COMPRADO]: REPARTOS.A_COMPRADO,
 
   [MOTIVOS.TORNEO_ENTRADA]: REPARTOS.SOLO_GANADO,
 

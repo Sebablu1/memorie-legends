@@ -56,6 +56,8 @@
  *   gcloud auth application-default login
  */
 
+import { pathToFileURL } from "node:url";
+
 const PROYECTO = "memorie-legends";
 const USUARIOS = "users";
 
@@ -211,10 +213,19 @@ async function principal() {
   console.log("   node herramientas/auditar-leyendas.mjs --email tu@email.com\n");
 }
 
-// Sólo cuando se lo invoca directo: importarlo para probar `planDeMigracion`
-// no tiene que intentar hablar con Firestore.
+/**
+ * Sólo cuando se lo invoca directo: importarlo para probar `planDeMigracion`
+ * no tiene que intentar hablar con Firestore.
+ *
+ * Se comparan las rutas COMPLETAS. La primera versión comparaba el NOMBRE del
+ * archivo, y la prueba de esta herramienta se llama igual que ella —vive en
+ * `pruebas/` en vez de `herramientas/`—, así que importarla lanzaba el CLI
+ * igual. No se notó porque la prueba terminaba y llamaba a `process.exit`
+ * antes de que el `principal()` colado llegara a fallar: pasaba por carrera,
+ * no porque el guard funcionara.
+ */
 const invocadoDirecto =
-  process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/").split("/").pop());
+  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (invocadoDirecto) {
   principal().catch((e) => {
