@@ -270,6 +270,28 @@ export function intentarDescarte(codigo, ventana, posicion, tocadoEn = Date.now(
   });
 }
 
+/**
+ * Deja lista una instancia de `intentarDescarte` antes de la ventana.
+ *
+ * Con funciones de primera generación, una instancia nueva tarda 3 a 4
+ * segundos en arrancar y la primera transacción otros dos. Un descarte que cae
+ * ahí llega tarde sin culpa del jugador. Esto hace que ese arranque lo pague
+ * un pedido cuya hora de llegada no importa. Ver `calentar` en el servidor.
+ *
+ * NO pasa por `llamar`, y a propósito: aquélla anota cada falla en la consola
+ * como un error. Un calentamiento que falla no es noticia —el próximo descarte
+ * arranca la instancia igual que antes de que esto existiera— y llenar la
+ * consola de errores que no lo son es cómo se deja de leerla.
+ *
+ * @returns true si la instancia quedó lista, false si no. Nadie lo necesita
+ *          para seguir jugando; sirve para las pruebas.
+ */
+export const calentarDescarte = (codigo) =>
+  httpsCallable(funciones, "intentarDescarte")({ codigo, calentar: true }).then(
+    () => true,
+    () => false,
+  );
+
 /** Cierra la ventana. La puede pedir cualquiera que vea que ya venció. */
 export const cerrarVentanaDescarte = (codigo) => llamar("cerrarVentanaDescarte", { codigo });
 

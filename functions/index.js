@@ -1645,6 +1645,19 @@ export const abrirVentanaDescarte = functions.https.onCall(async (data, context)
  */
 export const intentarDescarte = functions.https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "intentarDescarte");
+
+  // Precalentar: el mismo callable, para que la instancia que queda lista sea
+  // una de ÉSTE —en primera generación cada función tiene las suyas, así que
+  // calentar otra no serviría—. Va antes de validar el descarte porque no es
+  // uno: sólo lleva el código. Ver `calentar` en partida-red.js.
+  //
+  // Cuenta contra el techo de `intentarDescarte` a propósito: la mesa calienta
+  // como mucho una vez cada veinte segundos, y un bucle que lo abuse choca con
+  // el mismo límite que un bucle de descartes.
+  if (data?.calentar === true) {
+    return enRed.calentar({ uid, codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
+  }
+
   // El esquema normaliza y acota; lo que sigue siendo del servidor es el
   // TIEMPO: `declarado`, `latencia` e `incertidumbre` llegan validados como
   // números razonables, pero el que decide cuánto valen es `tiempoEfectivo`,

@@ -43,6 +43,7 @@ const vistaFalsa = (yo) => `
   export const nuevoIdDeAccion = () => "a1";
   export const saltarAusente = async () => {};
   export const volver = async () => {};
+  export const calentarDescarte = async () => true;
   export const latir = async () => {};
   export const accion = async () => {};
   export const mirar = async () => {};

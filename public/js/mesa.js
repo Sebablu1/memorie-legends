@@ -3627,6 +3627,68 @@ function pintarVista(vista) {
   pista(pistaDeRed(vista));
   modalesDeRed(vista);
   rescatarSiHayAusente();
+  calentarSiHaceFalta(vista);
+}
+
+/**
+ * Precalentar el descarte, justo antes de que haga falta.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Un descarte que cae en una instancia recién arrancada llega tres o cuatro
+ * segundos tarde, y en una ventana de reapertura de tres segundos eso es un
+ * descarte perdido. Si el arranque lo paga un pedido de calentamiento, el
+ * toque de verdad encuentra la instancia lista. Ver `calentarDescarte`.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * CUÁNDO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Con la primera vista de la partida: es el tramo con más margen antes de la
+ * primera ventana —reparto, cuenta regresiva, mirada—.
+ *
+ * Y al ENTRAR en `levantada` o en `mirar`, que son las fases que desembocan
+ * en una ventana: alguien levantó y está por tirar, o la ronda está por abrir
+ * sus reflejos. Al entrar y no mientras dure, porque cada vista nueva de la
+ * misma fase dispararía otra.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Y POR QUÉ ESTO DEJA VARIAS INSTANCIAS, NO UNA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Las cuatro mesas reciben la misma vista casi al mismo tiempo, así que las
+ * cuatro calientan juntas. Una instancia de primera generación atiende un
+ * pedido por vez: cuatro pedidos simultáneos obligan a tener cuatro, que es
+ * una por cada descarte que puede llegar a la vez. No hace falta coordinar
+ * nada para eso.
+ *
+ * Con freno: como mucho una vez cada veinte segundos por mesa. Una instancia
+ * que se usa no se enfría, y en una partida los descartes son frecuentes.
+ */
+const MS_ENTRE_CALENTADAS = 20_000;
+const FASES_ANTES_DE_UNA_VENTANA = new Set(["levantada", "mirar"]);
+let faseAntesDeCalentar = null;
+let ultimaCalentada = -Infinity;
+
+function calentarSiHaceFalta(vista) {
+  const primera = faseAntesDeCalentar === null;
+  const entra =
+    vista.fase !== faseAntesDeCalentar && FASES_ANTES_DE_UNA_VENTANA.has(vista.fase);
+  faseAntesDeCalentar = vista.fase;
+
+  if (!primera && !entra) return;
+  // Con la pestaña oculta no hay quien toque: calentar sería gastar por nada.
+  // La próxima entrada en `levantada` con la pestaña a la vista lo hace.
+  if (document.hidden) return;
+
+  const t = Date.now();
+  if (t - ultimaCalentada < MS_ENTRE_CALENTADAS) return;
+  ultimaCalentada = t;
+
+  // Sin esperar la respuesta: no bloquea nada ni avisa si falla.
+  Red.calentarDescarte(salaPedida);
 }
 // ----------------------------------------------------------------------
 

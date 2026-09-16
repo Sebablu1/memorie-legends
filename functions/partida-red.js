@@ -690,6 +690,52 @@ export function crearMotorEnRed({
     uid, codigo, windowId, posicion, clientActionId, declarado, latencia, incertidumbre,
     objetivo = null, posicionEntrega = null,
   }) {
+    /**
+     * La llegada se sella ACÁ, antes de cualquier espera.
+     *
+     * ─────────────────────────────────────────────────────────────────────
+     * DÓNDE SE LEÍA ANTES, Y QUÉ LE SUMABA
+     * ─────────────────────────────────────────────────────────────────────
+     *
+     * Se leía dentro de la transacción, después de `tx.get`. Todo lo que pasa
+     * hasta ese punto quedaba cargado a la cuenta del jugador, que no tiene
+     * ningún control sobre ello:
+     *
+     *   - La primera conexión con Firestore de una instancia nueva. En los
+     *     registros de producción, la primera llamada de cada instancia pasó
+     *     unos DOS SEGUNDOS dentro del handler —1963 ms en un descarte real,
+     *     que además fue rechazado— y las siguientes, 200 a 290 ms.
+     *
+     *   - La cola. Cuando varios descartan a la vez, las transacciones chocan
+     *     sobre el mismo documento y esperan su turno; cada una tarda ~250 ms.
+     *     El cuarto en entrar llegaba con unos 750 ms de más, cinco veces la
+     *     incertidumbre típica de sincronización. Esto pasaba TIBIO, sin
+     *     ningún arranque en frío: el que pierde es el que tuvo mala suerte en
+     *     la cola, no el más lento.
+     *
+     *   - Cada reintento de la transacción, que volvía a leer la hora, más
+     *     tarde.
+     *
+     * Con 2 s de gracia y el piso del tiempo efectivo empujado por esa llegada
+     * inflada, un toque a tiempo terminaba rechazado o contado segundos más
+     * tarde de lo que fue.
+     *
+     * ─────────────────────────────────────────────────────────────────────
+     * POR QUÉ ES SEGURO
+     * ─────────────────────────────────────────────────────────────────────
+     *
+     * La hora de entrada al handler nunca es ANTERIOR a la llegada real del
+     * pedido: el handler corre después de que el pedido llegó. Así que esto no
+     * le acredita a nadie un tiempo que no tuvo — sólo deja de cobrarle uno que
+     * no era suyo. La garantía del protocolo sigue intacta: mentir no da
+     * ventaja. Ver PROTOCOLO-REFLEJOS.md.
+     *
+     * Lo que NO corrige: el arranque del contenedor, que ocurre antes de que
+     * exista este handler. Eso lo reduce `calentar`, y lo resuelve de raíz que
+     * el toque deje de pasar por una función.
+     */
+    const llegada = ahora();
+
     return db.runTransaction(async (tx) => {
       const snap = await tx.get(refPartida(codigo));
       const partida = exigirPartida(snap, codigo);
@@ -731,7 +777,9 @@ export function crearMotorEnRed({
           posicionEntrega: contraRival ? posicionEntrega : null,
         },
         {
-          ahora: ahora(),
+          // La sellada al entrar, no la de ahora: ver arriba. Es la misma en
+          // cada reintento de esta transacción.
+          ahora: llegada,
           // El rango se mide contra la mano que se toca, no siempre la propia.
           cantidadDeCartas: partida.estado.jugadores[indiceObjetivo].mano.length,
         },
@@ -749,7 +797,8 @@ export function crearMotorEnRed({
       const siguiente = {
         ...partida,
         ventana: resultado.ventana,
-        latidos: { ...partida.latidos, [uid]: ahora() },
+        // La señal de vida fue la llegada del pedido.
+        latidos: { ...partida.latidos, [uid]: llegada },
         version: partida.version + 1,
       };
       // Ojo: no se republican las vistas con los intentos ajenos dentro; el
@@ -1397,6 +1446,57 @@ export function crearMotorEnRed({
   }
 
   /**
+   * Deja lista una instancia de `intentarDescarte` antes de que haga falta.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * POR QUÉ
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * Las funciones son de primera generación: cada instancia atiende UN pedido
+   * a la vez, y una instancia nueva tarda 3 a 4 segundos en arrancar —medido
+   * en producción—. Un toque que cae en una instancia así llega tarde por
+   * algo que el jugador no controla, y en una ventana de reapertura de tres
+   * segundos eso es un descarte perdido seguro.
+   *
+   * Sellar la llegada al entrar al handler no alcanza para ese caso: el
+   * arranque ocurre ANTES de que el handler exista. Lo que sí sirve es que el
+   * arranque lo pague otro pedido, uno que no importa cuándo llega.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * POR QUÉ UNA LECTURA Y NO UNA LLAMADA VACÍA
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * Una llamada vacía calienta el contenedor y las claves con que se
+   * verifican los tokens, pero NO la conexión con Firestore. Y esa conexión
+   * es la otra mitad del problema: en producción, la primera llamada de cada
+   * instancia pasó unos dos segundos dentro del handler, casi todos en su
+   * primera transacción. Una lectura la abre.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * QUÉ LECTURA, Y POR QUÉ ÉSA
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * La vista propia, fuera de transacción:
+   *
+   *   - Fuera de transacción no toma bloqueos. Leer el documento de la partida
+   *     dentro de una haría esperar a los descartes de verdad justo en la
+   *     ventana, que es el problema que esto viene a resolver.
+   *
+   *   - Y sirve de control sin costo extra: la vista sólo existe para quien
+   *     juega esa partida. Nadie de afuera recibe un «listo».
+   *
+   * No escribe, no anota ningún intento y no sube la versión. Cuesta una
+   * lectura.
+   */
+  async function calentar({ uid, codigo }) {
+    const vista = await refVista(codigo, uid).get();
+    if (!vista.exists) {
+      throw error("permission-denied", "No estás jugando esta partida.");
+    }
+    return { caliente: true };
+  }
+
+  /**
    * «He vuelto»: sale de la lista de ausentes por tiempo.
    *
    * ─────────────────────────────────────────────────────────────────────────
@@ -1686,6 +1786,7 @@ export function crearMotorEnRed({
     latir,
     saltarAusente,
     volver,
+    calentar,
     vencidas,
     marcarAbandono,
     ACCIONES,

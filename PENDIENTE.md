@@ -372,25 +372,98 @@ aparece en todo el HTML.
 
 ---
 
-## 10. Velocidad con conexión mala
+## 10. Velocidad en red
 
-**Estado:** sin mirar. Frente propio, no se mezcla con lo demás.
+**Estado:** diagnosticado y medido el 16 de septiembre. La fase 0a está hecha;
+el resto, en el orden de abajo. **Costo fijo: $0 en todas.** Nada de
+instancias mínimas.
 
-**Qué se pide:** que el juego se sienta rápido con 1G o con 4G con lag. Cuatro
-frentes posibles, ninguno investigado todavía:
+### Lo que se midió
 
-- **Actualizaciones optimistas.** Mostrar el resultado esperado antes de que el
-  servidor confirme. Es el que más cambia la sensación y el más delicado: la
-  mesa tiene que poder desandar lo que mostró si el servidor dice otra cosa, y
-  eso toca el modelo entero de la vista.
-- **Cargas chicas.** Mandar sólo lo que cambió en vez de la vista completa.
-- **Reconexión rápida y silenciosa.**
-- **Revisar los escuchas de Firestore.** ¿Escuchan de más? ¿Traen lo que nadie
-  usa? Es el más barato de averiguar y probablemente el primero que conviene.
+Desde la laptop de desarrollo, contra producción, con llamadas rechazadas sin
+sesión —no tocan datos—, y en los registros de una partida real:
 
-**Por qué va en su propia sesión:** los cuatro tocan cómo viaja el estado de la
-partida. Mezclarlos con arreglos de pantalla es cómo se rompen los turnos sin
-que nadie sepa cuál de los dos cambios fue.
+| Qué | Medido |
+|---|---|
+| Función en frío (contenedor) | **3,6 – 4,5 s** |
+| La misma, tibia | 0,29 s |
+| Primera llamada de cada instancia, *dentro* del handler | **~2 s** (primera conexión con Firestore + claves de tokens) |
+| Las siguientes, dentro del handler | 200 – 290 ms |
+| Cargar `firebase-functions/v1` | 1,3 s de los ~1,5 s del módulo |
+| Una jugada que publica | 1 lectura · 5 escrituras · 13 KB |
+| CPU del servidor por jugada | < 1 ms |
+
+**La causa principal es el arranque en frío.** Las funciones son de primera
+generación: una instancia atiende un pedido a la vez, con poca CPU, y sin
+instancias mínimas. Con el tráfico de hoy, casi cada partida las encuentra
+frías, y cada pedido simultáneo abre otra instancia que también arranca en
+frío.
+
+**Descartado con números:** mandar sólo el delta de las vistas (13 KB, no
+ahorra nada medible y complica la parte que garantiza que nadie vea cartas
+ajenas), las lecturas por jugada (1), la CPU, y los escuchas (2 documentos
+chicos durante el juego). Mover las funciones de región tampoco: Firestore está
+en `nam5` y las funciones en `us-central1`, mismo país.
+
+### El orden acordado
+
+1. ✅ **Fase 0a — el descarte que se perdía.** La llegada se sella al entrar al
+   handler, antes de la transacción: arregla la primera conexión y, sobre
+   todo, la COLA —el cuarto en descartar llegaba ~750 ms tarde por esperar a
+   los otros tres, aun tibio—. Y la mesa precalienta `intentarDescarte` antes
+   de cada ventana, con una lectura, para que el arranque lo pague otro
+   pedido.
+2. **Fase 3 — respuesta optimista** para tirar, cortar y pasar. No para
+   levantar (la carta la conoce sólo el servidor) ni para descartar (depende
+   del tiempo que mide el servidor).
+3. **Fase 4 — menos choques.** `latir` que actualice su campo y no reescriba el
+   documento entero cada cinco segundos por jugador; y un desfase al azar en
+   los golpes cuando vence un plazo, que hoy salen los cuatro a la vez.
+4. **Fase 0b — el toque directo a Firestore**, en su propia sesión junto con la
+   1B. El cliente escribe el intento con `serverTimestamp()` y las reglas
+   exigen que sea igual a `request.time`: una llegada que no se puede falsificar
+   y que no pasa por ninguna función. Es la primera escritura del cliente bajo
+   `partidas/`, así que las reglas pasan a ser frontera de seguridad y conviene
+   sumar el emulador para probarlas de verdad — hoy sólo se prueba su texto.
+5. **Fase 1B — migrar las funciones de juego a segunda generación**, con
+   concurrencia: una instancia atiende muchos pedidos. `webhookPago` NO se
+   mueve: su URL está en la lista de no tocar.
+
+### Anotado para las fases 3 y 1B — no tocar antes
+
+- **El `OPTIONS` antes de cada llamada.** Los registros muestran una
+  verificación de CORS antes de cada jugada: un viaje de ida y vuelta más, unos
+  250 ms. Una salida posible es llamar a las funciones desde el mismo dominio
+  (`getFunctions(app, "https://memorielegends.com")` con reescrituras de
+  Hosting), que no necesita esa verificación. Medirlo antes de decidir.
+- **La transacción tibia en `nam5` tarda ~250 ms.** Son las escrituras
+  confirmadas en varias regiones. Es un piso estructural: lo que se puede hacer
+  es necesitar menos transacciones por jugada, no hacerlas más rápidas.
+
+### Lo que 0a no arregla
+
+Un toque que cae en un **contenedor** frío sigue llegando tarde: ese arranque
+ocurre antes de que exista el handler. El precalentamiento lo vuelve raro, no
+imposible. Lo resuelve 0b.
+
+---
+
+## 11. Anotado de paso — sin tocar
+
+Encontrado mientras se trabajaba en otra cosa. Ninguno rompe nada hoy.
+
+- **`FASES_SIN_RELOJ`, en `public/js/mesa.js`, tiene un nombre falso.** Las tres
+  fases que agrupa —`levantada`, `poder` y `postLevantada`— tienen reloj desde
+  los cronómetros de decisión. Su USO sigue siendo correcto: son las fases en
+  las que `saltarAusente` puede actuar, porque `turno` lo cubre el plazo del
+  servidor. Es el mismo error que tenía el comentario de `saltarAusente`, ya
+  corregido. Un nombre como `FASES_QUE_RESCATA_EL_AUSENTE` diría la verdad.
+
+- **`functions/limite-de-ritmo.js` lleva un byte nulo literal.** Está a propósito,
+  como separador en la clave `${uid}\0${accion}`: es un carácter que no puede
+  aparecer en un uid. Pero hace que `file` y `grep` traten el archivo como
+  binario, y alguna herramienta podría truncarlo. Escribirlo como `"\u0000"`
+  dejaría el mismo valor sin el byte crudo en el fuente.
 
 ---
 

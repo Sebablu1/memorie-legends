@@ -207,14 +207,19 @@ console.log("\n=== Ninguna callable lee el código sin validarlo ===");
   // quedado sin validar, que es exactamente lo contrario de lo que había
   // pasado.
   const validadas = [...fuente.matchAll(/validar\(EsquemaDeSala, data, errorHttp\)/g)];
-  // Once y no trece: `intentarDescarte` y `accionDePartida` llevan más datos
-  // que el código, así que usan su propio esquema. Se comprueban abajo.
+  // `intentarDescarte` y `accionDePartida` llevan más datos que el código, así
+  // que usan su propio esquema. Se comprueban abajo.
   //
-  // Eran diez hasta que llegó `volver` —«he vuelto»—, que sólo lleva el código
-  // y valida igual que las demás. Que el número suba por una callable NUEVA
-  // que valida es lo esperado; lo que esta cuenta vigila es que baje sin que
-  // se haya borrado ninguna, que sería una que dejó de validar.
-  ok(validadas.length === 11,
+  // La cuenta subió dos veces, y las dos por lo esperado:
+  //
+  //   - 10 → 11: llegó `volver` —«he vuelto»—, que sólo lleva el código.
+  //   - 11 → 12: el PRECALENTAMIENTO de `intentarDescarte`. Es el mismo
+  //     callable, pero ese camino no es un descarte: sólo lleva el código y se
+  //     valida con el esquema de sala, antes del de descarte.
+  //
+  // Lo que esta cuenta vigila es que BAJE sin que se haya borrado ninguna
+  // callable, que sería una que dejó de validar.
+  ok(validadas.length === 12,
      `y ${validadas.length} pasan por el esquema de sala`, validadas.length);
 
   // Las dos que llevan más datos usan el suyo, no el de sala a secas.
