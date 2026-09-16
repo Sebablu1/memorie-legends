@@ -20,6 +20,7 @@ import {
   cortar,
   pasarTurno,
   MS_PASO_AUTOMATICO,
+  MS_TURNO,
   saltarTurno,
   siguienteRonda,
   PODERES,
@@ -54,7 +55,13 @@ import { LIMITE_ELIMINACION, puntosMano } from "./reglas/puntaje.js";
 import * as IA from "./reglas/ia.js";
 import { MODOS, ENTRADAS, ESTADOS_SALA, costoDeAbandonar } from "./reglas/salas.js";
 import * as Red from "./partida-red.js";
-import { elegibleParaPoder, pasoDelPoder, esperaUnaDecision } from "./reglas/red.js";
+import {
+  elegibleParaPoder,
+  pasoDelPoder,
+  esperaUnaDecision,
+  decisionQueVence,
+  MS_PARA_DECIDIR,
+} from "./reglas/red.js";
 import { MS_REVELACION } from "./reglas/vista.js";
 import { abandonarPartida, ErrorDeServidor } from "./servidor.js";
 import { sonidos, alternarSilencio } from "./sonidos.js";
@@ -447,14 +454,21 @@ let memorias = estado.jugadores.map(() => IA.crearMemoria());
  * qué pasó antes de que ocurra la siguiente.
  */
 /**
- * Tiempo para levantar del mazo. Si se agota, el jugador pierde la levantada
- * y el turno pasa al siguiente.
+ * Los relojes de la mesa, de un vistazo. Los números viven en `reglas/`.
  *
- * Decidir entre cortar y pasar tiene su propio reloj, más largo
- * (`MS_PASO_AUTOMATICO`, 30 segundos): es la decisión que más se piensa. El
- * resto del turno —cambiar o tirar, resolver el poder— no tiene reloj.
+ *   - `MS_TURNO` (8 s) — levantar del mazo. Si se agota, se pierde la
+ *     levantada y el turno pasa al siguiente.
+ *   - `MS_PARA_DECIDIR` (10 s) — qué hacer con la carta que ya se tiene en la
+ *     mano: tirarla, cambiarla, usar el poder.
+ *   - `MS_PASO_AUTOMATICO` (20 s) — cortar o pasar. Es el más largo porque es
+ *     la decisión que más se piensa, y perderla por apuro se paga en puntos.
+ *
+ * Ya no queda ninguna acción sin reloj: una mesa donde alguien puede no hacer
+ * nada indefinidamente es una mesa que los otros tres abandonan.
+ *
+ * `MS_TURNO` se importa del motor —ver la nota que tiene allá— en vez de
+ * declararse acá, que es como estaba y como se separan las copias.
  */
-const MS_TURNO = 8000;
 
 /**
  * Los dos relojes de la mesa. Ver modulos/temporizadores.js.
@@ -1227,7 +1241,7 @@ function resolverPorTiempo(indice) {
  * Se acabó el tiempo para decidir: se pasa el turno.
  *
  * Lo dispara el MISMO reloj que el jugador ve contar. Antes había dos cuentas
- * de treinta segundos —un `setTimeout` invisible y, ahora, la barra— y dos
+ * del mismo plazo —un `setTimeout` invisible y, ahora, la barra— y dos
  * relojes para lo mismo terminan discrepando: uno se cancela y el otro no, y
  * el turno se pasa solo mientras el número en pantalla sigue corriendo.
  */
@@ -1244,16 +1258,66 @@ function pasarPorTiempo() {
 }
 
 /**
+ * Se venció el plazo para decidir: se hace lo mismo que haría el servidor.
+ *
+ * Las tres transiciones son las de `AL_VENCER_LA_DECISION`, y las funciones
+ * son las mismas que usa `partida-red.js` —que las dos mitades del juego
+ * resuelvan igual no es una casualidad que haya que cuidar: es el motor—.
+ *
+ * `saltarTurno` no sirve para el poder: exige fase `turno` y sin carta
+ * levantada, así que desde `poder` devolvería el estado intacto y el reloj
+ * vencería una y otra vez sobre la misma pantalla. Lo que corresponde es
+ * soltar el poder —queda en `postLevantada`— y de ahí pasar el turno.
+ *
+ * El 10 a medio resolver es su propio caso: ya vio las dos cartas, así que lo
+ * que se declina no es el poder sino el cambio.
+ */
+async function resolverDecisionPorTiempo() {
+  // Se vuelve a comprobar: entre que arrancó la cuenta y ahora pudo pasar
+  // cualquier cosa. Es la misma precaución que toma `pasarPorTiempo`.
+  const que = decisionQueVence(estado.fase);
+  if (!que || estado.indiceTurno !== YO) return;
+
+  if (que === "descartarPorTiempo") {
+    sonidos.whoosh();
+    estado = tirarCarta(estado, { porTiempo: true });
+    pista("Se acabó el tiempo: se tiró la carta.");
+    dibujar();
+    // La carta tirada queda de muestra, así que abre reflejos igual que
+    // cuando se tira a mano. Sin esto, la mesa se saltearía la ventana.
+    if (await trasPonerMuestra()) {
+      abrirModalPoder();
+      return;
+    }
+    if (estado.fase === "postLevantada") pista("CORTAR O PASAR");
+    return;
+  }
+
+  sonidos.clic();
+  const sinPendiente =
+    estado.fase === "cambioConVista"
+      ? resolverCambioConVista(estado, false)
+      : saltarPoder(estado);
+  estado = pasarTurno(sinPendiente);
+  pista("Se acabó el tiempo para decidir: <b>pasaste</b> el turno.");
+  dibujar();
+  cicloTurnos();
+}
+
+/**
  * Arranca, reinicia o apaga el reloj según la fase. Se llama en cada dibujado,
  * así que basta con cambiar de fase para que el reloj se reinicie solo.
  */
 /**
  * Qué reloj corresponde a la fase actual, o ninguno.
  *
- * Son dos y miden cosas distintas: ocho segundos para levantar del mazo, y
- * treinta para decidir entre cortar y pasar. El segundo es más largo porque es
- * la decisión que más se piensa — y porque perderla por apuro se paga con diez
- * puntos.
+ * Son tres y miden cosas distintas: ocho segundos para levantar del mazo, diez
+ * para decidir qué hacer con la carta levantada, y veinte para elegir entre
+ * cortar y pasar. El último es el más largo porque es la decisión que más se
+ * piensa — y porque perderla por apuro se paga con diez puntos.
+ *
+ * Toda fase en la que la mesa espera a alguien tiene el suyo. La única que
+ * queda sin reloj es el turno de una IA, que se maneja sola.
  */
 function relojDeLaFase() {
   if (estado.jugadores[estado.indiceTurno]?.eliminado) return null;
@@ -1272,8 +1336,8 @@ function relojDeLaFase() {
   // navegador compitiendo con el del servidor pasaría turnos que el
   // servidor no dio por vencidos.
   //
-  // Pero la conclusión estaba de más. El servidor SÍ cuenta esos treinta
-  // segundos —`plazoDe`, caso `postLevantada`, acción `pasarPorTiempo`— y
+  // Pero la conclusión estaba de más. El servidor SÍ cuenta ese plazo
+  // —`plazoDe`, caso `postLevantada`, acción `pasarPorTiempo`— y
   // pasa el turno cuando vencen. Lo que faltaba no era el reloj: era
   // mostrarlo. El que jugaba por Leyendas se quedaba pensando y lo pasaban
   // sin un solo aviso, mientras el que entrenaba veía la barra bajar.
@@ -1297,15 +1361,22 @@ function relojDeLaFase() {
    * Los diez segundos para decidir qué hacer con lo que ya se tiene en la mano.
    *
    * ─────────────────────────────────────────────────────────────────────
-   * SÓLO EN RED, Y A PROPÓSITO
+   * EN LOS DOS MODOS, PERO CON DUEÑOS DISTINTOS
    * ─────────────────────────────────────────────────────────────────────
    *
-   * En entrenamiento estas fases no tienen reloj: el motor local no las vence.
-   * Dibujar una cuenta que no va a pasar nada al llegar a cero es peor que no
-   * dibujarla — el jugador apura una decisión por un plazo inventado.
+   * En red el número es un ESPEJO: cuenta el servidor y acá sólo se dibuja su
+   * `plazo.hasta`. En entrenamiento no hay a quién espejar, así que el plazo
+   * es de esta pestaña y ella misma lo resuelve, con `resolverDecisionPorTiempo`.
+   *
+   * Acá decía `if (!enRed()) return null`, y el argumento era que dibujar una
+   * cuenta que al llegar a cero no hace nada es peor que no dibujarla. Cierto,
+   * y por eso la respuesta no fue dibujarla igual: fue que también venza. Sin
+   * reloj, entrenar enseñaba a decidir sin apuro, y en una mesa de verdad la
+   * acción se toma sola a los diez segundos — la práctica dejaba puesta una
+   * costumbre que cuesta cartas.
    *
    * ─────────────────────────────────────────────────────────────────────
-   * Y SIN EL `=== YO` DE ARRIBA
+   * Y SIN EL `=== YO` DE ARRIBA, EN RED
    * ─────────────────────────────────────────────────────────────────────
    *
    * El reloj de `postLevantada` sólo lo ve quien decide, y para eso está bien:
@@ -1318,7 +1389,7 @@ function relojDeLaFase() {
    * y cuánto le queda, en vez de esperar sin saber si se fue.
    *
    * ─────────────────────────────────────────────────────────────────────
-   * AL LLEGAR A CERO NO HACE NADA
+   * AL LLEGAR A CERO NO HACE NADA, EN RED
    * ─────────────────────────────────────────────────────────────────────
    *
    * `alVencer` vacío, igual que en `postLevantada`. Quien tira la carta o salta
@@ -1326,7 +1397,17 @@ function relojDeLaFase() {
    * `plazo.hasta`, y un espejo no decide.
    */
   if (esperaUnaDecision(estado.fase)) {
-    if (!enRed()) return null;
+    /**
+     * En entrenamiento, sólo cuando el que decide es el humano.
+     *
+     * La IA tiene su propio ritmo y sus propias pausas. Un reloj corriendo
+     * sobre su turno le dispararía la acción por encima, en el medio de su
+     * jugada — y no hay nadie a quien apurar: la que está pensando es ella.
+     */
+    if (!enRed()) {
+      if (estado.indiceTurno !== YO) return null;
+      return { ms: MS_PARA_DECIDIR, alVencer: resolverDecisionPorTiempo };
+    }
 
     const plazo = miVista?.plazo?.fase === estado.fase ? miVista.plazo : null;
     if (!plazo) return null;

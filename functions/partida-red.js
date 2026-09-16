@@ -66,8 +66,9 @@ export const MS_SIN_SENALES = 15000;
  */
 export const MS_MESA_DESIERTA = 10 * 60 * 1000;
 
-/** Lo que espera la mesa a que alguien levante antes de saltarle el turno. */
-export const MS_TURNO = 8000;
+/** Lo que espera la mesa a que alguien levante. Vive en el motor: la pinta el
+    cliente y la aplica el servidor, y dos copias se separan en silencio. */
+export const MS_TURNO = motor.MS_TURNO;
 
 /**
  * Lo que dura la mirada del principio de la ronda.

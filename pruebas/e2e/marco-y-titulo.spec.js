@@ -216,6 +216,27 @@ test("el marco se achica al retrato aunque el archivo sea enorme", async ({ page
   const marco = page.locator('.jugador[data-jugador="1"] .marco-avatar');
   await expect(marco).toHaveCount(1);
 
+  /**
+   * Se espera a que el archivo esté DESCARGADO antes de medirlo.
+   *
+   * `naturalWidth` vale 0 mientras la imagen no cargó, así que sin esta espera
+   * la comprobación de abajo falla por una carrera y no por el CSS. Pasó en una
+   * corrida completa —con dos procesos peleando el disco— mientras el archivo
+   * suelto pasaba en verde: el síntoma parecía «el marco mide 0» y la causa era
+   * «el marco todavía no estaba».
+   *
+   * `toHaveCount` no alcanza: el elemento está en el DOM desde que se dibuja el
+   * asiento, mucho antes de que llegue el .webp.
+   */
+  await marco.evaluate(
+    (img) =>
+      img.complete ||
+      new Promise((listo) => {
+        img.addEventListener("load", listo, { once: true });
+        img.addEventListener("error", listo, { once: true });
+      }),
+  );
+
   // Primero: que el archivo de prueba SEA grande. Si algún día se cambia por
   // un icono de 40px, esta prueba dejaría de probar nada y en silencio.
   const natural = await marco.evaluate((img) => img.naturalWidth);

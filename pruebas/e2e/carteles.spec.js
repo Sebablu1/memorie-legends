@@ -124,8 +124,10 @@ test("el cartel viejo de frase larga ya no existe en el código", async ({ page 
   await expect(page.locator(".anuncio-mirada")).toHaveCount(0);
 });
 
-test("a los 30 segundos sin decidir, el turno pasa solo", async ({ page }) => {
-  expect(MS_PASO_AUTOMATICO, "la cuenta la fija el motor").toBe(30000);
+test("a los 20 segundos sin decidir, el turno pasa solo", async ({ page }) => {
+  // El número se fija acá a propósito: si alguien lo cambia, esta prueba se lo
+  // dice en vez de seguir midiendo un plazo que ya no es el del juego.
+  expect(MS_PASO_AUTOMATICO, "la cuenta la fija el motor").toBe(20000);
 
   const errores = await abrirMesa(page);
   await elegirCartaParaMirar(page);

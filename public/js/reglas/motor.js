@@ -48,13 +48,44 @@ export const MS_REAPERTURA = 3000;
  * otros tres sin querer.
  *
  * No es un reloj de reflejos y por eso es largo: cortar o pasar es la decisión
- * con más peso de la ronda y hay que poder pensarla. Treinta segundos es
- * tiempo de sobra para decidir y poco para quedarse mirando la pared.
+ * con más peso de la ronda y hay que poder pensarla.
+ *
+ * Fueron treinta segundos, con el argumento de que era «tiempo de sobra para
+ * decidir y poco para quedarse mirando la pared». La primera mitad resultó
+ * cierta y la segunda no: en la mesa, treinta segundos es un rato en el que no
+ * pasa nada y los demás miran. Veinte siguen alcanzando para pensarlo —no es
+ * una cuenta, es elegir entre dos— y no dejan la partida detenida.
+ *
+ * Diez, que es lo que dura decidir qué hacer con la carta levantada, sí es
+ * poco: aquello es seguir jugando y esto es apostar la ronda entera.
+ *
+ * Vale para los DOS modos, porque es literalmente la misma constante:
+ * `partida-red.js` la reexporta desde acá en vez de escribir su propio número.
  *
  * Al vencerse se PASA, nunca se corta. Pasar es lo que no arriesga nada de
  * quien no contestó: cortar por él podría eliminarlo.
  */
-export const MS_PASO_AUTOMATICO = 30000;
+export const MS_PASO_AUTOMATICO = 20000;
+
+/**
+ * Lo que espera la mesa a que alguien levante antes de saltarle el turno.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * VIVE ACÁ PORQUE LOS DOS LADOS LA NECESITAN
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Estaba declarada DOS veces con el mismo valor: `functions/partida-red.js`
+ * la exportaba y `public/js/mesa.js` tenía su propia copia. El cliente pinta
+ * la cuenta atrás y el servidor aplica el salto, así que si alguien cambiara
+ * una sola, el reloj que ve el jugador y el que decide dejarían de coincidir
+ * — y nadie se enteraría hasta que a alguien le salten el turno con el reloj
+ * por la mitad.
+ *
+ * Es el mismo patrón que ya nos costó una divergencia con `LEYENDAS_REGISTRO`,
+ * y el mismo que explica la nota de `MS_VENTANA` en `reglas/red.js`: son la
+ * misma regla y tienen que salir del mismo lugar.
+ */
+export const MS_TURNO = 8000;
 
 export const PODERES = {
   7: "mirarPropia",

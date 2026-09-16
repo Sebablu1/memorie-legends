@@ -14,7 +14,7 @@
  *
  * LO QUE SE PRUEBA
  *
- *   - que el plazo existe y vence a los 30 segundos del reloj del SERVIDOR;
+ *   - que el plazo existe y vence a los 20 segundos del reloj del SERVIDOR;
  *   - que latir NO lo corre — si respirar alcanzara para renovarlo, el agujero
  *     seguiría abierto exactamente igual;
  *   - que golpear la puerta antes de tiempo no lo adelanta;
@@ -23,7 +23,11 @@
  */
 
 import { crearMotorEnRed, MS_PASO_AUTOMATICO } from "../functions/partida-red.js";
-import { MS_PASO_AUTOMATICO as DEL_MOTOR } from "../public/js/reglas/motor.js";
+import {
+  MS_PASO_AUTOMATICO as DEL_MOTOR,
+  MS_TURNO as TURNO_DEL_MOTOR,
+} from "../public/js/reglas/motor.js";
+import { MS_TURNO } from "../functions/partida-red.js";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -132,20 +136,43 @@ async function enPostLevantada(db, red, quien = "ana") {
 
 // ==================================================================== 1
 
-console.log("\n=== 1. El plazo existe y dura 30 segundos ===");
+console.log("\n=== 1. El plazo existe y dura 20 segundos ===");
 {
   reloj = 500000;
   const { db, red } = montar();
   await enPostLevantada(db, red, "ana");
 
-  ok(MS_PASO_AUTOMATICO === 30000, "son 30 segundos", MS_PASO_AUTOMATICO);
+  /**
+   * Veinte segundos. Antes eran treinta.
+   *
+   * El argumento viejo era que treinta eran «tiempo de sobra para decidir y
+   * poco para quedarse mirando la pared». La primera mitad resultó cierta y la
+   * segunda no: en la mesa, treinta segundos es un rato en el que no pasa nada
+   * y los otros tres miran.
+   *
+   * El número se comprueba acá a propósito. No es un detalle de
+   * implementación: es cuánto tiempo tiene alguien para la decisión más cara
+   * de la ronda, y cambiarlo sin querer —o «redondearlo»— cambia el juego.
+   */
+  ok(MS_PASO_AUTOMATICO === 20000, "son 20 segundos", MS_PASO_AUTOMATICO);
   ok(MS_PASO_AUTOMATICO === DEL_MOTOR,
      "y el servidor usa la MISMA constante que la mesa de entrenamiento");
+
+  /**
+   * Y lo mismo con los ocho segundos para levantar.
+   *
+   * Estaba escrito dos veces con el mismo número: una acá en `partida-red.js`
+   * y otra dentro de `mesa.js`. Dos copias del mismo plazo aguantan hasta que
+   * alguien toca una — y entonces el reloj que ve el jugador y el que decide
+   * saltarle el turno dejan de ser el mismo, sin que nada falle a la vista.
+   */
+  ok(MS_TURNO === TURNO_DEL_MOTOR,
+     "y el plazo para levantar también sale de un solo lugar", MS_TURNO);
 
   const p = plazo(db);
   ok(p?.que === "pasarPorTiempo", "hay un plazo para pasar por tiempo", p);
   ok(p?.fase === "postLevantada", "atado a la fase", p?.fase);
-  ok(p?.hasta === reloj + MS_PASO_AUTOMATICO, "que vence a los 30 s", p?.hasta - reloj);
+  ok(p?.hasta === reloj + MS_PASO_AUTOMATICO, "que vence a los 20 s", p?.hasta - reloj);
 }
 
 // ==================================================================== 2
@@ -176,21 +203,21 @@ console.log("\n=== 3. Latir NO renueva el plazo ===");
   await enPostLevantada(db, red, "ana");
   const vence = plazo(db).hasta;
 
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 15; i++) {
     reloj += 1000;
     await red.latir({ uid: "ana", codigo: CODIGO });
     await red.latir({ uid: "beto", codigo: CODIGO });
   }
 
   ok(plazo(db).hasta === vence,
-     "veinte latidos repartidos en 20 s no corren el vencimiento", plazo(db).hasta - vence);
+     "quince latidos repartidos en 15 s no corren el vencimiento", plazo(db).hasta - vence);
 
-  // Los 10 s que le faltaban al plazo original. Si latir lo hubiera renovado,
-  // acá todavía faltarían 20 y este golpe no haría nada.
-  reloj += MS_PASO_AUTOMATICO - 20000;
+  // Los 5 s que le faltaban al plazo original. Si latir lo hubiera renovado,
+  // acá todavía faltarían 15 y este golpe no haría nada.
+  reloj += MS_PASO_AUTOMATICO - 15000;
   const r = await red.avanzarPartida({ codigo: CODIGO });
   ok(r.hizo === "pasarPorTiempo",
-     "y a los 30 s del arranque pasa, contados desde que entró en la fase", r);
+     "y a los 20 s del arranque pasa, contados desde que entró en la fase", r);
 }
 
 // ==================================================================== 4
