@@ -150,7 +150,16 @@ async function abrirMesa(page, caso) {
 const carta = (page, jugador, posicion) =>
   page.locator(`.jugador[data-jugador="${jugador}"] .carta[data-posicion="${posicion}"]`);
 
+/**
+ * Las dos marcas se cuentan por separado, y el selector lo permite solo.
+ *
+ * `.carta.mirada` NO matchea `.carta.mirada-inicial`: CSS compara tokens
+ * enteros, no subcadenas. Lo que sí las confunde es `toHaveClass(/mirada/)`,
+ * que corre contra el atributo como texto — por eso abajo las expresiones
+ * dicen `/mirada-inicial/` cuando quieren el borde.
+ */
 const conOjo = (page) => page.locator(".carta.mirada");
+const conBorde = (page) => page.locator(".carta.mirada-inicial");
 
 // =====================================================================
 
@@ -254,12 +263,20 @@ test("una línea sin posición no rompe la mesa", async ({ page }) => {
   expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
 });
 
-test("la mirada inicial también deja su ojo", async ({ page }) => {
+test("la mirada inicial deja BORDE, y no ojo", async ({ page }) => {
   /**
-   * El caso que faltaba, y el más común de todos: al empezar la ronda cada
-   * jugador mira UNA carta suya. Antes eso no dejaba ninguna constancia — la
-   * posición vivía en el jugador y no viajaba en la vista — así que nadie veía
-   * qué carta había mirado nadie.
+   * El caso más común de todos, y el que NO es un poder: al empezar la ronda
+   * cada jugador mira UNA carta suya.
+   *
+   * Llevó ojo por un tiempo y estaba mal. El ojo anuncia que alguien usó un
+   * poder para mirar: costó una carta, va con cartel y sonido, y dice que
+   * ahora sabe algo que antes no sabía. La mirada del principio no cuesta
+   * nada, no la elige nadie y les pasa a los cuatro a la vez — cuatro ojos
+   * idénticos al abrir cada ronda le sacaban significado al ojo justo antes de
+   * que apareciera el que sí importa.
+   *
+   * Lo que hay que poder leer acá es más chico: «el rival miró SU posición 1».
+   * Eso lo dice un borde.
    */
   await abrirMesa(page, {
     registro: [
@@ -267,11 +284,12 @@ test("la mirada inicial también deja su ojo", async ({ page }) => {
     ],
   });
 
-  await expect(carta(page, 2, 1)).toHaveClass(/mirada/);
-  await expect(conOjo(page)).toHaveCount(1);
+  await expect(carta(page, 2, 1)).toHaveClass(/mirada-inicial/);
+  await expect(conBorde(page)).toHaveCount(1);
+  await expect(conOjo(page), "la mirada inicial no es un poder").toHaveCount(0);
 });
 
-test("los cuatro miran a la vez y se ven los cuatro ojos", async ({ page }) => {
+test("los cuatro miran a la vez y se ven los cuatro bordes", async ({ page }) => {
   // Es lo que pasa de verdad en los dos segundos de apertura. Cada uno mira
   // una carta distinta de su propia mano.
   await abrirMesa(page, {
@@ -284,9 +302,10 @@ test("los cuatro miran a la vez y se ven los cuatro ojos", async ({ page }) => {
     })),
   });
 
-  await expect(conOjo(page)).toHaveCount(4);
+  await expect(conBorde(page)).toHaveCount(4);
+  await expect(conOjo(page)).toHaveCount(0);
   for (const quien of [0, 1, 2, 3]) {
-    await expect(carta(page, quien, quien)).toHaveClass(/mirada/);
+    await expect(carta(page, quien, quien)).toHaveClass(/mirada-inicial/);
   }
 });
 
@@ -294,10 +313,15 @@ test("el mecanismo es uno solo: no hay una rama por poder", async ({ page }) => 
   /**
    * La afirmación que protege la unificación.
    *
-   * Las cuatro clases de mirada llegan juntas y las cuatro tienen que pintar
-   * su ojo. Con una rama por evento, agregar un poder nuevo obliga a acordarse
-   * de agregarle también su ojo — y olvidarse no rompe nada, simplemente no
+   * Las cuatro clases de mirada llegan juntas y las cuatro tienen que dejar su
+   * marca. Con una rama por evento, agregar un poder nuevo obliga a acordarse
+   * de agregarle también la suya — y olvidarse no rompe nada, simplemente no
    * aparece. Acá se comprueban las cuatro de una.
+   *
+   * Que sean DOS marcas no rompe la unificación y es el punto: la bifurcación
+   * está en un solo lugar —`claseDeMarca`, que mira el tipo de la línea— y no
+   * repartida por los poderes. `cartasMiradasEn` sigue contestando quién miró
+   * qué, sea cual sea el evento.
    */
   await abrirMesa(page, {
     registro: [
@@ -311,11 +335,14 @@ test("el mecanismo es uno solo: no hay una rama por poder", async ({ page }) => 
     ],
   });
 
-  // Cinco ojos: uno por cada mirada, y el 10 cuenta por dos.
-  await expect(conOjo(page)).toHaveCount(5);
-  await expect(carta(page, 0, 0)).toHaveClass(/mirada/);
-  await expect(carta(page, 1, 1)).toHaveClass(/mirada/);
-  await expect(carta(page, 2, 2)).toHaveClass(/mirada/);
-  await expect(carta(page, 3, 3)).toHaveClass(/mirada/);
-  await expect(carta(page, 2, 0)).toHaveClass(/mirada/);
+  // Cinco marcas: una por cada mirada, y el 10 cuenta por dos. Cuatro ojos
+  // —los tres poderes, con el 10 doble— y un borde, el de la inicial.
+  await expect(conOjo(page)).toHaveCount(4);
+  await expect(conBorde(page)).toHaveCount(1);
+
+  await expect(carta(page, 0, 0), "la inicial").toHaveClass(/mirada-inicial/);
+  await expect(carta(page, 1, 1), "el 7").toHaveClass(/mirada(?!-)/);
+  await expect(carta(page, 2, 2), "el 8").toHaveClass(/mirada(?!-)/);
+  await expect(carta(page, 3, 3), "el 10, la propia").toHaveClass(/mirada(?!-)/);
+  await expect(carta(page, 2, 0), "el 10, la del rival").toHaveClass(/mirada(?!-)/);
 });

@@ -749,8 +749,9 @@ function dibujarJugador(jugador, i) {
         posicion: pos,
         // La compactada: es dónde se dibuja.
         estilo: estiloAbanico(enElAbanico, enLaMano.length, geometria),
-        // El ojo de un poder que acaba de mirar esta carta.
-        clases: miradas.has(llave) ? "mirada" : "",
+        // La marca de que esta carta se acaba de mirar: el ojo de un poder,
+        // o el borde de la mirada del principio de la ronda.
+        clases: miradas.get(llave)?.clase ?? "",
         // El dorso que compró ESTE jugador, no el que le tocaría al asiento.
         dorso: reversoDe(jugador, i),
       });
@@ -3113,18 +3114,66 @@ let registroAnunciado = 0;
 const miradas = new Map();
 
 /**
- * Cuánto dura el ojo.
+ * Cuánto dura una marca de mirada, sea ojo o borde.
  *
- * Dos segundos, y no el segundo y medio de antes. Un ojo sobre la carta de un
- * rival no es un adorno: es el dato con el que se decide si conviene cortar,
- * y hay que poder mirarlo, ubicar de quién es la mano y volver a lo propio.
- * Medio segundo de más no estorba a nadie; medio de menos lo convierte en algo
- * que se sospecha haber visto.
+ * Dos segundos, y no el segundo y medio de antes. No es un adorno: es el dato
+ * con el que se decide si conviene cortar, y hay que poder mirarlo, ubicar de
+ * quién es la mano y volver a lo propio. Medio segundo de más no estorba a
+ * nadie; medio de menos lo convierte en algo que se sospecha haber visto.
+ *
+ * Y no dura más que eso A PROPÓSITO. Una marca que se quedara toda la ronda
+ * dejaría escrito en la mesa lo que el juego pide recordar — que es el juego.
  */
-const MS_OJO = 2000;
+const MS_MARCA_DE_MIRADA = 2000;
 
 /**
- * Pone el ojo sobre una carta y lo saca solo.
+ * Las DOS marcas, que no dicen lo mismo.
+ *
+ * ───────────────────────────────────────────────────────────────────
+ * OJO: ALGUIEN USÓ UN PODER PARA MIRAR
+ * ───────────────────────────────────────────────────────────────────
+ *
+ * El 7, el 8 y el 10. Es una jugada: costó una carta, va con su cartel y su
+ * sonido, y lo que anuncia es que alguien AHORA sabe algo que antes no sabía.
+ *
+ * ───────────────────────────────────────────────────────────────────
+ * BORDE: LA MIRADA DEL PRINCIPIO DE LA RONDA
+ * ───────────────────────────────────────────────────────────────────
+ *
+ * Los cuatro miran UNA carta propia al repartir. No es una jugada, no cuesta
+ * nada y no la elige nadie: pasa siempre y pasa a la vez. Un ojo ahí decía lo
+ * mismo que el de un poder, y no es lo mismo — cuatro ojos idénticos al
+ * empezar cada ronda le sacan significado al ojo justo antes de que aparezca
+ * el que sí importa.
+ *
+ * Lo que hay que poder leer es más chico: «el rival miró SU posición 2». Un
+ * borde dice exactamente eso y nada más. Sin cartel y sin sonido, que es como
+ * ya venía: cuatro carteles pisándose no informan de nada.
+ *
+ * ───────────────────────────────────────────────────────────────────
+ * EL 9 NO LLEVA NINGUNA
+ * ───────────────────────────────────────────────────────────────────
+ *
+ * `cambioCiego` no mira nada, así que el motor no anota ninguna línea de
+ * mirada y acá no llega. Es correcto y conviene dejarlo escrito: una marca de
+ * mirada sobre una carta que nadie vio diría algo falso. El 9 ya tiene lo
+ * suyo — el 🌀 del cartel y el giro de las dos cartas.
+ */
+const MARCA_OJO = "mirada";
+const MARCA_INICIAL = "mirada-inicial";
+
+/**
+ * Cuál de las dos corresponde a esta línea del registro.
+ *
+ * No se llama `marcaDe`: ese nombre ya lo tiene la insignia del jugador, unas
+ * seiscientas líneas más arriba, y declararlo dos veces en el mismo módulo no
+ * es una advertencia sino un error que carga la mesa en blanco.
+ */
+const claseDeMarca = (linea) =>
+  linea?.tipo === "miradaInicial" ? MARCA_INICIAL : MARCA_OJO;
+
+/**
+ * Pone una marca sobre una carta y la saca sola.
  *
  * ───────────────────────────────────────────────────────────────────
  * ESTO LO VEN LOS CUATRO, Y ES EL PUNTO
@@ -3136,32 +3185,36 @@ const MS_OJO = 2000;
  * información pública y parte de la estrategia— y esto corre en cada
  * navegador con la misma línea del registro.
  *
- * El ojo va sobre el DORSO. Marca que esa carta se miró, no qué decía: el
- * número sigue sin viajar.
+ * Las dos van sobre el DORSO. Marcan que esa carta se miró, no qué decía: el
+ * número sigue sin viajar. Y en el dorso y no en la carta entera para que se
+ * vayan solas cuando las cartas se dan vuelta al final de la ronda.
  */
-function anotarOjo(indiceJugador, posicion) {
+function anotarMirada(indiceJugador, posicion, clase) {
   if (!Number.isInteger(posicion)) return;
   const llave = clave(indiceJugador, posicion);
 
-  clearTimeout(miradas.get(llave));
-  miradas.set(
-    llave,
-    setTimeout(() => {
+  // Si la misma carta vuelve a mirarse antes de que se cumpla, la marca nueva
+  // manda: un poder sobre una carta que ya tenía el borde de la inicial deja
+  // el ojo, que es la novedad.
+  clearTimeout(miradas.get(llave)?.apagador);
+  miradas.set(llave, {
+    clase,
+    apagador: setTimeout(() => {
       miradas.delete(llave);
       dibujar();
-    }, MS_OJO),
-  );
+    }, MS_MARCA_DE_MIRADA),
+  });
 }
 
 /**
  * Anotar y pintar. Es lo que usa el camino de red, que llega con la vista ya
- * aplicada y necesita que el ojo aparezca ahora.
+ * aplicada y necesita que la marca aparezca ahora.
  *
- * El entrenamiento usa `anotarOjo` pelado: allá esto se llama DESDE el
+ * El entrenamiento usa `anotarMirada` pelado: allá esto se llama DESDE el
  * dibujado, y pedir otro dibujado en el medio sería llamarse a sí mismo.
  */
-function ojoEn(indiceJugador, posicion) {
-  anotarOjo(indiceJugador, posicion);
+function marcarMirada(indiceJugador, posicion, clase) {
+  anotarMirada(indiceJugador, posicion, clase);
   dibujar();
 }
 
@@ -3203,8 +3256,9 @@ function ojosDelRegistroLocal() {
   registroAnunciado = registro.length;
 
   for (const linea of nuevas) {
+    const clase = claseDeMarca(linea);
     for (const { jugador, posicion } of cartasMiradasEn(linea)) {
-      anotarOjo(jugador, posicion);
+      anotarMirada(jugador, posicion, clase);
     }
   }
 }
@@ -3234,7 +3288,7 @@ function mostrarMiradas(vista) {
      * es sólo el cartel y el sonido, que sí son distintos en cada caso.
      */
     for (const { jugador, posicion } of cartasMiradasEn(linea)) {
-      ojoEn(jugador, posicion);
+      marcarMirada(jugador, posicion, claseDeMarca(linea));
     }
 
     /**

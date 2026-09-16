@@ -3739,3 +3739,48 @@ button.accion.con-poder {
     margin: -20px -20px 14px;
   }
 }
+
+/* ------------------------------- el borde de la mirada del principio
+
+   Al repartir, los cuatro miran UNA carta propia. No es una jugada: pasa
+   siempre, a la vez, y no la elige nadie. Lo que hay que poder leer es
+   «el rival miró SU posición 2» — nada más que eso.
+
+   Por qué NO lleva el 👁️: el ojo anuncia que alguien usó un poder para mirar,
+   que costó una carta y que ahora sabe algo. Cuatro ojos idénticos al empezar
+   cada ronda le sacan significado justo antes de que aparezca el que sí
+   importa. Dos hechos distintos, dos marcas distintas.
+
+   Es `outline` y no `border` ni un pseudo-elemento, por dos razones:
+
+     - `border` cambiaría el tamaño de la caja y desalinearía el abanico según
+       quién fue mirado — el mismo motivo por el que el marco del avatar no es
+       un borde.
+     - No queda pseudo-elemento libre sobre la carta: `::before` lo tiene el
+       borde punteado de `.atacable`, `::after` el halo de `.jugable`, y en el
+       dorso `::before` es el ojo y `::after` el dibujo del reverso.
+
+   Cian, el mismo de `.mano-mirada`: en esta mesa ese color ya quiere decir
+   «alguien miró». Y va en el DORSO, para que se vaya solo cuando las cartas se
+   dan vuelta al final de la ronda. */
+.carta.mirada-inicial .dorso {
+  /* Hacia adentro: hacia afuera pisaría a la carta vecina del abanico, que se
+     superponen a propósito. */
+  outline: 2px solid rgba(70, 200, 255, 0.85);
+  outline-offset: -2px;
+  animation: aparecerBordeMirada 0.18s ease-out;
+}
+
+/* La mano propia se dibuja más grande; su borde también, o se pierde. */
+.jugador.propio .carta.mirada-inicial .dorso { outline-width: 3px; }
+
+@keyframes aparecerBordeMirada {
+  from { outline-color: rgba(70, 200, 255, 0); }
+  to   { outline-color: rgba(70, 200, 255, 0.85); }
+}
+
+/* Quien pidió menos movimiento ve el borde, pero sin la entrada. El borde en
+   sí NO se apaga acá: es información del juego, no decoración. */
+@media (prefers-reduced-motion: reduce) {
+  .carta.mirada-inicial .dorso { animation: none; }
+}
