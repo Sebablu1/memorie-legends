@@ -207,8 +207,8 @@ test("el 10 marca las DOS cartas, una en cada mano", async ({ page }) => {
 });
 
 test("el ojo se va solo", async ({ page }) => {
-  // Dura un segundo y medio. Si se quedara, la mesa terminaría empapelada de
-  // ojos y dejarían de significar nada.
+  // Dura dos segundos. Si se quedara, la mesa terminaría empapelada de ojos y
+  // dejarían de significar nada.
   await abrirMesa(page, {
     registro: [
       { ronda: 1, texto: "Beto miró una carta de Caro", tipo: "miroCarta", actor: 1, objetivo: 2, posicion: 3 },

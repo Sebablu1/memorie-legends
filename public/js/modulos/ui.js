@@ -46,8 +46,54 @@ export function crearInterfaz({ dom, sonidos, titulos, esperar, msAnuncio, msMar
 
   // ----------------------------------------------------------- modal
 
+  /**
+   * La cuenta atrás, DENTRO del modal.
+   *
+   * ───────────────────────────────────────────────────────────────────
+   * POR QUÉ NO ALCANZA CON LA DEL CARTEL
+   * ───────────────────────────────────────────────────────────────────
+   *
+   * Porque el modal la tapa, y no hay z-index que lo arregle: `.escena` se
+   * declara `position: relative; z-index: 2`, así que todo lo que vive
+   * adentro —el cartel de la pista incluido— se pinta dentro de ESE nivel, y
+   * el velo es hermano de `.escena`, no suyo. Subirle el número al cartel no
+   * cambia nada; se midió.
+   *
+   * Las fases que abren modal son justamente las que tienen reloj: levantar
+   * una carta de poder y elegir a quién aplicárselo vencen a los diez
+   * segundos. El jugador estaba decidiendo contra una cuenta que no veía.
+   *
+   * ───────────────────────────────────────────────────────────────────
+   * ES LA MISMA CUENTA, NO OTRA
+   * ───────────────────────────────────────────────────────────────────
+   *
+   * Acá va sólo el hueco. Lo rellena `pintarReloj` desde `relojTurno`, igual
+   * que pinta el cartel y el aro del retrato: una sola cuenta, tres
+   * superficies.
+   *
+   * Un `setTimeout` propio del modal habría sido más corto de escribir y es
+   * exactamente lo que este archivo ya advierte en `iniciarRelojTurno`: dos
+   * relojes para lo mismo terminan discrepando en cuanto uno se cancela y el
+   * otro no, y entonces el modal se cerraría solo mientras el número del
+   * cartel sigue corriendo.
+   *
+   * Va en TODOS los modales y no sólo en los de poder, para que el día que
+   * una fase nueva con reloj abra el suyo no haya que acordarse de nada. Nace
+   * `hidden`; si no hay reloj corriendo, `pintarReloj` lo deja así.
+   *
+   * Aparece en el tick siguiente, hasta 120 ms después. Se prefirió eso a que
+   * la interfaz tenga que conocer al reloj para pedirle un repintado: 120 ms
+   * no se ven, y el acoplamiento sí se paga.
+   */
+  const RELOJ_DEL_MODAL = [
+    '<span class="reloj-modal" aria-hidden="true" hidden>',
+    '<span class="reloj-modal-barra"><i class="reloj-modal-relleno"></i></span>',
+    '<b class="reloj-modal-numero"></b>',
+    "</span>",
+  ].join("");
+
   const abrirModal = (html) => {
-    dom.modal.innerHTML = html;
+    dom.modal.innerHTML = RELOJ_DEL_MODAL + html;
     dom.velo.classList.add("abierto");
   };
 

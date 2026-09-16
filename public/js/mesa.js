@@ -837,6 +837,11 @@ function dibujarRegistro() {
 }
 
 function dibujar() {
+  // Antes de reconstruir el paño: si el motor anotó una mirada desde la última
+  // pasada, que su ojo entre en ESTE dibujado y no en el siguiente. En red no
+  // corre — allá las miradas llegan por la vista, en `mostrarMiradas`.
+  if (!enRed()) ojosDelRegistroLocal();
+
   dom.ronda.textContent = estado.ronda || "-";
 
   // El color del cartel sale de la fase, y de acá sale la fase.
@@ -1965,14 +1970,13 @@ async function poderDeIA(i) {
       () => 0,
     );
     // Se ve QUÉ posición miró, pero no la carta.
+    //
+    // El ojo lo pone `ojosDelRegistroLocal` desde el registro, igual que en
+    // red. Acá había además un destello de un segundo puesto a mano: dos
+    // marcas para el mismo hecho, una de ellas sólo para este poder y ninguna
+    // para la mirada inicial ni para el 10.
     dibujar();
     sonidos.voltear();
-    marcarEfecto(
-      objetivo.indiceJugador,
-      objetivo.posicion,
-      "efecto-mirar",
-      MS_MARCA_PODER,
-    );
     cartel(tipo);
     await esperar(MS_MARCA_PODER);
     return;
@@ -3108,8 +3112,16 @@ let registroAnunciado = 0;
  */
 const miradas = new Map();
 
-/** Cuánto dura el ojo. Suficiente para verlo, poco para no estorbar. */
-const MS_OJO = 1500;
+/**
+ * Cuánto dura el ojo.
+ *
+ * Dos segundos, y no el segundo y medio de antes. Un ojo sobre la carta de un
+ * rival no es un adorno: es el dato con el que se decide si conviene cortar,
+ * y hay que poder mirarlo, ubicar de quién es la mano y volver a lo propio.
+ * Medio segundo de más no estorba a nadie; medio de menos lo convierte en algo
+ * que se sospecha haber visto.
+ */
+const MS_OJO = 2000;
 
 /**
  * Pone el ojo sobre una carta y lo saca solo.
@@ -3127,7 +3139,7 @@ const MS_OJO = 1500;
  * El ojo va sobre el DORSO. Marca que esa carta se miró, no qué decía: el
  * número sigue sin viajar.
  */
-function ojoEn(indiceJugador, posicion) {
+function anotarOjo(indiceJugador, posicion) {
   if (!Number.isInteger(posicion)) return;
   const llave = clave(indiceJugador, posicion);
 
@@ -3139,7 +3151,62 @@ function ojoEn(indiceJugador, posicion) {
       dibujar();
     }, MS_OJO),
   );
+}
+
+/**
+ * Anotar y pintar. Es lo que usa el camino de red, que llega con la vista ya
+ * aplicada y necesita que el ojo aparezca ahora.
+ *
+ * El entrenamiento usa `anotarOjo` pelado: allá esto se llama DESDE el
+ * dibujado, y pedir otro dibujado en el medio sería llamarse a sí mismo.
+ */
+function ojoEn(indiceJugador, posicion) {
+  anotarOjo(indiceJugador, posicion);
   dibujar();
+}
+
+/**
+ * El ojo en entrenamiento, del MISMO registro que en red.
+ *
+ * ───────────────────────────────────────────────────────────────────
+ * POR QUÉ NO SE LLAMA DESDE CADA PODER
+ * ───────────────────────────────────────────────────────────────────
+ *
+ * Porque ya se probó y era la versión que faltaba. En entrenamiento el ojo no
+ * aparecía nunca: `mostrarMiradas` corre sólo con una vista del servidor, y
+ * acá no hay servidor. Lo que había en su lugar era un destello de un segundo
+ * puesto a mano en el camino de la IA que usa el 7 o el 8 —una rama, un poder,
+ * y ninguna para la mirada inicial ni para el 10—.
+ *
+ * El motor es el mismo en los dos modos y anota las mismas líneas, así que
+ * `cartasMiradasEn` contesta igual de este lado. Una sola función, los cuatro
+ * momentos, y un poder nuevo trae su ojo sin que haya que acordarse.
+ *
+ * ───────────────────────────────────────────────────────────────────
+ * Y POR QUÉ DESDE EL DIBUJADO
+ * ───────────────────────────────────────────────────────────────────
+ *
+ * El estado local cambia en una docena de sitios —cada poder, cada turno de
+ * IA, cada ventana— y colgar esto de cada uno es la misma trampa que la rama
+ * por poder. `dibujar()` es el único lugar por el que pasan todos.
+ *
+ * No se repite: `registroAnunciado` avanza ANTES de anotar, así que el
+ * dibujado que provoque el ojo ya no encuentra líneas nuevas.
+ */
+function ojosDelRegistroLocal() {
+  const registro = estado.registro ?? [];
+  // Ronda nueva: el registro se vació y lo anunciado no significa nada.
+  if (registro.length < registroAnunciado) registroAnunciado = 0;
+  if (registro.length === registroAnunciado) return;
+
+  const nuevas = registro.slice(registroAnunciado);
+  registroAnunciado = registro.length;
+
+  for (const linea of nuevas) {
+    for (const { jugador, posicion } of cartasMiradasEn(linea)) {
+      anotarOjo(jugador, posicion);
+    }
+  }
 }
 
 function mostrarMiradas(vista) {

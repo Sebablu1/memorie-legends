@@ -109,6 +109,35 @@ export function crearTemporizadores({ dom, msTurno }) {
     for (const aro of document.querySelectorAll(".retrato.contando")) apagarAro(aro);
   };
 
+  /**
+   * La tercera superficie de la MISMA cuenta: la del modal.
+   *
+   * El nodo se busca en cada tick, igual que el aro del retrato y por la misma
+   * razón: el modal se crea y se destruye entero en cada apertura, así que una
+   * referencia guardada apuntaría a un elemento que ya no está en la página.
+   *
+   * No existe fuera de un modal abierto, y entonces esto no hace nada. Que sea
+   * así —y no un `if` sobre alguna bandera de "hay modal"— es lo que permite
+   * que una fase nueva con reloj funcione sin tocar este archivo.
+   */
+  function pintarRelojDelModal(restante, ms, segundos, apurado) {
+    const caja = document.querySelector(".reloj-modal");
+    if (!caja) return;
+
+    caja.hidden = false;
+    caja.classList.toggle("apurado", apurado);
+    const relleno = caja.querySelector(".reloj-modal-relleno");
+    if (relleno) relleno.style.width = `${(restante / ms) * 100}%`;
+    const numero = caja.querySelector(".reloj-modal-numero");
+    if (numero) numero.textContent = `${segundos}s`;
+  }
+
+  /** Lo apaga sin romper si no hay modal abierto. */
+  function apagarRelojDelModal() {
+    const caja = document.querySelector(".reloj-modal");
+    if (caja) caja.hidden = true;
+  }
+
   function pintarReloj() {
     const caja = dom.reloj;
     if (!caja) return;
@@ -117,6 +146,7 @@ export function crearTemporizadores({ dom, msTurno }) {
       caja.hidden = true;
       dom.anuncio?.classList.remove("apurado");
       apagarTodosLosAros();
+      apagarRelojDelModal();
       return;
     }
 
@@ -128,8 +158,9 @@ export function crearTemporizadores({ dom, msTurno }) {
     // mismo cartel y tienen que leerse como lo mismo medido igual.
     dom.relojNumero.textContent = `${segundos}s`;
     // La barra se mide contra la duración de ESTE reloj, no contra una fija:
-    // el de levantar dura 8 segundos y el de decidir el corte, 30. Con un
-    // divisor único, el de 30 arrancaba con la barra ya casi vacía.
+    // el de levantar dura 8 segundos, el de decidir qué hacer con la carta 10
+    // y el de cortar o pasar 20. Con un divisor único, el más largo arrancaba
+    // con la barra ya casi vacía.
     dom.relojRelleno.style.width = `${(restante / relojTurno.ms) * 100}%`;
     // Dorado hasta los 2 segundos; de ahí en más, rojo. La marca va también en
     // el cartel, que es lo que se pinta: adentro está sólo la barra.
@@ -138,6 +169,7 @@ export function crearTemporizadores({ dom, msTurno }) {
     dom.anuncio?.classList.toggle("apurado", apurado);
 
     pintarAro(relojTurno.indice, restante / relojTurno.ms, segundos);
+    pintarRelojDelModal(restante, relojTurno.ms, segundos, apurado);
   }
 
   function cancelarRelojTurno() {
@@ -145,6 +177,7 @@ export function crearTemporizadores({ dom, msTurno }) {
     relojTurno = null;
     if (dom.reloj) dom.reloj.hidden = true;
     apagarTodosLosAros();
+    apagarRelojDelModal();
     // Sin esto el cartel se queda rojo después de que el reloj se fue.
     dom.anuncio?.classList.remove("apurado");
   }

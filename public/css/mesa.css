@@ -3655,3 +3655,87 @@ button.accion.con-poder {
 @media (prefers-reduced-motion: reduce) {
   .carta.mirada .dorso::before { animation: none; }
 }
+
+/* --------------------------------------------- el reloj dentro del modal
+
+   Las fases que abren modal —levantar una carta de poder, elegir a quién
+   aplicárselo— son justamente las que vencen a los diez segundos. La cuenta
+   del cartel de la pista existe y corre, pero no se ve: `.escena` se declara
+   `position: relative; z-index: 2`, así que el cartel vive dentro de ESE
+   nivel, y el velo del modal es hermano de `.escena`. Ningún número le gana a
+   un hermano desde adentro de un contexto de apilamiento ajeno; se midió
+   antes de escribir esto.
+
+   Es la MISMA cuenta que el cartel y que el aro del retrato: `pintarReloj` la
+   pinta en las tres. Acá no hay ningún temporizador.
+
+   `sticky` y no estático: el modal de elegir objetivo lleva hasta cuatro
+   manos y tiene `overflow-y: auto`, así que al bajar a la mano de un rival la
+   cuenta se iría de la pantalla — justo mientras se decide contra ella. */
+.reloj-modal {
+  position: sticky;
+  top: -30px; /* come el padding del modal, para pegarse al borde de arriba */
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -30px -30px 18px;
+  padding: 10px 16px;
+  border-radius: 22px 22px 12px 12px;
+  background: rgba(11, 17, 25, 0.92);
+  border-bottom: 1px solid rgba(212, 168, 67, 0.28);
+}
+
+/* Y que `hidden` de verdad lo esconda.
+ *
+ * Sin esto NO funciona, y no es una precaución de más: la regla del navegador
+ * para `[hidden]` es `display: none`, y viene de la hoja del agente de
+ * usuario — cualquier `display` escrito acá le gana, por poco específico que
+ * sea. El `display: flex` de arriba dejaba el hueco a la vista siempre, con la
+ * barra vacía y sin número, en TODOS los modales aunque no hubiera ninguna
+ * cuenta corriendo. Lo encontró la prueba, que leyó "" donde esperaba "20s".
+ */
+.reloj-modal[hidden] { display: none; }
+
+.reloj-modal-barra {
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.reloj-modal-relleno {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--oro), var(--oro-claro));
+  /* Sin transición: el ancho lo repinta el reloj cada 120 ms, y una
+     transición encima lo dejaría siempre corriendo detrás del número. */
+}
+
+.reloj-modal-numero {
+  color: var(--oro-claro);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.92rem;
+  /* Hueco fijo, o el cartel entero se corre un pelo en cada décima. */
+  min-width: 2.6em;
+  text-align: right;
+}
+
+/* Los últimos dos segundos, en rojo. La clase la pone el reloj, igual que en
+   el cartel de la pista y por la misma razón: `:has()` no existe en iOS
+   viejo, y ahí el aviso que más hay que ver sería el que no se ve. */
+.reloj-modal.apurado { border-bottom-color: rgba(169, 50, 38, 0.65); }
+.reloj-modal.apurado .reloj-modal-relleno { background: linear-gradient(90deg, #a93226, #ff9d84); }
+.reloj-modal.apurado .reloj-modal-numero { color: #ff9d84; }
+
+/* El modal baja a 20 px de padding en pantallas angostas —la regla está más
+   arriba en este archivo— y el reloj tiene que comerse ESE número, no el de
+   escritorio: con el margen de 30 quedaría 10 px fuera del modal. */
+@media (max-width: 600px) {
+  .reloj-modal {
+    top: -20px;
+    margin: -20px -20px 14px;
+  }
+}
