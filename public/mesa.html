@@ -172,6 +172,16 @@
         <button id="btnTirar" class="accion tira" disabled><svg class="icono-accion" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="4.6" width="9.6" height="14" rx="1.8"/><rect x="10.4" y="6.2" width="9.6" height="14" rx="1.8" transform="rotate(13 15.2 13.2)"/></svg><span>Tirar</span></button>
         <button id="btnCortar" class="accion corte" disabled><svg class="icono-accion" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.4" cy="17.8" r="2.5"/><circle cx="6.4" cy="6.2" r="2.5"/><path d="M20 4.4 8.6 16.2M20 19.6 8.6 7.8"/></svg><span>Cortar</span></button>
         <button id="btnPasar" class="accion pasa" disabled><svg class="icono-accion" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="currentColor" stroke="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3.6 6.3a.7.7 0 0 1 1.1-.6l7 5.7a.7.7 0 0 1 0 1.2l-7 5.7a.7.7 0 0 1-1.1-.6V6.3Zm8.6 0a.7.7 0 0 1 1.1-.6l7 5.7a.7.7 0 0 1 0 1.2l-7 5.7a.7.7 0 0 1-1.1-.6V6.3Z"/></svg><span>Pasar</span></button>
+        <!-- «He vuelto». Sólo existe mientras uno está marcado como ausente, y
+             entonces reemplaza a los cuatro de arriba: con la marca puesta los
+             turnos se saltean solos, así que esos botones no sirven para nada
+             y éste es lo único que hay para hacer.
+
+             Nace `hidden`. Ojo con eso: `hidden` sólo esconde si ninguna regla
+             le pone `display` al botón, y `.accion` sí se lo pone. `mesa.css`
+             tiene la regla que lo hace respetar — ya pasó con el reloj del
+             modal, que se veía vacío en todos los modales por lo mismo. -->
+        <button id="btnHeVuelto" class="accion vuelve" type="button" hidden><svg class="icono-accion" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span>He vuelto</span></button>
       </div>
 
       <aside class="lateral">

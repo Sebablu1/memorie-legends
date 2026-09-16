@@ -78,7 +78,10 @@ const medir = (page) =>
       .filter((t) => t.scrollWidth > t.clientWidth + 1)
       .map((t) => t.textContent.trim().slice(0, 30));
 
-    const tapados = [...document.querySelectorAll("button.accion")]
+    // `:not([hidden])` — sólo los que se ven. «He vuelto» vive en la misma barra
+    // y está oculto salvo que uno esté ausente: contado, mide cero, cae en (0,0)
+    // y las pruebas lo daban por tapado o por más angosto que los otros.
+    const tapados = [...document.querySelectorAll("button.accion:not([hidden])")]
       .filter((b) => {
         const q = b.getBoundingClientRect();
         const e = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2);

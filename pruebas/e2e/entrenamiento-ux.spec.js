@@ -299,7 +299,10 @@ test("las cartas no se meten encima del cartel ni de los botones", async ({
 
     // Los botones sí se preguntan por punto: ahí lo que importa es a quién le
     // llega el toque, y una carta encima se lo queda.
-    const tapados = [...document.querySelectorAll("button.accion")]
+    // `:not([hidden])` — sólo los que se ven. «He vuelto» vive en la misma barra
+    // y está oculto salvo que uno esté ausente: contado, mide cero, cae en (0,0)
+    // y las pruebas lo daban por tapado o por más angosto que los otros.
+    const tapados = [...document.querySelectorAll("button.accion:not([hidden])")]
       .filter((b) => {
         const r = b.getBoundingClientRect();
         const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
@@ -333,7 +336,7 @@ test("con el teléfono acostado la mesa sigue entrando", async ({ page }) => {
   const visto = await page.evaluate(() => {
     const mesa = document.querySelector(".mesa").getBoundingClientRect();
     const propio = document.querySelector('.jugador[data-jugador="0"]').getBoundingClientRect();
-    const tapados = [...document.querySelectorAll("button.accion")]
+    const tapados = [...document.querySelectorAll("button.accion:not([hidden])")]
       .filter((b) => {
         const r = b.getBoundingClientRect();
         const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
@@ -344,7 +347,7 @@ test("con el teléfono acostado la mesa sigue entrando", async ({ page }) => {
     return {
       desborde: Math.round(propio.bottom - mesa.bottom),
       tapados,
-      alto: Math.min(...[...document.querySelectorAll("button.accion")].map((b) =>
+      alto: Math.min(...[...document.querySelectorAll("button.accion:not([hidden])")].map((b) =>
         Math.round(b.getBoundingClientRect().height))),
       scroll: doc.scrollHeight > doc.clientHeight || doc.scrollWidth > doc.clientWidth,
     };
@@ -366,7 +369,7 @@ test("si los cuatro botones no entran en una fila, van dos y dos", async ({
   await abrirMesa(page);
 
   const anchos = await page
-    .locator("button.accion")
+    .locator("button.accion:not([hidden])")
     .evaluateAll((bs) => bs.map((b) => Math.round(b.getBoundingClientRect().width)));
 
   expect(new Set(anchos).size, `los botones miden ${anchos.join(", ")}`).toBe(1);

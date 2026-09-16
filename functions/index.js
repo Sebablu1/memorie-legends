@@ -1722,6 +1722,19 @@ export const saltarAusente = functions.https.onCall(async (data, context) => {
   return enRed.saltarAusente({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
 });
 
+/**
+ * «He vuelto»: quien quedó marcado por dejar vencer la decisión de cortar se
+ * reincorpora a la mano en curso.
+ *
+ * El uid sale de la SESIÓN y no del pedido, igual que en `latir`: si viniera en
+ * el cuerpo, cualquiera podría sacar a otro de la lista de ausentes y hacer que
+ * lo esperaran de nuevo.
+ */
+export const volver = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context, "volver");
+  return enRed.volver({ uid, codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
+});
+
 // ------------------------------------------------- abandono en curso
 
 /**

@@ -21,6 +21,7 @@ import {
   pasarTurno,
   MS_PASO_AUTOMATICO,
   MS_TURNO,
+  MS_ENTRE_RONDAS,
   saltarTurno,
   siguienteRonda,
   PODERES,
@@ -251,6 +252,7 @@ const dom = {
   btnTirarTexto: document.querySelector("#btnTirar span"),
   btnCortar: $("btnCortar"),
   btnPasar: $("btnPasar"),
+  btnHeVuelto: $("btnHeVuelto"),
   marcador: $("marcador"),
   registro: $("registro"),
   velo: $("velo"),
@@ -449,6 +451,92 @@ let estado = crearPartida(jugadoresConfig, opcionesDeReparto);
   if (lema) lema.textContent = `Mesa de ${cuantos} · límite ${limitePuntos}`;
 }
 let memorias = estado.jugadores.map(() => IA.crearMemoria());
+
+/**
+ * Ausencia, en los dos modos.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA REGLA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Si alguien se queda ausente, se lo marca y la ronda SIGUE: los demás no
+ * pierden tiempo esperando. Cuando vuelve, aprieta «he vuelto» y se reincorpora
+ * a la mano en curso. El turno que le saltearon mientras no estaba, perdido.
+ *
+ * La señal es dejar vencer los veinte segundos de cortar o pasar sin tocar
+ * nada. Es la decisión más pensada de la ronda: veinte segundos frente a ella
+ * sin moverse dicen que la pestaña está abierta y nadie la mira.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * EN RED HAY DOS LISTAS, Y ACÁ SE DIBUJAN LAS DOS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `ausentes` — por silencio. La calcula el servidor desde los latidos y la
+ * rescata `saltarAusente`. Es quien se fue de verdad y no puede apretar nada.
+ *
+ * `ausentesPorTiempo` — por la señal de arriba. Sólo la vacía «he vuelto».
+ *
+ * Las dos se ven igual en la mesa —el asiento apagado—, porque para los otros
+ * tres significan lo mismo: ése no está. Pero el botón sale sólo por la
+ * segunda: a uno mismo nunca se lo ve en la primera, porque `latir` excluye a
+ * quien llama, y quien puede apretar un botón está latiendo.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * EN ENTRENAMIENTO, UNA VARIABLE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * No hay servidor ni latidos, y la IA no se va. El único que puede ausentarse
+ * es uno mismo. No va en el estado del motor: en red la ausencia tampoco vive
+ * ahí, vive en la partida — es algo de la mesa, no del juego.
+ */
+let ausenteLocal = false;
+
+/** El avance automático de ronda que está esperando, para poder cancelarlo. */
+let avanceDeRondaPendiente = null;
+
+/** Si la última vez que se dibujó yo estaba marcado. Ver `actualizarBotones`. */
+let estabaMarcado = false;
+
+/** ¿El jugador `i` está ausente, por cualquiera de las dos causas? */
+function estaAusente(i) {
+  if (!enRed()) return i === YO && ausenteLocal;
+  const id = miVista?.jugadores?.[i]?.id;
+  if (!id) return false;
+  return (
+    (miVista.ausentes ?? []).includes(id) ||
+    (miVista.ausentesPorTiempo ?? []).includes(id)
+  );
+}
+
+/** ¿Me toca apretar «he vuelto»? Sólo por la lista de ausentes por tiempo. */
+function estoyMarcado() {
+  if (!enRed()) return ausenteLocal;
+  return (miVista?.ausentesPorTiempo ?? []).includes(miUid);
+}
+
+/**
+ * «He vuelto».
+ *
+ * En red lo decide el servidor, que saca el uid de la sesión. En entrenamiento
+ * alcanza con apagar la marca: el ciclo de turnos lo lee en cada vuelta, así
+ * que el próximo turno propio ya se espera como siempre.
+ *
+ * No devuelve nada. Si justo le saltearon el turno, ése se perdió — darle otro
+ * sería premiar la ausencia con una decisión que los demás no tuvieron.
+ */
+async function heVuelto() {
+  if (enRed()) {
+    await pedir("volver", () => Red.volver(salaPedida));
+    return;
+  }
+  ausenteLocal = false;
+  // Si la ronda terminó mientras no estaba, «Siguiente ronda» se iba a apretar
+  // sola. Ahora que volvió, la aprieta él cuando quiera.
+  clearTimeout(avanceDeRondaPendiente);
+  avanceDeRondaPendiente = null;
+  sonidos.clic();
+  dibujar();
+}
 
 /**
  * Ritmo de la mesa. Cada acción se deja respirar para que se entienda
@@ -761,6 +849,12 @@ function dibujarJugador(jugador, i) {
 
   const insignia = marcaDe(jugador);
   const marco = marcoDe(jugador);
+
+  // Ausente por cualquiera de las dos causas: para los otros tres significan
+  // lo mismo. El texto es fijo y no sale de ningún dato del jugador, así que
+  // no hay nada que escapar.
+  const ausente = !jugador.eliminado && estaAusente(i);
+  const marcaDeAusente = ausente ? ' <span class="marca-ausente">ausente</span>' : "";
   const titulo = tituloDe(jugador);
 
   /**
@@ -778,7 +872,7 @@ function dibujarJugador(jugador, i) {
    */
 
   return `
-    <div class="jugador ${claseAsiento(i)} ${enTurno ? "en-turno" : ""} ${propio ? "propio" : ""} ${jugador.eliminado ? "eliminado" : ""}"
+    <div class="jugador ${claseAsiento(i)} ${enTurno ? "en-turno" : ""} ${propio ? "propio" : ""} ${jugador.eliminado ? "eliminado" : ""} ${ausente ? "ausente" : ""}"
          data-jugador="${i}">
       <div class="cabecera-jugador">
         <span class="retrato ${claseAsiento(i)} ${marco ? "con-marco" : ""}" data-asiento="${i}">
@@ -787,7 +881,7 @@ function dibujarJugador(jugador, i) {
           <b class="cuenta-asiento" aria-hidden="true"></b>
         </span>
         <div class="datos">
-          <div class="nombre">${escapar(jugador.nombre)} ${titulo} ${insignia}</div>
+          <div class="nombre">${escapar(jugador.nombre)} ${titulo} ${insignia}${marcaDeAusente}</div>
           <div class="puntos">
             <span class="parcial">Ronda <b>${jugador.puntosRonda ?? 0}</b></span>
             <span class="acumulado">Total <b>${jugador.puntos}</b></span>
@@ -1191,6 +1285,37 @@ function actualizarBotones() {
   if (dom.btnTirarTexto) dom.btnTirarTexto.textContent = poderDisponible ? "Poder" : "Tirar";
   dom.btnCortar.disabled = !(estado.fase === "postLevantada" && miTurno);
   dom.btnPasar.disabled = !(estado.fase === "postLevantada" && miTurno);
+
+  /**
+   * Marcado como ausente: «he vuelto» en lugar de los cuatro.
+   *
+   * Con la marca puesta los turnos propios se saltean solos, así que los
+   * cuatro botones de jugada no sirven para nada — y dejarlos a la vista,
+   * apagados, se lee como «esperá tu turno», que es justo lo que no va a
+   * pasar. El único que hay para apretar es éste, y va donde la mirada vuelve
+   * primero.
+   *
+   * Vale para los dos modos porque `estoyMarcado` ya sabe de dónde leer.
+   */
+  const marcado = estoyMarcado() && !estado.jugadores[YO]?.eliminado;
+  for (const boton of [dom.btnLevantar, dom.btnTirar, dom.btnCortar, dom.btnPasar]) {
+    boton.hidden = marcado;
+  }
+  if (dom.btnHeVuelto) dom.btnHeVuelto.hidden = !marcado;
+
+  /**
+   * Y se dice por qué, una vez.
+   *
+   * En entrenamiento lo dice `pasarPorTiempo` en el momento. En red la marca
+   * llega en una vista, sin que nada de este navegador la haya pedido: sin
+   * este aviso, los botones cambian y nadie explica el motivo. Sólo en el
+   * flanco —al pasar de no marcado a marcado—, porque esta función corre en
+   * cada dibujado y pisaría cualquier otra pista mientras dure.
+   */
+  if (marcado && !estabaMarcado && enRed()) {
+    pista("Se acabó tu tiempo y quedaste <b>ausente</b>. Tocá <b>He vuelto</b> para seguir.");
+  }
+  estabaMarcado = marcado;
 }
 
 
@@ -1259,7 +1384,11 @@ function pasarPorTiempo() {
   if (estado.fase !== "postLevantada" || estado.indiceTurno !== YO) return;
   sonidos.clic();
   estado = pasarTurno(estado);
-  pista("Se acabó el tiempo para decidir: <b>pasaste</b> el turno.");
+  // Y queda ausente. Es la misma señal que usa el servidor en `transicion`:
+  // veinte segundos frente a la decisión de cortar sin tocar nada. Los plazos
+  // de diez —tirar, soltar el poder— no marcan: vencerlos es jugar apurado.
+  ausenteLocal = true;
+  pista("Se acabó el tiempo: <b>pasaste</b> el turno y quedaste <b>ausente</b>.");
   dibujar();
   cicloTurnos();
 }
@@ -1932,6 +2061,32 @@ async function cicloTurnos() {
 
     const jugador = estado.jugadores[estado.indiceTurno];
 
+    /**
+     * Un ausente no se espera: se le saltea el turno y el ciclo sigue.
+     *
+     * Es `saltarTurno` y no otra cosa, que es también lo que hace el servidor
+     * con el suyo. Alcanza con la fase `turno`: una vez marcado, cada turno
+     * propio se saltea antes de levantar, así que nunca llega a `levantada`,
+     * `poder` ni `postLevantada` mientras no vuelva.
+     *
+     * Con la pausa de siempre entre turnos: sin ella, un ausente haría que la
+     * mesa se saltara su lugar tan rápido que parecería que no existe.
+     */
+    if (!jugador.esIA && ausenteLocal) {
+      const salteado = saltarTurno(estado);
+      // `saltarTurno` exige fase `turno` y devuelve el estado intacto si no la
+      // encuentra. Con un `continue` sin esta comprobación, esa fase inesperada
+      // haría girar el ciclo para siempre sobre el mismo estado, colgando la
+      // pestaña. Si no se pudo saltar, se sigue como si estuviera: esperar su
+      // turno es peor que saltarlo, pero infinitamente mejor que un cuelgue.
+      if (salteado !== estado) {
+        estado = salteado;
+        dibujar();
+        await esperar(RITMO.entreTurnos);
+        continue;
+      }
+    }
+
     if (!jugador.esIA) {
       pista("LEVANTAR");
       dibujar();
@@ -2168,6 +2323,9 @@ dom.btnPasar.addEventListener("click", () => {
   dibujar();
   cicloTurnos();
 });
+
+// «He vuelto». Sólo es visible mientras uno está marcado; ver `heVuelto`.
+dom.btnHeVuelto?.addEventListener("click", heVuelto);
 
 // Clic en el mazo equivale a levantar.
 dom.mazoCarta.addEventListener("click", () => {
@@ -2710,6 +2868,11 @@ dom.modal.addEventListener("click", async (evento) => {
 
   const siguiente = evento.target.closest('[data-accion="siguiente"]');
   if (siguiente) {
+    // Sea quien sea el que la apretó —el jugador o el avance automático de un
+    // ausente—, ya no hay nada que avanzar solo. Sin esto, un clic a mano
+    // dejaría el temporizador vivo, esperando un modal que ya no existe.
+    clearTimeout(avanceDeRondaPendiente);
+    avanceDeRondaPendiente = null;
     cerrarModal();
     if (estado.fase === "finPartida") return;
     estado = siguienteRonda(estado);
@@ -2933,6 +3096,27 @@ async function mostrarFinRonda() {
     ${tabla}
     <button class="accion" data-accion="siguiente" type="button">Siguiente ronda</button>
   `);
+
+  /**
+   * Un ausente tampoco se espera entre rondas.
+   *
+   * En red el servidor reparte solo a los `MS_ENTRE_RONDAS`; acá, sin esto, la
+   * partida quedaría parada en este modal hasta que volviera. Mismo número que
+   * allá, importado del motor y no escrito de nuevo.
+   *
+   * Se aprieta el MISMO botón y no se copia lo que hace: así el reparto, la
+   * animación y la mirada siguen saliendo de un solo lugar.
+   *
+   * La partida terminada no llega acá —ya retornó arriba—: después de la
+   * última ronda no hay nada que avanzar.
+   */
+  if (ausenteLocal) {
+    clearTimeout(avanceDeRondaPendiente);
+    avanceDeRondaPendiente = setTimeout(() => {
+      avanceDeRondaPendiente = null;
+      dom.modal.querySelector('[data-accion="siguiente"]')?.click();
+    }, MS_ENTRE_RONDAS);
+  }
 }
 
 // ==================================================================

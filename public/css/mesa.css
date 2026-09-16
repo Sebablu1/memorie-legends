@@ -3784,3 +3784,63 @@ button.accion.con-poder {
 @media (prefers-reduced-motion: reduce) {
   .carta.mirada-inicial .dorso { animation: none; }
 }
+
+/* ------------------------------------------------------------ ausente
+
+   Quien dejó vencer la decisión de cortar sin tocar nada —o dejó de dar
+   señales— queda marcado, y la ronda sigue sin esperarlo.
+
+   Apagado, pero NO como un eliminado. El eliminado ya no juega: gris entero y
+   casi transparente. El ausente sigue en la partida, tiene cartas que cuentan
+   y puede volver en cualquier momento — tiene que seguir leyéndose como un
+   jugador, sólo que en pausa. Por eso menos opaco y sin el gris completo. */
+.jugador.ausente {
+  opacity: 0.55;
+  filter: saturate(0.35);
+  transition: opacity 0.25s, filter 0.25s;
+}
+
+/* La palabra, al lado del nombre. Sin ella el asiento apagado se confunde con
+   "todavía no le toca", y ésa es justamente la lectura que hay que evitar. */
+.marca-ausente {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(226, 232, 240, 0.4);
+  background: rgba(226, 232, 240, 0.1);
+  color: #e2e8f0;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* Que `hidden` esconda de verdad.
+
+   `button.accion` declara `display: flex`, y cualquier `display` escrito le
+   gana a la regla del navegador para `[hidden]`. Sin esto, ni «he vuelto» se
+   escondería al volver ni los cuatro de siempre al quedar ausente: los dos
+   juegos de botones estarían a la vista a la vez. Es la misma trampa que dejó
+   el reloj del modal vacío en todos los modales. */
+button.accion[hidden] { display: none; }
+
+/* «He vuelto», en oro: en esta mesa el oro es "lo tuyo, ahora". */
+button.accion.vuelve {
+  color: #1a1206;
+  border-color: rgba(255, 226, 150, 0.8);
+  background: linear-gradient(180deg, #f3d27a 0%, #d4a843 45%, #9c7424 100%);
+  box-shadow:
+    0 6px 0 #5e4513,
+    0 14px 26px rgba(0, 0, 0, 0.45),
+    0 0 26px rgba(212, 168, 67, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  /* Más ancho que los otros: es el único botón de la barra mientras dura, y
+     tiene que poder encontrarse de un vistazo al volver a la pestaña. */
+  min-width: 9em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jugador.ausente { transition: none; }
+}

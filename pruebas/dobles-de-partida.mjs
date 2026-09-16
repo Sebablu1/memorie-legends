@@ -5,9 +5,14 @@
  * QUÉ AGUJERO TAPA ESTO
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Tres pruebas de navegador reemplazan `public/js/partida-red.js` ENTERO por
+ * Varias pruebas de navegador reemplazan `public/js/partida-red.js` ENTERO por
  * un módulo de mentira, con `page.route`. Es la forma correcta de probar la
  * mesa sin servidor: la vista llega escrita a mano y no hay red de por medio.
+ *
+ * No se dice cuántas a propósito. Este comentario decía «tres» cuando ya eran
+ * siete, y un número escrito a mano en un texto que nadie relee es justo el
+ * tipo de cosa que esta prueba existe para no tener que mantener. La cuenta
+ * real la da la prueba misma: «hay N pruebas que lo doblan».
  *
  * El problema es qué pasa cuando el módulo real crece. Un `export` nuevo no
  * aparece en el doble, y `Red.loQueSea` queda en `undefined`. Llamarlo tira

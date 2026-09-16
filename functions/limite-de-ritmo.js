@@ -62,6 +62,10 @@ export const LIMITES = {
   cerrarVentanaDescarte: 90,
   cerrarMirada: 90,
   saltarAusente: 60,
+  // «He vuelto». Lo aprieta un dedo, una vez por ausencia: un jugador no
+  // puede quedar marcado más de una vez cada veinte segundos. Treinta es
+  // techo de sobra para una persona y corta el bucle de una pestaña.
+  volver: 30,
 
   // Sala: se tocan unas pocas veces por partida.
   crearSala: 20,

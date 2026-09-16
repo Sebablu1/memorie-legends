@@ -308,6 +308,14 @@ export const latir = (codigo) => llamar("latir", { codigo });
 export const saltarAusente = (codigo) => llamar("saltarAusente", { codigo });
 
 /**
+ * «He vuelto». Saca a quien llama de la lista de ausentes por tiempo.
+ *
+ * No manda quién: el servidor lo toma de la sesión. Mandarlo sería invitar a
+ * sacar a otro de la lista.
+ */
+export const volver = (codigo) => llamar("volver", { codigo });
+
+/**
  * Manda señales de vida cada tantos segundos.
  *
  * Perder la conexión no cuesta Leyendas: lo único que pasa es que, si te toca

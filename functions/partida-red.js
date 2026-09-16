@@ -11,6 +11,8 @@
  *     ventana        {...}             ventana de descarte abierta, si hay
  *     latidos        { uid: ms }       última señal de vida de cada uno
  *     ausentes       [uid, ...]        los que dejaron de dar señales
+ *     ausentesPorTiempo [uid, ...]     los que dejaron vencer la decisión de
+ *                                      cortar; sólo los saca «he vuelto»
  *     abandonaron    [uid, ...]        los que se fueron pagando la penalización
  *     version        n                 sube en cada cambio; ordena los avisos
  *
@@ -89,8 +91,10 @@ export const MS_MIRAR = motor.MS_MIRAR;
  */
 export const MS_PASO_AUTOMATICO = motor.MS_PASO_AUTOMATICO;
 
-/** Lo que se muestran los resultados antes de repartir la ronda siguiente. */
-export const MS_ENTRE_RONDAS = 6000;
+/** Lo que se muestran los resultados antes de repartir la ronda siguiente.
+    Vive en el motor: la mesa de entrenamiento la necesita para avanzar sola
+    cuando el jugador está ausente. */
+export const MS_ENTRE_RONDAS = motor.MS_ENTRE_RONDAS;
 
 /**
  * Lo que se muestra el resultado final antes de repartir el pozo.
@@ -223,7 +227,7 @@ export function crearMotorEnRed({
     const { estado, jugadores } = partida;
     partida = {
       ...partida,
-      plazo: plazoDe(estado, partida.ventana, partida.plazo, ahora(), Boolean(partida.cerrada)),
+      plazo: plazoDePartida(partida, partida.plazo, ahora()),
     };
 
     jugadores.forEach((uid, indice) => {
@@ -249,6 +253,10 @@ export function crearMotorEnRed({
         // hay nada que redactar. `filtracionesEn` ya corrió sobre `vista`.
         plazo: partida.plazo ?? null,
         ausentes: partida.ausentes ?? [],
+        // La otra lista de ausentes, y NO mezclada con la de arriba: ver
+        // `ausentesPorTiempo` en `transicion`. La mesa dibuja a los de las dos
+        // como ausentes, pero sólo ésta ofrece «he vuelto».
+        ausentesPorTiempo: partida.ausentesPorTiempo ?? [],
         abandonaron: partida.abandonaron ?? [],
         actualizado: marcaDeTiempo(),
       });
@@ -295,7 +303,33 @@ export function crearMotorEnRed({
    * reloj de turno no se agotaría nunca: bastaría con respirar para congelar
    * la partida.
    */
-  function plazoDe(estado, ventana, previo, ahoraMs, cerrada = false) {
+  /**
+   * ¿El que tiene el turno está marcado como ausente por tiempo?
+   *
+   * Sólo la lista nueva. Los ausentes por SILENCIO ya tienen su rescate
+   * —`saltarAusente`— y mezclarlos acá haría que un mismo jugador fuera
+   * salteado por dos caminos a la vez.
+   */
+  const turnoDeUnAusente = (partida) =>
+    (partida.ausentesPorTiempo ?? []).includes(partida.jugadores?.[partida.estado?.indiceTurno]);
+
+  /**
+   * El plazo de una partida, con TODO lo que hace falta saber de ella.
+   *
+   * Existe para que los dos llamadores no puedan pasar datos distintos. Ya
+   * pasó una vez: el segundo se olvidó de `cerrada`, calculó un plazo de cierre
+   * para una partida cerrada, se creyó desfasado y republicó en cada golpe,
+   * para siempre. Con un dato nuevo —el ausente en turno— la misma trampa
+   * volvía a estar servida, así que en vez de acordarse en dos lugares se
+   * pregunta en uno.
+   */
+  const plazoDePartida = (partida, previo, t) =>
+    plazoDe(partida.estado, partida.ventana, previo, t, {
+      cerrada: Boolean(partida.cerrada),
+      ausenteEnTurno: turnoDeUnAusente(partida),
+    });
+
+  function plazoDe(estado, ventana, previo, ahoraMs, { cerrada = false, ausenteEnTurno = false } = {}) {
     const nuevo = (fase, marca, hasta, que) => {
       // Mismo plazo que ya estaba: se conserva su vencimiento original.
       if (previo && previo.fase === fase && previo.marca === marca) return previo;
@@ -325,6 +359,29 @@ export function crearMotorEnRed({
         return nuevo("descarte", ventana.id, venceEn(ventana), "cerrarVentana");
 
       case "turno":
+        /**
+         * Un ausente por tiempo no se espera: se lo saltea ya.
+         *
+         * Es la regla: «los demás no pierden tiempo esperando». Si la marca
+         * sólo se viera, los otros tres esperarían los ocho segundos de
+         * levantar, los diez de decidir y los veinte de cortar, en CADA turno
+         * suyo, por alguien que ya demostró que no está.
+         *
+         * `ahoraMs` y no un número: el golpe siguiente lo encuentra vencido.
+         * La mesa golpea cada menos de un segundo, así que en la práctica es
+         * inmediato — y sigue pasando por el mismo camino que cualquier otro
+         * plazo, sin un atajo aparte que haya que mantener.
+         *
+         * La MARCA lleva `-ausente` y no es un detalle. `nuevo()` conserva el
+         * vencimiento de un plazo si la marca no cambió; sin esto, apretar «he
+         * vuelto» un instante antes del golpe dejaría vivo este plazo
+         * inmediato y lo saltearían igual. Con la marca distinta, al volver se
+         * calcula uno nuevo de ocho segundos.
+         */
+        if (ausenteEnTurno) {
+          return nuevo("turno", `t${estado.turnosRonda}-${estado.indiceTurno}-ausente`,
+                       ahoraMs, "saltarTurno");
+        }
         // El reloj corre por turno, no por publicación.
         return nuevo("turno", `t${estado.turnosRonda}-${estado.indiceTurno}`,
                      ahoraMs + MS_TURNO, "saltarTurno");
@@ -579,6 +636,7 @@ export function crearMotorEnRed({
       ventana: ventanaDeRonda(ahora()),
       latidos: Object.fromEntries(jugadores.map((uid) => [uid, ahora()])),
       ausentes: [],
+      ausentesPorTiempo: [],
       abandonaron: [],
       version: 1,
       creada: marcaDeTiempo(),
@@ -997,8 +1055,7 @@ export function crearMotorEnRed({
       // cerrada calcularía un plazo de cierre, se creería desfasada y se
       // republicaría en CADA golpe: cinco documentos escritos por segundo,
       // para siempre. Lo destapó la prueba del cierre repetido.
-      const faltaPlazo =
-        !plazo && plazoDe(partida.estado, partida.ventana, null, t, Boolean(partida.cerrada));
+      const faltaPlazo = !plazo && plazoDePartida(partida, null, t);
 
       if (desfasado || faltaPlazo) {
         publicar(tx, codigo, { ...partida, plazo: null, version: partida.version + 1 });
@@ -1132,8 +1189,47 @@ export function crearMotorEnRed({
 
       // Se acabó el tiempo de decidir: pasa, nunca corta. Cortar por alguien
       // que no contestó podría eliminarlo; pasar no le cuesta nada.
-      case "pasarPorTiempo":
-        return { ...partida, estado: motor.pasarTurno(partida.estado) };
+      case "pasarPorTiempo": {
+        /**
+         * Y queda marcado como ausente.
+         *
+         * ─────────────────────────────────────────────────────────────────
+         * POR QUÉ ÉSTA ES LA SEÑAL
+         * ─────────────────────────────────────────────────────────────────
+         *
+         * Veinte segundos frente a la decisión que más se piensa de la ronda,
+         * sin tocar nada, dicen algo que los latidos no pueden decir: la
+         * pestaña está abierta —late— pero nadie la mira. `saltarAusente` no
+         * lo agarra nunca, porque mide SILENCIO.
+         *
+         * No es la única señal y no reemplaza a aquélla. Son dos casos: el que
+         * se fue de verdad deja de latir y lo rescata `saltarAusente` sin que
+         * tenga que apretar nada; el que dejó la pestaña abierta cae acá, y
+         * cuando vuelve aprieta «he vuelto».
+         *
+         * ─────────────────────────────────────────────────────────────────
+         * POR QUÉ UNA LISTA APARTE Y NO `ausentes`
+         * ─────────────────────────────────────────────────────────────────
+         *
+         * `latir` recalcula `ausentes` ENTERA en cada llamada, a partir de los
+         * latidos. Este jugador sigue latiendo, así que el próximo latido de
+         * cualquiera lo borraría de ahí. Y `ausentes` es lo que dispara
+         * `saltarAusente`, que rechaza a quien todavía late: meterlo ahí
+         * haría que los navegadores tocaran ese timbre cada pocos segundos
+         * para nada.
+         *
+         * Sólo ESTE caso marca. Los plazos de diez segundos —tirar la carta,
+         * soltar el poder— son decisiones que vencen, no ausencias: vencer una
+         * es jugar apurado, no haberse ido.
+         */
+        const quien = partida.jugadores[partida.estado.indiceTurno];
+        const previos = partida.ausentesPorTiempo ?? [];
+        return {
+          ...partida,
+          estado: motor.pasarTurno(partida.estado),
+          ausentesPorTiempo: previos.includes(quien) ? previos : [...previos, quien],
+        };
+      }
 
       /**
        * Se acabaron los diez segundos con la carta levantada: se tira.
@@ -1253,10 +1349,17 @@ export function crearMotorEnRed({
         throw error("failed-precondition", "El jugador en turno sigue conectado.");
       }
 
-      // Levantada, poder y postLevantada no tienen reloj: se decide sin apuro.
-      // Pero si el que decide no está, la mesa no puede quedarse esperando
-      // para siempre. Se resuelve por él de la forma más neutra posible: sin
-      // usar el poder, sin cambiar cartas y sin cortar.
+      // Levantada, poder y postLevantada tienen su propio reloj —diez, diez y
+      // veinte segundos— y al vencer lo resuelven solos. Este rescate llega
+      // ANTES: quien dejó de latir quince segundos no va a volver en los que le
+      // quedan, y esperarlos es hacer esperar a los otros tres por nadie.
+      //
+      // Decía que esas fases «no tienen reloj», y era cierto cuando se
+      // escribió. Dejó de serlo con los cronómetros de decisión.
+      //
+      // Se resuelve por él de la forma más neutra posible —sin usar el poder,
+      // sin cambiar cartas y sin cortar—, que es también lo que hacen esos
+      // relojes al vencer.
       const estado = partida.estado;
       let avanzado;
       switch (estado.fase) {
@@ -1290,6 +1393,61 @@ export function crearMotorEnRed({
       };
       publicar(tx, codigo, siguiente);
       return { salteado: enTurno, version: siguiente.version };
+    });
+  }
+
+  /**
+   * «He vuelto»: sale de la lista de ausentes por tiempo.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * QUÉ HACE, Y QUÉ NO
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * Lo saca de `ausentesPorTiempo` y nada más. Se reincorpora a la mano que se
+   * está jugando AHORA: el turno que le saltearon mientras no estaba queda
+   * perdido. No se le devuelve la jugada ni se le da un turno de más — eso
+   * sería premiar la ausencia con una decisión que los otros tres no tuvieron.
+   *
+   * Si justo le toca a él, el próximo `publicar` calcula un plazo NUEVO de
+   * ocho segundos: la marca del plazo de un ausente lleva `-ausente`, así que
+   * deja de coincidir y `nuevo()` no conserva el vencimiento inmediato. Ver
+   * el caso `turno` de `plazoDe`.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * Y POR QUÉ NO TOCA `ausentes`
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * Esa lista la mantiene `latir` desde los latidos, y quien puede apretar un
+   * botón está latiendo: ya no figura ahí. Tocarla acá sería pisar el trabajo
+   * de otra función con un dato que ella calcula mejor.
+   *
+   * Idempotente. Dos clics, o un reintento de la red, no escriben dos veces:
+   * si ya no estaba, se contesta sin tocar la partida — y sin subir la versión,
+   * que haría republicar las cuatro vistas por nada.
+   */
+  async function volver({ uid, codigo }) {
+    return db.runTransaction(async (tx) => {
+      const snap = await tx.get(refPartida(codigo));
+      const partida = exigirPartida(snap, codigo);
+      if (partida.jugadores.indexOf(uid) < 0) {
+        throw error("permission-denied", "No estás jugando esta partida.");
+      }
+
+      const previos = partida.ausentesPorTiempo ?? [];
+      if (!previos.includes(uid)) {
+        return { yaEstaba: true, version: partida.version };
+      }
+
+      const siguiente = {
+        ...partida,
+        ausentesPorTiempo: previos.filter((u) => u !== uid),
+        // Volver es también una señal de vida: si justo después hubiera que
+        // decidir quién está en silencio, que no se lo cuente como ido.
+        latidos: { ...partida.latidos, [uid]: ahora() },
+        version: partida.version + 1,
+      };
+      publicar(tx, codigo, siguiente);
+      return { yaEstaba: false, version: siguiente.version };
     });
   }
 
@@ -1527,6 +1685,7 @@ export function crearMotorEnRed({
     accionDeTurno,
     latir,
     saltarAusente,
+    volver,
     vencidas,
     marcarAbandono,
     ACCIONES,

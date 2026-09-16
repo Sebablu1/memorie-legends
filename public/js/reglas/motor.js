@@ -87,6 +87,18 @@ export const MS_PASO_AUTOMATICO = 20000;
  */
 export const MS_TURNO = 8000;
 
+/**
+ * Lo que se muestran los resultados antes de repartir la ronda siguiente.
+ *
+ * Vive acá por la misma razón que `MS_TURNO`: lo usan los dos lados. El
+ * servidor lo aplica en su plazo de `finRonda`, y desde que existe la marca de
+ * ausente la mesa de entrenamiento también lo necesita — con el jugador
+ * ausente, «Siguiente ronda» se aprieta sola, y tiene que tardar lo mismo que
+ * en una partida por Leyendas. Dos copias de un número que tiene que ser el
+ * mismo es como se separan.
+ */
+export const MS_ENTRE_RONDAS = 6000;
+
 export const PODERES = {
   7: "mirarPropia",
   8: "mirarRival",
