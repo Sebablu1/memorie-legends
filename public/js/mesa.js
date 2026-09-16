@@ -29,6 +29,7 @@ import {
   MS_REAPERTURA,
   cartasMiradasEn,
   posicionesAtacablesDe,
+  ventanaTrasPoder,
 } from "./reglas/motor.js";
 
 
@@ -1786,6 +1787,56 @@ async function reflejosTrasTirar() {
 }
 
 /**
+ * Lo que va después de resolver un poder, en entrenamiento.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ EXISTE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Un jugador tiró un 8, usó el poder, vio que el rival tenía un 8 — y no pudo
+ * descartárselo. El orden lo explica: la ventana de reflejos corre ANTES del
+ * poder, así que cuando podía atacar ya no había ventana, y para la siguiente
+ * la muestra sería otra carta.
+ *
+ * `ventanaTrasPoder` decide si corresponde abrirla —la respuesta sale de
+ * `objetivosDe`, que es quien ya decidía a quién se puede atacar— y devuelve
+ * el estado intacto cuando no. Por eso esto se puede llamar desde los tres
+ * finales de poder sin preguntar cuál fue: el 7 sobre una carta propia y el 9
+ * no abren nada, salvo que quien lo usó ya supiera algo de antes.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Y POR QUÉ UNA SOLA FUNCIÓN
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque los finales de poder son tres y están lejos entre sí —el 7 y el 8 en
+ * un sitio, el 9 en otro, el 10 en `preguntarSiCambia`—. Repetir el bloque en
+ * cada uno es la misma trampa que ya nos costó el ojo: el día que se agregue
+ * un poder, olvidarse no rompe nada y simplemente no pasa.
+ *
+ * En red no corre ninguna de estas líneas: allá el servidor aplica el poder y
+ * `reabreDescarte` abre la ventana sola, con la misma marca del motor.
+ *
+ * @param pistaFinal qué decir si NO corresponde ventana.
+ */
+async function trasResolverElPoder(pistaFinal = "CORTAR O PASAR") {
+  const conVentana = ventanaTrasPoder(estado, YO);
+
+  if (conVentana === estado) {
+    pista(pistaFinal);
+    dibujar();
+    return;
+  }
+
+  estado = conVentana;
+  dibujar();
+  // Tres segundos, los mismos que una reapertura: ya se sabe qué se busca y
+  // en qué mano. El servidor llega al mismo número por su cuenta, leyendo
+  // `volverA` en `duracionDeVentana`.
+  await faseDescarte(null, MS_REAPERTURA, "BUSCÁ LA CARTA DEL RIVAL");
+  if (estado.fase === "postLevantada") pista("CORTAR O PASAR");
+}
+
+/**
  * Lo que va después de poner una carta nueva de muestra.
  *
  * Primero los reflejos de todos, después el poder del que tiró. Ese orden es
@@ -1808,8 +1859,12 @@ async function trasPonerMuestra() {
  * @param alCerrar  qué hacer al cerrarse. La ventana de la ronda encadena el
  *                  ciclo de turnos; la que abre tirar una carta no, porque
  *                  vuelve a `postLevantada` y el turno sigue siendo del mismo.
+ * @param rotulo    qué dice la pista mientras dura. La que sigue a un poder no
+ *                  es de todos ni es para descartar, así que anunciarla como
+ *                  "DESCARTE" mandaría a los otros tres a tocar sus cartas en
+ *                  una ventana en la que el motor les va a rechazar todo.
  */
-function faseDescarte(alCerrar, duracion = MS_DESCARTE) {
+function faseDescarte(alCerrar, duracion = MS_DESCARTE, rotulo = "DESCARTE") {
   return new Promise((listo) => {
     // Ventana nueva, nada mandado todavía. Sin esto, la carta que se tocó en
     // la ventana anterior aparece resaltada en ésta.
@@ -1818,7 +1873,7 @@ function faseDescarte(alCerrar, duracion = MS_DESCARTE) {
     // se salva, equivocarse suma una carta— y son cinco segundos en los que
     // nadie lee tres renglones: se mira la muestra y se toca. La regla se
     // aprende en "Cómo se juega", no en la ventana en la que hay que usarla.
-    pista("DESCARTE");
+    pista(rotulo);
     correrTemporizador(duracion);
     sonidos.aviso();
     dibujar();
@@ -2700,8 +2755,9 @@ dom.modal.addEventListener("click", async (evento) => {
     cartel(tipo);
     await revelarUnMomento(i, pos);
     cancelarTemporizador();
-    pista("CORTAR O PASAR");
-    dibujar();
+    // El 8 deja saber una carta ajena, así que acá puede abrirse la ventana
+    // para ir a buscarla. El 7 mira una propia y no abre nada.
+    await trasResolverElPoder();
     return;
   }
 
@@ -2746,8 +2802,10 @@ dom.modal.addEventListener("click", async (evento) => {
   await esperar(1100);
 
   seleccionPropia = null;
-  pista("CORTAR O PASAR");
-  dibujar();
+  // El 9 no mira nada, así que por sí solo no abre ventana. Se llama igual
+  // porque quien lo usó puede venir sabiendo algo de un poder anterior, y
+  // entonces sí corresponde — la decisión no es de acá, es de `objetivosDe`.
+  await trasResolverElPoder();
 });
 
 /**
@@ -2798,12 +2856,14 @@ async function resolverElDiez(cambiar) {
   // En entrenamiento no hay vistas del servidor, así que el aviso se dispara
   // acá. En red lo hace `mostrarMiradas` al recibir el registro.
   cartel(cambiar ? "cambio" : "sinCambio");
-  pista(
+  // El 10 miró una carta del rival, así que acá suele haber ventana. Si no la
+  // hay —porque el cambio se llevó justo lo que sabía— se dice cómo terminó,
+  // que es lo que se decía antes siempre.
+  await trasResolverElPoder(
     cambiar
       ? "Cambiaste la carta. Podés <b>cortar</b> o <b>pasar</b> el turno."
       : "Dejaste las cartas donde estaban. Podés <b>cortar</b> o <b>pasar</b> el turno.",
   );
-  dibujar();
 }
 
 // -------------------------------------------------------- fin de ronda

@@ -404,6 +404,20 @@ const rellenarMazo = (estado) => {
 export function intentarDescarte(estado, indiceJugador, posicion) {
   if (estado.fase !== "descarte" || !estado.ventanaDescarte) return estado;
 
+  /**
+   * La ventana que sigue a un poder es sólo para atacar.
+   *
+   * Quien la abrió ya tuvo su turno de descartar en la ventana de reflejos,
+   * con esta misma muestra. Si pudiera descartar acá también, tendría dos
+   * oportunidades sobre la misma carta y los otros tres una — y encima en
+   * privado, porque esta ventana no es de ellos.
+   *
+   * Se rechaza para TODOS y no sólo para el dueño: los demás caen igual en
+   * `soloPara`, dos líneas más abajo en `intentarDescarteRival`, y acá no
+   * tienen nada que hacer de ninguna manera.
+   */
+  if (estado.ventanaDescarte.soloAtaques) return estado;
+
   const jugador = estado.jugadores[indiceJugador];
   const carta = jugador.mano[posicion];
   if (!carta) return estado;
@@ -651,6 +665,20 @@ export function intentarDescarteRival(
   estado, actor, objetivo, posicionObjetivo, posicionEntrega,
 ) {
   if (estado.fase !== "descarte" || !estado.ventanaDescarte) return estado;
+
+  /**
+   * La ventana que sigue a un poder es de quien lo usó, y de nadie más.
+   *
+   * Los otros tres ya tuvieron la suya en la ventana de reflejos, con esta
+   * misma muestra; ésta existe porque a uno solo le llegó un dato después.
+   *
+   * `soloPara` sólo está en esa ventana: en las normales es `undefined` y esto
+   * no frena a nadie. Se compara contra `!= null` y no por verdadero, porque
+   * el jugador 0 es un índice legítimo.
+   */
+  const { soloPara } = estado.ventanaDescarte;
+  if (soloPara != null && actor !== soloPara) return estado;
+
   /**
    * Dos derechos distintos, y alcanza con cualquiera.
    *
@@ -777,6 +805,92 @@ export const cerrarVentanaDescarte = (estado) => {
 
   return resolverCorteDesde(cerrada, sinCartas, { automatico: true });
 };
+
+/**
+ * La ventana corta que sigue a un poder, para el que lo usó.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * EL AGUJERO QUE TAPA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Desde que rige «primero los reflejos de todos, después el poder del que
+ * tiró», tirar un 8 sale así:
+ *
+ *   1. tira el 8            → queda de muestra
+ *   2. ventana de reflejos  → acá TODAVÍA no sabe nada: el poder no se usó
+ *   3. se resuelve el poder → recién acá ve el 8 del rival
+ *   4. `postLevantada`      → sin ninguna ventana abierta
+ *
+ * El conocimiento llegaba un paso después de la única ventana donde servía, y
+ * para cuando hubiera otra la muestra ya sería otra carta. Tirar un poder que
+ * revela un par con su propia muestra era una jugada imposible de completar.
+ *
+ * Resolver el poder ANTES de los reflejos taparía esto y devolvería el
+ * problema que el orden nuevo vino a arreglar: las cartas de poder salteaban
+ * la ventana de todos. Se agrega un paso 5 en vez de deshacer el 2.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * CUÁNDO SE ABRE: `objetivosDe`, NO «TRAS UN PODER»
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Un 7 mira una carta PROPIA y no da derecho sobre nadie —`puedeAtacarA`
+ * empieza pidiendo `actor !== objetivo`—, así que abriría tres segundos
+ * muertos cada vez. El 9 no mira nada.
+ *
+ * Y al revés: si ya sabía algo de un poder anterior de la ronda, la ventana
+ * corresponde igual. Lo que se le devuelve es el momento de usar contra ESTA
+ * muestra lo que sabe, no específicamente lo que acaba de aprender.
+ *
+ * Nada de esto es una regla nueva: quién puede atacar a quién ya lo decidía
+ * `objetivosDe`, y acá sólo se le pregunta. El poder abre el momento.
+ *
+ * `saltarPoder` no llama a esto aunque quien declinó sepa cosas: ahí el poder
+ * no se usó, y una ventana privada extra por renunciar sería un premio por no
+ * jugar.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LAS DOS MARCAS DE LA VENTANA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `soloPara` — los otros tres ya tuvieron su ventana en el paso 2, con esta
+ * misma muestra. Ésta existe por algo que le pasó a uno solo.
+ *
+ * `soloAtaques` — si además pudiera descartar una carta propia, tendría DOS
+ * oportunidades sobre la misma muestra y los demás una.
+ *
+ * Van separadas y no en un solo campo «es una ventana de poder» porque son
+ * dos restricciones distintas: una dice QUIÉN y la otra QUÉ. Las comprueban
+ * `intentarDescarte` e `intentarDescarteRival`, cada una la suya.
+ *
+ * `volverA: "postLevantada"` no es decorativo. Lo lee `cerrarVentanaDescarte`
+ * para devolverle a quien tiró su decisión de cortar —sin él la mesa volvería
+ * a `turno`— y lo lee el servidor para elegir la duración: con `volverA` son
+ * tres segundos, sin él cinco. Por eso acá no hace falta ninguna constante de
+ * tiempo nueva.
+ */
+export function ventanaTrasPoder(estado, actor) {
+  // Conservadora a propósito, como el resto de las transiciones: si ya hay una
+  // ventana abierta, reemplazarla les quitaría a los otros tres los reflejos
+  // que están corriendo y borraría los intentos ya anotados.
+  if (estado.fase !== "postLevantada" || estado.ventanaDescarte) return estado;
+  if (!objetivosDe(estado, actor).length) return estado;
+
+  return {
+    ...estado,
+    fase: "descarte",
+    ventanaDescarte: {
+      // `huboPrimero` en `true`: nadie puede "llegar primero" acá. No es lo
+      // que impide el descarte propio —de eso se ocupa `soloAtaques`— pero
+      // deja el dato coherente para quien lo lea, porque el primero de esta
+      // muestra ya se definió en la ventana del paso 2.
+      huboPrimero: true,
+      intentos: [],
+      volverA: "postLevantada",
+      soloPara: actor,
+      soloAtaques: true,
+    },
+  };
+}
 
 // ----------------------------------------------------------------- turnos
 

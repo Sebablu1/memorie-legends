@@ -170,6 +170,42 @@ async function abrirMesa(page, caso) {
 
 const reloj = (page) => page.locator("#relojTurno");
 
+/**
+ * Que la cuenta esté corriendo y venga del plazo de diez segundos.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ NO SE EXIGE «10s» EXACTO, QUE ES LO QUE DECÍA ANTES
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque «10s» está en pantalla durante UN segundo: el reloj se repinta cada
+ * 120 ms y a los 1000 ms ya dice «9s». La prueba tenía que ganarle esa carrera
+ * desde el arranque de la página, y con la suite entera corriendo en paralelo
+ * en esta máquina, a veces no llegaba.
+ *
+ * Falló así una vez, con la suite completa: el registro de Playwright muestra
+ * que la primera lectura ya encontró «9s» y de ahí bajó hasta cero. Las tres
+ * pruebas que usaban esa línea tenían la misma carrera; ésta la perdió
+ * primero. No era el reloj, era el cronómetro de la prueba.
+ *
+ * Un rango conserva lo que importaba —que hay una cuenta, y que sale de un
+ * plazo de diez segundos y no de otro—. Que el número venga del SERVIDOR y no
+ * de una constante del navegador lo fija su propia prueba, más abajo, con un
+ * plazo que no es de diez.
+ *
+ * El piso en 5 no es generoso por las dudas: por debajo de eso ya no se podría
+ * distinguir un plazo de diez de uno de seis, y entonces la prueba dejaría de
+ * decir de dónde salió el número.
+ */
+async function cuentaDeDiezSegundos(page) {
+  await expect(reloj(page)).toBeVisible();
+
+  const texto = await page.locator("#relojNumero").innerText();
+  const segundos = Number.parseInt(texto, 10);
+
+  expect(segundos, `la cuenta dice "${texto}"`).toBeGreaterThanOrEqual(5);
+  expect(segundos, `la cuenta dice "${texto}"`).toBeLessThanOrEqual(10);
+}
+
 // =====================================================================
 
 test("con una carta levantada, la cuenta se ve", async ({ page }) => {
@@ -179,8 +215,7 @@ test("con una carta levantada, la cuenta se ve", async ({ page }) => {
     que: "descartarPorTiempo",
   });
 
-  await expect(reloj(page)).toBeVisible();
-  await expect(page.locator("#relojNumero")).toContainText("10s");
+  await cuentaDeDiezSegundos(page);
 
   expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
 });
@@ -196,15 +231,13 @@ test("LOS RIVALES también la ven, no sólo quien decide", async ({ page }) => {
    */
   await abrirMesa(page, { fase: "levantada", decide: 1, que: "descartarPorTiempo" });
 
-  await expect(reloj(page)).toBeVisible();
-  await expect(page.locator("#relojNumero")).toContainText("10s");
+  await cuentaDeDiezSegundos(page);
 });
 
 test("con un poder pendiente también corre", async ({ page }) => {
   await abrirMesa(page, { fase: "poder", decide: 0, que: "saltarPorTiempo" });
 
-  await expect(reloj(page)).toBeVisible();
-  await expect(page.locator("#relojNumero")).toContainText("10s");
+  await cuentaDeDiezSegundos(page);
 });
 
 test("la cuenta sale del servidor, no de una constante del navegador", async ({ page }) => {
