@@ -105,7 +105,7 @@ const vistaDe = (db, uid) => db.leer(`partidas/${CODIGO}/vistas/${uid}`);
  * transiciones que ya prueban otras suites.
  */
 async function en(db, red, { fase, quien = "ana", ausentesPorTiempo = [] }) {
-  if (!partida(db)) await red.repartir({ codigo: CODIGO, jugadores: DOS, nombres: DOS });
+  if (!partida(db)) await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: DOS, nombres: DOS });
   const p = partida(db);
   await db.runTransaction(async (tx) => {
     tx.set({ ruta: `partidas/${CODIGO}` }, {

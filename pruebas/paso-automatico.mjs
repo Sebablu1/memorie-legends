@@ -117,7 +117,7 @@ const enTurno = (db) => partida(db).estado.indiceTurno;
  * caso de éste enterraría lo que se quiere mirar.
  */
 async function enPostLevantada(db, red, quien = "ana") {
-  await red.repartir({ codigo: CODIGO, jugadores: DOS, nombres: DOS });
+  await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: DOS, nombres: DOS });
   const p = partida(db);
   await db.runTransaction(async (tx) => {
     tx.set({ ruta: `partidas/${CODIGO}` }, {

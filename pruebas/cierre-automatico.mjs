@@ -185,7 +185,7 @@ console.log("\n=== 1. finPartida sin vencer: todavía no cierra ===");
 {
   reloj = 7000000;
   const { db, enRed } = montar();
-  await enRed.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO.map((u) => NOMBRE[u]) });
+  await enRed.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO.map((u) => NOMBRE[u]) });
   await llevarAlFinal(db, enRed);
 
   const p = partida(db);
@@ -211,7 +211,7 @@ console.log("\n=== 2. finPartida vencido: cierra solo ===");
 {
   reloj = 7000000;
   const { db, enRed } = montar();
-  await enRed.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO.map((u) => NOMBRE[u]) });
+  await enRed.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO.map((u) => NOMBRE[u]) });
   await llevarAlFinal(db, enRed, "ana");
 
   reloj += MS_ANTES_DE_CERRAR + 1;
@@ -244,7 +244,7 @@ console.log("\n=== 3. avanzarPartida dos veces: un solo cierre ===");
 {
   reloj = 7000000;
   const { db, enRed } = montar();
-  await enRed.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO.map((u) => NOMBRE[u]) });
+  await enRed.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO.map((u) => NOMBRE[u]) });
   await llevarAlFinal(db, enRed);
   reloj += MS_ANTES_DE_CERRAR + 1;
 
@@ -268,7 +268,7 @@ console.log("\n=== 4. Los cuatro golpean a la vez ===");
 {
   reloj = 7000000;
   const { db, enRed } = montar();
-  await enRed.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO.map((u) => NOMBRE[u]) });
+  await enRed.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO.map((u) => NOMBRE[u]) });
   await llevarAlFinal(db, enRed);
   reloj += MS_ANTES_DE_CERRAR + 1;
   const intentosAntes = db.intentos;
@@ -297,7 +297,7 @@ console.log("\n=== 5. Con abandono: el que se fue no cobra ===");
 {
   reloj = 7000000;
   const { db, enRed, abandonar } = montar();
-  await enRed.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO.map((u) => NOMBRE[u]) });
+  await enRed.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO.map((u) => NOMBRE[u]) });
 
   // Caro abandona de verdad, por el camino normal.
   const ab = await capturar(() => abandonar({ uid: "caro", codigo: CODIGO }));
@@ -325,7 +325,7 @@ console.log("\n=== 6. El abandono sigue funcionando igual ===");
 {
   reloj = 7000000;
   const { db, enRed, abandonar } = montar();
-  await enRed.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO.map((u) => NOMBRE[u]) });
+  await enRed.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO.map((u) => NOMBRE[u]) });
 
   const r = await capturar(() => abandonar({ uid: "ana", codigo: CODIGO }));
   ok(r.valor?.penalizacion === 50, "penalización de 50", r.error?.message);
@@ -381,7 +381,7 @@ console.log("\n=== 9. Lo que queda escrito ===");
 {
   reloj = 7000000;
   const { db, enRed } = montar();
-  await enRed.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO.map((u) => NOMBRE[u]) });
+  await enRed.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO.map((u) => NOMBRE[u]) });
   await llevarAlFinal(db, enRed);
   reloj += MS_ANTES_DE_CERRAR + 1;
   await enRed.avanzarPartida({ codigo: CODIGO });

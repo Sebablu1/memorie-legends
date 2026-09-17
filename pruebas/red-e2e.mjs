@@ -139,7 +139,7 @@ const B = jugador(db, CODIGO, "beto");
 
 ok(A.recibidas.length === 0 && B.recibidas.length === 0, "antes de iniciar no reciben nada");
 
-await red.repartir({ codigo: CODIGO, jugadores: ["ana", "beto"], nombres: ["Ana", "Beto"] });
+await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: ["ana", "beto"], nombres: ["Ana", "Beto"] });
 
 ok(A.recibidas.length === 1, "A recibe su vista al iniciarse la partida", A.recibidas.length);
 ok(B.recibidas.length === 1, "B recibe la suya", B.recibidas.length);

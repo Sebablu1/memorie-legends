@@ -408,7 +408,7 @@ const CUATRO = ["ana", "beto", "caro", "dani"];
 async function partidaEnDescarte() {
   reloj = 100000;
   const { db, red } = montar();
-  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
   await red.cerrarMirada({ codigo: "ABCDEF" });
   const { ventana } = await red.abrirVentana({ codigo: "ABCDEF" });
   return { db, red, ventana };

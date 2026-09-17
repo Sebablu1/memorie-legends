@@ -110,7 +110,7 @@ function espectador(db, uid) {
 async function nueva() {
   reloj = 1000000;
   const { db, red } = montar();
-  await red.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
   return { db, red };
 }
 

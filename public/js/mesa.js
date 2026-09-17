@@ -28,6 +28,7 @@ import {
   MS_MIRAR,
   MS_DESCARTE,
   MS_REAPERTURA,
+  MS_CUENTA_REGRESIVA,
   cartasMiradasEn,
   posicionesAtacablesDe,
   ventanaTrasPoder,
@@ -1136,7 +1137,9 @@ function marcarCartasJugables() {
 
   const miTurno = estado.indiceTurno === YO;
   const habilitar =
-    (estado.fase === "mirar" && estado.jugadores[YO].posicionMirada == null) ||
+    (estado.fase === "mirar" &&
+      estado.jugadores[YO].posicionMirada == null &&
+      !miradaTodaviaCerrada(miVista)) ||
     estado.fase === "descarte" ||
     (estado.fase === "levantada" && miTurno);
 
@@ -1804,11 +1807,34 @@ async function animarReparto() {
 }
 
 /**
+ * Los pasos de la cuenta regresiva, y cuánto dura cada uno.
+ *
+ * Los usan las dos cuentas —la de entrenamiento y la de red— para que sean la
+ * misma. La duración total sale del motor, que es donde el servidor la lee
+ * para programar la apertura de la primera ronda.
+ */
+const PASOS_DE_LA_CUENTA = ["3", "2", "1", "Preparate…"];
+const MS_POR_PASO = MS_CUENTA_REGRESIVA / PASOS_DE_LA_CUENTA.length;
+
+function pintarPasoDeLaCuenta(numero, paso) {
+  numero.textContent = paso;
+  numero.classList.toggle("palabra", paso.length > 2);
+  // Reinicia la animación en cada paso: sin esto sólo late el primero,
+  // porque para el navegador es el mismo elemento con la misma clase.
+  numero.style.animation = "none";
+  void numero.offsetWidth;
+  numero.style.animation = "";
+}
+
+/**
  * "3, 2, 1, Preparate…" antes de la mirada.
  *
  * Sólo en la primera ronda de la partida. Repetirla en cada una sumaría cuatro
  * segundos de espera obligatoria a cada ronda, y lo que se gana —avisar que
  * arranca— ya no hace falta cuando se lleva media partida jugada.
+ *
+ * En red no corre ésta sino `cuentaRegresivaEnRed`, que cuenta contra el
+ * reloj del servidor.
  */
 async function cuentaRegresiva() {
   if (enRed() || sinMovimiento()) return;
@@ -1818,15 +1844,9 @@ async function cuentaRegresiva() {
   if (!caja || !numero) return;
 
   caja.hidden = false;
-  for (const paso of ["3", "2", "1", "Preparate…"]) {
-    numero.textContent = paso;
-    numero.classList.toggle("palabra", paso.length > 2);
-    // Reinicia la animación en cada paso: sin esto sólo late el primero,
-    // porque para el navegador es el mismo elemento con la misma clase.
-    numero.style.animation = "none";
-    void numero.offsetWidth;
-    numero.style.animation = "";
-    await esperar(1000);
+  for (const paso of PASOS_DE_LA_CUENTA) {
+    pintarPasoDeLaCuenta(numero, paso);
+    await esperar(MS_POR_PASO);
   }
   caja.hidden = true;
 }
@@ -3278,6 +3298,102 @@ function comoEstado(vista) {
   };
 }
 
+/**
+ * Si la mirada de la ronda todavía no empezó, en red.
+ *
+ * La primera ronda nace esperando a que lleguen todos, y después corre una
+ * cuenta regresiva: la ventana llega con `abiertaEn` en el futuro. En ese
+ * lapso la fase ya es `mirar`, pero el servidor rechaza cualquier mirada —si
+ * no, quien carga primero memorizaría con ventaja—, así que la mesa no ofrece
+ * las cartas.
+ *
+ * Sin ventana y sin espera es una partida repartida antes de este cambio: ahí
+ * la mirada ya estaba abierta, y bloquearla dejaría a esa mesa sin mirar.
+ *
+ * En entrenamiento no hay vista y siempre contesta que no.
+ */
+function miradaTodaviaCerrada(vista) {
+  if (!enRed() || !vista || vista.fase !== "mirar") return false;
+  if (vista.esperando) return true;
+  const abre = vista.ventana?.abiertaEn;
+  return abre != null && abre > Red.ahoraDelServidor();
+}
+
+/**
+ * La cuenta regresiva de la primera ronda, en red.
+ *
+ * Es la de entrenamiento —mismos pasos, misma duración— pero no la cuenta
+ * esta pestaña: cada paso se calcula contra el reloj del servidor y el
+ * `abiertaEn` de la ventana. Así los cuatro ven el mismo número a la vez, y
+ * quien llega con la cuenta empezada entra en el paso que corresponde en vez
+ * de arrancar de «3».
+ *
+ * Es un espejo. Al llegar a cero no abre nada —la apertura ya la dejó
+ * programada el servidor—: sólo repinta, porque no llega ninguna vista nueva
+ * que avise que las cartas ya se pueden tocar.
+ *
+ * Con movimiento reducido se muestra igual. La espera es real, no un adorno:
+ * lo que se apaga es el latido del número, desde el CSS.
+ */
+let cuentaEnRed = null;
+
+function cuentaRegresivaEnRed(vista) {
+  const abre =
+    vista.fase === "mirar" && !vista.esperando ? vista.ventana?.abiertaEn : null;
+  if (abre == null || abre <= Red.ahoraDelServidor()) {
+    apagarCuentaEnRed();
+    return;
+  }
+  // La misma cuenta que ya corre: cada vista nueva no la reinicia.
+  if (cuentaEnRed?.abiertaEn === abre) return;
+
+  apagarCuentaEnRed();
+  cuentaEnRed = { abiertaEn: abre, paso: null, temporizador: null };
+  avanzarCuentaEnRed();
+}
+
+function avanzarCuentaEnRed() {
+  const cuenta = cuentaEnRed;
+  if (!cuenta) return;
+
+  const caja = $("cuentaAtras");
+  const numero = $("cuentaAtrasNumero");
+  const falta = cuenta.abiertaEn - Red.ahoraDelServidor();
+
+  if (falta <= 0 || !caja || !numero) {
+    apagarCuentaEnRed();
+    if (miVista) {
+      dibujar();
+      pista(pistaDeRed(miVista));
+    }
+    return;
+  }
+
+  // Contados desde el final: con 3,4 s por delante quedan cuatro pasos y va
+  // el primero, el «3». Con más de la cuenta entera —relojes que no terminan
+  // de coincidir— se queda en el primero.
+  const quedan = Math.ceil(falta / MS_POR_PASO);
+  const paso = PASOS_DE_LA_CUENTA[Math.max(0, PASOS_DE_LA_CUENTA.length - quedan)];
+  if (paso !== cuenta.paso) {
+    cuenta.paso = paso;
+    caja.hidden = false;
+    pintarPasoDeLaCuenta(numero, paso);
+  }
+
+  // Hasta el próximo cambio de paso, no un intervalo fijo: un intervalo se
+  // corre, y la cuenta tiene que caer en cero cuando el servidor abre.
+  const hastaElProximo = falta - (quedan - 1) * MS_POR_PASO;
+  cuenta.temporizador = setTimeout(avanzarCuentaEnRed, Math.max(16, hastaElProximo));
+}
+
+function apagarCuentaEnRed() {
+  if (!cuentaEnRed) return;
+  clearTimeout(cuentaEnRed.temporizador);
+  cuentaEnRed = null;
+  const caja = $("cuentaAtras");
+  if (caja) caja.hidden = true;
+}
+
 /** Texto de la situación, para el modo red. */
 function pistaDeRed(vista) {
   if (vista.abandonaron?.includes(miUid)) return "Abandonaste esta partida.";
@@ -3286,6 +3402,14 @@ function pistaDeRed(vista) {
 
   switch (vista.fase) {
     case "mirar":
+      // Sólo números: los nombres no hacen falta para saber que falta alguien.
+      if (vista.esperando) {
+        const { llegaron, total } = vista.esperando;
+        return `Esperando a los jugadores (${Number(llegaron)}/${Number(total)})…`;
+      }
+      if (miradaTodaviaCerrada(vista)) {
+        return "Preparate: vas a tocar <b>una</b> carta tuya para memorizarla.";
+      }
       return "Tocá <b>una</b> carta tuya para memorizarla.";
     case "descarte":
       return "<b>¡Reflejos!</b> Tocá una carta que creas igual a la muestra.";
@@ -3666,6 +3790,7 @@ function pintarVista(vista) {
   // Después de dibujar: la marca busca la mano en el DOM ya pintado.
   mostrarMiradas(vista);
   pista(pistaDeRed(vista));
+  cuentaRegresivaEnRed(vista);
   modalesDeRed(vista);
   rescatarSiHayAusente();
   calentarSiHaceFalta(vista);
@@ -4332,6 +4457,10 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
   }
 
   if (miVista.fase === "mirar" && indiceJugador === YO) {
+    // Antes de que abra, ni mirar ni descartar: el servidor rechazaría las
+    // dos, y la pista ya dice qué se está esperando.
+    if (miradaTodaviaCerrada(miVista)) return;
+
     // D2: la muestra puede ser justo la carta que acabás de memorizar, y la
     // ventana de descarte ya está abierta. El segundo toque la descarta.
     //

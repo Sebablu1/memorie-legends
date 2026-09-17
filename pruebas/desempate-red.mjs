@@ -133,7 +133,7 @@ async function cortarConElDelTurno(sufijo) {
 
 console.log("\n=== 1. Los cuatro se pasan de 150 en la misma ronda ===");
 
-await red.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
+await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
 const espectadores = CUATRO.map((u) => {
   const e = { uid: u, vistas: [] };
   e.dejar = db.escuchar(`partidas/${CODIGO}/vistas/${u}`, (s) => {

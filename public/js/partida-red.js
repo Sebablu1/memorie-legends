@@ -338,7 +338,7 @@ export const saltarAusente = (codigo) => llamar("saltarAusente", { codigo });
 export const volver = (codigo) => llamar("volver", { codigo });
 
 /**
- * Manda señales de vida cada tantos segundos.
+ * Manda señales de vida: una apenas se entra, y después cada tantos segundos.
  *
  * Perder la conexión no cuesta Leyendas: lo único que pasa es que, si te toca
  * el turno y no estás, te lo saltan. Para irse hay que abandonar, que es una
@@ -347,10 +347,15 @@ export const volver = (codigo) => llamar("volver", { codigo });
  * @returns función para dejar de latir
  */
 export function mantenerVivo(codigo) {
-  const t = setInterval(() => {
+  const latido = () =>
     latir(codigo).catch(() => {
       // Un latido perdido no es noticia: el siguiente llega en cinco segundos.
     });
-  }, MS_ENTRE_LATIDOS);
+
+  // El primero sale YA, sin esperar el intervalo. Además de «sigo acá» es el
+  // «llegué»: la primera ronda no abre la mirada hasta que llegan todos, y
+  // callarlo cinco segundos era hacer esperar a los otros tres por nada.
+  latido();
+  const t = setInterval(latido, MS_ENTRE_LATIDOS);
   return () => clearInterval(t);
 }

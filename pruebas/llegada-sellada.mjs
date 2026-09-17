@@ -141,7 +141,7 @@ async function montar() {
     db, partidas: "partidas", ahora: () => reloj.ms, idAleatorio: () => `v${reloj.ms}`,
     marcaDeTiempo: () => "T", error, semillaDe: () => 4242,
   });
-  await red.repartir({ codigo: CODIGO, jugadores: JUGADORES, nombres: JUGADORES });
+  await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: JUGADORES, nombres: JUGADORES });
   const ventana = db.leer(`partidas/${CODIGO}`).ventana;
   return { db, red, ventana };
 }

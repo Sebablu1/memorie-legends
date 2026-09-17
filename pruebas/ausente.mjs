@@ -122,7 +122,7 @@ function elClienteLlamaria(v, miUid) {
 
 /** Deja la partida en la fase pedida, con `quien` en turno. */
 async function llevarA(db, red, fase, quien = "ana") {
-  await red.repartir({ codigo: CODIGO, jugadores: DOS, nombres: DOS });
+  await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: DOS, nombres: DOS });
   const p = partida(db);
   const i = DOS.indexOf(quien);
   const estado = { ...p.estado, fase, indiceTurno: i };
@@ -305,7 +305,7 @@ console.log("\n=== 7. Las fases normales no cambian ===");
   for (const fase of ["mirar", "descarte", "finRonda", "finPartida"]) {
     reloj = 500000;
     const { db, red } = montar();
-    const p = partida(db) ?? (await red.repartir({ codigo: CODIGO, jugadores: DOS, nombres: DOS }), partida(db));
+    const p = partida(db) ?? (await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: DOS, nombres: DOS }), partida(db));
     await db.runTransaction(async (tx) => {
       tx.set({ ruta: `partidas/${CODIGO}` }, {
         ...partida(db), estado: { ...partida(db).estado, fase }, version: partida(db).version + 1,
@@ -337,7 +337,7 @@ console.log("\n=== 8. Reproducción: se va el jugador activo, sigue el otro ==="
 {
   reloj = 500000;
   const { db, red } = montar();
-  await red.repartir({ codigo: CODIGO, jugadores: DOS, nombres: DOS });
+  await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: DOS, nombres: DOS });
 
   // Se juega hasta una fase sin reloj, por el camino normal.
   reloj += MS_MIRAR + 1;

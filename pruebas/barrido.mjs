@@ -187,7 +187,7 @@ console.log("\n=== Con todos afuera, la partida termina en el acto ===");
   const db = db0();
   const red = motorDe(db);
 
-  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
   for (const uid of CUATRO) await red.marcarAbandono({ codigo: "ABCDEF", uid });
 
   const estado = db.leer("partidas/ABCDEF").estado;
@@ -218,7 +218,7 @@ console.log("\n=== Si queda uno solo en pie, gana él ===");
   const db = db0();
   const red = motorDe(db);
 
-  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
   for (const uid of ["beto", "caro", "dani"]) await red.marcarAbandono({ codigo: "ABCDEF", uid });
 
   const estado = db.leer("partidas/ABCDEF").estado;
@@ -240,7 +240,7 @@ console.log("\n=== Una partida viva y sin nadie mirando: la destraba el barrido 
   const db = db0();
   const red = motorDe(db);
 
-  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
   const alRepartir = db.leer("partidas/ABCDEF").estado.fase;
 
   // Pasa media hora y nadie golpea la puerta.
@@ -273,7 +273,7 @@ console.log("\n=== El barredor no adelanta el reloj ===");
   const db = db0();
   const red = motorDe(db);
 
-  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
   const faseAlRepartir = db.leer("partidas/ABCDEF").estado.fase;
 
   // Sin mover el reloj: el plazo de la mirada todavía no venció.
@@ -307,7 +307,7 @@ console.log("\n=== Una mesa sin nadie GIRA: el barredor solo no la termina ===")
   const db = db0();
   const red = motorDe(db);
 
-  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
 
   // Media hora sin que nadie lata: se fueron todos, sin abandonar.
   reloj += 30 * 60 * 1000;
@@ -338,7 +338,7 @@ console.log("\n=== Vaciarla la termina, y el pozo puede volver ===");
   const db = db0();
   const red = motorDe(db);
 
-  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
   reloj += 30 * 60 * 1000;
 
   const r = await red.vaciarMesaDesierta({ codigo: "ABCDEF" });
@@ -372,7 +372,7 @@ console.log("\n=== Con uno solo mirando, no se toca ===");
   const db = db0();
   const red = motorDe(db);
 
-  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
   reloj += 30 * 60 * 1000;
   await red.latir({ codigo: "ABCDEF", uid: "caro" });
 
@@ -395,7 +395,7 @@ console.log("\n=== Una recién repartida no se vacía nunca ===");
   const db = db0();
   const red = motorDe(db);
 
-  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
   const r = await red.vaciarMesaDesierta({ codigo: "ABCDEF" });
 
   ok(!r.vaciada, "no se vacía recién repartida", r);
@@ -410,7 +410,7 @@ console.log("\n=== Lo que ya está cerrado o vacío se deja en paz ===");
   const db = db0();
   const red = motorDe(db);
 
-  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
   reloj += 30 * 60 * 1000;
   for (const uid of CUATRO) await red.marcarAbandono({ codigo: "ABCDEF", uid });
 
@@ -439,7 +439,7 @@ console.log("\n=== Una partida cerrada no se mueve más, la empuje quien la empu
   const db = db0();
   const red = motorDe(db);
 
-  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
   reloj += 60_000;
 
   // Lo que escribe la cancelación: cerrada y sin plazo.

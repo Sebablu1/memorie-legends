@@ -465,6 +465,11 @@ Encontrado mientras se trabajaba en otra cosa. Ninguno rompe nada hoy.
   binario, y alguna herramienta podría truncarlo. Escribirlo como `"\u0000"`
   dejaría el mismo valor sin el byte crudo en el fuente.
 
+- **Dos comentarios de documentación seguidos sobre `repartirEn`**, en
+  `functions/partida-red.js`. El primero —«Reparte en el servidor…»— es el de
+  `repartir`, que quedó separado de su función. Un editor muestra el de abajo
+  y el de arriba no se lee en ningún lado.
+
 ---
 
 ## 12. App Check — resolver los navegadores donde reCAPTCHA falla
@@ -495,6 +500,38 @@ esperaban eso antes de salir.
 **Cómo se sabe que se resolvió:** hay un número de navegadores que fallan, una
 decisión sobre ellos, y una partida jugada con App Check exigido desde un
 navegador con bloqueo de terceros que o funciona, o explica por qué no.
+
+---
+
+## 13. La mirada inicial — anotado al arreglar la primera ronda
+
+Desde el 17 de septiembre la ronda 1 en red espera a que lleguen todos y corre
+la cuenta regresiva antes de abrir la mirada. Tres cosas quedaron afuera a
+propósito, porque no eran ese arreglo:
+
+- **En red, la mirada dura dos segundos EN TOTAL; en entrenamiento, cinco para
+  elegir y dos para ver.** El servidor cierra la fase `mirar` a
+  `abiertaEn + MS_MIRAR` (`plazoDe`, caso `mirar`, acción `cerrarMirada`), así
+  que en red hay que elegir Y llegar al servidor dentro de esos dos segundos.
+  Con la latencia medida —unos 0,8 s por jugada— un toque al segundo y medio
+  puede llegar con la mirada ya cerrada. Es una diferencia entre modos, contra
+  la regla de «entrenamiento = red», y es lo primero a mirar si alguien
+  vuelve a decir «no puedo ver la primera carta». Cambiarlo toca la duración
+  de la ventana de la ronda (`MS_VENTANA_TOTAL = MS_MIRAR + MS_VENTANA`), que
+  hoy incluye la mirada: es una decisión de reglas, no un retoque.
+
+- **`cerrarMirada` puede cortar la mirada antes de tiempo.** Ya no antes de que
+  abra —eso se tapó—, pero una vez abierta cualquiera de los cuatro puede
+  llamarla y terminarla para todos antes de los dos segundos. El plazo del
+  servidor la cierra solo, así que el cliente no necesita llamarla: se podría
+  exigir que haya vencido `abiertaEn + MS_MIRAR`, o sacarla.
+
+- **En entrenamiento, tocar una carta durante la cuenta regresiva dice «Una
+  sola carta por ronda».** La fase ya es `mirar` pero `faseMirada` todavía no
+  puso su manejador, y la mesa toma el toque como un segundo intento. Las
+  cartas, además, se ven tocables durante la cuenta. En red ya no pasa:
+  `miradaTodaviaCerrada` las apaga. En entrenamiento el aviso correcto sería
+  no decir nada, como en red.
 
 ---
 

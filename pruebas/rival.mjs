@@ -458,7 +458,7 @@ console.log("\n=== 10. El servidor no cree en la palabra del cliente ===");
   const partida = () => docs.get(`partidas/${C}`).datos;
   const vista = (u) => docs.get(`partidas/${C}/vistas/${u}`).datos;
 
-  await red.repartir({ codigo: C, jugadores: TRES, nombres: TRES });
+  await red.repartir({ yaSentados: true, codigo: C, jugadores: TRES, nombres: TRES });
   reloj += MS_MIRAR + 1;
   await red.avanzarPartida({ codigo: C });
   await red.avanzarPartida({ codigo: C });

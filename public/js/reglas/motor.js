@@ -99,6 +99,19 @@ export const MS_TURNO = 8000;
  */
 export const MS_ENTRE_RONDAS = 6000;
 
+/**
+ * La cuenta regresiva antes de la primera mirada: «3, 2, 1, Preparate…».
+ *
+ * Cuatro pasos de un segundo. La mesa de entrenamiento la muestra desde hace
+ * tiempo; en red se agregó cuando se vio que la primera mirada terminaba
+ * antes de que nadie llegara a la mesa, y tiene que ser la misma: el
+ * servidor abre la ventana cuando esta cuenta termina, y las cuatro pantallas
+ * la dibujan contra esa hora.
+ *
+ * Vive en el motor porque la usan los dos lados, igual que `MS_TURNO`.
+ */
+export const MS_CUENTA_REGRESIVA = 4000;
+
 export const PODERES = {
   7: "mirarPropia",
   8: "mirarRival",

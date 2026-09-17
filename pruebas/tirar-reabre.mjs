@@ -339,7 +339,7 @@ console.log("\n=== 5. En red: tirar abre una ventana NUEVA ===");
   const vistaDe = (uid) => docs.get(`partidas/${C}/vistas/${uid}`)?.datos;
   const vence = (v) => v.abiertaEn + v.duracionMs + v.graciaMs;
 
-  await red.repartir({ codigo: C, jugadores: DOS, nombres: DOS });
+  await red.repartir({ yaSentados: true, codigo: C, jugadores: DOS, nombres: DOS });
   const primera = partida().ventana;
 
   // Se atraviesa la ventana de la ronda sin que nadie descarte.

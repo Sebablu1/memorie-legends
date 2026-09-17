@@ -118,7 +118,7 @@ function auditar(etiqueta) {
   }
 }
 
-await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+await red.repartir({ yaSentados: true, codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
 auditar("reparto");
 
 for (let ronda = 0; ronda < 3; ronda++) {

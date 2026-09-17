@@ -180,7 +180,7 @@ const motorDe = (db) =>
 async function repartirCon(luce) {
   const db = db0();
   const red = motorDe(db);
-  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO, luce });
+  await red.repartir({ yaSentados: true, codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO, luce });
   return db.leer("partidas/ABCDEF").estado.jugadores;
 }
 
@@ -220,11 +220,12 @@ const caras = (jugadores) => jugadores.map((j) => j.retrato);
   const db = db0();
   const red = motorDe(db);
   const CARAS = [{ retrato: "/img/avatar/a.webp" }, {}, {}, {}];
-  await red.repartir({ codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO, luce: CARAS });
+  await red.repartir({ yaSentados: true, codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO, luce: CARAS });
   const antes = db.leer("partidas/ABCDEF").estado.jugadores[0].retrato;
 
   // Repartir de nuevo con otra cara no cambia nada: el reparto es idempotente.
   await red.repartir({
+    yaSentados: true,
     codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO,
     luce: [{ retrato: "/img/avatar/OTRA.webp" }, {}, {}, {}],
   });

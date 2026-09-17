@@ -139,7 +139,7 @@ async function montar({ saldos = { ana: 500, beto: 500, caro: 500, dani: 500 } }
     partidaEnRed: { leer: enRed.leerPartidaParaAbandono, marcar: enRed.marcarAbandonoEn },
   });
 
-  await enRed.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
+  await enRed.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
   return { db, enRed, abandonar };
 }
 

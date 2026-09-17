@@ -98,7 +98,7 @@ const registro = (db) => partida(db).estado.registro;
  * suites, y repetirlas acá enterraría lo que se quiere mirar.
  */
 async function enFase(db, red, faseDestino, extra = {}, quien = "ana") {
-  await red.repartir({ codigo: CODIGO, jugadores: DOS, nombres: DOS });
+  await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: DOS, nombres: DOS });
   const p = partida(db);
   await db.runTransaction(async (tx) => {
     tx.set({ ruta: `partidas/${CODIGO}` }, {

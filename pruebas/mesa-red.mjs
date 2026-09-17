@@ -169,7 +169,7 @@ console.log("\n=== 1. La vista se convierte en algo dibujable ===");
   reloj = 100000;
   const { db, red } = montar();
   const M = CUATRO.map((u) => mesa(db, CODIGO, u));
-  await red.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
 
   const e = M[0].estado;
   ok(e.jugadores.length === 4, "la mesa ve cuatro jugadores", e.jugadores.length);
@@ -213,7 +213,7 @@ console.log("\n=== 2. Versiones repetidas y fuera de orden ===");
   reloj = 100000;
   const { db, red } = montar();
   const M = mesa(db, CODIGO, "ana");
-  await red.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
   await red.accionDeTurno({ uid: "ana", codigo: CODIGO, accion: "mirar", clientActionId: "m1", posicion: 0 });
   const pintadasAntes = [...M.pintadas];
   ok(pintadasAntes.length === 2, "se pintaron dos vistas", pintadasAntes);
@@ -234,7 +234,7 @@ console.log("\n=== 3. Cuatro jugadores, una ronda completa ===");
   reloj = 100000;
   const { db, red } = montar();
   const M = CUATRO.map((u) => mesa(db, CODIGO, u));
-  await red.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
 
   ok(M.every((m) => m.pintadas.length === 1), "los cuatro reciben su vista inicial",
      M.map((m) => m.pintadas.length));
@@ -324,7 +324,7 @@ console.log("\n=== 4. Desconexión y reconexión ===");
   reloj = 100000;
   const { db, red } = montar();
   const M = CUATRO.map((u) => mesa(db, CODIGO, u));
-  await red.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
   await red.cerrarMirada({ codigo: CODIGO });
   const { ventana } = await red.abrirVentana({ codigo: CODIGO });
   reloj = trasLaGracia(db);
@@ -375,7 +375,7 @@ console.log("\n=== 5. Un refresco del navegador no crea otra partida ===");
   reloj = 100000;
   const { db, red } = montar();
   const M = mesa(db, CODIGO, "ana");
-  await red.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
   await red.accionDeTurno({ uid: "ana", codigo: CODIGO, accion: "mirar", clientActionId: "m", posicion: 0 });
 
   const antes = JSON.parse(JSON.stringify(db.leer(`partidas/${CODIGO}`)));
@@ -393,7 +393,7 @@ console.log("\n=== 5. Un refresco del navegador no crea otra partida ===");
      "y la partida no cambió en absoluto");
 
   // Y si alguien llamara a repartir otra vez, tampoco reinicia nada.
-  const otra = await red.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
+  const otra = await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
   ok(otra.yaExistia === true, "repartir sobre una partida existente es idempotente", otra);
   ok(JSON.stringify(db.leer(`partidas/${CODIGO}`)) === JSON.stringify(antes),
      "y no toca el estado");
@@ -453,7 +453,7 @@ console.log("\n=== 6. Cartas elegibles con un poder ===");
   // --- y lo no elegible sigue bloqueado en el servidor, que es lo que importa ---
   reloj = 100000;
   const { db, red } = montar();
-  await red.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
   const base = db.leer(`partidas/${CODIGO}`);
   await db.runTransaction(async (tx) => {
     tx.set({ ruta: `partidas/${CODIGO}` }, {

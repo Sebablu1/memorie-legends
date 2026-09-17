@@ -551,7 +551,7 @@ console.log("\n=== 9. Cierre después de un abandono real ===");
     motivo: "premio_partida", marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
   });
 
-  await enRed.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO.map((u) => NOMBRES[u]) });
+  await enRed.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO.map((u) => NOMBRES[u]) });
   await abandonar({ uid: "caro", codigo: CODIGO });
   ok(saldo(db, "caro") === SALDO_INICIAL - 50, "C pagó 50 de penalización", ganado(db, "caro"));
   ok(sala(db).pozo === 400, "el pozo sigue en 400", sala(db).pozo);

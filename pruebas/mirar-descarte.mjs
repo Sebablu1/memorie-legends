@@ -100,7 +100,7 @@ const capturar = async (fn) => {
 async function nueva() {
   reloj = 400000;
   const { db, red } = montar();
-  await red.repartir({ codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
+  await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
   return { db, red };
 }
 

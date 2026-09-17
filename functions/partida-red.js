@@ -97,6 +97,24 @@ export const MS_PASO_AUTOMATICO = motor.MS_PASO_AUTOMATICO;
 export const MS_ENTRE_RONDAS = motor.MS_ENTRE_RONDAS;
 
 /**
+ * Cuánto se espera, como mucho, a que todos lleguen a la mesa.
+ *
+ * La partida se crea desde la sala, y los jugadores todavía tienen que
+ * redirigirse, cargar la mesa y abrir la sesión: en producción eso llevó unos
+ * seis segundos. Antes la primera mirada arrancaba en el reparto y se
+ * terminaba antes de que nadie pudiera tocar una carta.
+ *
+ * Ahora se abre cuando llega el último. Este tope es para el que no llega
+ * nunca —una pestaña que no carga no puede trabar la mesa de los demás—: al
+ * cumplirse, la partida arranca igual, y el que falta se pierde su mirada como
+ * si se hubiera desconectado.
+ */
+export const MS_ESPERA_LLEGADAS = 15_000;
+
+/** La cuenta regresiva antes de la primera mirada. Vive en el motor. */
+export const MS_CUENTA_REGRESIVA = motor.MS_CUENTA_REGRESIVA;
+
+/**
  * Lo que se muestra el resultado final antes de repartir el pozo.
  *
  * Corto a propósito: el dinero de la gente no puede quedar esperando. Pero no
@@ -257,6 +275,11 @@ export function crearMotorEnRed({
         // `ausentesPorTiempo` en `transicion`. La mesa dibuja a los de las dos
         // como ausentes, pero sólo ésta ofrece «he vuelto».
         ausentesPorTiempo: partida.ausentesPorTiempo ?? [],
+        // Mientras la primera ronda espera a que lleguen todos: cuántos van.
+        // Sólo la cuenta, que es lo que la mesa muestra.
+        esperando: partida.esperandoLlegadas
+          ? { llegaron: (partida.llegadas ?? []).length, total: partida.jugadores.length }
+          : null,
         abandonaron: partida.abandonaron ?? [],
         actualizado: marcaDeTiempo(),
       });
@@ -327,9 +350,13 @@ export function crearMotorEnRed({
     plazoDe(partida.estado, partida.ventana, previo, t, {
       cerrada: Boolean(partida.cerrada),
       ausenteEnTurno: turnoDeUnAusente(partida),
+      esperandoDesde: partida.esperandoLlegadas ? partida.esperandoDesde : null,
     });
 
-  function plazoDe(estado, ventana, previo, ahoraMs, { cerrada = false, ausenteEnTurno = false } = {}) {
+  function plazoDe(
+    estado, ventana, previo, ahoraMs,
+    { cerrada = false, ausenteEnTurno = false, esperandoDesde = null } = {},
+  ) {
     const nuevo = (fase, marca, hasta, que) => {
       // Mismo plazo que ya estaba: se conserva su vencimiento original.
       if (previo && previo.fase === fase && previo.marca === marca) return previo;
@@ -338,6 +365,19 @@ export function crearMotorEnRed({
 
     switch (estado.fase) {
       case "mirar":
+        /**
+         * Esperando a que lleguen todos: el único plazo es el tope.
+         *
+         * Sin este caso, la línea de abajo calculaba «cerrar la mirada dentro
+         * de dos segundos» con una ventana que todavía no existe —el `??
+         * ahoraMs`—, y la primera ronda se habría saltado entera. Su marca es
+         * otra que la de la mirada, así que cuando la ventana abre se calcula
+         * un plazo nuevo en vez de heredar éste.
+         */
+        if (esperandoDesde != null) {
+          return nuevo("mirar", `llegadas-r${estado.ronda}`,
+                       esperandoDesde + MS_ESPERA_LLEGADAS, "abrirPrimeraRonda");
+        }
         // Los dos segundos se cuentan desde que abrió la ventana, no desde
         // este golpe: si no, una publicación posterior recortaría la mirada.
         return nuevo("mirar", `r${estado.ronda}`,
@@ -593,6 +633,32 @@ export function crearMotorEnRed({
   // ------------------------------------------------------------ reparto
 
   /**
+   * La primera ronda empieza: se abre su ventana, con la cuenta por delante.
+   *
+   * `abiertaEn` queda en el FUTURO, al terminar la cuenta regresiva. Las
+   * cuatro pantallas dibujan «3, 2, 1, Preparate…» contra esa hora, así que
+   * empiezan a mirar en el mismo instante; y todo lo que llegue antes —una
+   * mirada, un descarte— cae fuera de la ventana y se rechaza solo.
+   */
+  const abrirPrimeraRonda = (partida, t) => ({
+    ...partida,
+    esperandoLlegadas: false,
+    ventana: ventanaDeRonda(t + MS_CUENTA_REGRESIVA),
+  });
+
+  /**
+   * ¿Llegaron todos los que siguen en la partida?
+   *
+   * Los que abandonaron no cuentan: esperar a quien ya se fue sería esperar al
+   * tope siempre.
+   */
+  const llegaronTodos = (partida) => {
+    const idos = partida.abandonaron ?? [];
+    const llegadas = partida.llegadas ?? [];
+    return partida.jugadores.every((uid) => idos.includes(uid) || llegadas.includes(uid));
+  };
+
+  /**
    * Reparte en el servidor. El mazo se baraja acá y su orden no sale nunca:
    * es la diferencia entre un juego de memoria y una lista pública de cartas.
    */
@@ -604,7 +670,7 @@ export function crearMotorEnRed({
    * partida podría quedar iniciada sin documento maestro —o al revés— y no
    * habría forma de saber cuál de las dos cosas pasó.
    */
-  async function repartirEn(tx, { codigo, jugadores, nombres, luce }) {
+  async function repartirEn(tx, { codigo, jugadores, nombres, luce, yaSentados = false }) {
     const snap = await tx.get(refPartida(codigo));
     // Idempotente: repartir dos veces la misma partida no la reinicia.
     if (snap.exists) return { codigo, yaExistia: true, version: snap.data().version };
@@ -626,15 +692,59 @@ export function crearMotorEnRed({
       esIA: false,
     }));
 
+    const t = ahora();
     const partida = {
       codigo,
       jugadores,
       // La semilla la elige el SERVIDOR. Si la mandara el cliente, podría
       // probar semillas hasta dar con un reparto que le convenga.
       estado: motor.empezarRonda(motor.crearPartida(configuracion, { semilla: semillaDe() })),
-      // La ventana nace con la mirada, no con el descarte: ver arriba.
-      ventana: ventanaDeRonda(ahora()),
-      latidos: Object.fromEntries(jugadores.map((uid) => [uid, ahora()])),
+
+      /**
+       * La ventana NO nace con el reparto: nace cuando llegan todos.
+       *
+       * ───────────────────────────────────────────────────────────────────
+       * EL BUG QUE ESTO ARREGLA
+       * ───────────────────────────────────────────────────────────────────
+       *
+       * Nacía acá, y la primera mirada dura dos segundos. Pero quien reparte
+       * es la SALA: los jugadores todavía tienen que redirigirse, cargar la
+       * mesa y abrir la sesión, y en producción eso llevó unos seis segundos.
+       * El primero en llegar golpeaba al entrar, el servidor encontraba la
+       * mirada vencida y la cerraba, y el toque para mirar rebotaba con un
+       * 400. Nadie veía su primera carta.
+       *
+       * Ahora la partida arranca esperando. `latir` anota quién llegó, y
+       * cuando llega el último se abre la ventana, con la cuenta regresiva
+       * por delante. Si alguien no llega nunca, el plazo de
+       * `MS_ESPERA_LLEGADAS` la abre igual.
+       *
+       * ───────────────────────────────────────────────────────────────────
+       * POR QUÉ LAS LLEGADAS VAN APARTE Y NO EN LOS LATIDOS
+       * ───────────────────────────────────────────────────────────────────
+       *
+       * Sería lo más corto: arrancar los latidos en cero y considerar llegado
+       * al que latió una vez. Y destruiría todas las partidas nuevas.
+       * `vaciarMesaDesierta` mira el latido MÁS RECIENTE de los que siguen, y
+       * con todos en cero el silencio sería enorme: el barredor —que pasa cada
+       * minuto— daría por abandonada cada mesa recién creada. Los latidos
+       * siguen arrancando con la hora del reparto, y eso le da a una mesa que
+       * espera los mismos diez minutos de gracia que tenía siempre.
+       *
+       * ───────────────────────────────────────────────────────────────────
+       * `yaSentados`
+       * ───────────────────────────────────────────────────────────────────
+       *
+       * Es el comportamiento de antes: la ventana abre en el acto, sin cuenta.
+       * Sirve para las pruebas que no miran el arranque y parten de una mesa
+       * con todos sentados. `iniciarPartida` NO lo pasa —nadie está sentado
+       * cuando se reparte— y `pruebas/primera-ronda.mjs` lo vigila, porque
+       * olvidarlo allá es exactamente el bug de arriba.
+       */
+      ...(yaSentados
+        ? { ventana: ventanaDeRonda(t), esperandoLlegadas: false, llegadas: [...jugadores] }
+        : { ventana: null, esperandoLlegadas: true, llegadas: [], esperandoDesde: t }),
+      latidos: Object.fromEntries(jugadores.map((uid) => [uid, t])),
       ausentes: [],
       ausentesPorTiempo: [],
       abandonaron: [],
@@ -883,6 +993,23 @@ export function crearMotorEnRed({
       if (partida.estado.fase !== "mirar") {
         return { yaEstaba: true, version: partida.version };
       }
+
+      /**
+       * No se puede terminar una mirada que todavía no empezó.
+       *
+       * Esta función terminaba la mirada sin preguntar la hora. Con la primera
+       * ronda esperando jugadores —que es fase `mirar` sin ventana— o durante
+       * la cuenta regresiva, cualquiera podía llamarla y saltarles la mirada a
+       * todos, dejando además la partida en `descarte` sin ventana.
+       *
+       * Queda un hueco que viene de antes y NO se tapa acá: una vez abierta la
+       * ventana, esto sigue pudiendo cortar los dos segundos de mirada antes
+       * de tiempo. Está anotado en PENDIENTE.md.
+       */
+      if (partida.esperandoLlegadas || !partida.ventana || ahora() < partida.ventana.abiertaEn) {
+        throw error("failed-precondition", "La mirada todavía no empezó.");
+      }
+
       const siguiente = {
         ...partida,
         estado: motor.terminarMirada(partida.estado),
@@ -915,6 +1042,17 @@ export function crearMotorEnRed({
       }
 
       exigirFase(partida, accion);
+
+      // Mirar, sólo con la ventana abierta. Mientras la primera ronda espera
+      // jugadores, o durante la cuenta regresiva, la fase ya es `mirar` pero
+      // la mirada no empezó: quien tocara antes miraría con ventaja sobre los
+      // que todavía están cargando la mesa.
+      if (
+        accion === ACCIONES.MIRAR &&
+        (partida.esperandoLlegadas || !partida.ventana || ahora() < partida.ventana.abiertaEn)
+      ) {
+        throw error("failed-precondition", "La mirada todavía no empezó.");
+      }
 
       if (EXIGEN_TURNO.has(accion) && partida.estado.indiceTurno !== indice) {
         throw error("failed-precondition", "No es tu turno.");
@@ -1193,6 +1331,13 @@ export function crearMotorEnRed({
   /** La transición concreta que toca. Devuelve la partida nueva, o null. */
   function transicion(partida, plazo, t) {
     switch (plazo.que) {
+      // Venció la espera y falta alguien: la partida arranca igual. El que no
+      // llegó se pierde su mirada, como si se hubiera desconectado; trabar la
+      // mesa de los otros por una pestaña que no carga no es una opción.
+      case "abrirPrimeraRonda":
+        if (!partida.esperandoLlegadas) return null;
+        return abrirPrimeraRonda(partida, t);
+
       case "cerrarMirada":
         return { ...partida, estado: motor.terminarMirada(partida.estado) };
 
@@ -1364,18 +1509,38 @@ export function crearMotorEnRed({
         (u) => u !== uid && t - (latidos[u] ?? 0) > MS_SIN_SENALES,
       );
 
-      // Sólo se republican las vistas si CAMBIÓ quién está ausente. Un latido
-      // cada cinco segundos por cuatro jugadores serían miles de escrituras
-      // por partida, y encima cada publicación recalcularía plazos.
-      const cambio = JSON.stringify(ausentes) !== JSON.stringify(partida.ausentes ?? []);
+      /**
+       * Latir es también LLEGAR.
+       *
+       * La mesa manda su primer latido en cuanto carga, así que el primero de
+       * cada jugador dice «estoy sentado». Cuando llega el último mientras la
+       * partida espera, se abre la primera ronda. No hizo falta una función
+       * nueva —que tendría su propio arranque en frío— para algo que ésta ya
+       * recibía.
+       */
+      const previas = partida.llegadas ?? [];
+      const llegadas = previas.includes(uid) ? previas : [...previas, uid];
+      const llego = llegadas !== previas;
+
+      let conLlegadas = { ...partida, latidos, ausentes, llegadas };
+      const abre = conLlegadas.esperandoLlegadas && llegaronTodos(conLlegadas);
+      if (abre) conLlegadas = abrirPrimeraRonda(conLlegadas, t);
+
+      // Sólo se republican las vistas si CAMBIÓ algo que se ve: quién está
+      // ausente, quién llegó, o que la ronda abrió. Un latido cada cinco
+      // segundos por cuatro jugadores serían miles de escrituras por partida,
+      // y encima cada publicación recalcularía plazos.
+      const cambio =
+        llego || abre ||
+        JSON.stringify(ausentes) !== JSON.stringify(partida.ausentes ?? []);
       if (!cambio) {
         tx.set(refPartida(codigo), { ...partida, latidos, actualizado: marcaDeTiempo() });
         return { ausentes, version: partida.version };
       }
 
-      const siguiente = { ...partida, latidos, ausentes, version: partida.version + 1 };
+      const siguiente = { ...conLlegadas, version: partida.version + 1 };
       publicar(tx, codigo, siguiente);
-      return { ausentes, version: siguiente.version };
+      return { ausentes, abrio: abre, version: siguiente.version };
     });
   }
 
