@@ -184,10 +184,26 @@ async function abrirRed(page, secuencia) {
   return errores;
 }
 
-/** Detiene el reloj de la página: de acá en más sólo avanza con `runFor`. */
+/**
+ * Detiene el reloj de la página: de acá en más sólo avanza con `runFor`.
+ *
+ * El reloj instalado corre solo hasta que se lo pausa, y pausar en el pasado es
+ * un error. Con la máquina cargada —la suite entera corriendo— entre leer la
+ * hora y pausar pasaron más de los cien milisegundos de margen que había, y la
+ * prueba fallaba sin que la mesa tuviera nada que ver. Ahora el margen es de un
+ * segundo, y si igual se pasa, se vuelve a leer la hora y se reintenta.
+ */
 async function pausar(page) {
-  const ahora = await page.evaluate(() => Date.now());
-  await page.clock.pauseAt(new Date(ahora + 100));
+  for (let intento = 0; intento < 5; intento++) {
+    const ahora = await page.evaluate(() => Date.now());
+    try {
+      await page.clock.pauseAt(new Date(ahora + 1000));
+      return;
+    } catch (error) {
+      if (!/past/i.test(String(error))) throw error;
+    }
+  }
+  throw new Error("no se pudo pausar el reloj de la página");
 }
 
 const pista = (page) => page.locator("#pista");

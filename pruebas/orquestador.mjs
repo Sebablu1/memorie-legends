@@ -702,9 +702,13 @@ console.log("\n=== 11. Lo que se expone se ve, y después se tapa ===");
   ok((durante.revelaciones ?? []).some((r) => r.carta?.id === equivocada.id),
      "que además viaja en el campo de revelaciones");
 
-  // Las demás cartas de ana siguen tapadas: se expone una, no la mano.
-  const otras = durante.jugadores[0].mano.filter((c, i) => i !== pos && c);
+  // Las demás cartas de ana siguen tapadas, salvo la de castigo: la regla la
+  // muestra a los cuatro, y entra al final de la mano.
+  const castigo = durante.jugadores[0].mano.length - 1;
+  const otras = durante.jugadores[0].mano.filter((c, i) => i !== pos && i !== castigo && c);
   ok(otras.every((c) => c.oculta), "el resto de la mano de ana sigue tapada", otras.length);
+  ok(durante.jugadores[0].mano[castigo] && !durante.jugadores[0].mano[castigo].oculta,
+     "y la de castigo se ve", durante.jugadores[0].mano[castigo]);
 
   reloj += MS_REVELACION;
   await red.avanzarPartida({ codigo: CODIGO });

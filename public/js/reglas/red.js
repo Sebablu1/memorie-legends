@@ -356,10 +356,9 @@ export function registrarIntento(ventana, intento, { ahora, cantidadDeCartas }) 
   // puede costar una carta de castigo.
   //
   // Ojo: esto NO limita al jugador a un intento por ventana, y no debe
-  // hacerlo. Con los poderes 8 y 10 uno sabe QUÉ carta tiene el rival pero no
-  // DÓNDE, así que puede equivocarse de posición varias veces —sumando un
-  // castigo por cada error— y seguir buscando. Un identificador nuevo es un
-  // intento humano nuevo, y es legítimo.
+  // hacerlo. Sobre una carta conocida de un rival se puede volver a intentar
+  // mientras dure la ventana —sumando un castigo por cada error—: es la regla.
+  // Un identificador nuevo es un intento humano nuevo, y es legítimo.
   if (ventana.intentos[clientActionId]) {
     return { ok: true, ventana, duplicado: true };
   }
@@ -372,9 +371,7 @@ export function registrarIntento(ventana, intento, { ahora, cantidadDeCartas }) 
   // con un identificador nuevo y al cerrar la ventana se aplicaban todos.
   //
   // Sobre la mano de un RIVAL no se limita, por lo que dice el comentario de
-  // arriba: buscar una carta conocida por un poder es lo contrario de una
-  // carrera. Hoy no existen los intentos sobre rival; la distinción queda
-  // escrita para que cuando existan no choquen contra esto.
+  // arriba: se puede intentar más de una vez sobre una carta que se conoce.
   const contraSuPropiaMano = (intento.objetivo ?? uid) === uid;
   const yaJugoLoSuyo = Object.values(ventana.intentos)
     .some((x) => x.uid === uid && (x.objetivo ?? x.uid) === x.uid);
@@ -408,7 +405,7 @@ export function registrarIntento(ventana, intento, { ahora, cantidadDeCartas }) 
           clientActionId,
           uid,
           // De quién es la mano que se toca: la propia, o la de un rival
-          // sobre el que se tiene un poder 8/10.
+          // del que se conoce esa carta.
           objetivo: intento.objetivo ?? uid,
           posicion,
           // Qué carta propia se entrega si el intento sobre un rival acierta.

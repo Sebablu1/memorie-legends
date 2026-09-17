@@ -11,23 +11,23 @@
  * poderes 8 y 10. Se veía y no se tocaba.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * POR QUÉ EL ALCANCE ES LA POSICIÓN Y NO LA MANO
+ * POR QUÉ EL ALCANCE ES ESA CARTA Y NO LA MANO
  * ─────────────────────────────────────────────────────────────────────────
  *
- * El derecho de los poderes vale sobre la mano entera, y con razón: quien usa
- * un 8 se lleva un NÚMERO, no un lugar, así que limitarlo a donde lo vio
- * volvería el poder un acierto garantizado.
+ * Porque todo conocimiento es de una carta: la mesa vio ésa, en ese lugar.
+ * Dar derecho sobre la mano entera regalaría un permiso que nadie se ganó.
  *
- * Acá es al revés: la mesa vio el número Y el lugar, los dos a la vez. Dar
- * derecho sobre la mano entera regalaría un permiso que nadie se ganó.
+ * Un error muestra además la carta de castigo, y ésa también la conocen
+ * todos. Así que tras un fallo hay DOS cartas atacables: la fallada y el
+ * castigo. Las otras, no.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * Y POR QUÉ NADIE TIENE QUE ACORDARSE DE INVALIDARLO
  * ─────────────────────────────────────────────────────────────────────────
  *
- * El conocimiento guarda el `id` de la carta y se compara contra la que HAY en
- * esa posición. Si se la cambiaron, se la descartaron o volvió a fallar con
- * otra, el recuerdo deja de valer solo. La mitad de esta suite es eso.
+ * El derecho se busca contra la carta que HAY en esa posición. Si se la
+ * cambiaron o se la descartaron, deja de valer ahí solo. La mitad de esta
+ * suite es eso.
  */
 
 import * as M from "../public/js/reglas/motor.js";
@@ -112,12 +112,15 @@ console.log("\n=== 1. Fallar le da derecho a los demás, y sólo ahí ===");
   }
 
   /**
-   * Y sigue sin tener el derecho de mano entera.
+   * Lo atacable es exactamente la fallada y la de castigo.
    *
-   * Es la diferencia con un poder. Si `puedeAtacarA` diera true, el permiso
-   * sería sobre toda la mano y la distinción no existiría.
+   * Si apareciera cualquier otra posición, el fallo estaría regalando la mano
+   * entera.
    */
-  ok(!M.puedeAtacarA(tras, 1, 0), "el fallo NO da derecho sobre la mano entera");
+  ok(JSON.stringify(M.posicionesAtacablesDe(tras, 1)) ===
+       '[{"objetivo":0,"posicion":1},{"objetivo":0,"posicion":3}]',
+     "el fallo da derecho sobre la fallada y el castigo, y nada más",
+     M.posicionesAtacablesDe(tras, 1));
 
   // El que falló no gana derecho sobre sí mismo.
   ok(!M.puedeAtacarEn(tras, 0, 0, 1), "y el que falló no se ataca a sí mismo");
@@ -202,7 +205,7 @@ console.log("\n=== 3. El derecho se invalida solo cuando la carta cambia ===");
 }
 
 // =====================================================================
-console.log("\n=== 4. Un fallo nuevo en la misma posición reemplaza al viejo ===");
+console.log("\n=== 4. Un fallo nuevo en la misma posición da un derecho nuevo ===");
 // =====================================================================
 
 {
@@ -230,12 +233,13 @@ console.log("\n=== 4. Un fallo nuevo en la misma posición reemplaza al viejo ==
   const dos = M.intentarDescarte(conOtra, 0, 1);
   ok(M.puedeAtacarEn(dos, 1, 0, 1), "y el fallo nuevo da un derecho nuevo");
 
-  // Una sola creencia por posición: no se acumulan dos.
-  const deEsaPosicion = (dos.conocimientos ?? []).filter(
-    (c) => c.actor === 1 && c.objetivo === 0 && c.posicion === 1 && c.origen === "fallo",
-  );
-  ok(deEsaPosicion.length === 1, "y queda UNA sola creencia por posición", deEsaPosicion.length);
-  ok(deEsaPosicion[0]?.idCarta === "a9", "la de la carta que se vio último", deEsaPosicion[0]?.idCarta);
+  // Lo que se sabe es de cartas: la vieja ya no está en ninguna mano y su
+  // recuerdo se borró; la nueva queda una sola vez.
+  const deJ1 = (dos.conocimientos ?? []).filter((c) => c.actor === 1);
+  ok(!deJ1.some((c) => c.idCarta === "a1"),
+     "el recuerdo de la carta que ya no está se borró", deJ1);
+  ok(deJ1.filter((c) => c.idCarta === "a9").length === 1,
+     "y la que se vio último queda una sola vez", deJ1);
 }
 
 // =====================================================================

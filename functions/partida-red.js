@@ -868,9 +868,10 @@ export function crearMotorEnRed({
         if (partida.estado.jugadores[indiceObjetivo].eliminado) {
           throw error("failed-precondition", "Ese jugador ya no está en juego.");
         }
-        // LA autorización: la da el estado, no el navegador.
-        if (!motor.puedeAtacarA(partida.estado, indice, indiceObjetivo)) {
-          throw error("permission-denied", "No sabés nada de esa mano.");
+        // LA autorización: la da el estado, no el navegador. Es sobre ESA
+        // carta: conocer otra de la misma mano no alcanza.
+        if (!motor.puedeAtacarEn(partida.estado, indice, indiceObjetivo, posicion)) {
+          throw error("permission-denied", "No conocés esa carta.");
         }
         // La carta que se entregaría tiene que existir de verdad.
         const miMano = partida.estado.jugadores[indice].mano;

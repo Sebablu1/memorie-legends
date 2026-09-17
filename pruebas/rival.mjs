@@ -1,19 +1,24 @@
 /**
- * Buscar en la mano del rival: poderes 8 y 10, conocimiento y transferencia.
+ * Descartarle una carta a un rival: de dónde sale el derecho, y qué pasa.
  *
- * La mecánica, en una frase: ver una carta ajena no es saber DÓNDE está.
+ * La mecánica, en una frase: sólo se ataca una carta que se CONOCE.
  *
- * Un poder 8 o 10 deja saber que el rival tiene, por ejemplo, un 5. Cuando la
- * muestra sea un 5, se lo puede ir a buscar —pero a cualquiera de sus cuatro
- * posiciones, porque las cartas se mueven y la memoria falla—. Equivocarse
- * cuesta una carta y no borra lo que se sabe: se puede insistir, y cada error
- * vuelve a costar. Al acertar, la carta del rival se va al descarte y en su
- * lugar exacto queda una carta propia, elegida por posición y a ciegas: ni
- * quien la entrega sabe cuál era.
+ * Conocer es saber qué carta es y dónde está. Lo da un 8, un 10, el castigo de
+ * un error ajeno, o una carta propia conocida que pasó a otra mano. Si la
+ * muestra es de ese número, se la puede descartar: la del rival se va al
+ * descarte y en su lugar exacto queda una carta propia, elegida por posición y
+ * a ciegas. Si no es, el que ataca se come una de castigo, sigue conociendo la
+ * carta, y puede volver a intentar; cada error vuelve a costar.
+ *
+ * ANTES ERA OTRA COSA. El conocimiento guardaba el número visto y habilitaba
+ * cualquier posición de esa mano: "sé que tiene un 5, no dónde". No seguía a
+ * la carta cuando se movía, no caducaba cuando se iba, y la mesa y el servidor
+ * no se ponían de acuerdo sobre qué se podía atacar. Esta prueba afirmaba ese
+ * modelo; se reescribió con la especificación del descarte al rival.
  *
  * Lo que se comprueba acá es sobre todo lo que NO pasa: que no aparezcan ni
- * desaparezcan cartas, que el número conocido no viaje nunca al navegador, y
- * que nadie pueda atacar una mano de la que no sabe nada.
+ * desaparezcan cartas, que ninguna carta conocida viaje al navegador, y que
+ * nadie pueda atacar una carta que no conoce.
  */
 
 import * as M from "../public/js/reglas/motor.js";
@@ -55,10 +60,13 @@ function mesa({ manoX, manoY, muestra = carta("Copa", 5) } = {}) {
   };
 }
 
-/** Deja anotado que X vio una carta de Y, sin pasar por la fase de poder. */
-const conSaber = (s, numero, origen = "poder8") => ({
+/** Deja anotado que `actor` conoce esas cartas, sin pasar por un poder. */
+const conSaber = (s, ids, actor = 0, origen = "poder8") => ({
   ...s,
-  conocimientos: [{ actor: 0, objetivo: 1, numero, origen, ronda: s.ronda }],
+  conocimientos: [
+    ...(s.conocimientos ?? []),
+    ...[ids].flat().map((idCarta) => ({ actor, idCarta, origen, ronda: s.ronda })),
+  ],
 });
 
 const cuenta = (s, i) => s.jugadores[i].mano.filter(Boolean).length;
@@ -68,61 +76,52 @@ const todasLasCartas = (s) => [
   ...s.jugadores.flatMap((j) => j.mano.filter(Boolean).map((c) => c.id)),
   ...(s.levantada ? [s.levantada.id] : []),
 ];
+const atacables = (s, actor) => JSON.stringify(M.posicionesAtacablesDe(s, actor));
 
 // ================================================ 1. de dónde sale el saber
 
-console.log("\n=== 1. El poder 8 deja saber, el 7 no ===");
+console.log("\n=== 1. El 8 deja conocida la carta que se miró; el 7 no autoriza nada ===");
 {
   const s = { ...mesa(), fase: "poder", poderPendiente: { tipo: "mirarRival", numero: 8, indiceJugador: 0 } };
-  const r = M.usarPoderMirar(s, 1, 1);   // X mira la posición 1 de Y: un 5
+  const r = M.usarPoderMirar(s, 1, 1);   // X mira la posición 1 de Y: Basto-5
 
   ok(r.revelada?.carta?.numero === 5, "X ve la carta que miró", r.revelada?.carta?.numero);
-  ok(r.estado.conocimientos.length === 1, "y queda anotado que sabe algo", r.estado.conocimientos);
+  ok(M.conoceCarta(r.estado, 0, "Basto-5"), "y queda anotado que la conoce");
 
-  const c = r.estado.conocimientos[0];
-  ok(c.actor === 0 && c.objetivo === 1, "quién sabe, y de quién");
-  ok(c.numero === 5, "qué número", c.numero);
-  ok(c.origen === "poder8", "de dónde salió", c.origen);
-  ok(!("posicion" in c), "y NO se guarda la posición: ésa es toda la mecánica");
+  const c = r.estado.conocimientos.find((k) => k.actor === 0);
+  ok(c?.idCarta === "Basto-5", "lo que se guarda es la carta", c);
+  ok(c?.origen === "poder8", "de dónde salió", c?.origen);
+  ok(!("numero" in c) && !("posicion" in c),
+     "ni el número ni la posición: la posición se busca en la mano cada vez", c);
+  ok(atacables(r.estado, 0) === '[{"objetivo":1,"posicion":1}]',
+     "y lo que habilita es ESA carta, no la mano entera", M.posicionesAtacablesDe(r.estado, 0));
 
-  // El 7 mira la carta propia: eso no autoriza nada contra nadie.
-  //
-  // Antes esto se comprobaba con `conocimientos.length === 0`, y dejó de valer
-  // cuando el 7 empezó a dejar constancia de QUÉ vio —hace falta para que un 9
-  // o un 10 le enseñen algo a quien los sufre. Lo que importaba nunca fue que
-  // la lista estuviera vacía sino que no diera derechos, así que ahora se
-  // afirma eso: la entrada existe, y no habilita a nadie contra nadie.
+  // El 7 mira una carta propia: la deja conocida, pero no autoriza nada
+  // contra nadie. Nadie se ataca a sí mismo.
   const propio = { ...mesa(), fase: "poder", poderPendiente: { tipo: "mirarPropia", numero: 7, indiceJugador: 0 } };
   const r7 = M.usarPoderMirar(propio, 0, 0);
 
   ok(M.objetivosDe(r7.estado, 0).length === 0,
      "mirar una carta propia no autoriza a atacar a nadie", M.objetivosDe(r7.estado, 0));
-  ok(r7.estado.conocimientos.every((c) => c.actor === c.objetivo),
-     "y lo único que queda anotado es sobre uno mismo", r7.estado.conocimientos);
-
-  const propia = r7.estado.conocimientos[0];
-  ok(propia?.origen === "poder7", "con su origen", propia?.origen);
-  ok(propia?.posicion === 0 && typeof propia?.idCarta === "string",
-     "la posición y la carta concreta, que es lo que permite saber después si sigue ahí",
-     propia);
+  ok(M.conoceCarta(r7.estado, 0, "Oro-1"), "pero la carta queda conocida");
+  ok(r7.estado.conocimientos.find((k) => k.actor === 0)?.origen === "poder7", "con su origen");
 }
 
-console.log("\n=== 2. El 10 muestra, espera, y deja saber según lo que se decidió ===");
+console.log("\n=== 2. El 10 deja conocidas las dos cartas; el 9 no deja nada nuevo ===");
 {
-  // El 10 son DOS pasos. Primero muestra las dos cartas y se detiene: hasta
-  // que su dueño no conteste no se mueve nada ni se sabe nada, porque todavía
-  // no se sabe dónde va a quedar cada carta.
+  // El 10 son DOS pasos. Primero muestra las dos cartas y se detiene; lo que
+  // vio ya lo conoce, cambie o no.
   const s = { ...mesa(), fase: "poder", poderPendiente: { tipo: "cambioConVista", numero: 10, indiceJugador: 0 } };
   const miCarta = s.jugadores[0].mano[2];        // Oro-3
-  const suCarta = s.jugadores[1].mano[0];
+  const suCarta = s.jugadores[1].mano[0];        // Basto-7
   const visto = M.usarPoderCambio(s, 2, 1, 0);   // mi posición 2 por la 0 de Y
 
   ok(visto.estado.fase === "cambioConVista", "primero espera la decisión", visto.estado.fase);
   ok(visto.revelada?.propia?.id === miCarta.id && visto.revelada?.rival?.id === suCarta.id,
      "mostrando las dos cartas a quien lo usó");
   ok(visto.estado.jugadores[1].mano[0].id === suCarta.id, "sin haber movido nada todavía");
-  ok((visto.estado.conocimientos ?? []).length === 0,
-     "y sin anotar conocimiento: aún no se sabe dónde va a quedar cada carta");
+  ok(M.conoceCarta(visto.estado, 0, miCarta.id) && M.conoceCarta(visto.estado, 0, suCarta.id),
+     "y conociendo ya las dos");
 
   // Las POSICIONES quedan en el estado para poder resolver, nunca las cartas:
   // guardarlas ahí las pondría a un `vistaDe` mal escrito de toda la mesa.
@@ -132,133 +131,113 @@ console.log("\n=== 2. El 10 muestra, espera, y deja saber según lo que se decid
   ok(!JSON.stringify(p).includes(suCarta.id) && !JSON.stringify(p).includes(miCarta.id),
      "y NO guarda ninguna carta", p);
 
-  // SI CAMBIA: la del rival pasa a ser propia, así que saberla ya no dice nada
-  // de nadie. La que él entregó sí quedó en la mano ajena, y su número se vio.
+  // SI CAMBIA: las dos se mueven y el conocimiento va con ellas. La suya ya
+  // es mía —no se ataca—; la mía quedó en la mano de Y, y ésa sí.
   const cambio = M.resolverCambioConVista(visto.estado, true);
   ok(cambio.jugadores[1].mano[0].id === miCarta.id, "mi carta quedó en la mano de Y");
   ok(cambio.jugadores[0].mano[2].id === suCarta.id, "y la suya en la mía");
-  const c = cambio.conocimientos[0];
-  ok(c?.numero === miCarta.numero, "y sé que Y tiene ese número", c?.numero);
-  ok(c?.origen === "poder10", "anotado como poder10", c?.origen);
+  ok(atacables(cambio, 0) === '[{"objetivo":1,"posicion":0}]',
+     "puedo ir sobre la carta que le di, en su lugar nuevo", M.posicionesAtacablesDe(cambio, 0));
   ok(cambio.fase === "postLevantada", "y vuelve a la decisión de cortar", cambio.fase);
 
-  // SI NO CAMBIA: cada carta se queda donde estaba, y lo que sabe es la carta
-  // del rival, que sigue siendo del rival. Derivarlo al revés le daría un
-  // derecho sobre una carta que no está donde él cree.
+  // SI NO CAMBIA: cada carta se queda donde estaba, y la que puedo atacar es
+  // la de Y, que sigue siendo de Y.
   const sinCambiar = M.resolverCambioConVista(visto.estado, false);
   ok(sinCambiar.jugadores[1].mano[0].id === suCarta.id, "no cambiar deja todo donde estaba");
   ok(sinCambiar.jugadores[0].mano[2].id === miCarta.id, "en las dos manos");
-  const c2 = sinCambiar.conocimientos[0];
-  ok(c2?.numero === suCarta.numero,
-     "y lo que sabe es la carta de Y, no la suya", { sabe: c2?.numero, deY: suCarta.numero });
-  ok(c2?.origen === "poder10", "también anotado como poder10", c2?.origen);
+  ok(atacables(sinCambiar, 0) === '[{"objetivo":1,"posicion":0}]',
+     "y puedo ir sobre la carta de Y que vi", M.posicionesAtacablesDe(sinCambiar, 0));
 
   /**
-   * Las posiciones son PÚBLICAS, y es una decisión de diseño.
-   *
-   * ───────────────────────────────────────────────────────────────────────
-   * ESTA PRUEBA AFIRMABA LO CONTRARIO
-   * ───────────────────────────────────────────────────────────────────────
-   *
-   * Decía que la mesa no podía enterarse de qué posiciones se estaban
-   * mirando, y el argumento era bueno: decir «está mirando la segunda de
-   * Bruno» convierte el poder en un anuncio público de dónde está lo que se
-   * vio.
-   *
-   * Se decidió al revés, a propósito. La mesa ve el ojo sobre la carta
-   * exacta, y saber qué carta conoce un rival pasa a ser parte de la
-   * estrategia: el juego se vuelve más sobre leer al otro y menos sobre
-   * esconder.
-   *
-   * Lo que sigue sin viajar son las CARTAS, y eso no cambió: `cambioPendiente`
-   * guarda posiciones y nada más. Hacer público DÓNDE miró no es lo mismo que
-   * hacer público QUÉ vio, y la segunda mitad de este bloque es la que lo
-   * vigila.
+   * Las posiciones del 10 son PÚBLICAS, y es una decisión de diseño: la mesa
+   * ve el ojo sobre la carta exacta. Lo que sigue sin viajar son las CARTAS.
    */
-  {
-    const V = await import("../public/js/reglas/vista.js");
-
-    for (const quien of [0, 1, 2]) {
-      const v = V.vistaDe(visto.estado, quien).cambioPendiente;
-      ok(v?.indiceJugador === 0 && v?.indiceRival === 1,
-         `el jugador ${quien} ve quién decide y sobre quién`);
-      ok(v?.posicionPropia === 2 && v?.posicionRival === 0,
-         `y el jugador ${quien} TAMBIÉN ve las posiciones`, v);
-    }
-
-    // Pero ninguna carta, para nadie. Es el límite que no se movió.
-    for (const quien of [0, 1, 2]) {
-      const v = V.vistaDe(visto.estado, quien).cambioPendiente;
-      const campos = Object.keys(v ?? {}).sort();
-      ok(
-        JSON.stringify(campos) ===
-          JSON.stringify(["indiceJugador", "indiceRival", "posicionPropia", "posicionRival"]),
-        `el jugador ${quien} ve las cuatro posiciones y NADA más`,
-        campos,
-      );
-    }
+  for (const quien of [0, 1, 2]) {
+    const v = V.vistaDe(visto.estado, quien).cambioPendiente;
+    ok(v?.indiceJugador === 0 && v?.indiceRival === 1,
+       `el jugador ${quien} ve quién decide y sobre quién`);
+    ok(v?.posicionPropia === 2 && v?.posicionRival === 0,
+       `y el jugador ${quien} TAMBIÉN ve las posiciones`, v);
+    const campos = Object.keys(v ?? {}).sort();
+    ok(
+      JSON.stringify(campos) ===
+        JSON.stringify(["indiceJugador", "indiceRival", "posicionPropia", "posicionRival"]),
+      `el jugador ${quien} ve las cuatro posiciones y NADA más`,
+      campos,
+    );
   }
 
-  // El 9 cambia a ciegas: no se vio nada, no se sabe nada, y no espera a nadie.
+  // El 9 cambia a ciegas: no se vio nada, no se anota nada, y no espera.
   const s9 = { ...mesa(), fase: "poder", poderPendiente: { tipo: "cambioCiego", numero: 9, indiceJugador: 0 } };
   const r9 = M.usarPoderCambio(s9, 2, 1, 0);
   ok(r9.estado.fase === "postLevantada", "el 9 no pregunta nada", r9.estado.fase);
-  ok((r9.estado.conocimientos ?? []).length === 0, "el 9 cambia a ciegas y no deja conocimiento");
+  ok((r9.estado.conocimientos ?? []).length === 0, "el 9 no anota conocimiento nuevo");
   ok(r9.estado.jugadores[1].mano[0].id === miCarta.id, "pero sí cambia");
 }
 
 // ================================================== 3. la autorización
 
-console.log("\n=== 3. Saber una carta habilita TODA la mano ===");
+console.log("\n=== 3. Conocer una carta habilita ESA carta, y nada más ===");
 {
-  const s = conSaber(mesa(), 5);
+  const s = conSaber(mesa(), "Basto-5");
 
-  ok(M.puedeAtacarA(s, 0, 1) === true, "X puede ir contra Y");
-  ok(M.puedeAtacarA(s, 0, 2) === false, "pero no contra Z, de quien no sabe nada");
-  ok(M.puedeAtacarA(s, 1, 0) === false, "y Y no puede ir contra X: el saber no es mutuo");
-  ok(M.puedeAtacarA(s, 0, 0) === false, "nadie se ataca a sí mismo por esta vía");
+  ok(M.puedeAtacarEn(s, 0, 1, 1) === true, "X puede ir sobre la carta que conoce");
+  for (const p of [0, 2, 3]) {
+    ok(M.puedeAtacarEn(s, 0, 1, p) === false, `pero no sobre la posición ${p} de Y`);
+  }
+  ok(M.puedeAtacarA(s, 0, 2) === false, "ni contra Z, de quien no conoce nada");
+  ok(M.puedeAtacarA(s, 1, 0) === false, "y Y no puede ir contra X: conocer no es mutuo");
+  ok(M.puedeAtacarEn(s, 0, 0, 0) === false, "nadie se ataca a sí mismo");
 
   ok(JSON.stringify(M.objetivosDe(s, 0)) === "[1]", "los objetivos de X son sólo Y", M.objetivosDe(s, 0));
   ok(M.objetivosDe(s, 1).length === 0, "Y no tiene ninguno");
 
-  // Sabe que hay un 5, no dónde: las cuatro posiciones quedan habilitadas.
-  const habilitadas = s.jugadores[1].mano.map((_, p) => p).filter(() => M.puedeAtacarA(s, 0, 1));
-  ok(habilitadas.length === 4, "las cuatro posiciones de Y quedan disponibles", habilitadas.length);
-
-  // A un eliminado no se lo ataca.
+  // A un eliminado no se lo ataca, ni un eliminado ataca.
   const conYFuera = { ...s, jugadores: s.jugadores.map((j, i) => (i === 1 ? { ...j, eliminado: true } : j)) };
-  ok(M.puedeAtacarA(conYFuera, 0, 1) === false, "a un jugador eliminado no");
+  ok(M.puedeAtacarEn(conYFuera, 0, 1, 1) === false, "a un jugador eliminado no");
+  const conXFuera = { ...s, jugadores: s.jugadores.map((j, i) => (i === 0 ? { ...j, eliminado: true } : j)) };
+  ok(M.puedeAtacarEn(conXFuera, 0, 1, 1) === false, "y un eliminado no ataca");
 }
 
 // ============================================ 4. equivocarse y seguir
 
-console.log("\n=== 4. Equivocarse cuesta, pero no cancela la búsqueda ===");
+console.log("\n=== 4. Equivocarse cuesta, y se puede volver a intentar ===");
 {
-  // Y = [7, 5, 3, 9]. El 5 está en la posición 1. X va a fallar tres veces.
-  let s = conSaber(mesa(), 5);
+  // Y = [7, 5, 3, 9], muestra 5. X conoce el 7 y el 5 de Y.
+  let s = conSaber(mesa(), ["Basto-7", "Basto-5"]);
   const antesX = cuenta(s, 0);
   const cartasAntes = todasLasCartas(s).length;
 
   s = M.intentarDescarteRival(s, 0, 1, 0, 0);   // Y[0] = 7 → error
-  ok(s.ventanaDescarte.intentos.at(-1).resultado === "rivalError", "primer intento: error");
+  const primero = s.ventanaDescarte.intentos.at(-1);
+  ok(primero.resultado === "rivalError", "primer intento sobre el 7: error");
   ok(cuenta(s, 0) === antesX + 1, "X recibe una carta", cuenta(s, 0));
   ok(s.jugadores[1].mano[0].id === "Basto-7", "la carta de Y no se movió");
-  ok(s.conocimientos.length === 1, "y sigue sabiendo que Y tiene un 5");
+  ok(M.conoceCarta(s, 0, "Basto-7"), "y X la sigue conociendo");
 
-  s = M.intentarDescarteRival(s, 0, 1, 2, 0);   // Y[2] = 3 → error
-  ok(cuenta(s, 0) === antesX + 2, "segundo error: otra carta más", cuenta(s, 0));
+  s = M.intentarDescarteRival(s, 0, 1, 0, 0);   // otra vez el 7 → error
+  ok(s.ventanaDescarte.intentos.at(-1).resultado === "rivalError", "segundo intento: se puede, y es error");
+  ok(cuenta(s, 0) === antesX + 2, "otra carta más", cuenta(s, 0));
 
-  s = M.intentarDescarteRival(s, 0, 1, 3, 0);   // Y[3] = 9 → error
-  ok(cuenta(s, 0) === antesX + 3, "tercer error: y otra", cuenta(s, 0));
-  ok(s.conocimientos.length === 1, "el conocimiento aguanta los tres errores");
+  const igual = M.intentarDescarteRival(s, 0, 1, 2, 0);   // Y[2]: no la conoce
+  ok(igual === s, "sobre una carta que no conoce no hay intento, ni castigo");
 
-  ok(s.ventanaDescarte.intentos.every((i) => i.carta), "las tres falladas se exponen a la mesa");
-  ok(s.ventanaDescarte.intentos.length === 3, "y quedan los tres intentos anotados");
+  // La de castigo se ve y la conocen todos.
+  const castigo = primero.castigo;
+  ok(castigo?.indiceJugador === 0 && castigo?.posicion === antesX,
+     "el castigo es de X y entra al final de su mano", castigo);
+  ok(s.jugadores[0].mano[castigo?.posicion]?.id === castigo?.carta?.id, "es la carta que está ahí");
+  ok([0, 1, 2].every((i) => M.conoceCarta(s, i, castigo?.carta?.id)),
+     "y la conocen los tres, X incluido");
+  ok(M.puedeAtacarEn(s, 1, 0, castigo?.posicion) && M.puedeAtacarEn(s, 2, 0, castigo?.posicion),
+     "así que Y y Z pueden ir sobre ella");
 
-  // Cuarto intento: ahora sí.
+  // Ahora sí: el 5.
   s = M.intentarDescarteRival(s, 0, 1, 1, 0);   // Y[1] = 5 → acierto
-  ok(s.ventanaDescarte.intentos.at(-1).resultado === "rivalAcierto", "cuarto intento: acierto");
-  ok(s.conocimientos.length === 0, "y el conocimiento se consume: el 5 ya no está ahí");
+  ok(s.ventanaDescarte.intentos.at(-1).resultado === "rivalAcierto", "sobre el 5: acierto");
+  ok(!M.conoceCarta(s, 0, "Basto-5"), "el 5 salió de la mesa y nadie lo conoce más");
+  ok(M.conoceCarta(s, 0, "Basto-7"), "el 7 sigue ahí, y sigue conocido");
+  ok(s.ventanaDescarte.intentos.at(-1).castigo === undefined, "un acierto no lleva castigo");
 
   ok(todasLasCartas(s).length === cartasAntes, "y en toda la mesa no se creó ni se perdió ninguna carta",
      { antes: cartasAntes, despues: todasLasCartas(s).length });
@@ -268,7 +247,7 @@ console.log("\n=== 4. Equivocarse cuesta, pero no cancela la búsqueda ===");
 
 console.log("\n=== 5. La transferencia: exacta, atómica y a ciegas ===");
 {
-  const s0 = conSaber(mesa(), 5);
+  const s0 = conSaber(mesa(), "Basto-5");
   const entregada = s0.jugadores[0].mano[2];      // Oro-3, la que X va a dar
   const objetivo = s0.jugadores[1].mano[1];       // Basto-5, la que busca
   const idsAntes = todasLasCartas(s0).sort().join(",");
@@ -289,64 +268,75 @@ console.log("\n=== 5. La transferencia: exacta, atómica y a ciegas ===");
      "ni las de Y");
 
   ok(cuenta(s, 1) === 4, "Y sigue con cuatro cartas: perdió una y recibió una", cuenta(s, 1));
-  ok(cuenta(s, 0) === 3, "X queda con tres: entregó y no recibió castigo", cuenta(s, 0));
+  ok(cuenta(s, 0) === 3, "X queda con tres: una menos", cuenta(s, 0));
 
   ok(todasLasCartas(s).sort().join(",") === idsAntes, "ninguna carta duplicada ni perdida");
   ok(s.ventanaDescarte.intentos.at(-1).carta === null,
      "la carta entregada NO se expone: nadie la ve, ni quien la dio");
+  ok(M.posicionesAtacablesDe(s, 0).length === 0,
+     "X no sabía cuál entregaba, así que no la conoce");
+
+  // Pero si la conocía de antes —la miró al empezar la ronda—, la sigue
+  // conociendo en la mano de Y. El recuerdo es de la carta.
+  const sabia = M.intentarDescarteRival(conSaber(s0, "Oro-3", 0, "mirada"), 0, 1, 1, 2);
+  ok(atacables(sabia, 0) === '[{"objetivo":1,"posicion":1}]',
+     "si X conocía la que entregó, la sigue en la mano de Y", M.posicionesAtacablesDe(sabia, 0));
 }
 
 // ============================================== 6. lo que no se permite
 
-console.log("\n=== 6. Sin conocimiento no hay derecho ===");
+console.log("\n=== 6. Sin conocer la carta no hay intento ===");
 {
   const sinSaber = mesa();
-  const igual = M.intentarDescarteRival(sinSaber, 0, 1, 1, 0);
-  ok(igual === sinSaber, "sin conocimiento, el intento no cambia nada");
+  ok(M.intentarDescarteRival(sinSaber, 0, 1, 1, 0) === sinSaber,
+     "sin conocimiento, el intento no cambia nada");
 
-  // Conocer a Y no habilita a Z, aunque Z tenga la carta de la muestra.
-  const soloY = conSaber(mesa(), 5);
-  const contraZ = M.intentarDescarteRival(soloY, 0, 2, 0, 0);
-  ok(contraZ === soloY, "conocer a Y no habilita contra Z");
+  const soloEsa = conSaber(mesa(), "Basto-5");
+  ok(M.intentarDescarteRival(soloEsa, 0, 1, 0, 0) === soloEsa,
+     "conocer el 5 de Y no habilita otra carta de Y");
+  ok(M.intentarDescarteRival(soloEsa, 0, 2, 0, 0) === soloEsa,
+     "ni una de Z, aunque vaya con la muestra");
 
   // Una posición vacía no es un objetivo.
   const conHueco = {
-    ...soloY,
-    jugadores: soloY.jugadores.map((j, i) =>
-      i === 1 ? { ...j, mano: [null, ...j.mano.slice(1)] } : j),
+    ...soloEsa,
+    jugadores: soloEsa.jugadores.map((j, i) =>
+      i === 1 ? { ...j, mano: [j.mano[0], null, ...j.mano.slice(2)] } : j),
   };
-  ok(M.intentarDescarteRival(conHueco, 0, 1, 0, 0) === conHueco, "un hueco no se puede atacar");
+  ok(M.intentarDescarteRival(conHueco, 0, 1, 1, 0) === conHueco, "un hueco no se puede atacar");
 
   // No se puede entregar una carta que no se tiene.
   const sinEsa = {
-    ...soloY,
-    jugadores: soloY.jugadores.map((j, i) =>
+    ...soloEsa,
+    jugadores: soloEsa.jugadores.map((j, i) =>
       i === 0 ? { ...j, mano: [j.mano[0], null, null, null] } : j),
   };
   ok(M.intentarDescarteRival(sinEsa, 0, 1, 1, 2) === sinEsa,
      "no se puede entregar desde una posición vacía");
 
   // Fuera de la ventana no se ataca.
-  const cerrada = { ...soloY, fase: "turno", ventanaDescarte: null };
+  const cerrada = { ...soloEsa, fase: "turno", ventanaDescarte: null };
   ok(M.intentarDescarteRival(cerrada, 0, 1, 1, 0) === cerrada, "fuera de la fase de descarte tampoco");
 }
 
 // ============================================ 7. lo que ve cada uno
 
-console.log("\n=== 7. El permiso viaja; el número, jamás ===");
+console.log("\n=== 7. El permiso viaja; la carta, jamás ===");
 {
-  const s = conSaber(mesa(), 5);
+  const s = conSaber(mesa(), "Basto-5");
 
   const vistaX = V.vistaDe(s, 0);
   const vistaY = V.vistaDe(s, 1);
   const vistaZ = V.vistaDe(s, 2);
 
-  ok(JSON.stringify(vistaX.puedeAtacar) === "[1]", "X ve que puede ir contra Y", vistaX.puedeAtacar);
-  ok(vistaY.puedeAtacar.length === 0 && vistaZ.puedeAtacar.length === 0,
+  ok(JSON.stringify(vistaX.puedeAtacarEn) === '[{"objetivo":1,"posicion":1}]',
+     "X ve dónde puede ir", vistaX.puedeAtacarEn);
+  ok(JSON.stringify(vistaX.puedeAtacar) === "[1]", "y contra quién", vistaX.puedeAtacar);
+  ok(vistaY.puedeAtacarEn.length === 0 && vistaZ.puedeAtacarEn.length === 0,
      "Y y Z no ven ningún objetivo");
 
   ok(!("conocimientos" in vistaX), "el modelo de conocimiento no viaja");
-  ok(!JSON.stringify(vistaX).includes('"actor"'), "ni disfrazado bajo otro nombre");
+  ok(!JSON.stringify(vistaX).includes('"idCarta"'), "ni disfrazado bajo otro nombre");
 
   // Y sobre todo: la mano de Y sigue tapada para X.
   ok(vistaX.jugadores[1].mano.every((c) => c?.oculta),
@@ -356,11 +346,16 @@ console.log("\n=== 7. El permiso viaja; el número, jamás ===");
     ok(V.filtracionesEn(v, s).length === 0, `la vista de ${quien} no filtra nada`,
        V.filtracionesEn(v, s));
   }
+
+  // El detector reconoce la forma nueva si alguien la publicara.
+  const conFuga = { ...vistaX, algo: [{ actor: 0, idCarta: "Basto-5" }] };
+  ok(V.filtracionesEn(conFuga, s).some((p) => /conocimiento/.test(p)),
+     "y si un conocimiento se colara en la vista, el detector lo ve");
 }
 
 console.log("\n=== 8. Tras la transferencia, nadie sabe qué se entregó ===");
 {
-  const s0 = conSaber(mesa(), 5);
+  const s0 = conSaber(mesa(), "Basto-5");
   const entregada = s0.jugadores[0].mano[2];
   const s = M.intentarDescarteRival(s0, 0, 1, 1, 2);
 
@@ -373,7 +368,7 @@ console.log("\n=== 8. Tras la transferencia, nadie sabe qué se entregó ===");
   const vX = V.vistaDe(s, 0);
   ok(vX.jugadores[1].mano[1]?.oculta === true,
      "en la vista de X esa posición está tapada, aunque él puso la carta");
-  ok(vX.puedeAtacar.length === 0, "y ya no puede seguir atacando: gastó lo que sabía");
+  ok(vX.puedeAtacarEn.length === 0, "y ya no tiene nada que atacar: la que conocía se fue");
 
   for (const i of [0, 1, 2]) {
     ok(V.filtracionesEn(V.vistaDe(s, i), s).length === 0, `sin filtraciones tras la transferencia (${i})`);
@@ -384,7 +379,7 @@ console.log("\n=== 8. Tras la transferencia, nadie sabe qué se entregó ===");
 
 console.log("\n=== 9. El conocimiento sobrevive el viaje por Firestore ===");
 {
-  let s = conSaber(mesa(), 5);
+  let s = conSaber(mesa(), ["Basto-7", "Basto-5"]);
   s = M.intentarDescarteRival(s, 0, 1, 0, 0);     // un error
 
   const ida = JSON.parse(JSON.stringify(s));
@@ -414,7 +409,6 @@ console.log("\n=== 9. El conocimiento sobrevive el viaje por Firestore ===");
 console.log("\n=== 10. El servidor no cree en la palabra del cliente ===");
 {
   const { crearMotorEnRed, MS_MIRAR } = await import("../functions/partida-red.js");
-  const { MS_VENTANA, MS_GRACIA } = await import("../public/js/reglas/red.js");
   const { MS_REVELACION } = await import("../public/js/reglas/vista.js");
 
   class E extends Error { constructor(c, m) { super(m); this.codigo = c; } }
@@ -480,10 +474,10 @@ console.log("\n=== 10. El servidor no cree en la palabra del cliente ===");
   const mintiendo = await capturar(() => red.intentarDescarte({
     uid: "x", codigo: C, windowId: v.id, posicion: 0, objetivo: "y", posicionEntrega: 0,
     clientActionId: "n2", declarado: 500, latencia: 30, incertidumbre: 15,
-    conoceRival: true, cartaConocida: 5, poder8: true,
+    conoceRival: true, cartaConocida: 5, poder8: true, idCarta: "lo-que-sea",
   }));
   ok(mintiendo.error?.codigo === "permission-denied",
-     "decir «yo tengo el poder» no autoriza nada", mintiendo.error?.message);
+     "decir «yo la conozco» no autoriza nada", mintiendo.error?.message);
 
   // Contra un jugador que no existe.
   const fantasma = await capturar(() => pedir({
@@ -491,12 +485,18 @@ console.log("\n=== 10. El servidor no cree en la palabra del cliente ===");
   }));
   ok(fantasma.error?.codigo === "not-found", "ni contra alguien que no juega", fantasma.error?.message);
 
-  // Ahora sí: se le concede el conocimiento en el estado maestro.
+  // Ahora sí: x conoce las tres primeras cartas de y, en el estado maestro.
   const p = partida();
+  const deY = p.estado.jugadores[1].mano;
   await db.runTransaction(async (tx) => {
     tx.set({ ruta: `partidas/${C}` }, {
       ...p,
-      estado: { ...p.estado, conocimientos: [{ actor: 0, objetivo: 1, numero: 5, origen: "poder8", ronda: p.estado.ronda }] },
+      estado: {
+        ...p.estado,
+        conocimientos: [0, 1, 2].map((i) => ({
+          actor: 0, idCarta: deY[i].id, origen: "poder8", ronda: p.estado.ronda,
+        })),
+      },
       version: p.version + 1,
     });
   });
@@ -506,15 +506,24 @@ console.log("\n=== 10. El servidor no cree en la palabra del cliente ===");
   ok(sinEntrega.error?.codigo === "invalid-argument",
      "hay que elegir una carta propia para entregar", sinEntrega.error?.message);
 
+  // La cuarta carta de y no la conoce: el permiso es por carta.
+  const laCuarta = await capturar(() => pedir({
+    posicion: 3, objetivo: "y", posicionEntrega: 0, clientActionId: "n5",
+  }));
+  ok(laCuarta.error?.codigo === "permission-denied",
+     "conocer tres cartas de y no habilita la cuarta", laCuarta.error?.message);
+
   // Varios intentos humanos sobre el rival: permitidos.
   const a = await capturar(() => pedir({ posicion: 0, objetivo: "y", posicionEntrega: 0, clientActionId: "r1" }));
 
   // Escribir el maestro a mano no republica las vistas —eso lo hace
   // `publicar`—, así que se comprueban después del primer intento, que sí
   // publica. Es además el camino real: la autorización llega con la vista.
-  ok(vista("x").puedeAtacar.includes(1), "la vista de x lo autoriza contra y", vista("x").puedeAtacar);
-  ok(vista("y").puedeAtacar.length === 0, "y no ve autorización ninguna");
-  ok(!JSON.stringify(vista("x")).includes('"conocimientos"'), "y el número conocido no viaja");
+  ok(JSON.stringify(vista("x").puedeAtacarEn) ===
+       '[{"objetivo":1,"posicion":0},{"objetivo":1,"posicion":1},{"objetivo":1,"posicion":2}]',
+     "la vista de x lo autoriza sobre esas tres cartas", vista("x").puedeAtacarEn);
+  ok(vista("y").puedeAtacarEn.length === 0, "y no ve autorización ninguna");
+  ok(!JSON.stringify(vista("x")).includes('"conocimientos"'), "y lo que conoce no viaja");
 
   const b = await capturar(() => pedir({ posicion: 1, objetivo: "y", posicionEntrega: 1, clientActionId: "r2" }));
   const c = await capturar(() => pedir({ posicion: 2, objetivo: "y", posicionEntrega: 2, clientActionId: "r3" }));
@@ -523,7 +532,7 @@ console.log("\n=== 10. El servidor no cree en la palabra del cliente ===");
      [a, b, c].map((r) => r.error?.message ?? "ok"));
 
   // El mismo identificador, en cambio, es un reintento técnico.
-  const repetido = await capturar(() => pedir({ posicion: 3, objetivo: "y", posicionEntrega: 3, clientActionId: "r1" }));
+  const repetido = await capturar(() => pedir({ posicion: 0, objetivo: "y", posicionEntrega: 3, clientActionId: "r1" }));
   ok(repetido.valor?.duplicado === true, "y el mismo identificador no agrega un cuarto");
   ok(Object.keys(partida().ventana.intentos).length === 3, "quedan tres, no cuatro",
      Object.keys(partida().ventana.intentos).length);
@@ -550,6 +559,8 @@ console.log("\n=== 10. El servidor no cree en la palabra del cliente ===");
   ok(ids.length === new Set(ids).size, "tras resolver todo, ninguna carta duplicada",
      ids.length - new Set(ids).size);
   ok(ids.length === 48, "y están las 48 de la baraja", ids.length);
+  ok((fin.conocimientos ?? []).every((k) => fin.jugadores.some((j) => j.mano.some((x) => x?.id === k.idCarta))),
+     "y ningún recuerdo apunta a una carta que ya no está en una mano");
 }
 
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);

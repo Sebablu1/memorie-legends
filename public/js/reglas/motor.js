@@ -220,18 +220,22 @@ export const crearPartida = (
   // Hechos puntuables de la partida, que consume el ranking.
   eventos: [],
   /**
-   * Lo que cada jugador SABE de las manos ajenas, por haber usado un poder.
+   * Qué CARTAS conoce cada jugador.
    *
-   *   { actor, objetivo, numero, origen, ronda }
+   *   { actor, idCarta, origen, ronda }
    *
-   * Guarda el NÚMERO, no la posición: ésa es toda la mecánica. Ver un 5 en la
-   * mano de otro no es saber dónde está el 5 dentro de un rato, porque las
-   * cartas se mueven y la memoria falla. Por eso conocer una carta habilita a
-   * intentar sobre CUALQUIER posición de esa mano, y equivocarse cuesta.
+   * Se guarda la carta —su `id`—, no el número ni la posición. La posición se
+   * busca en las manos cada vez que hace falta: si la carta se mueve con un 9
+   * o un 10, quien la conocía la sigue conociendo en su lugar nuevo. Y cuando
+   * sale de las manos, el recuerdo se borra en esa misma jugada: ver
+   * `olvidarLoQueSalio`.
+   *
+   * Conocer una carta de otro es lo que habilita a descartársela, y sólo a
+   * ella. Ver `puedeAtacarEn`.
    *
    * Es un array de objetos planos: viaja con el estado y sobrevive el JSON.
-   * NUNCA sale hacia una vista: al cliente sólo le llega a quién puede
-   * atacar, jamás qué número conoce. Ver `vista.js`.
+   * NUNCA sale hacia una vista: al cliente le llegan las POSICIONES que puede
+   * atacar, jamás qué carta conoce. Ver `vista.js`.
    */
   conocimientos: [],
   // El azar es un número, no una función: avanza con cada barajada y viaja
@@ -306,12 +310,13 @@ export const mirar = (estado, indiceJugador, posicion = 0) =>
   anotar(
     {
       ...estado,
-      conocimientos: recordarPropia(estado, {
-        jugador: indiceJugador,
-        posicion,
-        carta: estado.jugadores[indiceJugador]?.mano?.[posicion],
-        origen: "mirada",
-      }),
+      conocimientos: conocer(
+        estado.conocimientos ?? [],
+        [indiceJugador],
+        estado.jugadores[indiceJugador]?.mano?.[posicion],
+        "mirada",
+        estado.ronda,
+      ),
       jugadores: estado.jugadores.map((j, i) =>
         i === indiceJugador ? { ...j, posicionMirada: posicion } : j,
       ),
@@ -457,6 +462,7 @@ export function intentarDescarte(estado, indiceJugador, posicion) {
   const mano = [...jugador.mano];
   const cartaCastigo = () => (mazo.length ? mazo.shift() : null);
 
+  let castigo = null;
   if (correcto && fuePrimero) {
     // Llegó primero: la carta se va y pasa a ser la muestra.
     mano[posicion] = null;
@@ -485,31 +491,29 @@ export function intentarDescarte(estado, indiceJugador, posicion) {
      * la deja y suma una, y fallar hace lo mismo Y ADEMÁS le regala a los
      * rivales el derecho a descartársela — ver `recordarFallo`.
      */
-    mano.push(cartaCastigo());
+    castigo = cartaCastigo();
+    mano.push(castigo);
   }
 
   const resultado = correcto ? (fuePrimero ? "primero" : "tarde") : "error";
 
   /**
-   * Un fallo le muestra a la mesa la carta Y dónde estaba.
+   * Un error deja DOS cartas a la vista de los cuatro, y las dos quedan
+   * conocidas: la que se falló, que sigue en su lugar, y la de castigo, que
+   * entra al final de la mano.
    *
-   * ───────────────────────────────────────────────────────────────────
-   *
-   * Hasta ahora eso no servía de nada: la carta se exponía dos segundos, los
-   * rivales la veían, y no podían hacer nada con ella — `puedeAtacarA` exige un
-   * conocimiento, y los conocimientos sólo los daban los poderes 8 y 10.
-   *
-   * SÓLO el error, nunca el acierto tarde. Los dos exponen la carta, pero sólo
-   * el error regala el derecho: así fallar sigue siendo peor que llegar tarde,
-   * y llegar tarde peor que ser primero.
+   * SÓLO el error, nunca el acierto tarde. Los dos exponen la carta tocada,
+   * pero sólo el error regala el derecho sobre ella y sólo el error muestra el
+   * castigo: así fallar sigue siendo peor que llegar tarde, y llegar tarde
+   * peor que ser primero.
    */
   const conocimientos =
     resultado === "error"
-      ? recordarFallo(estado, { objetivo: indiceJugador, posicion, carta })
+      ? conocerCastigo(estado, recordarFallo(estado, carta), castigo)
       : (estado.conocimientos ?? []);
 
   return anotar(
-    {
+    olvidarLoQueSalio({
       ...estado,
       mazo,
       descarte,
@@ -529,162 +533,219 @@ export function intentarDescarte(estado, indiceJugador, posicion) {
           ...estado.ventanaDescarte.intentos,
           // La carta viaja en el intento para que la mesa pueda mostrarla un
           // momento. Sólo la del primero no se muestra: ya está en el descarte.
-          { indiceJugador, posicion, resultado, carta: fuePrimero ? null : carta },
+          {
+            indiceJugador,
+            posicion,
+            resultado,
+            carta: fuePrimero ? null : carta,
+            ...castigoALaVista(resultado === "error", indiceJugador, mano.length - 1, castigo),
+          },
         ],
       },
-    },
+    }),
     `${jugador.nombre}: descarte ${resultado}`,
   );
 }
 
 /**
- * ¿Puede `actor` intentar sobre la mano de `objetivo`?
+ * ¿Puede `actor` intentar descartarle a `objetivo` la carta de `posicion`?
  *
- * Basta con conocer UNA carta suya. Conocer un número no es conocer una
- * posición, así que el derecho es sobre la mano entera: si el permiso se
- * limitara a la posición donde se vio, el poder sería un acierto garantizado
- * y no habría nada que recordar.
- */
-export const puedeAtacarA = (estado, actor, objetivo) =>
-  actor !== objetivo &&
-  !estado.jugadores[objetivo]?.eliminado &&
-  (estado.conocimientos ?? []).some(
-    (c) =>
-      c.actor === actor &&
-      c.objetivo === objetivo &&
-      /**
-       * Menos lo que dejó un fallo ajeno, que da derecho por POSICIÓN.
-       *
-       * Sin este filtro, el conocimiento del fallo satisfacía la condición de
-       * arriba y habilitaba la mano entera — que es exactamente lo que no
-       * corresponde: la mesa vio dónde estaba esa carta, no las otras tres.
-       *
-       * Ese derecho lo contesta `puedeAtacarEn`, que además compara el `id` de
-       * la carta contra la que hay ahí ahora.
-       */
-      c.origen !== "fallo",
-  );
-
-/** A quién puede atacar cada jugador. Es lo ÚNICO de esto que puede viajar. */
-export const objetivosDe = (estado, actor) =>
-  estado.jugadores
-    .map((_, i) => i)
-    .filter((i) => puedeAtacarA(estado, actor, i));
-
-/**
- * El otro derecho: el que deja un descarte FALLIDO, y que es por POSICIÓN.
+ * Sólo si CONOCE esa carta. No el número: la carta. Si la conoce, puede
+ * intentar siempre —el resultado lo decide la muestra, no un permiso—; si no
+ * la conoce, ni siquiera puede intentar.
  *
  * ─────────────────────────────────────────────────────────────────────
- * POR QUÉ ÉSTE NO ES SOBRE LA MANO ENTERA
+ * ANTES ERA POR NÚMERO, Y SOBRE LA MANO ENTERA
  * ─────────────────────────────────────────────────────────────────────
  *
- * El de los poderes sí lo es, y con razón: quien usa un 8 se lleva un NÚMERO,
- * no una posición, así que limitarlo al lugar donde lo vio volvería el poder
- * un acierto garantizado y no habría nada que recordar.
+ * Un 8 guardaba el número visto y habilitaba cualquier posición de esa mano.
+ * Tenía tres agujeros, y los tres rompían la jugada:
  *
- * Acá al revés. Cuando alguien falla un descarte, la mesa entera ve la carta
- * Y dónde estaba: los dos datos, a la vez y sin esfuerzo. Darle derecho sobre
- * la mano entera regalaría un permiso que nadie se ganó.
+ *   - No viajaba. Si la carta se movía con un 9, el derecho se quedaba en la
+ *     mano vieja en vez de seguirla.
+ *   - No caducaba. Si la carta se descartaba, el derecho seguía vivo sobre
+ *     una mano donde ya no estaba, y cada intento costaba una carta.
+ *   - No alcanzaba. Pasarle a otro con un 9 una carta propia conocida, o ver
+ *     la de castigo de un error, no daba ningún derecho.
  *
- * ─────────────────────────────────────────────────────────────────────
- * Y POR QUÉ NO HACE FALTA INVALIDARLO NUNCA
- * ─────────────────────────────────────────────────────────────────────
- *
- * Porque se guarda el `id` de la carta y acá se compara contra la que HAY en
- * esa posición. Si se la cambiaron con un 9, se la descartaron, o volvió a
- * fallar y ahora hay otra, el recuerdo deja de valer solo.
- *
- * La alternativa era borrarlo a mano en las funciones que mueven cartas de una
- * mano —`usarPoderCambio`, `intentarDescarteRival`, `intentarDescarte`— y
- * olvidarse de una sola le daría a alguien derecho sobre una carta que ya no
- * está donde él cree. Es el mismo truco que `loQueSabeDeSuCarta`, y por el
- * mismo motivo.
+ * Ahora la carta se busca en la mano en el momento: el derecho la sigue
+ * adonde vaya, y se va con ella cuando sale de las manos.
  */
-export const puedeAtacarEn = (estado, actor, objetivo, posicion) => {
-  if (actor === objetivo || estado.jugadores[objetivo]?.eliminado) return false;
-
-  const memo = (estado.conocimientos ?? []).find(
-    (c) =>
-      c.actor === actor &&
-      c.objetivo === objetivo &&
-      c.posicion === posicion &&
-      c.origen === "fallo",
-  );
-  if (!memo) return false;
-
-  const actual = estado.jugadores[objetivo]?.mano?.[posicion];
-  return Boolean(actual) && actual.id === memo.idCarta;
-};
-
-/**
- * Las posiciones sueltas que `actor` puede atacar, por un fallo ajeno.
- *
- * Esto SÍ puede viajar, y no filtra nada: la carta y su posición se
- * expusieron a los cuatro cuando el fallo ocurrió. Lo que viaja es el
- * permiso —quién y dónde— nunca el número.
- */
-export const posicionesAtacablesDe = (estado, actor) => {
-  const salida = [];
-  for (const c of estado.conocimientos ?? []) {
-    if (c.actor !== actor || c.origen !== "fallo") continue;
-    if (puedeAtacarEn(estado, actor, c.objetivo, c.posicion)) {
-      salida.push({ objetivo: c.objetivo, posicion: c.posicion });
-    }
-  }
-  return salida;
-};
-
-/**
- * Anota que TODA la mesa vio dónde estaba la carta que alguien falló.
- *
- * Sólo el error, nunca el acierto tarde. Los dos exponen la carta dos segundos
- * —eso no cambió— pero sólo el error regala el derecho a atacarla. Es lo que
- * mantiene el escalón: fallar es peor que llegar tarde, y llegar tarde es peor
- * que ser primero.
- */
-function recordarFallo(estado, { objetivo, posicion, carta }) {
-  if (!carta) return estado.conocimientos ?? [];
-
-  let conocimientos = estado.conocimientos ?? [];
-  for (let actor = 0; actor < estado.jugadores.length; actor++) {
-    if (actor === objetivo || estado.jugadores[actor]?.eliminado) continue;
-
-    // Una creencia por actor y posición: si esa posición vuelve a fallar con
-    // otra carta, lo que vale es lo último que se vio.
-    conocimientos = conocimientos.filter(
-      (c) => !(c.actor === actor && c.objetivo === objetivo && c.posicion === posicion && c.origen === "fallo"),
-    );
-    conocimientos = [
-      ...conocimientos,
-      {
-        actor,
-        objetivo,
-        numero: carta.numero,
-        posicion,
-        idCarta: carta.id,
-        origen: "fallo",
-        ronda: estado.ronda,
-      },
-    ];
-  }
-  return conocimientos;
+export function puedeAtacarEn(estado, actor, objetivo, posicion) {
+  if (actor === objetivo) return false;
+  if (estado.jugadores[actor]?.eliminado || estado.jugadores[objetivo]?.eliminado) return false;
+  const carta = estado.jugadores[objetivo]?.mano?.[posicion];
+  return Boolean(carta) && conoceCarta(estado, actor, carta.id);
 }
 
 /**
- * Intento de descarte sobre la mano de OTRO, habilitado por un poder 8 o 10.
+ * Las posiciones ajenas que `actor` puede atacar: una por cada carta que
+ * conoce en la mano de otro.
  *
- * `posicionObjetivo` es una apuesta, no una afirmación: el jugador cree que
- * ahí está la carta que vio. `posicionEntrega` es la carta propia que va a
- * dar a cambio SI acierta, elegida por posición y a ciegas —no sabe cuál es—.
+ * Es lo único de todo esto que viaja al navegador: quién y dónde. Nunca qué
+ * carta es.
+ */
+export function posicionesAtacablesDe(estado, actor) {
+  const salida = [];
+  estado.jugadores.forEach((jugador, objetivo) => {
+    (jugador.mano ?? []).forEach((_, posicion) => {
+      if (puedeAtacarEn(estado, actor, objetivo, posicion)) salida.push({ objetivo, posicion });
+    });
+  });
+  return salida;
+}
+
+/** ¿Conoce `actor` alguna carta de `objetivo`? */
+export const puedeAtacarA = (estado, actor, objetivo) =>
+  posicionesAtacablesDe(estado, actor).some((p) => p.objetivo === objetivo);
+
+/** A quién puede atacar cada jugador. */
+export const objetivosDe = (estado, actor) => [
+  ...new Set(posicionesAtacablesDe(estado, actor).map((p) => p.objetivo)),
+];
+
+// ------------------------------------------ qué cartas conoce cada uno
+
+/** Dónde está una carta ahora: en qué mano y en qué posición, o null. */
+export function dondeEsta(estado, idCarta) {
+  for (let jugador = 0; jugador < estado.jugadores.length; jugador++) {
+    const posicion = (estado.jugadores[jugador].mano ?? []).findIndex((c) => c?.id === idCarta);
+    if (posicion >= 0) return { jugador, posicion };
+  }
+  return null;
+}
+
+/**
+ * ¿`actor` conoce la carta `idCarta`?
  *
- * ACIERTO: la carta del rival se va al descarte y la carta propia ocupa
- *          EXACTAMENTE ese hueco, boca abajo. Nadie ve su valor, ni siquiera
- *          quien la entregó. El conocimiento de ese número se consume.
+ * Sin `id` no hay nada que conocer. Sin esta guarda, una carta sin `id` y un
+ * recuerdo viejo sin `idCarta` coincidían —`undefined === undefined`— y el
+ * derecho aparecía de la nada.
+ */
+export function conoceCarta(estado, actor, idCarta) {
+  if (idCarta == null) return false;
+  return (estado.conocimientos ?? []).some((c) => c.actor === actor && c.idCarta === idCarta);
+}
+
+/**
+ * Suma que `actores` conocen `carta`.
  *
- * ERROR:   la carta del rival no se mueve, se expone un momento a la mesa, y
- *          el atacante recibe una carta de castigo. El conocimiento queda:
- *          equivocarse de posición no borra lo que se vio, así que puede
- *          seguir buscando y cada error vuelve a costar.
+ * Saber dos veces lo mismo no da dos derechos: repetido no se duplica, y queda
+ * el origen de la primera vez.
+ */
+function conocer(conocimientos, actores, carta, origen, ronda) {
+  if (!carta?.id) return conocimientos;
+  let salida = conocimientos;
+  for (const actor of actores) {
+    if (salida.some((c) => c.actor === actor && c.idCarta === carta.id)) continue;
+    salida = [...salida, { actor, idCarta: carta.id, origen, ronda }];
+  }
+  return salida;
+}
+
+/** Los que siguen en la partida: los que ven lo que se muestra en la mesa. */
+const enJuego = (estado) =>
+  estado.jugadores.map((_, i) => i).filter((i) => !estado.jugadores[i].eliminado);
+
+/**
+ * Borra lo que se sabía de cartas que ya no están en ninguna mano.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * POR QUÉ AL FINAL DE LA JUGADA Y NO DONDE SALE CADA CARTA
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Porque así no hay que acordarse de nada. Las cartas salen de las manos en
+ * tres jugadas —descartar la propia, acertarle a un rival, cambiar por la
+ * levantada— y las tres terminan pasando por acá.
+ *
+ * Y olvidarse de una costaría caro: la carta va al descarte, el descarte se
+ * rebaraja cuando se acaba el mazo, y esa misma carta puede volver a entrar
+ * en una mano como castigo. Con su `id` todavía anotado, el recuerdo viejo
+ * revivía y le daba a alguien un derecho que nunca se ganó.
+ *
+ * Los recuerdos sin `id` —de partidas empezadas antes de este modelo— no
+ * corresponden a ninguna carta y se van la primera vez que pasan por acá.
+ */
+function olvidarLoQueSalio(estado) {
+  const enMano = new Set();
+  for (const jugador of estado.jugadores) {
+    for (const carta of jugador.mano ?? []) if (carta?.id) enMano.add(carta.id);
+  }
+  const previos = estado.conocimientos ?? [];
+  const conocimientos = previos.filter((c) => enMano.has(c.idCarta));
+  return conocimientos.length === previos.length ? estado : { ...estado, conocimientos };
+}
+
+/**
+ * Un error deja la carta tocada a la vista: desde ahí la conocen todos los que
+ * siguen en juego, el que falló incluido.
+ *
+ * Al que falló no le da ningún derecho —nadie se ataca a sí mismo—, pero si
+ * después se la cambian con un 9, la sigue igual que los demás.
+ */
+function recordarFallo(estado, carta) {
+  return conocer(estado.conocimientos ?? [], enJuego(estado), carta, "fallo", estado.ronda);
+}
+
+/**
+ * La de castigo de un error se muestra a los cuatro, y desde ahí la conocen
+ * todos: se sabe que la tiene, y dónde.
+ */
+function conocerCastigo(estado, conocimientos, castigo) {
+  return conocer(conocimientos, enJuego(estado), castigo, "castigo", estado.ronda);
+}
+
+/** Lo que el intento lleva de la carta de castigo: nada, salvo en un error. */
+const castigoALaVista = (esError, indiceJugador, posicion, carta) =>
+  esError && carta ? { castigo: { indiceJugador, posicion, carta } } : {};
+
+/**
+ * Qué cartas quedaron a la vista de la mesa en una ventana, y dónde.
+ *
+ * Dos por intento, como mucho: la carta que se tocó —salvo la del primero,
+ * que ya está en el descarte, y la del rival acertada, que también— y la de
+ * castigo de un error.
+ *
+ * Una sola lista para los tres que la leen: la vista que arma el servidor, la
+ * mesa de entrenamiento y la memoria de la IA. Con una lista por lugar, la
+ * carta de castigo se habría mostrado en un modo y en el otro no.
+ */
+export function cartasExpuestas(intentos = []) {
+  const salida = [];
+  for (const intento of intentos) {
+    if (intento.carta) {
+      salida.push({
+        indiceJugador: intento.indiceJugador,
+        posicion: intento.posicion,
+        carta: intento.carta,
+      });
+    }
+    if (intento.castigo?.carta) {
+      salida.push({
+        indiceJugador: intento.castigo.indiceJugador,
+        posicion: intento.castigo.posicion,
+        carta: intento.castigo.carta,
+      });
+    }
+  }
+  return salida;
+}
+
+/**
+ * Intento de descarte sobre la mano de OTRO.
+ *
+ * Sólo sobre una carta que `actor` conoce: ver `puedeAtacarEn`. Si no la
+ * conoce no hay intento, y no pasa nada. `posicionEntrega` es la carta propia
+ * que da si acierta, elegida por posición y a ciegas.
+ *
+ * ACIERTO: la carta del rival va con la muestra. Se va al descarte y la
+ *          propia ocupa EXACTAMENTE ese hueco, boca abajo. Quien la dio queda
+ *          con una carta menos; el rival, con las mismas.
+ *
+ * ERROR:   no va. La carta del rival no se mueve, y el atacante se come una de
+ *          castigo que ven los cuatro. Sigue conociendo la del rival, así que
+ *          puede volver a intentar mientras dure la ventana; cada error vuelve
+ *          a costar.
  */
 export function intentarDescarteRival(
   estado, actor, objetivo, posicionObjetivo, posicionEntrega,
@@ -704,31 +765,14 @@ export function intentarDescarteRival(
   const { soloPara } = estado.ventanaDescarte;
   if (soloPara != null && actor !== soloPara) return estado;
 
-  /**
-   * Dos derechos distintos, y alcanza con cualquiera.
-   *
-   * ───────────────────────────────────────────────────────────────────
-   *
-   * `puedeAtacarA` es el de los poderes: vale sobre la mano ENTERA, porque lo
-   * que se supo fue un número y no un lugar.
-   *
-   * `puedeAtacarEn` es el que deja un fallo ajeno: vale sobre ESA posición y
-   * ninguna otra, porque la mesa vio exactamente dónde estaba.
-   *
-   * Se comprueban los dos y no uno: quien tiene el derecho de un poder puede
-   * atacar donde quiera, y quien sólo vio un fallo, sólo ahí.
-   */
-  if (
-    !puedeAtacarA(estado, actor, objetivo) &&
-    !puedeAtacarEn(estado, actor, objetivo, posicionObjetivo)
-  ) {
-    return estado;
-  }
+  // La única condición para intentar: conocer la carta. Antes había dos
+  // derechos —uno por número sobre la mano entera y otro por posición— y la
+  // mesa ofrecía uno y el servidor aceptaba el otro.
+  if (!puedeAtacarEn(estado, actor, objetivo, posicionObjetivo)) return estado;
 
   const manoObjetivo = [...estado.jugadores[objetivo].mano];
   const manoActor = [...estado.jugadores[actor].mano];
   const carta = manoObjetivo[posicionObjetivo];
-  if (!carta) return estado;
 
   const muestra = cima(estado.descarte);
   const correcto = esDescarteValido(carta, muestra);
@@ -738,6 +782,7 @@ export function intentarDescarteRival(
   const descarte = [...origen.descarte];
 
   let conocimientos = estado.conocimientos ?? [];
+  let castigo = null;
 
   if (correcto) {
     // La entrega tiene que ser una carta que exista de verdad.
@@ -750,18 +795,17 @@ export function intentarDescarteRival(
     manoObjetivo[posicionObjetivo] = { ...entregada, visible: false };
     manoActor[posicionEntrega] = null;
 
-    // El número encontrado ya no está en esa mano: el conocimiento se gastó.
-    // Lo que se entregó NO hereda nada: quien la dio no sabe cuál era.
-    conocimientos = conocimientos.filter(
-      (c) => !(c.actor === actor && c.objetivo === objetivo && c.numero === carta.numero),
-    );
+    // La encontrada salió de las manos: `olvidarLoQueSalio` borra lo que se
+    // sabía de ella. La entregada conserva su `id`, así que quien ya la
+    // conocía —el que la dio, si la había visto— la sigue en su lugar nuevo.
   } else {
-    // Se equivocó de posición: la carta del rival no se toca y paga con una.
-    manoActor.push(mazo.length ? mazo.shift() : null);
+    castigo = mazo.length ? mazo.shift() : null;
+    manoActor.push(castigo);
+    conocimientos = conocerCastigo(estado, conocimientos, castigo);
   }
 
   return anotar(
-    {
+    olvidarLoQueSalio({
       ...estado,
       mazo,
       descarte,
@@ -780,13 +824,14 @@ export function intentarDescarteRival(
             posicion: posicionObjetivo,
             actor,
             resultado: correcto ? "rivalAcierto" : "rivalError",
-            // Sólo la fallada se expone a la mesa. La acertada se fue al
+            // La fallada se muestra a la mesa. La acertada se fue al
             // descarte, donde ya se ve; la entregada no se muestra jamás.
             carta: correcto ? null : carta,
+            ...castigoALaVista(!correcto, actor, manoActor.length - 1, castigo),
           },
         ],
       },
-    },
+    }),
     correcto
       ? `${estado.jugadores[actor].nombre} encontró el ${carta.numero} de ${estado.jugadores[objetivo].nombre}`
       : `${estado.jugadores[actor].nombre} se equivocó buscando en ${estado.jugadores[objetivo].nombre}`,
@@ -999,14 +1044,19 @@ export function cambiarCarta(estado, posicion) {
   const descartada = mano[posicion];
   mano[posicion] = { ...estado.levantada, visible: false };
 
-  const conLaMuestraNueva = {
+  const conLaMuestraNueva = olvidarLoQueSalio({
     ...estado,
+    // La que se queda la vio al levantarla: la conoce, y el recuerdo va con
+    // ella si después se la cambian. La que se va deja de conocerse al salir.
+    conocimientos: conocer(
+      estado.conocimientos ?? [], [i], estado.levantada, "levantada", estado.ronda,
+    ),
     jugadores: estado.jugadores.map((j, idx) => (idx === i ? { ...j, mano } : j)),
     descarte: descartada
       ? [{ ...descartada, visible: true }, ...estado.descarte]
       : estado.descarte,
     levantada: null,
-  };
+  });
 
   // Si la posición estaba vacía no hay carta nueva arriba del descarte, así
   // que no hay a qué reaccionar: no se abre ninguna ventana.
@@ -1073,109 +1123,20 @@ export function tirarCarta(estado, { porTiempo = false } = {}) {
   );
 }
 
+/**
+ * ¿La víctima de un 9 o un 10 conocía la carta que le sacaron?
+ *
+ * Si la conocía, ahora sabe en qué mano está: la sigue conociendo —el
+ * recuerdo es de la carta, no del lugar— y eso le da derecho a intentar
+ * descartársela al que usó el poder. No hay nada que anotar; lo único que se
+ * agrega es el aviso a la mesa.
+ *
+ * Se pregunta ANTES del intercambio, sobre la carta que estaba ahí.
+ */
+const conociaLaQueLeSacaron = (estado, victima, carta) =>
+  Boolean(carta) && conoceCarta(estado, victima, carta.id);
+
 /** Poderes 7 y 8: mirar. Devuelve la carta para que la UI la muestre un instante. */
-/**
- * Anota que `actor` sabe que `objetivo` tiene una carta de ese número.
- *
- * Se guarda el número y no la carta ni su posición: es lo único que el
- * jugador se lleva de verdad. Repetido no se duplica —saber dos veces lo
- * mismo no da dos derechos— pero sí se guardan números distintos.
- */
-function recordar(estado, { actor, objetivo, numero, origen }) {
-  if (actor === objetivo || !Number.isInteger(numero)) return estado.conocimientos ?? [];
-  const previos = estado.conocimientos ?? [];
-  const repetido = previos.some(
-    (c) => c.actor === actor && c.objetivo === objetivo && c.numero === numero,
-  );
-  if (repetido) return previos;
-  return [...previos, { actor, objetivo, numero, origen, ronda: estado.ronda }];
-}
-
-/**
- * Anota que un jugador vio una carta SUYA.
- *
- * Va en `conocimientos`, la misma lista que lo demás, y con `actor` igual a
- * `objetivo`. Eso no le da ningún derecho: `puedeAtacarA` empieza pidiendo
- * `actor !== objetivo`, así que estas entradas no habilitan nada por sí solas.
- * Se guardan acá y no en una lista aparte por seguridad: `filtracionesEn`
- * caza cualquier objeto con `actor`, `objetivo` y `numero`, así que si un día
- * alguien publicara esto en la vista, el detector lo vería. Una estructura
- * nueva con otra forma se le escaparía.
- *
- * Se guarda el `id` de la carta además del número. Ahí está el truco que hace
- * que esto no necesite limpiarse nunca: al leerlo se compara contra la carta
- * que HAY en esa posición, y si no es la misma, el recuerdo simplemente no
- * cuenta. Sin eso habría que invalidarlo a mano en las cinco funciones que
- * mueven cartas de una mano —cambiar, descartar, acertarle a un rival,
- * fallarle, y los propios poderes 9 y 10— y olvidarse de una sola le daría a
- * alguien un derecho sobre una carta que ya no está donde él cree.
- */
-function recordarPropia(estado, { jugador, posicion, carta, origen }) {
-  const previos = estado.conocimientos ?? [];
-  if (!carta) return previos;
-  // Una creencia por posición: mirar dos veces la misma no acumula, reemplaza.
-  const otros = previos.filter(
-    (c) => !(c.actor === jugador && c.objetivo === jugador && c.posicion === posicion),
-  );
-  return [
-    ...otros,
-    {
-      actor: jugador,
-      objetivo: jugador,
-      numero: carta.numero,
-      posicion,
-      idCarta: carta.id,
-      origen,
-      ronda: estado.ronda,
-    },
-  ];
-}
-
-/**
- * Qué recuerda un jugador de su propia carta ahí, si todavía es verdad.
- *
- * Devuelve el recuerdo sólo si la carta que hay en esa posición es la misma
- * que vio. Si se la cambiaron, se la descartaron o le pusieron otra boca
- * abajo, el recuerdo está viejo y esto devuelve null — que es lo correcto: el
- * jugador cree saber algo que ya no es cierto, y el juego no puede premiarlo
- * por una creencia equivocada.
- */
-function loQueSabeDeSuCarta(estado, jugador, posicion) {
-  const memo = (estado.conocimientos ?? []).find(
-    (c) => c.actor === jugador && c.objetivo === jugador && c.posicion === posicion,
-  );
-  if (!memo) return null;
-  const actual = estado.jugadores[jugador]?.mano?.[posicion];
-  return actual && actual.id === memo.idCarta ? memo : null;
-}
-
-/**
- * A la víctima de un 9 o un 10 le sacaron una carta que ella conocía.
- *
- * Entonces ahora sabe dónde está: en la mano del que usó el poder. Es
- * conocimiento ganado igual que cualquier otro —lo vio con sus ojos— y le da
- * el mismo derecho: puede intentar descartársela.
- *
- * Se comprueba ANTES del intercambio, contra el estado sin tocar, porque
- * después la carta ya no está ahí y el recuerdo dejaría de validar.
- *
- * Devuelve `{ conocimientos, supo }`. `supo` es null si no sabía nada, y
- * entonces no se agrega ni se anuncia nada: no todo cambio enseña algo.
- */
-function loQueAprendeLaVictima(estado, conocimientos, { victima, activador, posicion }) {
-  const memo = loQueSabeDeSuCarta(estado, victima, posicion);
-  if (!memo) return { conocimientos, supo: null };
-  return {
-    conocimientos: recordar({ ...estado, conocimientos }, {
-      actor: victima,
-      objetivo: activador,
-      numero: memo.numero,
-      origen: "cambio",
-    }),
-    supo: memo,
-  };
-}
-
 export function usarPoderMirar(estado, indiceObjetivo, posicion) {
   const poder = estado.poderPendiente;
   if (estado.fase !== "poder" || !poder) return { estado, revelada: null };
@@ -1188,28 +1149,17 @@ export function usarPoderMirar(estado, indiceObjetivo, posicion) {
 
   const carta = estado.jugadores[indiceObjetivo].mano[posicion];
 
-  // El 8 mira la mano de otro: de ahí sale el derecho a atacarlo. El 7 mira la
-  // propia y sigue sin dar ninguno —saber lo tuyo no te autoriza sobre nadie—,
-  // pero ahora SÍ queda anotado qué vio.
-  //
-  // Es un recuerdo, no un permiso: `puedeAtacarA` exige `actor !== objetivo`,
-  // así que esta entrada no habilita nada. Sirve para una sola cosa: si
-  // después alguien le cambia esa carta con un 9 o un 10, se puede distinguir
-  // a quien le robaron algo que conocía de quien nunca supo qué tenía.
-  const conocimientos =
-    poder.tipo === "mirarPropia"
-      ? recordarPropia(estado, {
-          jugador: poder.indiceJugador,
-          posicion,
-          carta,
-          origen: "poder7",
-        })
-      : recordar(estado, {
-          actor: poder.indiceJugador,
-          objetivo: indiceObjetivo,
-          numero: carta?.numero,
-          origen: "poder8",
-        });
+  // Los dos dejan conocida la carta que se miró. La del 8 es de otro, y de ahí
+  // sale el derecho a descartársela. La del 7 es propia y no autoriza nada
+  // sobre nadie —nadie se ataca a sí mismo—, pero el recuerdo viaja con ella:
+  // si después pasa a otra mano con un 9, se sabe dónde quedó.
+  const conocimientos = conocer(
+    estado.conocimientos ?? [],
+    [poder.indiceJugador],
+    carta,
+    poder.tipo === "mirarPropia" ? "poder7" : "poder8",
+    estado.ronda,
+  );
 
   // Queda escrito en el registro QUÉ se hizo y SOBRE QUIÉN, nunca qué carta
   // era ni en qué posición estaba. El registro lo lee toda la mesa: decir "la
@@ -1280,6 +1230,15 @@ export function usarPoderCambio(estado, posicionPropia, indiceRival, posicionRiv
           fase: "cambioConVista",
           poderPendiente: null,
           cambioPendiente: { indiceJugador: yo, posicionPropia, indiceRival, posicionRival },
+          // Vio las dos, así que las conoce desde ya, cambie o no. Si cambia,
+          // cada una sigue conocida en su mano nueva.
+          conocimientos: conocer(
+            conocer(estado.conocimientos ?? [], [yo], miMano[posicionPropia], "poder10", estado.ronda),
+            [yo],
+            manoRival[posicionRival],
+            "poder10",
+            estado.ronda,
+          ),
         },
         `${estado.jugadores[yo].nombre} mira su carta y una de ${estado.jugadores[indiceRival].nombre}`,
         // Las DOS posiciones, por lo mismo que en `usarPoderMirar`: la mesa
@@ -1298,43 +1257,25 @@ export function usarPoderCambio(estado, posicionPropia, indiceRival, posicionRiv
 
   const revelada = null;
   const mia = miMano[posicionPropia];
-  miMano[posicionPropia] = manoRival[posicionRival];
+  const suya = manoRival[posicionRival];
+  miMano[posicionPropia] = suya;
   manoRival[posicionRival] = mia;
 
-  // Qué conocimiento deja el 10, derivado de lo que REALMENTE pasó:
-  //
-  // El 10 muestra las dos cartas y después las intercambia. La que era del
-  // rival ahora es propia, así que saber su número ya no es saber nada de
-  // nadie. Pero la carta que uno entregó SÍ quedó en la mano del rival, y su
-  // número se vio. Ése es el conocimiento que queda: "el rival tiene esto".
-  //
-  // El 9 cambia a ciegas —`revelada` es null— y por eso no deja ninguno: no
-  // se puede recordar lo que no se vio.
-  const delActivador = revelada
-    ? recordar(estado, {
-        actor: yo,
-        objetivo: indiceRival,
-        numero: mia?.numero,
-        origen: "poder10",
-      })
-    : (estado.conocimientos ?? []);
-
-  // Y lo que aprende el otro. El 9 cambia a ciegas para QUIEN LO USA, pero no
-  // para quien lo sufre: si la víctima sabía qué carta tenía ahí —la miró al
-  // principio de la ronda, o con un 7— acaba de ver adónde se fue. Eso es
-  // conocimiento ganado con los ojos, igual que el de cualquier poder, y da
-  // el mismo derecho.
-  const { conocimientos, supo } = loQueAprendeLaVictima(estado, delActivador, {
-    victima: indiceRival,
-    activador: yo,
-    posicion: posicionRival,
-  });
+  /**
+   * El 9 no le muestra nada a nadie, y no anota nada. No hace falta.
+   *
+   * Lo que se sabía era de las CARTAS, y las cartas sólo cambiaron de lugar.
+   * Si el que lo usa conocía la suya —la miró al empezar la ronda, o con un
+   * 7— ahora la conoce en la mano del rival, y puede descartársela. Si la
+   * víctima conocía la que le sacaron, la conoce en la mano del que usó el
+   * poder. Y lo mismo cualquier otro que las conociera.
+   */
+  const supo = conociaLaQueLeSacaron(estado, indiceRival, suya);
 
   const cambiado = {
     ...estado,
     fase: "postLevantada",
     poderPendiente: null,
-    conocimientos,
     jugadores: estado.jugadores.map((j, i) =>
       i === yo ? { ...j, mano: miMano } : i === indiceRival ? { ...j, mano: manoRival } : j,
     ),
@@ -1369,16 +1310,9 @@ const anotarLoQueSupo = (estado, victima, activador) =>
 /**
  * Segunda mitad del 10: ya vio las dos cartas y decide.
  *
- * El conocimiento que queda depende de lo que decidió, y no es lo mismo:
- *
- *   - Si CAMBIA, la carta que era del rival pasa a ser suya, así que saber su
- *     número ya no es saber nada de nadie. Lo que sí queda es que la carta que
- *     él entregó está ahora en la mano del rival, y su número lo vio.
- *   - Si NO CAMBIA, cada carta se queda donde estaba, y lo que vio es la carta
- *     del rival, que sigue siendo del rival. Ése es el conocimiento.
- *
- * Derivarlo mal en cualquiera de los dos casos le daría al jugador un derecho
- * sobre una carta que no está donde él cree.
+ * Lo que vio quedó anotado al mirar, en `usarPoderCambio`. Decida lo que
+ * decida no hay nada nuevo que saber: si no cambia, cada carta sigue donde la
+ * vio; si cambia, las dos se mueven y el recuerdo va con ellas.
  */
 export function resolverCambioConVista(estado, cambiar) {
   const pendiente = estado.cambioPendiente;
@@ -1394,15 +1328,7 @@ export function resolverCambioConVista(estado, cambiar) {
 
   if (!cambiar) {
     return anotar(
-      {
-        ...sinPendiente,
-        conocimientos: recordar(estado, {
-          actor: yo,
-          objetivo: indiceRival,
-          numero: suya?.numero,
-          origen: "poder10",
-        }),
-      },
+      sinPendiente,
       `${estado.jugadores[yo].nombre} miró las dos cartas y NO cambió`,
       // Sin posiciones: no se movió nada, así que no hay nada que la mesa
       // pueda haber visto moverse.
@@ -1413,26 +1339,14 @@ export function resolverCambioConVista(estado, cambiar) {
   miMano[posicionPropia] = suya;
   manoRival[posicionRival] = mia;
 
-  const delActivador = recordar(estado, {
-    actor: yo,
-    objetivo: indiceRival,
-    numero: mia?.numero,
-    origen: "poder10",
-  });
-
   // El mismo caso que en el 9: si la víctima conocía la carta que le sacaron,
   // ahora sabe en qué mano está. Va sólo en esta rama porque en la otra no se
   // cambió nada, y sin cambio no hay nada que aprender.
-  const { conocimientos, supo } = loQueAprendeLaVictima(estado, delActivador, {
-    victima: indiceRival,
-    activador: yo,
-    posicion: posicionRival,
-  });
+  const supo = conociaLaQueLeSacaron(estado, indiceRival, suya);
 
   const conElCambio = anotar(
     {
       ...sinPendiente,
-      conocimientos,
       jugadores: estado.jugadores.map((j, i) =>
         i === yo ? { ...j, mano: miMano } : i === indiceRival ? { ...j, mano: manoRival } : j,
       ),

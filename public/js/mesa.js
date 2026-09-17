@@ -8,7 +8,6 @@ import {
   // sólo la mesa en red. Acá se cablea el mismo camino para entrenamiento: no
   // hizo falta tocar una línea de las reglas.
   intentarDescarteRival,
-  puedeAtacarA,
   cerrarVentanaDescarte,
   levantar,
   cambiarCarta,
@@ -30,6 +29,7 @@ import {
   MS_REAPERTURA,
   MS_CUENTA_REGRESIVA,
   cartasMiradasEn,
+  cartasExpuestas,
   posicionesAtacablesDe,
   ventanaTrasPoder,
 } from "./reglas/motor.js";
@@ -1143,34 +1143,15 @@ function marcarCartasJugables() {
     estado.fase === "descarte" ||
     (estado.fase === "levantada" && miTurno);
 
-  // Manos ajenas sobre las que un poder 8 o 10 dejó conocimiento. Se marca la
-  // mano ENTERA: el servidor manda a quién se puede atacar y nunca dónde está
-  // la carta, así que marcar una posición sería inventarse un dato que no
-  // tenemos —y regalar el juego, que consiste justamente en acordarse.
+  /**
+   * Las cartas ajenas que conozco: ésas, y sólo ésas, se pueden atacar.
+   *
+   * Antes un 8 marcaba la mano ENTERA del rival, porque el motor guardaba el
+   * número visto y no la carta. Ahora el conocimiento es de la carta y la
+   * sigue si se mueve, así que se marca exactamente dónde está. La lista es
+   * la misma en los dos modos: ver `quePosicionesPuedoAtacar`.
+   */
   if (estado.fase === "descarte") {
-    for (const objetivo of aQuienPuedoAtacar()) {
-      document
-        .querySelectorAll(
-          `.jugador[data-jugador="${objetivo}"] .carta[data-posicion]`,
-        )
-        .forEach((el) => el.classList.add("jugable", "atacable"));
-    }
-
-    /**
-     * Y las cartas sueltas que alguien falló, que son por POSICIÓN.
-     *
-     * ─────────────────────────────────────────────────────────────────────
-     * POR QUÉ ACÁ SÍ SE MARCA UNA POSICIÓN
-     * ─────────────────────────────────────────────────────────────────────
-     *
-     * Arriba se marca la mano entera porque el derecho de un poder es sobre la
-     * mano: se supo un número, no un lugar, y señalar una carta sería
-     * inventarse un dato.
-     *
-     * Acá el dato existe y es público. Cuando alguien falla un descarte, los
-     * cuatro ven la carta Y dónde estaba; el permiso es sobre esa posición y
-     * marcarla no regala nada que la mesa no haya visto.
-     */
     for (const { objetivo, posicion } of quePosicionesPuedoAtacar()) {
       document
         .querySelector(
@@ -1208,30 +1189,21 @@ function marcarCartasJugables() {
 }
 
 /**
- * Qué cartas sueltas se pueden atacar por un fallo ajeno, en los dos modos.
+ * Qué cartas ajenas se pueden atacar, en los dos modos.
  *
  * En red lo decide el servidor y viaja en la vista; en entrenamiento se
- * calcula del estado local con la misma función del motor. Es el mismo reparto
- * que hace `aQuienPuedoAtacar` para el derecho de mano entera.
+ * calcula del estado local con la misma función del motor.
  */
 function quePosicionesPuedoAtacar() {
   if (enRed()) return miVista?.puedeAtacarEn ?? [];
   return posicionesAtacablesDe(estado, YO);
 }
 
-/**
- * A qué rivales se les puede buscar la carta, en cualquiera de los dos modos.
- *
- * En red lo dice el servidor: manda la lista ya recortada y NUNCA en qué
- * posición está la carta, porque eso es justamente lo que hay que recordar.
- * En entrenamiento el motor corre acá, así que se le pregunta a la misma
- * función de las reglas que usa el servidor del otro lado.
- */
-function aQuienPuedoAtacar() {
-  if (enRed()) return miVista?.puedeAtacar ?? [];
-  return estado.jugadores
-    .map((_, i) => i)
-    .filter((i) => i !== YO && puedeAtacarA(estado, YO, i));
+/** ¿Conozco la carta de `objetivo` en `posicion`? */
+function puedoAtacarAhi(objetivo, posicion) {
+  return quePosicionesPuedoAtacar().some(
+    (p) => p.objetivo === objetivo && p.posicion === posicion,
+  );
 }
 
 /**
@@ -1945,22 +1917,24 @@ function resolverUltimoDescarte() {
   const ultimo = intentos[intentos.length - 1];
   if (!ultimo) return;
 
-  // El primero se lleva su carta al descarte sin más trámite. A los otros dos
-  // se les destapa la carta para toda la mesa, y a los dos segundos se tapa.
-  if (ultimo.resultado === "primero") {
-    sonidos.acierto();
-    return;
-  }
-
-  if (ultimo.resultado === "tarde") sonidos.aviso();
+  // Acertarle a un rival suena como ser primero: las dos son aciertos. Antes
+  // caía en el sonido de error, y el que acertaba creía que había fallado.
+  const acerto = ultimo.resultado === "primero" || ultimo.resultado === "rivalAcierto";
+  if (acerto) sonidos.acierto();
+  else if (ultimo.resultado === "tarde") sonidos.aviso();
   else sonidos.error();
 
-  const llave = clave(ultimo.indiceJugador, ultimo.posicion);
-  revelaciones.set(llave, ultimo.carta);
-  setTimeout(() => {
-    revelaciones.delete(llave);
-    dibujar();
-  }, MS_CARTA_EXPUESTA);
+  // Lo que quedó a la vista de la mesa, dos segundos: la carta tocada si no se
+  // fue, y la de castigo si fue un error. La misma lista que manda el
+  // servidor en red.
+  for (const { indiceJugador, posicion, carta } of cartasExpuestas([ultimo])) {
+    const llave = clave(indiceJugador, posicion);
+    revelaciones.set(llave, carta);
+    setTimeout(() => {
+      revelaciones.delete(llave);
+      dibujar();
+    }, MS_CARTA_EXPUESTA);
+  }
 }
 
 /**
@@ -2095,10 +2069,14 @@ function faseDescarte(alCerrar, duracion = MS_DESCARTE, rotulo = "DESCARTE") {
       setTimeout(() => {
         pendientes.forEach(clearTimeout);
         manejadorDescarte = null;
+        // Un ataque apuntado que no llegó a completarse muere con la ventana.
+        // Si quedaba vivo, la mesa seguía apagada y el primer toque propio de
+        // la ventana siguiente se tomaba como entrega.
+        atacando = null;
         cancelarTemporizador();
         // Lo que se destapó lo vio toda la mesa, la IA incluida.
         memorias = memorias.map((m) =>
-          IA.absorberRevelaciones(m, estado.ventanaDescarte?.intentos ?? []),
+          IA.absorberRevelaciones(m, cartasExpuestas(estado.ventanaDescarte?.intentos ?? [])),
         );
         estado = cerrarVentanaDescarte(estado);
         dibujar();
@@ -2413,9 +2391,9 @@ let manejadorDescarte = null;
  * Última carta que mandé, para mostrarla resaltada mientras se resuelve.
  *
  * NO es un candado: un jugador puede intentar varias veces en la misma
- * ventana, y debe poder. Con los poderes 8 y 10 uno sabe QUÉ carta tiene el
- * rival pero no DÓNDE, así que equivocarse de posición y volver a probar
- * —pagando un castigo por cada error— es parte de la mecánica.
+ * ventana, y debe poder. Sobre una carta conocida de un rival se puede volver
+ * a intentar mientras dure la ventana, pagando un castigo por cada error: es
+ * la regla del descarte al rival.
  *
  * ─────────────────────────────────────────────────────────────────────
  * VIVE UNA VENTANA, Y HAY QUE APAGARLA AL FINAL
@@ -2656,15 +2634,17 @@ document.addEventListener("click", async (evento) => {
     return;
   }
 
-  // Buscar la carta propia en la mano de un rival.
+  // Descartarle a un rival una carta que conozco.
   //
-  // Sólo se puede si un poder 8 o 10 dejó ese conocimiento; `aQuienPuedoAtacar`
-  // lo resuelve con las mismas reglas que usa el servidor en el modo en red.
+  // Sólo esa carta: `puedoAtacarAhi` lo resuelve con la misma regla del motor
+  // que usa el servidor en red. Antes preguntaba por la mano entera, y las
+  // cartas que marcaba un fallo ajeno se veían atacables pero el toque no
+  // hacía nada.
   if (
     estado.fase === "descarte" &&
     manejadorDescarte &&
     indiceJugador !== YO &&
-    aQuienPuedoAtacar().includes(indiceJugador)
+    puedoAtacarAhi(indiceJugador, posicion)
   ) {
     if (!dobleClic) {
       destelloPrimerToque(cartaEl);
@@ -2674,6 +2654,12 @@ document.addEventListener("click", async (evento) => {
     atacando = { indiceJugador, posicion };
     dibujar();
     pista("Ahora elegí una carta tuya para entregar.");
+    return;
+  }
+
+  // Una carta ajena que no conozco: no hay intento, y se dice por qué.
+  if (estado.fase === "descarte" && manejadorDescarte && indiceJugador !== YO) {
+    if (dobleClic) pista("⚠️ Esa carta no la conocés");
     return;
   }
 
@@ -3783,6 +3769,9 @@ function pintarVista(vista) {
   // ventana. Entre una ventana y la siguiente la fase pasa por turno o por
   // postLevantada, así que salir de `descarte` es el momento exacto.
   if (vista.fase !== "descarte" && posicionEnviada != null) posicionEnviada = null;
+  // Y el ataque apuntado, igual: sin esto la mesa quedaba apagada para siempre
+  // si la ventana se cerraba antes de elegir la entrega.
+  if (vista.fase !== "descarte" && atacando) atacando = null;
   estado = comoEstado(vista);
   // Antes de dibujar: si algo se expuso, tiene que verse en este mismo pintado.
   mostrarRevelaciones(vista);
@@ -4340,6 +4329,35 @@ let pidiendo = false;
 async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
   if (!miVista) return;
 
+  /**
+   * Con un ataque apuntado, tocar una carta propia es ENTREGARLA.
+   *
+   * Tiene que ir antes que el bloque de abajo, que se queda con todos los
+   * toques propios de la fase: uno "mira", dos descartan. Estando después,
+   * la entrega no llegaba nunca —el ataque al rival no salía jamás— y un
+   * doble toque terminaba en un descarte propio que casi siempre fallaba.
+   */
+  if (miVista.fase === "descarte" && atacando && indiceJugador === YO) {
+    const objetivo = atacando;
+    const ventana = miVista.ventana;
+    atacando = null;
+    dibujar();
+    if (!ventana || ventana.cerrada) return;
+
+    const tocadoEn = Date.now();
+    const r = await pedir("descartar", () =>
+      Red.intentarDescarte(salaPedida, ventana, objetivo.posicion, tocadoEn, {
+        objetivo: miVista.jugadores[objetivo.indiceJugador]?.id,
+        posicionEntrega: posicion,
+      }),
+    );
+    if (r?.anotado) {
+      sonidos.aviso();
+      pista("Jugada registrada. Se resuelve al cerrar la ventana.");
+    }
+    return;
+  }
+
   // ---- NUEVO: Permitir mirar (clic simple) en fase descarte ----
   if (miVista.fase === "descarte" && indiceJugador === YO) {
     // Clic simple: mostrar la carta (mirar)
@@ -4510,19 +4528,17 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
     return;
   }
 
-  // Mano de un rival sobre el que un poder dejó conocimiento.
+  // Una carta de un rival que conozco. Sólo ésa: la lista viene del servidor.
   if (
     miVista.fase === "descarte" &&
     indiceJugador !== YO &&
-    (miVista.puedeAtacar ?? []).includes(indiceJugador)
+    puedoAtacarAhi(indiceJugador, posicion)
   ) {
     const ventana = miVista.ventana;
     if (!ventana || ventana.cerrada) return;
 
     if (!dobleClic) {
-      pista(
-        "Tocá <b>dos veces</b> la carta del rival que creas que es la tuya conocida.",
-      );
+      pista("Tocá <b>dos veces</b> la carta del rival que conocés.");
       return;
     }
 
@@ -4540,25 +4556,9 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
     return;
   }
 
-  // Elegir la carta propia que se entrega, con un ataque ya apuntado.
-  if (miVista.fase === "descarte" && atacando && indiceJugador === YO) {
-    const objetivo = atacando;
-    const ventana = miVista.ventana;
-    atacando = null;
-    dibujar();
-    if (!ventana || ventana.cerrada) return;
-
-    const tocadoEn = Date.now();
-    const r = await pedir("descartar", () =>
-      Red.intentarDescarte(salaPedida, ventana, objetivo.posicion, tocadoEn, {
-        objetivo: miVista.jugadores[objetivo.indiceJugador]?.id,
-        posicionEntrega: posicion,
-      }),
-    );
-    if (r?.anotado) {
-      sonidos.aviso();
-      pista("Jugada registrada. Se resuelve al cerrar la ventana.");
-    }
+  // Una carta ajena que no conozco: no hay intento, y se dice por qué.
+  if (miVista.fase === "descarte" && indiceJugador !== YO) {
+    if (dobleClic) pista("⚠️ Esa carta no la conocés");
     return;
   }
 

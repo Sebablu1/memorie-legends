@@ -88,8 +88,9 @@ function auditar(etiqueta) {
     // por una revelación en curso de la ventana de descarte.
     if (!rondaTerminada) {
       // Cartas que la regla del juego SÍ permite que viajen destapadas: las
-      // que alguien expuso al descartar mal o tarde. Se leen de los intentos
-      // aplicados, que son datos, no de la función que se está auditando.
+      // que alguien expuso al descartar mal o tarde, y la de castigo de un
+      // error. Se leen de los intentos aplicados, que son datos, no de la
+      // función que se está auditando.
       // Y sólo valen mientras la fase siga siendo `descarte`: en cuanto se
       // cierra la revelación, cualquier carta visible vuelve a ser una fuga.
       const reveladas = new Set([
@@ -97,7 +98,8 @@ function auditar(etiqueta) {
           ? Object.values(maestro.ventana.intentos ?? {}) : []
         ).map((x) => maestro.estado.jugadores[CUATRO.indexOf(x.uid)]?.mano[x.posicion]?.id).filter(Boolean),
         ...(maestro.estado.fase === "descarte"
-          ? (maestro.estado.ventanaDescarte?.intentos ?? []).map((x) => x.carta?.id).filter(Boolean)
+          ? (maestro.estado.ventanaDescarte?.intentos ?? [])
+              .flatMap((x) => [x.carta?.id, x.castigo?.carta?.id]).filter(Boolean)
           : []),
       ]);
       for (const [j, jug] of maestro.estado.jugadores.entries()) {

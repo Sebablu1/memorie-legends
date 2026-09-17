@@ -70,8 +70,18 @@ for (const quien of [0, 1, 2, 3]) {
   if (cartaEnVista?.id !== expuesta.id) { fallos++; console.log("  ✗ el jugador", quien, "no ve la carta expuesta"); }
 }
 ok(true, "los cuatro jugadores ven la carta que se expuso");
-ok(vistaDe(e, 0).jugadores[2].mano.filter((c) => c && !c.oculta).length === 1,
-   "y sólo esa: el resto de esa mano sigue tapado");
+// Un error deja DOS cartas a la vista: la fallada y la de castigo, que entra
+// al final de la mano. Las otras siguen tapadas.
+const castigo = destapadas[0].castigo;
+ok(castigo?.posicion === e.jugadores[2].mano.length - 1,
+   "la de castigo entra al final de la mano", castigo?.posicion);
+ok(vistaDe(e, 0).jugadores[2].mano[castigo?.posicion]?.id === castigo?.carta?.id,
+   "y los demás la ven");
+const visibles = vistaDe(e, 0).jugadores[2].mano
+  .map((c, p) => (c && !c.oculta ? p : null))
+  .filter((p) => p !== null);
+ok(JSON.stringify(visibles) === JSON.stringify([posMala, castigo?.posicion].sort((a, b) => a - b)),
+   "y sólo esas dos: el resto de esa mano sigue tapado", visibles);
 ok(filtracionesEn(vistaDe(e, 0), e).length === 0, "exponer una carta no cuenta como filtración");
 
 // Y en cuanto se cierra la ventana, esa información desaparece de la vista:

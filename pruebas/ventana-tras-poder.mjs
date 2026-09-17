@@ -103,8 +103,8 @@ function trasElPoder({ muestra = carta("Copa", 5), sabe = [] } = {}) {
   };
 }
 
-/** X vio que Y tiene un 5. Es el derecho que deja un 8 o un 10. */
-const SABE = [{ actor: 0, objetivo: 1, numero: 5, origen: "poder8" }];
+/** X conoce el 5 de Y. Es el derecho que deja un 8 o un 10. */
+const SABE = [{ actor: 0, idCarta: "Basto-5", origen: "poder8" }];
 
 const cuenta = (s, i) => s.jugadores[i].mano.filter(Boolean).length;
 
@@ -122,26 +122,28 @@ console.log("\n=== 1. Se abre sólo si el que usó el poder puede atacar ===");
   ok(sinSaber.ventanaDescarte === null, "y no queda ninguna ventana");
 
   /**
-   * Un 7 mira una carta PROPIA, así que no deja derecho sobre nadie:
-   * `puedeAtacarA` empieza pidiendo `actor !== objetivo`. Que acá no abra no
-   * es una regla nueva, es aquélla.
+   * Un 7 mira una carta PROPIA, así que no deja derecho sobre nadie: nadie se
+   * ataca a sí mismo. Que acá no abra no es una regla nueva, es aquélla.
    */
   const solo7 = M.ventanaTrasPoder(
-    trasElPoder({ sabe: [{ actor: 0, objetivo: 0, numero: 5, origen: "poder7" }] }),
+    trasElPoder({ sabe: [{ actor: 0, idCarta: "Oro-5", origen: "poder7" }] }),
     0,
   );
   ok(solo7.fase === "postLevantada", "un 7 sobre carta propia tampoco abre", solo7.fase);
 
   /**
-   * El conocimiento que deja un FALLO ajeno da derecho por POSICIÓN, no sobre
-   * la mano entera, y `objetivosDe` lo excluye a propósito. Que no abra esta
-   * ventana es consecuencia de esa regla, no una decisión aparte.
+   * Lo que dejó un FALLO ajeno también cuenta, y abre.
+   *
+   * Antes no abría: ese derecho era por posición y `objetivosDe` sólo miraba
+   * los de mano entera. Ahora todo conocimiento es de una carta y vale igual,
+   * y la condición de apertura es la amplia: saber algo atacable, venga de
+   * donde venga.
    */
   const porFallo = M.ventanaTrasPoder(
-    trasElPoder({ sabe: [{ actor: 0, objetivo: 1, numero: 5, origen: "fallo" }] }),
+    trasElPoder({ sabe: [{ actor: 0, idCarta: "Basto-5", origen: "fallo" }] }),
     0,
   );
-  ok(porFallo.fase === "postLevantada", "un fallo ajeno no abre esta ventana", porFallo.fase);
+  ok(porFallo.fase === "descarte", "lo que dejó un fallo ajeno también abre", porFallo.fase);
 }
 
 // =====================================================================
@@ -181,14 +183,14 @@ console.log("\n=== 3. Los otros tres no juegan en esta ventana ===");
   /**
    * Y tampoco puede atacar, aunque tenga derecho.
    *
-   * El conocimiento se le da a propósito: sin él lo frenaría `puedeAtacarA` y
+   * El conocimiento se le da a propósito: sin él lo frenaría `puedeAtacarEn` y
    * la prueba pasaría por el motivo equivocado, sin llegar a tocar `soloPara`.
    */
   const conY = {
     ...s,
     conocimientos: [
       ...s.conocimientos,
-      { actor: 1, objetivo: 2, numero: 11, origen: "poder8", ronda: s.ronda },
+      { actor: 1, idCarta: "Espada-11", origen: "poder8", ronda: s.ronda },
     ],
   };
   const yAtaca = M.intentarDescarteRival(conY, 1, 2, 0, 0);

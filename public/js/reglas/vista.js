@@ -15,7 +15,7 @@
  */
 
 import { puntosCarta } from "./baraja.js";
-import { objetivosDe, posicionesAtacablesDe } from "./motor.js";
+import { cartasExpuestas, objetivosDe, posicionesAtacablesDe } from "./motor.js";
 
 /** Marcador de carta tapada. No lleva palo, número ni imagen. */
 export const CARTA_OCULTA = { oculta: true };
@@ -24,7 +24,8 @@ export const CARTA_OCULTA = { oculta: true };
 export const HUECO = null;
 
 /**
- * Cartas que la mesa está viendo AHORA por un descarte fallido o tardío.
+ * Cartas que la mesa está viendo AHORA: la tocada en un descarte fallido o
+ * tardío, y la de castigo de un error.
  *
  * Nada de esto queda marcado: en cuanto se cierra la ventana de descarte, la
  * información desaparece de la vista y sólo sobrevive en la memoria de cada
@@ -39,7 +40,8 @@ export const MS_REVELACION = 2000;
 
 export function revelacionesDe(estado) {
   if (estado.fase !== "descarte") return [];
-  return (estado.ventanaDescarte?.intentos ?? []).filter((i) => i.carta);
+  // La misma lista que usa la mesa de entrenamiento: ver `cartasExpuestas`.
+  return cartasExpuestas(estado.ventanaDescarte?.intentos ?? []);
 }
 
 function posicionesReveladas(estado) {
@@ -134,27 +136,23 @@ export function vistaDe(estado, indiceQuienMira) {
     cambioPendiente: estado.cambioPendiente ?? null,
 
     /**
-     * Las posiciones sueltas que puede atacar por un fallo ajeno.
+     * Las cartas ajenas que QUIEN MIRA puede intentar descartar, por posición.
      *
      * ─────────────────────────────────────────────────────────────────────
-     * ESTO NO FILTRA NADA, Y CONVIENE ENTENDER POR QUÉ
+     * POR QUÉ LA POSICIÓN SÍ VIAJA
      * ─────────────────────────────────────────────────────────────────────
      *
-     * Mandar "podés atacarle la posición 2 a Bruno" suena a estar regalando
-     * dónde mirar. No lo es: ese permiso existe JUSTAMENTE porque Bruno falló
-     * un descarte y la mesa entera vio su carta y su lugar. Lo que viaja es
-     * una consecuencia de algo que ya fue público para los cuatro.
+     * Porque es la regla. Conocer una carta es saber dónde está, y si se
+     * mueve con un 9 o un 10, saber adónde fue: el jugador vio el cambio. La
+     * mesa marca exactamente esas cartas, y sólo ésas se pueden tocar.
      *
-     * Lo que sigue sin viajar es el NÚMERO. Va el permiso —quién y dónde— y
-     * quien lo usa tiene que acordarse de qué carta era.
+     * Lo que sigue sin viajar es QUÉ carta es. Va el permiso —quién y dónde—
+     * y quien lo usa tiene que acordarse de si va con la muestra: si no va,
+     * se come una de castigo.
      */
     puedeAtacarEn: posicionesAtacablesDe(estado, indiceQuienMira),
 
-    // A quién puede atacar QUIEN MIRA, y nada más.
-    //
-    // Viaja el permiso, nunca el número conocido: si viajara, el navegador
-    // sabría dónde buscar y el poder dejaría de depender de la memoria. Ni
-    // siquiera se dice cuántas cartas conoce, que ya sería una pista.
+    // A quién puede atacar, en resumen: los dueños de esas mismas cartas.
     puedeAtacar: objetivosDe(estado, indiceQuienMira),
 
     // --- los jugadores ---
@@ -235,7 +233,7 @@ export function filtracionesEn(vista, estadoCompleto) {
     problemas.push("la carta levantada viaja a alguien que no está en turno");
   }
 
-  // El conocimiento de los poderes 8 y 10 NO viaja: sólo el permiso.
+  // Lo que cada jugador conoce NO viaja: sólo el permiso.
   //
   // Si el número conocido llegara al navegador, el jugador no tendría que
   // recordar nada —le bastaría con leerlo— y buscar en la mano del rival
@@ -248,7 +246,10 @@ export function filtracionesEn(vista, estadoCompleto) {
     if (!v || typeof v !== "object") return;
     if (Array.isArray(v)) return v.forEach((x, i) => buscarConocimiento(x, `${ruta}[${i}]`));
     const claves = Object.keys(v);
-    if (claves.includes("objetivo") && claves.includes("numero") && claves.includes("actor")) {
+    // Las dos formas que tuvo: por número y mano, y por carta.
+    const porNumero = claves.includes("objetivo") && claves.includes("numero");
+    const porCarta = claves.includes("idCarta");
+    if (claves.includes("actor") && (porNumero || porCarta)) {
       problemas.push(`la vista lleva un conocimiento de mano ajena en ${ruta}`);
     }
     for (const [k, x] of Object.entries(v)) {

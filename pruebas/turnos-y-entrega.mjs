@@ -107,22 +107,30 @@ console.log("\n=== 3. Acertarle a un rival: quién pierde y quién gana cartas =
 // =====================================================================
 
 {
-  // Se arma el caso a mano: el jugador 0 sabe que el 1 tiene un 5, y la
-  // muestra es un 5. Con eso el ataque puede acertar.
+  // Se arma el caso a mano: el jugador 0 conoce dos cartas del 1 —un 12 en la
+  // posición 0 y un 5 en la 1— y la muestra es un 5. Con eso el ataque puede
+  // acertar sobre una y fallar sobre la otra.
+  //
+  // Las cartas llevan `id`: el conocimiento es de una carta, y sin `id` no hay
+  // carta que conocer. Esta prueba pasó un tiempo sin ellos, por una
+  // coincidencia entre dos `undefined` que ya no existe.
   let e = M.empezarRonda(M.crearPartida(CUATRO, { semilla: 4242 }));
 
-  const cinco = { numero: 5, palo: "copa", imagen: "", visible: false };
-  const mia = { numero: 12, palo: "espada", imagen: "", visible: false };
+  const cinco = { id: "t-5", numero: 5, palo: "copa", imagen: "", visible: false };
+  const mia = (n) => ({ id: `t-12-${n}`, numero: 12, palo: "espada", imagen: "", visible: false });
 
   e = {
     ...e,
     fase: "descarte",
     ventanaDescarte: { abiertaEn: Date.now(), duracionMs: 5000, graciaMs: 0, intentos: [], huboPrimero: false },
     descarte: [{ ...cinco, visible: true }],
-    conocimientos: [{ actor: 0, objetivo: 1, numero: 5, origen: "poder", ronda: 1 }],
+    conocimientos: [
+      { actor: 0, idCarta: "t-12-4", origen: "poder8", ronda: 1 },
+      { actor: 0, idCarta: "t-5", origen: "poder8", ronda: 1 },
+    ],
     jugadores: e.jugadores.map((j, i) =>
-      i === 0 ? { ...j, mano: [mia, { ...mia }, { ...mia }, { ...mia }] }
-        : i === 1 ? { ...j, mano: [{ ...mia }, cinco, { ...mia }, { ...mia }] }
+      i === 0 ? { ...j, mano: [mia(0), mia(1), mia(2), mia(3)] }
+        : i === 1 ? { ...j, mano: [mia(4), cinco, mia(5), mia(6)] }
         : j,
     ),
   };
@@ -156,7 +164,7 @@ console.log("\n=== 3. Acertarle a un rival: quién pierde y quién gana cartas =
     "boca abajo: ni quien la entregó sabe cuál era",
   );
 
-  // Falla: apunta a una posición donde no está el 5.
+  // Falla: apunta al 12 que conoce, que no va con la muestra.
   const error = M.intentarDescarteRival(e, 0, 1, 0, 2);
   const f = manos(error);
   ok(f[0] === 5, "AL FALLAR: recibo una carta de castigo (4 -> 5)", f[0]);

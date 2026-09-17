@@ -470,6 +470,14 @@ Encontrado mientras se trabajaba en otra cosa. Ninguno rompe nada hoy.
   `repartir`, que quedó separado de su función. Un editor muestra el de abajo
   y el de arriba no se lee en ningún lado.
 
+- **El bloque «NUEVO: Permitir mirar (clic simple) en fase descarte»**, al
+  principio de `clicEnCartaDeRed` en `public/js/mesa.js`. Un toque sobre una
+  carta propia durante el descarte dice «Mirando tu carta…» y no muestra
+  nada: en red la mano propia llega tapada, así que lo que se "revela" es el
+  marcador de carta oculta. Además repite el descarte propio que ya existe más
+  abajo, y deja esa otra rama sin uso. Desde el descarte al rival la entrega
+  va antes que este bloque —era lo que la bloqueaba—, pero el bloque sigue ahí.
+
 ---
 
 ## 12. App Check — resolver los navegadores donde reCAPTCHA falla

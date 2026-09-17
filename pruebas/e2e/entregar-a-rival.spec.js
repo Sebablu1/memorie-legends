@@ -1,37 +1,41 @@
 /**
- * Entregarle una carta a un rival, en la mesa de entrenamiento.
+ * Descartarle una carta a un rival, en la mesa de entrenamiento.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * QUÉ ES ESTA JUGADA
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Un poder 8 o 10 deja ver una carta ajena. A partir de ahí se sabe QUÉ tiene
- * ese rival, pero no DÓNDE — la mano se marca entera, nunca la posición—. En la
- * siguiente ventana de descarte se puede apostar: tocar dos veces la carta del
- * rival donde uno cree que está, y entregar una carta propia a ciegas si
- * acierta.
+ * Un poder 8 deja conocer una carta ajena: cuál es y dónde está. Con la
+ * ventana de descarte abierta se la puede intentar descartar —dos toques sobre
+ * ESA carta— y, si va con la muestra, entregar una propia a ciegas en su
+ * lugar. Si no va, el que ataca se come una de castigo.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * POR QUÉ ESTA PRUEBA EXISTE
  * ─────────────────────────────────────────────────────────────────────────
  *
- * El motor ya sabía hacerlo —`intentarDescarteRival`, probado en
- * `pruebas/rival.mjs`— y la mesa EN RED ya lo usaba. La de entrenamiento no:
- * los rivales nunca se marcaban y los toques no llegaban a ningún lado.
+ * Las reglas las prueban `pruebas/descarte-al-rival.mjs` y compañía, con el
+ * estado armado a mano. Lo que ninguna prueba de motor puede ver es el
+ * cableado: que la mesa marque la carta correcta y que los toques del
+ * navegador lleguen al motor.
  *
- * Lo que se agregó, entonces, es cableado: las mismas reglas, conectadas al
- * camino local. Y el cableado es justo lo que ninguna prueba de motor puede
- * ver, porque del lado del motor todo estaba bien desde el principio.
+ * Antes la mesa marcaba la mano ENTERA del rival, porque el motor guardaba el
+ * número visto y no la carta. Ahora marca sólo la carta conocida, y un doble
+ * toque sobre cualquier otra no intenta nada.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * POR QUÉ EL CAMINO ES TAN LARGO
+ * POR QUÉ EL ATAQUE VA EN LA VENTANA QUE ABRE EL 8
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Porque la condición no se puede fabricar: hace falta que caiga un poder 8,
- * usarlo, y recién entonces llega la ventana donde la jugada existe. Se busca
- * una semilla que reparta un 8 arriba del mazo — igual que hace
- * `poder-diez.spec.js` con el 10, y por el mismo motivo: probar semillas al
- * azar dejaba la prueba SALTADA, que es peor que un rojo porque no se nota.
+ * Porque es la única en la que la carta conocida sigue seguro donde se vio.
+ * Esta prueba esperaba antes una reapertura más adelante, y con la marca de
+ * mano entera daba igual qué hicieran las IA en el medio. Ahora no: si el
+ * rival cambia justo esa carta por la que levantó, deja de ser atacable —que
+ * es la regla— y la prueba fallaría por azar.
+ *
+ * Y porque la condición no se puede fabricar: hace falta que caiga un 8. Se
+ * busca una semilla que reparta un 8 arriba del mazo, igual que hace
+ * `poder-diez.spec.js` con el 10.
  */
 
 import { test, expect } from "@playwright/test";
@@ -63,15 +67,13 @@ async function mesaConOcho(page) {
   return null;
 }
 
-test("mirar una carta ajena habilita entregarle una carta a ese rival", async ({
-  page,
-}) => {
-  test.setTimeout(240_000);
-
-  const semilla = await mesaConOcho(page);
-  test.skip(semilla === null, "ninguna semilla repartió un 8 en el primer turno");
-
-  // Usar el 8: se elige una carta de un rival y se la mira.
+/**
+ * Usa el 8 sobre la primera carta que el modal ofrezca de un rival.
+ *
+ * @returns el rival y la posición mirada, que es la única que se va a poder
+ *          atacar.
+ */
+async function usarElOcho(page) {
   await page.locator('[data-accion="usar-poder"]').click();
   await expect(page.locator("#modal .objetivos")).toBeVisible({ timeout: 20_000 });
 
@@ -79,92 +81,103 @@ test("mirar una carta ajena habilita entregarle una carta a ese rival", async ({
     .locator('#modal .objetivos [data-objetivo]:not([data-objetivo="0"])')
     .first();
   const rival = Number(await objetivo.getAttribute("data-objetivo"));
+  const posicion = Number(await objetivo.getAttribute("data-pos"));
   await objetivo.click();
+  return { rival, posicion };
+}
 
-  // El 8 se gasta con la carta levantada, así que después no queda nada que
-  // tirar: el turno sigue siendo mío pero sólo para cortar o pasar.
-  await expect(page.locator(SEL.pasar)).toBeEnabled({ timeout: 25_000 });
+test("el 8 marca la carta que se vio, y dos toques sobre ella la atacan", async ({ page }) => {
+  test.setTimeout(240_000);
 
-  // Se pasa, y se espera una REAPERTURA: la ventana que abre cualquiera al
-  // tirar una carta. Tiene que ser en esta misma ronda — `empezarRonda` borra
-  // `conocimientos`, porque al repartir de nuevo lo que uno sabía ya no
-  // corresponde a ninguna carta que siga ahí. O sea: la jugada existe sólo
-  // desde que se usa el poder hasta que termina la ronda.
-  await page.locator(SEL.pasar).click();
+  const semilla = await mesaConOcho(page);
+  test.skip(semilla === null, "ninguna semilla repartió un 8 en el primer turno");
+
+  const { rival, posicion } = await usarElOcho(page);
+  const otroRival = rival === 1 ? 2 : 1;
 
   // ── Lo que se viene a comprobar ──────────────────────────────────────
   //
   // Todo lo que sigue pasa DENTRO de la página, en un solo viaje. La ventana
-  // reabierta dura tres segundos y hay que dar tres toques adentro; manejarla
-  // desde afuera es una carrera que se pierde sola, como se descubrió en
-  // `doble-toque-ios.spec.js`.
+  // que abre el 8 dura tres segundos y hay que dar varios toques adentro;
+  // manejarla desde afuera es una carrera que se pierde sola, como se
+  // descubrió en `doble-toque-ios.spec.js`.
   const visto = await page.evaluate(
-    async ({ sel, rival }) => {
+    async ({ sel, rival, posicion, otroRival }) => {
       const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
       const texto = (s) => document.querySelector(s)?.textContent ?? "";
       const cartaDe = (j, p) =>
         document.querySelector(`.jugador[data-jugador="${j}"] .carta[data-posicion="${p}"]`);
-      const mias = () => document.querySelectorAll(`${sel.miMano} .carta[data-posicion]`).length;
-      const suyas = () =>
-        document.querySelectorAll(`.jugador[data-jugador="${rival}"] .carta[data-posicion]`).length;
+      const cuantas = (j) =>
+        document.querySelectorAll(`.jugador[data-jugador="${j}"] .carta[data-posicion]`).length;
+      const marcadas = (j) =>
+        [...document.querySelectorAll(`.jugador[data-jugador="${j}"] .carta[data-posicion].atacable`)]
+          .map((c) => Number(c.dataset.posicion));
 
-      // Se espera a que ALGUIEN tire y reabra la ventana. Puede tardar: antes
-      // juegan las IA que estén en el medio. El plazo es generoso a propósito,
-      // pero acotado por la ronda: si termina, `conocimientos` se borra y la
-      // jugada deja de existir.
-      const limite = Date.now() + 45_000;
-      while (!/descarte/i.test(texto(sel.reloj))) {
+      // La ventana que abre el 8, después de los dos segundos de mirar.
+      const limite = Date.now() + 15_000;
+      while (!/busc/i.test(texto(sel.pista))) {
         if (Date.now() > limite) {
-          return { fallo: `nadie reabrió la ventana; el reloj dice "${texto(sel.reloj)}"` };
+          return { fallo: `no se abrió la ventana tras el 8; la pista dice "${texto(sel.pista)}"` };
         }
         await dormir(16);
       }
 
-      // 1. La mano del rival quedó marcada como atacable — la mano ENTERA,
-      //    nunca una posición: se sabe qué tiene, no dónde.
-      const cartasSuyas = [...document.querySelectorAll(
-        `.jugador[data-jugador="${rival}"] .carta[data-posicion]`)];
-      const atacables = cartasSuyas.filter((c) => c.classList.contains("atacable")).length;
+      const atacablesRival = marcadas(rival);
+      const atacablesOtro = marcadas(otroRival);
 
-      // 2. Dos toques sobre una carta suya apuntan el ataque y piden la
-      //    entrega. El primero no: tiene que avisar que falta el otro.
-      const suya = cartasSuyas[0];
+      // Dos toques sobre una carta del otro rival, que no conozco: nada.
+      const ajena = cartaDe(otroRival, 0);
+      ajena.click();
+      ajena.click();
+      await dormir(30);
+      const trasLaAjena = texto(sel.pista);
+
+      // Ni sobre otra carta del MISMO rival: conocer una no habilita las demás.
+      const vecina = cartaDe(rival, (posicion + 1) % cuantas(rival));
+      vecina.click();
+      vecina.click();
+      await dormir(30);
+      const trasLaVecina = texto(sel.pista);
+
+      // Dos toques sobre la conocida apuntan el ataque. El primero avisa.
+      const suya = cartaDe(rival, posicion);
       suya.click();
       const trasUnToque = texto(sel.pista);
       suya.click();
-      await dormir(60);
+      await dormir(30);
       const trasDosToques = texto(sel.pista);
 
-      // 3. Y ahora un solo toque en una carta propia ejecuta la jugada. Un
-      //    solo toque a propósito: la decisión ya se confirmó al apuntar.
-      const cuantasAntes = mias();
-      const suyasAntes = suyas();
+      // Y un toque en una carta propia ejecuta la jugada.
+      const misAntes = cuantas(0);
+      const suyasAntes = cuantas(rival);
       const primera = document.querySelector(`${sel.miMano} .carta[data-posicion]`);
       cartaDe(0, primera.dataset.posicion).click();
       await dormir(700);
 
       return {
-        atacables,
-        cuantasSuyas: cartasSuyas.length,
+        atacablesRival,
+        atacablesOtro,
+        trasLaAjena,
+        trasLaVecina,
         trasUnToque,
         trasDosToques,
-        cuantasAntes,
-        cuantasDespues: mias(),
+        misAntes,
+        misDespues: cuantas(0),
         suyasAntes,
-        suyasDespues: suyas(),
+        suyasDespues: cuantas(rival),
         pistaFinal: texto(sel.pista),
       };
     },
-    { sel: SEL, rival },
+    { sel: SEL, rival, posicion, otroRival },
   );
 
   expect(visto.fallo ?? "", visto.fallo ?? "").toBe("");
 
-  expect(
-    visto.atacables,
-    "la mano del rival no quedó marcada: en entrenamiento el ataque no existía",
-  ).toBe(visto.cuantasSuyas);
+  expect(visto.atacablesRival, "se marca la carta que se vio, y sólo ésa").toEqual([posicion]);
+  expect(visto.atacablesOtro, "del otro rival no se marca nada").toEqual([]);
 
+  expect(visto.trasLaAjena, "dos toques sobre una carta que no conozco").toMatch(/no la conocés/i);
+  expect(visto.trasLaVecina, "dos toques sobre otra carta del mismo rival").toMatch(/no la conocés/i);
   expect(visto.trasUnToque, "un solo toque ya apuntó el ataque").toMatch(/doble toque/i);
   expect(
     visto.trasDosToques,
@@ -176,31 +189,63 @@ test("mirar una carta ajena habilita entregarle una carta a ese rival", async ({
   // Mi mano cambia en EXACTAMENTE una carta, para cualquiera de los dos
   // desenlaces: al acertar entrego una y quedo con menos; al fallar recibo una
   // de castigo y quedo con más. Cambiar en dos, o no cambiar, serían las dos
-  // formas de estar roto.
-  const cambio = visto.cuantasDespues - visto.cuantasAntes;
+  // formas de estar roto. Cuál de los dos fue depende del reparto; que cada
+  // uno haga lo que debe está en `pruebas/descarte-al-rival.mjs`.
+  const cambio = visto.misDespues - visto.misAntes;
   expect(
     Math.abs(cambio),
-    `mi mano pasó de ${visto.cuantasAntes} a ${visto.cuantasDespues}; la pista dice "${visto.pistaFinal}"`,
+    `mi mano pasó de ${visto.misAntes} a ${visto.misDespues}; la pista dice "${visto.pistaFinal}"`,
   ).toBe(1);
 
-  // Y la del rival NO cambia de cantidad, gane o pierda. Al acertar se le va
-  // una carta y le entra la mía EN SU LUGAR —por eso sigue igual—; al fallar no
-  // se le toca nada. Si su mano creciera, la carta se estaría duplicando en vez
-  // de transferirse.
+  // Y la del rival NO cambia de cantidad, gane o pierda. Si creciera, la carta
+  // se estaría duplicando en vez de transferirse.
   expect(
     visto.suyasDespues,
-    `la mano del rival pasó de ${visto.suyasAntes} a ${visto.suyasDespues}: la carta no se transfirió, se duplicó`,
+    `la mano del rival pasó de ${visto.suyasAntes} a ${visto.suyasDespues}`,
   ).toBe(visto.suyasAntes);
+});
 
-  // Acá NO se comprueba cuál de los dos desenlaces fue.
-  //
-  // La primera versión lo intentaba leyendo la pista, y se equivocaba: el texto
-  // menciona "entregar" en los dos casos, así que daba por acierto un fallo.
-  // Y no hay forma de forzar el acierto desde el navegador — la posición de la
-  // carta buscada depende del reparto, que cambia en cada ronda.
-  //
-  // Que al acertar la carta propia se va de mi mano y aparece EN EL LUGAR
-  // EXACTO de la del rival está probado en `pruebas/turnos-y-entrega.mjs`, con
-  // el estado armado a mano y sin azar. Lo que esta prueba aporta es lo que
-  // aquélla no puede ver: que los toques del navegador llegan al motor.
+test("un ataque apuntado que no se completa se olvida al cerrar la ventana", async ({ page }) => {
+  /**
+   * Apuntar y no elegir la entrega. Antes el ataque a medio armar quedaba
+   * vivo: la mesa seguía apagada con la carta apuntada resaltada, y el primer
+   * toque propio de la ventana siguiente se tomaba como entrega.
+   */
+  test.setTimeout(240_000);
+
+  const semilla = await mesaConOcho(page);
+  test.skip(semilla === null, "ninguna semilla repartió un 8 en el primer turno");
+
+  const { rival, posicion } = await usarElOcho(page);
+
+  const apuntado = await page.evaluate(
+    async ({ sel, rival, posicion }) => {
+      const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
+      const texto = (s) => document.querySelector(s)?.textContent ?? "";
+      const limite = Date.now() + 15_000;
+      while (!/busc/i.test(texto(sel.pista))) {
+        if (Date.now() > limite) return { fallo: "no se abrió la ventana tras el 8" };
+        await dormir(16);
+      }
+      const suya = document.querySelector(
+        `.jugador[data-jugador="${rival}"] .carta[data-posicion="${posicion}"]`,
+      );
+      suya.click();
+      suya.click();
+      await dormir(30);
+      return { apagadas: document.querySelectorAll(".carta.apagada").length };
+    },
+    { sel: SEL, rival, posicion },
+  );
+
+  expect(apuntado.fallo ?? "", apuntado.fallo ?? "").toBe("");
+  expect(apuntado.apagadas, "con el ataque apuntado, el resto de la mesa se apaga")
+    .toBeGreaterThan(0);
+
+  // La ventana se cierra sola y vuelve la decisión de cortar.
+  await expect(page.locator(SEL.pasar)).toBeEnabled({ timeout: 25_000 });
+
+  await expect(page.locator(".carta.apagada"), "la mesa sigue apagada tras cerrar la ventana")
+    .toHaveCount(0);
+  await expect(page.locator(".carta.apuntada"), "y la carta sigue apuntada").toHaveCount(0);
 });

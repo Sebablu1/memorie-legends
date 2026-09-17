@@ -94,8 +94,12 @@ ok(!("infoPublica" in s), "no existe ningún registro permanente de exposiciones
 
 console.log("\n=== La revelación es efímera y la ven todos ===");
 const reveladas = V.revelacionesDe(s);
-ok(reveladas.length === 2, "se destapan dos cartas: la de B y la de C", reveladas.length);
-ok(reveladas.every((r) => r.carta), "las dos vienen con su carta");
+ok(reveladas.length === 3, "se destapan tres cartas: la de B, la de C y el castigo de C", reveladas.length);
+ok(reveladas.every((r) => r.carta), "las tres vienen con su carta");
+ok(reveladas.filter((r) => r.indiceJugador === 1).length === 1,
+   "B, que llegó tarde, muestra sólo la suya: su castigo va boca abajo");
+ok(reveladas.filter((r) => r.indiceJugador === 2).length === 2,
+   "C, que se equivocó, muestra la que falló y la de castigo");
 ok(!reveladas.some((r) => r.indiceJugador === 0), "la de A no se destapa: ya está en el descarte");
 
 for (const quien of [0, 1, 2]) {
