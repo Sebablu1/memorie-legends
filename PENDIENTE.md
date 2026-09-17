@@ -467,6 +467,37 @@ Encontrado mientras se trabajaba en otra cosa. Ninguno rompe nada hoy.
 
 ---
 
+## 12. App Check — resolver los navegadores donde reCAPTCHA falla
+
+**Estado:** apagado en el cliente desde el 16 de septiembre (`MANDAR_TOKEN =
+false`, atado a `EXIGIR_APP_CHECK`). No protege nada hoy, y así estaba también
+antes: el servidor nunca lo exigió.
+
+**Qué pasó.** Con App Check inicializado, el SDK de Firebase no manda ninguna
+llamada hasta tener respuesta sobre el token. En el navegador de un jugador
+real, reCAPTCHA fallaba en cada llamada (`appCheck/recaptcha-error`), y
+reproducido bloqueando su iframe, los dos primeros pedidos de token quedaron
+colgados más de veinte segundos cada uno. Las primeras jugadas de la partida
+esperaban eso antes de salir.
+
+**Qué falta antes de exigirlo algún día:**
+
+- **Saber cuántos navegadores fallan.** No son atacantes: son jugadores con
+  extensiones de privacidad o con el almacenamiento de terceros bloqueado. El
+  período de «mandar sin exigir y mirar la consola» ya no sirve para medirlo,
+  porque mandarlo es justamente lo que les arruinaba la partida.
+- **Decidir qué hacer con ellos.** Opciones a evaluar, ninguna probada: otro
+  proveedor de atestación; pedir el token con un límite de tiempo propio en
+  vez de dejar que el SDK espere; o aceptar que quien bloquee reCAPTCHA no
+  pueda jugar por Leyendas, avisándole por qué en vez de colgarle la mesa.
+- **Encender los dos interruptores juntos**, en el mismo despliegue.
+
+**Cómo se sabe que se resolvió:** hay un número de navegadores que fallan, una
+decisión sobre ellos, y una partida jugada con App Check exigido desde un
+navegador con bloqueo de terceros que o funciona, o explica por qué no.
+
+---
+
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del

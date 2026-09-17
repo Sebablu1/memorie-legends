@@ -13,8 +13,9 @@ bien antes de encender nada.
 
 | Qué | Estado |
 |---|---|
-| App Check — clave puesta, token viajando | ✅ hecho |
-| App Check — obligatorio | ⬜ pendiente, a propósito (ver §1) |
+| App Check — clave puesta | ✅ hecho |
+| App Check — token viajando | ⏸️ **apagado en el cliente** desde el 16/09 (ver §1) |
+| App Check — obligatorio | ⬜ pendiente, y con un problema por resolver antes (ver §1) |
 | 2FA (TOTP) — código escrito y QR comprobado | ✅ hecho |
 | 2FA (TOTP) — encendido en el servidor | ✅ hecho por API (ver §2) |
 | 2FA — probado por una persona de verdad | ✅ hecho |
@@ -47,18 +48,52 @@ servidor.
 - Y acordate de `public/js/app-check.js`: tiene su propia lista de dominios, y
   un dominio que falte ahí deja App Check apagado **en silencio**.
 
+### ⏸️ Por qué el cliente NO pide token hoy
+
+El plan era mandar token sin exigirlo, mirar la consola unos días y recién
+después exigirlo. Ese primer paso tenía un costo que no estaba en la cuenta.
+
+Una vez inicializado App Check, el SDK de Firebase **no manda ninguna llamada
+hasta tener una respuesta sobre el token**. En un navegador donde reCAPTCHA no
+anda, eso es la partida entera:
+
+- La consola de un jugador real estaba llena de `appCheck/recaptcha-error`, una
+  vez por llamada. En los registros del servidor, sus pedidos llegaban con
+  `"app": "MISSING"`; los de su rival, en la misma partida, con `"VALID"`. **La
+  clave anda: lo que falla es ese navegador.**
+- Reproducido bloqueando el iframe de reCAPTCHA —lo que hace una extensión de
+  privacidad, o el bloqueo de almacenamiento de terceros—: los dos primeros
+  pedidos de token quedaron **colgados más de veinte segundos cada uno**, y los
+  siguientes fallan igual. A diferencia de un 403, esa falla el SDK no la
+  frena: la reintenta en cada llamada.
+
+Con el servidor sin exigirlo, ese token no protegía nada. Así que
+`MANDAR_TOKEN` en `public/js/app-check.js` quedó en `false`, atado a
+`EXIGIR_APP_CHECK`: `pruebas/app-check.mjs` falla si los dos no coinciden.
+
 ### Antes de encenderlo — esto es lo importante
 
-**Esperá al menos unos días** y mirá **App Check → APIs → Cloud Functions**. La
-consola muestra cuántos pedidos llegan con token válido y cuántos sin él.
+**Primero, resolver los navegadores donde reCAPTCHA no anda.** Exigir App Check
+así los deja afuera del juego, con el saldo adentro — y no son atacantes: son
+jugadores con una extensión de privacidad. Hace falta saber cuántos son y qué
+hacer con ellos antes de tocar los interruptores. Ver `PENDIENTE.md`.
 
-Los "sin token" no son todos atacantes: también son jugadores con la pestaña
-abierta desde antes del despliegue, que van a seguir sin mandarlo hasta que
-recarguen. Exigirlo el mismo día que se enciende los deja afuera del juego con
-el saldo adentro. Por eso hay que mirar primero.
+**El período de mirar la consola ya no existe tal como estaba pensado.** Era
+mandar token sin exigirlo durante unos días para contar cuántos pedidos
+llegaban sin él — y mandarlo sin exigirlo es exactamente lo que costaba la
+partida en los navegadores donde reCAPTCHA falla. Cómo medir sin ese costo
+es parte de lo que hay que resolver.
 
-Cuando los pedidos sin token sean cerca de cero, hay **dos** interruptores y
-conviene entender que son distintos:
+Lo que sigue valiendo de aquel período es su razón: quien tenga la pestaña
+abierta desde antes del despliegue no manda token hasta que recargue. Si se
+exige el mismo día, esa gente recibe «Recargá la página para seguir jugando»
+—el servidor ya lo dice así—, y eso tiene que ser una decisión, no una
+sorpresa.
+
+Los interruptores del juego —`MANDAR_TOKEN` en el cliente y
+`EXIGIR_APP_CHECK` en el servidor— se encienden **juntos**, en el mismo
+despliegue: `pruebas/app-check.mjs` no deja separarlos. Y hay **dos** niveles,
+que conviene no confundir:
 
 - `EXIGIR_APP_CHECK = true` en `functions/index.js` — lo comprueban las Cloud
   Functions. Éste es el que importa para el juego.
@@ -207,7 +242,8 @@ https://us-central1-memorie-legends.cloudfunctions.net/webhookPago
 
 | Qué | Dónde se enciende | Estado hoy |
 |---|---|---|
-| App Check (cliente) | `public/js/app-check.js` → `CLAVE_RECAPTCHA` | ✅ puesta (Enterprise) |
+| App Check (clave) | `public/js/app-check.js` → `CLAVE_RECAPTCHA` | ✅ puesta (Enterprise) |
+| App Check (cliente) | `public/js/app-check.js` → `MANDAR_TOKEN` | `false` — atado al de abajo |
 | App Check (servidor) | `functions/index.js` → `EXIGIR_APP_CHECK` | `false` — a propósito |
 | 2FA (TOTP) | `node herramientas/mfa.mjs --activar` / `--apagar` | ✅ ENABLED, ±5 ventanas |
 | Pagos | `functions:secrets:set` | ⬜ sin secretos |

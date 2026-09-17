@@ -70,10 +70,14 @@ const funciones = getFunctions(app);
  *
  * Es mejor que acordarse pantalla por pantalla: acá olvidarse es imposible.
  *
- * Va sin `await`: no tiene que retrasar la carga de nada, y el SDK sabe
- * esperar el token cuando le hace falta. Mientras no haya clave, o en un
- * dominio que no sea el de producción, es una función que devuelve `false` y
- * ya. Ver `app-check.js`.
+ * Va sin `await`: no tiene que retrasar la carga de nada. Pero ojo con lo que
+ * hace el SDK DESPUÉS de inicializarlo: espera el token antes de cada llamada,
+ * y en un navegador donde reCAPTCHA no anda esa espera se come la partida.
+ *
+ * Hoy es una función que devuelve `false` y ya, porque el servidor no exige
+ * el token y pedirlo era todo costo. También devuelve `false` sin clave, o en
+ * un dominio que no sea el de producción. Ver `MANDAR_TOKEN` en
+ * `app-check.js`.
  */
 import("./app-check.js")
   .then((m) => m.encenderAppCheck())

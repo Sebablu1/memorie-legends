@@ -188,5 +188,50 @@ console.log("\n=== 4. La portada no arrastra nada de eso ===");
 
 // ────────────────────────────────────────────────────────────────────
 
+console.log("\n=== 5. El cliente pide token si y sólo si el servidor lo exige ===");
+{
+  /**
+   * ─────────────────────────────────────────────────────────────────────
+   * POR QUÉ ESTA COMPARACIÓN
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Una vez inicializado App Check, el SDK no manda ninguna llamada hasta
+   * tener respuesta sobre el token. Donde reCAPTCHA no anda —extensiones de
+   * privacidad, almacenamiento de terceros bloqueado— eso dejó los primeros
+   * pedidos colgados más de veinte segundos, medido. Y con el servidor sin
+   * exigirlo, ese token no protegía nada: era todo costo.
+   *
+   * De las cuatro combinaciones, dos tienen sentido: ninguno, o los dos.
+   *
+   *   cliente sí, servidor no → la espera de arriba, a cambio de nada.
+   *   cliente no, servidor sí → nadie manda token y el servidor rechaza a
+   *                             todo el mundo, con el saldo adentro.
+   *
+   * La segunda es la peligrosa, y por eso esto no se conforma con mirar que
+   * el cliente esté apagado: compara los dos valores.
+   */
+  const servidor = readFileSync(new URL("../functions/index.js", import.meta.url), "utf8");
+  const exige = servidor.match(/const EXIGIR_APP_CHECK\s*=\s*(true|false)\s*;/)?.[1];
+  const manda = fuente.match(/const MANDAR_TOKEN\s*=\s*(true|false)\s*;/)?.[1];
+
+  ok(exige !== undefined, "se pudo leer EXIGIR_APP_CHECK del servidor", exige);
+  ok(manda !== undefined, "se pudo leer MANDAR_TOKEN del cliente", manda);
+  ok(manda === exige,
+     `el cliente pide token (${manda}) igual que el servidor lo exige (${exige})`,
+     { manda, exige });
+
+  // Y que el interruptor esté donde tiene que estar: ANTES de que se baje
+  // nada. Si la comprobación quedara después del `import()` del SDK, el
+  // cliente seguiría bajando App Check y reCAPTCHA aunque no los use.
+  const cuerpo = fuente.slice(fuente.indexOf("export async function encenderAppCheck"));
+  const corte = cuerpo.indexOf("if (!MANDAR_TOKEN) return false;");
+  const bajada = cuerpo.indexOf("firebase-app-check.js");
+  ok(corte >= 0, "encenderAppCheck se corta cuando no hay que mandar token", corte);
+  ok(corte >= 0 && bajada > corte,
+     "y se corta ANTES de bajar el SDK de App Check", { corte, bajada });
+}
+
+// ────────────────────────────────────────────────────────────────────
+
 console.log(fallos ? `\n❌ ${fallos} fallo(s)` : "\n✅ TODO OK");
 process.exit(fallos ? 1 : 0);

@@ -15,23 +15,17 @@
  * diciendo el token— sino que responde otra pregunta: desde dónde.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * ESTADO: MANDANDO TOKEN, PERO SIN EXIGIRLO
+ * ESTADO: APAGADO EN EL CLIENTE, PORQUE NADIE LO EXIGE
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Con la clave puesta, cada navegador empieza a mandar el token. Lo que NO
- * pasa todavía es que el servidor lo exija: la consola está en modo
- * SUPERVISIÓN y `EXIGIR_APP_CHECK` sigue en `false` en functions/index.js.
+ * El plan era encenderlo en dos pasos: primero que los navegadores mandaran
+ * token sin que el servidor lo exigiera, para mirar en la consola cuántos
+ * llegaban sin él, y después exigirlo.
  *
- * Los dos interruptores están apagados a propósito, y en este orden:
- *
- *   1. AHORA — los navegadores mandan token. La consola cuenta cuántos
- *      pedidos llegan con y sin él. Nada se rechaza.
- *   2. DESPUÉS — cuando los "sin token" sean cerca de cero, se exige.
- *
- * Ese paso 1 no es burocracia. Quien tenga la pestaña abierta desde antes de
- * este despliegue no manda token, y va a seguir sin mandarlo hasta que
- * recargue. Exigirlo el mismo día que se enciende deja afuera a toda esa
- * gente, con el saldo adentro. Por eso se mira primero y se exige después.
+ * El primer paso resultó tener un costo que no estaba en la cuenta, y lo
+ * pagaba el juego: ver `MANDAR_TOKEN`, abajo. Mientras el servidor no lo
+ * exija, el cliente no lo pide. Cuando se decida exigirlo, los dos se
+ * encienden juntos — una prueba vigila que no se separen.
  *
  * Los pasos concretos están en `HACER-EN-LA-CONSOLA.md`.
  */
@@ -50,6 +44,52 @@ import { app } from "./firebase.js";
  * Vacía = App Check apagado.
  */
 const CLAVE_RECAPTCHA = "6Lcd56UtAAAAAME1Ckf4zKXIY_CC8OaZ_t3Kffm-";
+
+/**
+ * ¿El navegador pide token? Hoy, NO — y va atado a `EXIGIR_APP_CHECK`.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LO QUE COSTABA PEDIRLO SIN QUE NADIE LO EXIJA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Una vez inicializado, el SDK de Firebase no manda NINGUNA llamada —ni a las
+ * funciones ni, para el caso, a Firestore— hasta tener una respuesta sobre el
+ * token. En un navegador donde reCAPTCHA funciona eso es casi nada. En uno
+ * donde no, es la partida entera:
+ *
+ *   - La consola de un jugador real estaba llena de
+ *     `appCheck/recaptcha-error`, una vez por llamada, y en los registros del
+ *     servidor sus pedidos llegaban con `"app": "MISSING"`. Los de su rival,
+ *     en la misma partida y el mismo segundo, con `"VALID"`: la clave anda,
+ *     lo que falla es ese navegador.
+ *
+ *   - Reproducido bloqueando el iframe de reCAPTCHA, como hace una extensión
+ *     de privacidad o el bloqueo de almacenamiento de terceros
+ *     (`requestStorageAccess: Permission denied` aparece solo): los dos
+ *     primeros pedidos de token quedaron COLGADOS más de veinte segundos
+ *     cada uno, y los siguientes fallan igual. Esa falla, a diferencia de
+ *     un 403, el SDK no la frena: la reintenta en cada llamada.
+ *
+ * Mientras el servidor no lo exige, ese token no protege nada — el servidor
+ * lo recibe y lo ignora. Era todo costo: las primeras jugadas de la partida
+ * esperando decenas de segundos antes de salir, en los navegadores
+ * justamente de quienes cuidan su privacidad. Y de paso, en TODAS las
+ * páginas, los 345 KB de reCAPTCHA y sus 770 ms de hilo principal.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ ATADO AL SERVIDOR
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Las dos combinaciones con sentido son «ninguno» y «los dos». Servidor
+ * exigiendo con este apagado dejaría afuera a todo el mundo, con el saldo
+ * adentro; éste encendido con el servidor sin exigir es lo que acaba de
+ * describirse. `pruebas/app-check.mjs` compara los dos valores.
+ *
+ * Antes de encender los dos, hay que resolver qué pasa con los navegadores
+ * donde reCAPTCHA no anda: exigirlo así los deja afuera. Ver
+ * `HACER-EN-LA-CONSOLA.md` y `PENDIENTE.md`.
+ */
+const MANDAR_TOKEN = false;
 
 /**
  * Los dominios donde esta clave vale.
@@ -132,6 +172,9 @@ const SIN_APP_CHECK = new Set(["/", "/index.html"]);
  * @returns true si quedó encendido.
  */
 export async function encenderAppCheck() {
+  // Primero, antes que la clave y el dominio: sin esto, ni el SDK de App Check
+  // ni reCAPTCHA se bajan. Ver `MANDAR_TOKEN`.
+  if (!MANDAR_TOKEN) return false;
   if (!CLAVE_RECAPTCHA) return false;
   if (!DOMINIOS.includes(window.location.hostname)) return false;
   if (SIN_APP_CHECK.has(window.location.pathname)) return false;
