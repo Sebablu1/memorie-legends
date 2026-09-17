@@ -528,6 +528,14 @@ propósito, porque no eran ese arreglo:
   de la ventana de la ronda (`MS_VENTANA_TOTAL = MS_MIRAR + MS_VENTANA`), que
   hoy incluye la mirada: es una decisión de reglas, no un retoque.
 
+  **Ya pasó en producción.** Partida del 17 de septiembre, 07:19:47 UTC: una
+  mirada llegó al final de los dos segundos a una instancia recién arrancada
+  —1679 ms dentro de la función— y `accionDePartida` la rechazó con 400: para
+  cuando la transacción leyó la partida, la mirada ya estaba cerrada. Se suma
+  al punto 10 (arranques en frío). Queda para después de que el usuario pruebe
+  el arreglo de la carta que no se veía, que era otra cosa: ahí el servidor sí
+  aceptaba la mirada (200) y la mesa no la dibujaba.
+
 - **`cerrarMirada` puede cortar la mirada antes de tiempo.** Ya no antes de que
   abra —eso se tapó—, pero una vez abierta cualquiera de los cuatro puede
   llamarla y terminarla para todos antes de los dos segundos. El plazo del

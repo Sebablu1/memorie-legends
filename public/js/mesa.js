@@ -832,7 +832,20 @@ function dibujarJugador(jugador, i) {
       // La carta destapada se muestra dos segundos y se vuelve a tapar.
       const llave = clave(i, pos);
       const destapada = revelaciones.has(llave);
-      return dibujarCarta(carta ?? revelaciones.get(llave), {
+      /**
+       * Lo revelado le gana a lo que hay en la mano.
+       *
+       * Estaba al revés —`carta ?? revelada`— y en red eso tapaba todo lo que
+       * llega por la respuesta y no por la vista: la mirada inicial, el 7, el
+       * 8 y el 10. La mano propia llega como el marcador `{ oculta: true }`,
+       * que no es `null`, así que ganaba, y un marcador se dibuja de dorso
+       * aunque se lo pida boca arriba.
+       *
+       * En entrenamiento no se notaba, y sigue igual: ahí la mano tiene la
+       * carta de verdad y la revelación es un `null` que sólo dice «dala
+       * vuelta», así que sigue ganando la de la mano.
+       */
+      return dibujarCarta(revelaciones.get(llave) ?? carta, {
         visible: rondaTerminada || destapada,
         asiento: i,
         // La de siempre: es como la nombra el motor.
