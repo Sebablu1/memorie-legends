@@ -1349,6 +1349,10 @@ async function revelarUnMomento(i, pos, ms = MS_MIRAR) {
  * No se toca ninguna otra fase.
  */
 function resolverPorTiempo(indice) {
+  // Sólo entrenamiento. En red el turno lo saltea el servidor, y correr el
+  // motor sobre la copia local sólo pinta un estado que el servidor no dio.
+  // `relojDeLaFase` ya no la pasa en red; esto es el cinturón.
+  if (enRed()) return;
   if (estado.fase !== "turno" || estado.indiceTurno !== indice) return;
 
   sonidos.error();
@@ -1455,11 +1459,60 @@ async function resolverDecisionPorTiempo() {
  * Toda fase en la que la mesa espera a alguien tiene el suyo. La única que
  * queda sin reloj es el turno de una IA, que se maneja sola.
  */
+/**
+ * En red, el reloj de una fase es un ESPEJO del plazo del servidor.
+ *
+ * Se dibuja cuánto le falta a `plazo.hasta`, medido contra el reloj del
+ * servidor, y al llegar a cero no se hace nada: quien actúa es el servidor,
+ * con su propio reloj. Un espejo no decide.
+ *
+ * Estaba escrito dos veces igual —para cortar o pasar, y para las decisiones
+ * de diez segundos— y faltaba en el tercer lugar que lo necesitaba, el turno.
+ * Ahora es uno.
+ *
+ * Sin plazo para ESTA fase no se dibuja nada. Un plazo de otra fase es una
+ * vista a medio actualizar, y uno ya vencido no tiene nada que contar: el
+ * servidor está por moverse.
+ */
+function espejoDelPlazo(fase) {
+  const plazo = miVista?.plazo?.fase === fase ? miVista.plazo : null;
+  if (!plazo) return null;
+
+  const restante = plazo.hasta - Red.ahoraDelServidor();
+  if (restante <= 0) return null;
+  return { ms: restante, alVencer: () => {} };
+}
+
 function relojDeLaFase() {
   if (estado.jugadores[estado.indiceTurno]?.eliminado) return null;
 
+  /**
+   * Los ocho segundos para levantar.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * EN RED ERA UN RELOJ LOCAL QUE ACTUABA
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Contaba sus propios ocho segundos y al vencer llamaba a
+   * `resolverPorTiempo`, que corre el MOTOR sobre la copia local del estado y
+   * después `cicloTurnos`, que es el bucle del entrenamiento. En red eso no
+   * tiene nada que hacer: el turno lo saltea el servidor.
+   *
+   * Se vio en una prueba sin vistas nuevas: el turno avanzaba solo de un
+   * jugador al siguiente, cada ocho segundos, y la pista pasaba a decir
+   * «LEVANTAR», el texto del entrenamiento. En producción la vista del
+   * servidor lo pisaba enseguida, pero era un parpadeo de estado falso — y
+   * la mitad del «reloj que llega a cero y se reinicia» sobre el cartel de
+   * fin de ronda que no se cerraba.
+   *
+   * Ahora es un espejo, igual que los otros dos relojes de red. De paso, un
+   * jugador marcado como ausente —al que el servidor saltea sin esperar—
+   * deja de mostrar ocho segundos que nunca iban a correr: su plazo vence
+   * ya, y un plazo vencido no se dibuja.
+   */
   if (estado.fase === "turno") {
-    return { ms: MS_TURNO, alVencer: resolverPorTiempo };
+    if (!enRed()) return { ms: MS_TURNO, alVencer: resolverPorTiempo };
+    return espejoDelPlazo("turno");
   }
 
   // Decidir el corte, y sólo si el turno es mío.
@@ -1484,13 +1537,7 @@ function relojDeLaFase() {
   // turno es el servidor. La autoridad del tiempo no se movió de lugar.
   if (estado.fase === "postLevantada" && estado.indiceTurno === YO) {
     if (!enRed()) return { ms: MS_PASO_AUTOMATICO, alVencer: pasarPorTiempo };
-
-    const plazo = miVista?.plazo?.fase === "postLevantada" ? miVista.plazo : null;
-    if (!plazo) return null;
-
-    const restante = plazo.hasta - Red.ahoraDelServidor();
-    if (restante <= 0) return null;
-    return { ms: restante, alVencer: () => {} };
+    return espejoDelPlazo("postLevantada");
   }
 
   /**
@@ -1544,13 +1591,7 @@ function relojDeLaFase() {
       if (estado.indiceTurno !== YO) return null;
       return { ms: MS_PARA_DECIDIR, alVencer: resolverDecisionPorTiempo };
     }
-
-    const plazo = miVista?.plazo?.fase === estado.fase ? miVista.plazo : null;
-    if (!plazo) return null;
-
-    const restante = plazo.hasta - Red.ahoraDelServidor();
-    if (restante <= 0) return null;
-    return { ms: restante, alVencer: () => {} };
+    return espejoDelPlazo(estado.fase);
   }
 
   return null;
@@ -3700,11 +3741,56 @@ function calentarSiHaceFalta(vista) {
  * otra fase lo dejaría abierto sobre una partida que ya siguió.
  */
 let faseMostrada = null;
+
+/**
+ * Fases que abren un modal propio y que, al TERMINAR, tienen que cerrarlo.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * EL BUG QUE DEJÓ LA RONDA 2 INJUGABLE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Lo de arriba decía cómo tenía que ser, pero sólo se cumplía para el poder:
+ * la única regla de cierre era `if (eraPoder) cerrarModal()`. El resultado de
+ * una ronda se abría al cortar y nadie lo cerraba al llegar la siguiente —en
+ * entrenamiento lo cierra `arrancarRonda`, que en red no corre—.
+ *
+ * El cartel «Ronda 1 terminada» tapaba la ronda 2 entera. Nadie podía tocar
+ * nada, el servidor salteaba turno tras turno, y el reloj de cada turno —que
+ * también se pinta dentro de los modales— llegaba a cero y volvía a empezar
+ * encima de ese cartel. Al recargar, la ronda 2 aparecía: el cartel ya no se
+ * abría. Existía desde el 28 de agosto; el reloj en el modal lo hizo visible.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ `cambioConVista` TAMBIÉN
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Es la misma trampa, recién abierta: desde que las decisiones vencen solas,
+ * el servidor puede resolver el 10 por tiempo mientras el modal con las dos
+ * cartas sigue abierto en la pantalla de quien lo usó. Al salir de la fase,
+ * ese modal ya no tiene nada que decidir.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ SE COMPARA LA FASE Y NO LA CLAVE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Dentro del mismo `finRonda` pueden llegar vistas nuevas —cambia la versión
+ * por cualquier motivo—. Cerrar en cada una haría parpadear el cartel: se
+ * cierra y el bloque de abajo lo vuelve a abrir, con su animación de entrada.
+ *
+ * `finPartida` NO está, y a propósito: es el final, ahí vive la revancha, y
+ * no hay fase siguiente que lo tenga que desalojar.
+ *
+ * El poder no está en la lista porque tiene su propia regla, un poco más
+ * amplia, que queda como estaba.
+ */
+const FASES_QUE_CIERRAN_SU_MODAL = new Set(["finRonda", "cambioConVista"]);
+
 function modalesDeRed(vista) {
   const clave = `${vista.fase}:${vista.ronda}:${vista.version}`;
   if (clave === faseMostrada) return;
 
   const eraPoder = faseMostrada?.startsWith("poder:");
+  const faseAnterior = faseMostrada?.split(":")[0] ?? null;
   faseMostrada = clave;
 
   if (vista.fase === "poder" && vista.indiceTurno === YO) {
@@ -3712,6 +3798,10 @@ function modalesDeRed(vista) {
     return;
   }
   if (eraPoder) cerrarModal();
+
+  if (faseAnterior !== vista.fase && FASES_QUE_CIERRAN_SU_MODAL.has(faseAnterior)) {
+    cerrarModal();
+  }
 
   // El 10, esperando la decisión de su dueño.
   //
