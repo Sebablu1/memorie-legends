@@ -16,12 +16,21 @@
  * sólo aceptaba cartas conocidas.
  *
  * ─────────────────────────────────────────────────────────────────────────
+ * Y LA CARTA SE ELIGE DESPUÉS, SÓLO SI ACERTÓ
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * El ataque sale con los dos toques. La respuesta dice si acertó; sólo en ese
+ * caso la mesa pide la carta propia, con su propio reloj, y la manda aparte.
+ * Al errar no se pide nada.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
  * CÓMO SE ARMA CADA CASO
  * ─────────────────────────────────────────────────────────────────────────
  *
  * `window.__caso.secuencia` es la lista de vistas que publica el servidor,
- * cada una con cuántos milisegundos después de arrancar llega. El módulo de
- * partida es un doble que anota los pedidos en `window.__pedidos`.
+ * cada una con cuántos milisegundos después de arrancar llega, y
+ * `window.__caso.acierta` lo que contesta el servidor a un ataque. El módulo
+ * de partida es un doble que anota los pedidos en `window.__pedidos`.
  *
  * Y SIN COMILLAS INVERTIDAS DENTRO DE `partidaFalsa`: es un template literal,
  * y una suelta adentro lo cierra antes de tiempo. Playwright informa «No
@@ -93,6 +102,10 @@ const partidaFalsa = `
   export const saltarAusente = async () => {};
   export const volver = async () => {};
   export const calentarDescarte = async () => true;
+  export const entregarCarta = async (codigo, ventana, clientActionId, posicionEntrega) => {
+    window.__pedidos.push({ nombre: "entregarCarta", clientActionId, posicionEntrega });
+    return { entregada: true };
+  };
   export const latir = async () => {};
   export const accion = anotar("accion");
   export const mirar = anotar("mirar");
@@ -103,9 +116,18 @@ const partidaFalsa = `
   export const cambiarCarta = async () => {};
   export const resolverCambio = async () => {};
   export const saltarPoder = async () => {};
+  // Contesta como el servidor: si fue contra un rival, si acertó y hasta
+  // cuándo espera la carta. El cliente de verdad agrega el identificador.
   export const intentarDescarte = async (codigo, ventana, posicion, tocadoEn, rival) => {
     window.__pedidos.push({ nombre: "intentarDescarte", posicion, rival: rival ?? null });
-    return { anotado: true };
+    if (!rival) return { anotado: true, clientActionId: "c1" };
+    const acierta = CASO.acierta !== false;
+    return {
+      anotado: true,
+      clientActionId: "c1",
+      acierta,
+      ...(acierta ? { entregaHasta: Date.now() + 7000 } : {}),
+    };
   };
   export const abrirVentanaDescarte = async () => {};
   export const cerrarVentanaDescarte = async () => {};
@@ -154,13 +176,13 @@ const partidaFalsa = `
   }
 `;
 
-async function abrirRed(page, secuencia) {
+async function abrirRed(page, secuencia, { acierta = true } = {}) {
   const errores = [];
   page.on("pageerror", (e) => errores.push(String(e)));
   await page.clock.install({ time: new Date("2026-09-17T12:00:00Z") });
-  await page.addInitScript((s) => {
-    window.__caso = { secuencia: s };
-  }, secuencia);
+  await page.addInitScript((c) => {
+    window.__caso = c;
+  }, { secuencia, acierta });
 
   await page.route("**/js/guardia-sesion.js", (r) =>
     r.fulfill(js(`export async function exigirSesionEnMesa(){
@@ -221,20 +243,40 @@ test("se marca la carta conocida, y sólo ésa", async ({ page }) => {
   expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
 });
 
-test("dos toques sobre la conocida y uno sobre una propia mandan el ataque", async ({ page }) => {
+test("al acertar, se elige una carta propia y va como entrega", async ({ page }) => {
   const errores = await abrirRed(page, CONOCE_UNA);
 
   await carta(page, 1, 2).dblclick();
-  await expect(pista(page)).toContainText(/carta tuya/i);
+  await expect.poll(() => pedidos(page)).toEqual([
+    { nombre: "intentarDescarte", posicion: 2, rival: { objetivo: "beto" } },
+  ]);
+  await expect(pista(page)).toContainText(/le acertaste/i);
+  await expect(page.locator("#temporizador")).toHaveClass(/activo/);
 
   await carta(page, 0, 3).click();
 
   await expect.poll(() => pedidos(page)).toEqual([
-    { nombre: "intentarDescarte", posicion: 2, rival: { objetivo: "beto", posicionEntrega: 3 } },
+    { nombre: "intentarDescarte", posicion: 2, rival: { objetivo: "beto" } },
+    { nombre: "entregarCarta", clientActionId: "c1", posicionEntrega: 3 },
   ]);
   await expect(pista(page), "el toque de la entrega se tomó como «mirar»")
     .not.toContainText(/mirando tu carta/i);
+  await expect(page.locator(".carta.apagada")).toHaveCount(0);
   expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
+});
+
+test("al errar, no se pide ninguna carta", async ({ page }) => {
+  await abrirRed(page, CONOCE_UNA, { acierta: false });
+
+  await carta(page, 1, 2).dblclick();
+  await expect(pista(page)).toContainText(/no era esa/i);
+  await expect(page.locator(".carta.apagada"), "la mesa pide una carta al errar").toHaveCount(0);
+
+  // Un toque en una carta propia no es una entrega: no hay nada que entregar.
+  await carta(page, 0, 3).click();
+  await page.clock.runFor(100);
+  expect((await pedidos(page)).map((p) => p.nombre), "se mandó una entrega tras un error")
+    .toEqual(["intentarDescarte"]);
 });
 
 test("dos toques sobre una carta ajena que no conozco no mandan nada", async ({ page }) => {
@@ -250,14 +292,34 @@ test("dos toques sobre una carta ajena que no conozco no mandan nada", async ({ 
   await expect(page.locator(".carta.apagada"), "y no quedó ningún ataque apuntado").toHaveCount(0);
 });
 
-test("un ataque apuntado se olvida cuando la ventana termina", async ({ page }) => {
+test("si no se elige a tiempo, la mesa suelta la entrega", async ({ page }) => {
+  await abrirRed(page, CONOCE_UNA);
+
+  await carta(page, 1, 2).dblclick();
+  await expect(pista(page)).toContainText(/le acertaste/i);
+  await expect(page.locator(".carta.apagada").first()).toBeVisible();
+
+  // El reloj que se ve es el de elegir: siete segundos del servidor, menos los
+  // dos de gracia para el viaje.
+  await page.clock.runFor(5100);
+
+  await expect(pista(page)).toContainText(/al azar/i);
+  await expect(page.locator(".carta.apagada")).toHaveCount(0);
+
+  await carta(page, 0, 3).click();
+  await page.clock.runFor(100);
+  expect((await pedidos(page)).map((p) => p.nombre), "se mandó una entrega vencida")
+    .toEqual(["intentarDescarte"]);
+});
+
+test("un acierto que espera su carta se olvida cuando la ventana termina", async ({ page }) => {
   await abrirRed(page, [
     ...CONOCE_UNA,
     { fase: "turno", indiceTurno: 0, despues: 1000 },
   ]);
 
   await carta(page, 1, 2).dblclick();
-  await expect(pista(page)).toContainText(/carta tuya/i);
+  await expect(pista(page)).toContainText(/le acertaste/i);
   await expect(page.locator(".carta.apagada").first()).toBeVisible();
 
   await page.clock.runFor(1100);

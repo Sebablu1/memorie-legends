@@ -501,10 +501,12 @@ console.log("\n=== 10. El servidor no cree en la palabra del cliente ===");
     });
   });
 
-  // Sin decir qué carta entrega, no vale.
+  // Sin la carta a entregar, el ataque se anota igual: se elige después, y
+  // sólo si acierta. La respuesta dice si acertó.
   const sinEntrega = await capturar(() => pedir({ posicion: 0, objetivo: "y", clientActionId: "n4" }));
-  ok(sinEntrega.error?.codigo === "invalid-argument",
-     "hay que elegir una carta propia para entregar", sinEntrega.error?.message);
+  ok(sinEntrega.valor?.anotado && typeof sinEntrega.valor?.acierta === "boolean",
+     "sin carta a entregar se anota, y la respuesta dice si acertó",
+     sinEntrega.valor ?? sinEntrega.error?.message);
 
   // La cuarta carta de y no la conoce: el permiso es por carta.
   const laCuarta = await capturar(() => pedir({
@@ -534,7 +536,7 @@ console.log("\n=== 10. El servidor no cree en la palabra del cliente ===");
   // El mismo identificador, en cambio, es un reintento técnico.
   const repetido = await capturar(() => pedir({ posicion: 0, objetivo: "y", posicionEntrega: 3, clientActionId: "r1" }));
   ok(repetido.valor?.duplicado === true, "y el mismo identificador no agrega un cuarto");
-  ok(Object.keys(partida().ventana.intentos).length === 3, "quedan tres, no cuatro",
+  ok(Object.keys(partida().ventana.intentos).length === 4, "quedan cuatro —con el de n4—, no cinco",
      Object.keys(partida().ventana.intentos).length);
 
   // Y sobre la mano propia sigue habiendo un solo tiro.

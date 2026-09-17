@@ -218,6 +218,7 @@ const vistaConLuce = `
   export const saltarAusente = async () => {};
   export const volver = async () => {};
   export const calentarDescarte = async () => true;
+  export const entregarCarta = async () => ({});
   export const latir = async () => {};
   export const accion = async () => {};
   export const mirar = async () => {};

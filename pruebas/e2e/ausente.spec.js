@@ -107,6 +107,7 @@ const partidaFalsa = `
   export const saltarAusente = async () => {};
   export const volver = async () => { window.__volver += 1; return { yaEstaba: false }; };
   export const calentarDescarte = async () => true;
+  export const entregarCarta = async () => ({});
   export const latir = async () => {};
   export const accion = async () => {};
   export const mirar = async () => {};

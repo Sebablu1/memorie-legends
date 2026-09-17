@@ -39,6 +39,8 @@ import {
   resolverVentana,
   venceEn,
   yaVencio,
+  entregasPendientes,
+  MS_GRACIA_ENTREGA,
   MS_PARA_DECIDIR,
   decisionQueVence,
 } from "./reglas/red.js";
@@ -396,7 +398,15 @@ export function crearMotorEnRed({
         if (!ventana) {
           return nuevo("descarte", `abrir-r${estado.ronda}`, ahoraMs, "abrirVentana");
         }
-        return nuevo("descarte", ventana.id, venceEn(ventana), "cerrarVentana");
+        {
+          // Un ataque acertado que espera su carta estira el cierre. La marca
+          // cambia con él: si no, `nuevo()` conservaría el vencimiento de
+          // antes y la ventana se resolvería sin la carta.
+          const marca = entregasPendientes(ventana).length
+            ? `${ventana.id}-entrega-${venceEn(ventana)}`
+            : ventana.id;
+          return nuevo("descarte", marca, venceEn(ventana), "cerrarVentana");
+        }
 
       case "turno":
         /**
@@ -873,12 +883,44 @@ export function crearMotorEnRed({
         if (!motor.puedeAtacarEn(partida.estado, indice, indiceObjetivo, posicion)) {
           throw error("permission-denied", "No conocés esa carta.");
         }
-        // La carta que se entregaría tiene que existir de verdad.
-        const miMano = partida.estado.jugadores[indice].mano;
-        if (!Number.isInteger(posicionEntrega) || !miMano[posicionEntrega]) {
-          throw error("invalid-argument", "Elegí una carta tuya para entregar.");
+        // La carta a entregar ya no viene con el ataque: se elige después, y
+        // sólo si acierta. Si viene igual —una pestaña con la mesa de antes—,
+        // tiene que ser una carta que exista de verdad.
+        if (posicionEntrega != null) {
+          const miMano = partida.estado.jugadores[indice].mano;
+          if (!Number.isInteger(posicionEntrega) || !miMano[posicionEntrega]) {
+            throw error("invalid-argument", "Elegí una carta tuya para entregar.");
+          }
         }
       }
+
+      /**
+       * El resultado de un ataque se sabe al llegar.
+       *
+       * La carta del rival es una que el atacante conoce, y la muestra no cambia
+       * de número mientras dure la ventana: acertar o no ya está decidido. Se
+       * le contesta ahora porque la regla dice que la carta a entregar se elige
+       * DESPUÉS de acertar, y nunca al errar.
+       *
+       * No le dice nada que no sepa: la carta la vio él, y la muestra está a la
+       * vista de todos. Lo que sí sigue esperando al cierre es el orden, que es
+       * lo que decide quién llegó antes a una carta que conocían dos.
+       */
+      const evaluado = contraRival
+        ? motor.evaluarAtaque(partida.estado, indice, indiceObjetivo, posicion)
+        : null;
+      if (evaluado === "sinDerecho") {
+        // Conoce la carta, así que lo que falta es la ventana: es la que abrió
+        // otro con un poder, y ésa es sólo de él.
+        throw error("failed-precondition", "Esta ventana es de quien usó el poder.");
+      }
+      const esperaEntrega = evaluado === "acierto" && posicionEntrega == null;
+      const previo = partida.ventana.intentos?.[clientActionId];
+      const entregaHasta = previo?.entregaHasta ??
+        (esperaEntrega ? llegada + motor.MS_PARA_ENTREGAR + MS_GRACIA_ENTREGA : null);
+      const delAtaque = contraRival
+        ? { acierta: evaluado === "acierto", ...(entregaHasta != null ? { entregaHasta } : {}) }
+        : {};
 
       const resultado = registrarIntento(
         partida.ventana,
@@ -886,6 +928,8 @@ export function crearMotorEnRed({
           windowId, clientActionId, uid, posicion, declarado, latencia, incertidumbre,
           objetivo: contraRival ? objetivo : uid,
           posicionEntrega: contraRival ? posicionEntrega : null,
+          esperaEntrega,
+          entregaHasta,
         },
         {
           // La sellada al entrar, no la de ahora: ver arriba. Es la misma en
@@ -902,7 +946,7 @@ export function crearMotorEnRed({
       // Duplicado: se contesta que sí sin escribir nada. Un reintento por una
       // respuesta que se perdió no puede costar una carta de castigo.
       if (resultado.duplicado) {
-        return { anotado: true, duplicado: true, version: partida.version };
+        return { anotado: true, duplicado: true, version: partida.version, ...delAtaque };
       }
 
       const siguiente = {
@@ -915,7 +959,62 @@ export function crearMotorEnRed({
       // Ojo: no se republican las vistas con los intentos ajenos dentro; el
       // resumen de ventana que viaja no los incluye.
       publicar(tx, codigo, siguiente);
-      return { anotado: true, duplicado: false, version: siguiente.version };
+      return { anotado: true, duplicado: false, version: siguiente.version, ...delAtaque };
+    });
+  }
+
+  /**
+   * La carta que da quien le acertó a un rival.
+   *
+   * Llega después del ataque, que ya está anotado y esperándola. Tiene hasta
+   * `entregaHasta`; después, al resolverse la ventana, la carta sale al azar.
+   * Va por el mismo callable que el descarte para caer en una instancia que
+   * ya está caliente: ese ataque acaba de pasar por ella.
+   *
+   * Idempotente: la primera carta que llega es la que vale. Un reintento —o un
+   * segundo toque— no cambia la elección.
+   */
+  async function entregarCarta({ uid, codigo, windowId, clientActionId, posicionEntrega }) {
+    const llegada = ahora();
+
+    return db.runTransaction(async (tx) => {
+      const snap = await tx.get(refPartida(codigo));
+      const partida = exigirPartida(snap, codigo);
+      const indice = exigirJugador(partida, uid);
+      const ventana = partida.ventana;
+
+      if (!ventana || ventana.id !== windowId) {
+        throw error("failed-precondition", "Esa jugada era de otra ventana.");
+      }
+      const intento = ventana.intentos?.[clientActionId];
+      if (!intento || intento.uid !== uid || !intento.esperaEntrega) {
+        throw error("failed-precondition", "No hay ninguna carta que entregar.");
+      }
+      if (intento.posicionEntrega != null) {
+        return { entregada: true, duplicado: true, version: partida.version };
+      }
+      if (ventana.cerrada || llegada > intento.entregaHasta) {
+        throw error("failed-precondition", "Se terminó el tiempo: la carta salió al azar.");
+      }
+
+      const mano = partida.estado.jugadores[indice].mano;
+      if (!Number.isInteger(posicionEntrega) || !mano[posicionEntrega]) {
+        throw error("invalid-argument", "Elegí una carta tuya para entregar.");
+      }
+
+      const siguiente = {
+        ...partida,
+        ventana: {
+          ...ventana,
+          intentos: { ...ventana.intentos, [clientActionId]: { ...intento, posicionEntrega } },
+        },
+        latidos: { ...partida.latidos, [uid]: llegada },
+        version: partida.version + 1,
+      };
+      // Publicar recalcula el plazo: sin entregas pendientes, la ventana
+      // vuelve a vencer cuando vencía, y si eso ya pasó, cierra al golpe.
+      publicar(tx, codigo, siguiente);
+      return { entregada: true, duplicado: false, version: siguiente.version };
     });
   }
 
@@ -1947,6 +2046,7 @@ export function crearMotorEnRed({
     cerrarMirada,
     abrirVentana,
     intentarDescarte,
+    entregarCarta,
     cerrarVentana,
     accionDeTurno,
     latir,

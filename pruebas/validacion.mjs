@@ -20,6 +20,7 @@ import {
   Posicion,
   EsquemaDeSala,
   EsquemaDescarte,
+  EsquemaEntrega,
   EsquemaAccion,
   EsquemaCompra,
   EsquemaReferido,
@@ -155,6 +156,16 @@ console.log("\n=== El intento de descarte ===");
   ok(conRival.ok, "el intento contra un rival pasa", conRival.mensaje);
   ok(pasa(EsquemaDescarte, { ...bueno, objetivo: null, posicionEntrega: null }).ok,
      "y con los dos en nulo, que es como viaja cuando no hay rival");
+  ok(pasa(EsquemaDescarte, { ...bueno, objetivo: "uid-rival" }).ok,
+     "y contra un rival SIN carta a entregar: se elige después, si acierta");
+
+  // La entrega que llega después de acertar: a qué ataque, y qué carta.
+  const entrega = { codigo: "ABC234", windowId: "v1", clientActionId: "a1", posicionEntrega: 2 };
+  ok(pasa(EsquemaEntrega, entrega).ok, "una entrega bien formada pasa");
+  ok(!pasa(EsquemaEntrega, { ...entrega, posicionEntrega: undefined }).ok, "sin carta, no");
+  ok(!pasa(EsquemaEntrega, { ...entrega, posicionEntrega: -1 }).ok, "con una posición negativa, tampoco");
+  ok(!pasa(EsquemaEntrega, { ...entrega, clientActionId: "" }).ok, "sin decir a qué ataque, tampoco");
+  ok(!pasa(EsquemaEntrega, { ...entrega, windowId: "" }).ok, "ni sin ventana");
 }
 
 // ═══════════════════════════════════════════════════ los mensajes que salen
@@ -227,6 +238,8 @@ console.log("\n=== Ninguna callable lee el código sin validarlo ===");
      "intentarDescarte usa su propio esquema");
   ok(fuente.includes("validar(EsquemaAccion, data, errorHttp)"),
      "accionDePartida usa el suyo");
+  ok(fuente.includes("validar(EsquemaEntrega, data, errorHttp)"),
+     "y la entrega tras un acierto, el suyo");
 }
 
 console.log(fallos ? `\n❌ ${fallos} fallos\n` : "\n✅ TODO OK\n");

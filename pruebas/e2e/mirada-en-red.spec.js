@@ -97,6 +97,7 @@ const partidaFalsa = `
   export const saltarAusente = async () => {};
   export const volver = async () => {};
   export const calentarDescarte = async () => true;
+  export const entregarCarta = async () => ({});
   export const latir = async () => {};
   // Lo que contesta el servidor a cada acción: sólo a quien la hizo.
   export const accion = async (codigo, nombre, datos) => {

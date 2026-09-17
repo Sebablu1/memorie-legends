@@ -62,6 +62,7 @@ import {
   validar,
   EsquemaDeSala,
   EsquemaDescarte,
+  EsquemaEntrega,
   EsquemaAccion,
   EsquemaCompra,
   EsquemaReferido,
@@ -1658,6 +1659,20 @@ export const intentarDescarte = functions.https.onCall(async (data, context) => 
     return enRed.calentar({ uid, codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
   }
 
+  // La carta que da quien le acertó a un rival. Va por este mismo callable
+  // por la misma razón que el precalentamiento: la instancia que atendió el
+  // ataque está caliente. Tampoco es un descarte, y tiene su esquema.
+  if (data?.entregar === true) {
+    const e = validar(EsquemaEntrega, data, errorHttp);
+    return enRed.entregarCarta({
+      uid,
+      codigo: e.codigo,
+      windowId: e.windowId,
+      clientActionId: e.clientActionId,
+      posicionEntrega: e.posicionEntrega,
+    });
+  }
+
   // El esquema normaliza y acota; lo que sigue siendo del servidor es el
   // TIEMPO: `declarado`, `latencia` e `incertidumbre` llegan validados como
   // números razonables, pero el que decide cuánto valen es `tiempoEfectivo`,
@@ -1673,8 +1688,8 @@ export const intentarDescarte = functions.https.onCall(async (data, context) => 
     declarado: d.declarado,
     latencia: d.latencia,
     incertidumbre: d.incertidumbre,
-    // Contra la mano de un rival: a quién y qué carta propia se entrega si
-    // acierta. Sólo posiciones y un uid; el servidor deriva todo lo demás.
+    // Contra la mano de un rival: a quién. La carta propia ya no viene acá
+    // —se manda después, si acierta—; sólo la manda una pestaña vieja.
     objetivo: d.objetivo ?? null,
     posicionEntrega: d.posicionEntrega ?? null,
   });

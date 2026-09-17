@@ -22,9 +22,11 @@
  * 1 al 11 se prueban contra el motor, que es lo que corre la mesa de
  * entrenamiento; el 12 contra el servidor de las partidas en red.
  *
- * El caso 2 dice además «no elijo carta». Acá se comprueba lo que el motor ya
- * garantiza —al errar, la carta propia elegida no se mueve—; que la mesa no
- * la pida es del commit siguiente.
+ * El caso 2 dice además «no elijo carta»: la carta se elige DESPUÉS de saber
+ * que se acertó. Eso lo prueban las secciones 13 a 15 —el motor contesta si
+ * acertó antes de aplicar, la carta sale al azar si no se elige a tiempo, y en
+ * red el servidor espera la carta sólo si hubo acierto—, y las pruebas de
+ * navegador, que la mesa no la pide al errar.
  */
 
 import * as M from "../public/js/reglas/motor.js";
@@ -337,122 +339,138 @@ console.log("\n=== 11. El 7 nunca da conocimiento de una carta ajena ===");
 
 // ==================================================================== 12
 
+/**
+ * Lo que comparten las pruebas contra el servidor: un Firestore de mentira
+ * con transacciones que se reintentan, y una partida real de cuatro con la
+ * ventana de la ronda abierta.
+ */
+const { crearMotorEnRed, MS_MIRAR } = await import("../functions/partida-red.js");
+const { MS_REVELACION } = await import("../public/js/reglas/vista.js");
+const { MS_GRACIA_ENTREGA, yaVencio } = await import("../public/js/reglas/red.js");
+
+class E extends Error { constructor(c, m) { super(m); this.codigo = c; } }
+const error = (c, m) => new E(c, m);
+const capturar = async (f) => { try { return { valor: await f() }; } catch (e) { return { error: e }; } };
+const venceBase = (v) => v.abiertaEn + v.duracionMs + v.graciaMs;
+
+function firestore() {
+  const docs = new Map(); let version = 0;
+  return {
+    docs,
+    collection: (n) => ({ doc: (id = `a${Math.random()}`) => ({ ruta: `${n}/${id}` }) }),
+    async runTransaction(cuerpo) {
+      for (let i = 0; i < 10; i++) {
+        const leidas = new Map(); const esc = []; let yaEsc = false;
+        const tx = {
+          async get(ref) {
+            if (yaEsc) throw error("invalid-argument", "Lectura tras escritura");
+            const d = docs.get(ref.ruta); leidas.set(ref.ruta, d ? d.version : 0);
+            return { exists: Boolean(d), data: () => (d ? structuredClone(d.datos) : undefined) };
+          },
+          set(ref, datos, op) { yaEsc = true; esc.push({ ruta: ref.ruta, datos, m: Boolean(op?.merge) }); },
+          update(ref, datos) { yaEsc = true; esc.push({ ruta: ref.ruta, datos, m: true }); },
+        };
+        const res = await cuerpo(tx);
+        if ([...leidas].some(([r, v]) => (docs.get(r)?.version ?? 0) !== v)) continue;
+        for (const e of esc) {
+          const p = docs.get(e.ruta);
+          docs.set(e.ruta, { datos: e.m ? { ...(p?.datos ?? {}), ...structuredClone(e.datos) } : structuredClone(e.datos), version: ++version });
+        }
+        return res;
+      }
+      throw error("aborted", "reintentos");
+    },
+  };
+}
+
+const UIDS = ["a", "b", "c", "d"];
+const COD = "RIV012";
+
+/**
+ * Una partida real, con la ventana de la ronda abierta, en la que `a` conoce
+ * dos cartas de un rival: una que va con la muestra y otra que no. La semilla
+ * se busca en vez de fijarla, para no depender de un reparto que cambie si
+ * cambia la baraja.
+ */
+async function montar() {
+  for (let semilla = 1; semilla < 200; semilla++) {
+    const db = firestore();
+    let reloj = 900000;
+    const red = crearMotorEnRed({
+      db, partidas: "partidas", ahora: () => reloj, idAleatorio: () => `v${reloj}`,
+      marcaDeTiempo: () => "T", error, semillaDe: () => semilla,
+    });
+    await red.repartir({ yaSentados: true, codigo: COD, jugadores: UIDS, nombres: UIDS });
+    reloj += MS_MIRAR + 1;
+    await red.avanzarPartida({ codigo: COD });
+    const p0 = db.docs.get(`partidas/${COD}`).datos;
+    if (p0.estado.fase !== "descarte") continue;
+
+    const muestra = p0.estado.descarte[0];
+    for (const rival of [1, 2, 3]) {
+      const mano = p0.estado.jugadores[rival].mano;
+      const va = mano.findIndex((k) => k && k.numero === muestra.numero);
+      const noVa = mano.findIndex((k) => k && k.numero !== muestra.numero);
+      if (va < 0 || noVa < 0) continue;
+
+      // a conoce las dos: como si hubiera usado un 8 dos veces.
+      await db.runTransaction(async (tx) => {
+        tx.set({ ruta: `partidas/${COD}` }, {
+          ...p0,
+          estado: {
+            ...p0.estado,
+            conocimientos: [va, noVa].map((i) => ({
+              actor: 0, idCarta: mano[i].id, origen: "poder8", ronda: p0.estado.ronda,
+            })),
+          },
+          version: p0.version + 1,
+        });
+      });
+
+      const partida = () => db.docs.get(`partidas/${COD}`).datos;
+      return {
+        db, red, rival, va, noVa, semilla,
+        ventana: p0.ventana,
+        deRival: mano,
+        ahora: () => reloj,
+        adelantar: (ms) => { reloj += ms; },
+        fijar: (t) => { reloj = t; },
+        partida,
+        vista: (u) => db.docs.get(`partidas/${COD}/vistas/${u}`).datos,
+        atacar: (extra) => red.intentarDescarte({
+          uid: "a", codigo: COD, windowId: p0.ventana.id,
+          declarado: 400, latencia: 30, incertidumbre: 15,
+          objetivo: UIDS[rival], ...extra,
+        }),
+        entregar: (extra) => red.entregarCarta({
+          uid: "a", codigo: COD, windowId: p0.ventana.id, ...extra,
+        }),
+        // Lo que haría el golpe de cualquier mesa: resolver si ya venció.
+        golpe: () => red.avanzarPartida({ codigo: COD }),
+      };
+    }
+  }
+  throw new Error("ninguna semilla dio un reparto útil");
+}
+
 console.log("\n=== 12. En red, el servidor aplica la misma regla ===");
 {
-  const { crearMotorEnRed, MS_MIRAR } = await import("../functions/partida-red.js");
-  const { MS_REVELACION } = await import("../public/js/reglas/vista.js");
-
-  class E extends Error { constructor(c, m) { super(m); this.codigo = c; } }
-  const error = (c, m) => new E(c, m);
-  const capturar = async (f) => { try { return { valor: await f() }; } catch (e) { return { error: e }; } };
-  const vence = (v) => v.abiertaEn + v.duracionMs + v.graciaMs;
-
-  function firestore() {
-    const docs = new Map(); let version = 0;
-    return {
-      docs,
-      collection: (n) => ({ doc: (id = `a${Math.random()}`) => ({ ruta: `${n}/${id}` }) }),
-      async runTransaction(cuerpo) {
-        for (let i = 0; i < 10; i++) {
-          const leidas = new Map(); const esc = []; let yaEsc = false;
-          const tx = {
-            async get(ref) {
-              if (yaEsc) throw error("invalid-argument", "Lectura tras escritura");
-              const d = docs.get(ref.ruta); leidas.set(ref.ruta, d ? d.version : 0);
-              return { exists: Boolean(d), data: () => (d ? structuredClone(d.datos) : undefined) };
-            },
-            set(ref, datos, op) { yaEsc = true; esc.push({ ruta: ref.ruta, datos, m: Boolean(op?.merge) }); },
-            update(ref, datos) { yaEsc = true; esc.push({ ruta: ref.ruta, datos, m: true }); },
-          };
-          const res = await cuerpo(tx);
-          if ([...leidas].some(([r, v]) => (docs.get(r)?.version ?? 0) !== v)) continue;
-          for (const e of esc) {
-            const p = docs.get(e.ruta);
-            docs.set(e.ruta, { datos: e.m ? { ...(p?.datos ?? {}), ...structuredClone(e.datos) } : structuredClone(e.datos), version: ++version });
-          }
-          return res;
-        }
-        throw error("aborted", "reintentos");
-      },
-    };
-  }
-
-  const UIDS = ["a", "b", "c", "d"];
-  const COD = "RIV012";
-
-  /**
-   * Una partida real, con la ventana de la ronda abierta, y una semilla en la
-   * que algún rival de `a` tenga una carta que va con la muestra y otra que
-   * no. Se busca en vez de fijarla: así la prueba no depende de un reparto
-   * que cambie si cambia la baraja.
-   */
-  async function montar() {
-    for (let semilla = 1; semilla < 200; semilla++) {
-      const db = firestore();
-      let reloj = 900000;
-      const red = crearMotorEnRed({
-        db, partidas: "partidas", ahora: () => reloj, idAleatorio: () => `v${reloj}`,
-        marcaDeTiempo: () => "T", error, semillaDe: () => semilla,
-      });
-      await red.repartir({ yaSentados: true, codigo: COD, jugadores: UIDS, nombres: UIDS });
-      reloj += MS_MIRAR + 1;
-      await red.avanzarPartida({ codigo: COD });
-      const p = db.docs.get(`partidas/${COD}`).datos;
-      if (p.estado.fase !== "descarte") continue;
-
-      const muestra = p.estado.descarte[0];
-      for (const rival of [1, 2, 3]) {
-        const mano = p.estado.jugadores[rival].mano;
-        const va = mano.findIndex((k) => k && k.numero === muestra.numero);
-        const noVa = mano.findIndex((k) => k && k.numero !== muestra.numero);
-        if (va < 0 || noVa < 0) continue;
-        return {
-          db, red, rival, va, noVa,
-          adelantar: (ms) => { reloj += ms; },
-          fijar: (t) => { reloj = t; },
-          partida: () => db.docs.get(`partidas/${COD}`).datos,
-          vista: (u) => db.docs.get(`partidas/${COD}/vistas/${u}`).datos,
-        };
-      }
-    }
-    throw new Error("ninguna semilla dio un reparto útil");
-  }
-
+  // Acá la carta a entregar va con el ataque, como la mandaba la mesa de
+  // antes. Ese camino se sigue aceptando: una pestaña abierta durante el
+  // despliegue no se queda sin poder jugar.
   const m = await montar();
-  const { red, rival, va, noVa } = m;
-  const p0 = m.partida();
-  const v = p0.ventana;
-  const deRival = p0.estado.jugadores[rival].mano;
-  const miaAntes = p0.estado.jugadores[0].mano.filter(Boolean).length;
-  const entregada = p0.estado.jugadores[0].mano[0];
-
-  // a conoce las dos cartas del rival: como si hubiera usado un 8 dos veces.
-  await m.db.runTransaction(async (tx) => {
-    tx.set({ ruta: `partidas/${COD}` }, {
-      ...p0,
-      estado: {
-        ...p0.estado,
-        conocimientos: [va, noVa].map((i) => ({
-          actor: 0, idCarta: deRival[i].id, origen: "poder8", ronda: p0.estado.ronda,
-        })),
-      },
-      version: p0.version + 1,
-    });
-  });
-
-  const pedir = (extra) => red.intentarDescarte({
-    uid: "a", codigo: COD, windowId: v.id, declarado: 400, latencia: 30, incertidumbre: 15,
-    objetivo: UIDS[rival], ...extra,
-  });
+  const { rival, va, noVa, deRival } = m;
+  const miaAntes = m.partida().estado.jugadores[0].mano.filter(Boolean).length;
+  const entregada = m.partida().estado.jugadores[0].mano[0];
 
   const otra = [0, 1, 2, 3].find((i) => i !== va && i !== noVa);
-  const ajena = await capturar(() => pedir({ posicion: otra, posicionEntrega: 1, clientActionId: "x0" }));
+  const ajena = await capturar(() => m.atacar({ posicion: otra, posicionEntrega: 1, clientActionId: "x0" }));
   ok(ajena.error?.codigo === "permission-denied", "una carta que no conoce: rechazada",
      ajena.error?.message);
 
-  const acierto = await capturar(() => pedir({ posicion: va, posicionEntrega: 0, clientActionId: "x1" }));
-  const errado = await capturar(() => pedir({ posicion: noVa, posicionEntrega: 1, clientActionId: "x2" }));
-  const otraVez = await capturar(() => pedir({ posicion: noVa, posicionEntrega: 1, clientActionId: "x3" }));
+  const acierto = await capturar(() => m.atacar({ posicion: va, posicionEntrega: 0, clientActionId: "x1" }));
+  const errado = await capturar(() => m.atacar({ posicion: noVa, posicionEntrega: 1, clientActionId: "x2" }));
+  const otraVez = await capturar(() => m.atacar({ posicion: noVa, posicionEntrega: 1, clientActionId: "x3" }));
   ok([acierto, errado, otraVez].every((r) => r.valor?.anotado),
      "el acierto y dos errores se anotan: varios intentos en la ventana",
      [acierto, errado, otraVez].map((r) => r.error?.message ?? "ok"));
@@ -466,8 +484,8 @@ console.log("\n=== 12. En red, el servidor aplica la misma regla ===");
      "las de los demás no marcan nada");
 
   // Se cierra la ventana.
-  m.fijar(vence(v) + 1);
-  await red.avanzarPartida({ codigo: COD });
+  m.fijar(venceBase(m.ventana) + 1);
+  await m.golpe();
 
   const resuelta = m.partida().estado;
   ok(resuelta.jugadores[rival].mano[va]?.id === entregada.id,
@@ -490,13 +508,139 @@ console.log("\n=== 12. En red, el servidor aplica la misma regla ===");
 
   // Pasada la revelación, las cartas se tapan pero lo conocido queda.
   m.adelantar(MS_REVELACION + 1);
-  await red.avanzarPartida({ codigo: COD });
+  await m.golpe();
   const b = m.vista("b");
   ok(castigos.every((k) => b.jugadores[0].mano[k.posicion]?.oculta),
      "después se tapan");
   ok(castigos.every((k) => b.puedeAtacarEn.some((x) => x.objetivo === 0 && x.posicion === k.posicion)),
      "y b los sigue teniendo marcados como atacables");
   ok(V.filtracionesEn(b, m.partida().estado).length === 0, "sin filtraciones");
+}
+
+// ==================================================================== 13
+
+console.log("\n=== 13. Antes de elegir la carta, el motor dice si acertó ===");
+{
+  const s = enVentana(ocho(ocho(mesa(), A, B, 0), A, B, 1));   // A conoce el 7 y el 5 de B
+  ok(M.evaluarAtaque(s, A, B, 1) === "acierto", "el 5 va con la muestra: acierto");
+  ok(M.evaluarAtaque(s, A, B, 0) === "error", "el 7 no: error");
+  ok(M.evaluarAtaque(s, A, B, 2) === "sinDerecho", "una carta que no conoce: sin derecho");
+  ok(M.evaluarAtaque(s, C, B, 1) === "sinDerecho", "otro que no la conoce: sin derecho");
+  ok(M.evaluarAtaque({ ...s, fase: "turno", ventanaDescarte: null }, A, B, 1) === "sinDerecho",
+     "fuera de la ventana: sin derecho");
+  ok(M.evaluarAtaque({ ...s, ventanaDescarte: { ...s.ventanaDescarte, soloPara: C } }, A, B, 1) === "sinDerecho",
+     "en la ventana del poder de otro: sin derecho");
+  ok(M.evaluarAtaque(s, A, B, 1) === "acierto" && s.ventanaDescarte.intentos.length === 0,
+     "y preguntar no anota nada");
+}
+
+// ==================================================================== 14
+
+console.log("\n=== 14. Si no elige a tiempo, la carta sale al azar ===");
+{
+  const s = enVentana(ocho(mesa(), A, B, 1));
+  const r = M.intentarDescarteRival(s, A, B, 1, null);
+  const otra = M.intentarDescarteRival(s, A, B, 1, null);
+
+  ok(r.ventanaDescarte.intentos.at(-1)?.resultado === "rivalAcierto", "el acierto se aplica igual");
+  ok(r.ventanaDescarte.intentos.at(-1)?.entregaAlAzar === true, "y queda dicho que la eligió el azar");
+  ok(cuenta(r, A) === cuenta(s, A) - 1, "quedo con una menos", cuenta(r, A));
+  const puesta = r.jugadores[B].mano[1]?.id;
+  ok(s.jugadores[A].mano.some((c) => c.id === puesta), "la que entró en B es una de las mías", puesta);
+  ok(!r.jugadores[A].mano.some((c) => c?.id === puesta), "y salió de mi mano");
+  ok(JSON.stringify(r) === JSON.stringify(otra), "con el mismo estado sale la misma: es la semilla");
+  ok(r.semilla !== s.semilla, "y la semilla avanzó, para que la próxima no repita", r.semilla);
+
+  const elegida = M.intentarDescarteRival(s, A, B, 1, 2);
+  ok(elegida.ventanaDescarte.intentos.at(-1)?.entregaAlAzar === undefined,
+     "con carta elegida no hay azar");
+  ok(elegida.semilla === s.semilla, "ni se toca la semilla");
+
+  const errado = M.intentarDescarteRival(enVentana(ocho(mesa(), A, B, 0)), A, B, 0, null);
+  ok(errado.ventanaDescarte.intentos.at(-1)?.entregaAlAzar === undefined,
+     "al errar no se entrega nada, ni al azar");
+}
+
+// ==================================================================== 15
+
+console.log("\n=== 15. En red, la carta se elige después, y sólo si acertó ===");
+{
+  // a) El error se sabe al llegar, y no pide carta.
+  {
+    const m = await montar();
+    const r = await m.atacar({ posicion: m.noVa, clientActionId: "e1" });
+    ok(r.anotado && r.acierta === false, "un ataque errado dice que no acertó", r);
+    ok(r.entregaHasta === undefined, "y no espera ninguna carta", r);
+    m.fijar(venceBase(m.ventana) + 1);
+    ok(yaVencio(m.partida().ventana, m.ahora()), "la ventana vence cuando vencía");
+  }
+
+  // b) El acierto pide la carta, y la ventana la espera.
+  {
+    const m = await montar();
+    // Un segundo más tarde: sin esto, la espera de la entrega vence en el mismo
+    // milisegundo que la ventana, y no se puede probar que la estira.
+    m.adelantar(1000);
+    const antes = m.ahora();
+    const r = await m.atacar({ posicion: m.va, clientActionId: "a1" });
+    ok(r.anotado && r.acierta === true, "un ataque acertado dice que acertó", r);
+    ok(r.entregaHasta === antes + M.MS_PARA_ENTREGAR + MS_GRACIA_ENTREGA,
+       "y hasta cuándo se espera la carta", r.entregaHasta);
+
+    const repetido = await m.atacar({ posicion: m.va, clientActionId: "a1" });
+    ok(repetido.duplicado && repetido.acierta === true && repetido.entregaHasta === r.entregaHasta,
+       "un reintento contesta lo mismo, con la misma hora", repetido);
+
+    m.fijar(venceBase(m.ventana) + 1);
+    ok(!yaVencio(m.partida().ventana, m.ahora()), "vencido el tiempo de intentar, la ventana espera");
+    ok(m.partida().plazo?.hasta === r.entregaHasta, "y su plazo es el de la entrega", m.partida().plazo);
+    await m.golpe();
+    ok(!m.partida().ventana.cerrada, "un golpe no la resuelve sin la carta");
+
+    // Intentar ya no se puede: la espera es sólo para elegir.
+    const tarde = await capturar(() => m.atacar({ posicion: m.noVa, clientActionId: "a2" }));
+    ok(Boolean(tarde.error), "un ataque nuevo llega tarde", tarde.error?.message);
+
+    const ajeno = await capturar(() => m.red.entregarCarta({
+      uid: "b", codigo: COD, windowId: m.ventana.id, clientActionId: "a1", posicionEntrega: 0,
+    }));
+    ok(Boolean(ajeno.error), "otro no puede elegir la carta de a", ajeno.error?.message);
+
+    const vacia = await capturar(() => m.entregar({ clientActionId: "a1", posicionEntrega: 9 }));
+    ok(vacia.error?.codigo === "invalid-argument", "una posición sin carta, no", vacia.error?.message);
+
+    const miCarta = m.partida().estado.jugadores[0].mano[3];
+    const e = await m.entregar({ clientActionId: "a1", posicionEntrega: 3 });
+    ok(e.entregada && !e.duplicado, "la carta elegida llega", e);
+    const otraVez = await m.entregar({ clientActionId: "a1", posicionEntrega: 1 });
+    ok(otraVez.duplicado, "y la segunda no cambia nada: vale la primera", otraVez);
+
+    ok(yaVencio(m.partida().ventana, m.ahora()), "con la carta elegida, la ventana ya puede cerrar");
+    await m.golpe();
+    const fin = m.partida().estado;
+    ok(m.partida().ventana.cerrada, "y el golpe la resuelve");
+    ok(fin.jugadores[m.rival].mano[m.va]?.id === miCarta.id,
+       "con la carta que se eligió", fin.jugadores[m.rival].mano[m.va]?.id);
+    ok(fin.jugadores[0].mano[3] === null, "que salió de la mano de a");
+  }
+
+  // c) Si la carta no llega, sale al azar.
+  {
+    const m = await montar();
+    const r = await m.atacar({ posicion: m.va, clientActionId: "z1" });
+    m.fijar(r.entregaHasta + 1);
+    const tarde = await capturar(() => m.entregar({ clientActionId: "z1", posicionEntrega: 0 }));
+    ok(Boolean(tarde.error), "una carta que llega pasada la hora no se acepta", tarde.error?.message);
+
+    await m.golpe();
+    const fin = m.partida().estado;
+    const ultimo = fin.ventanaDescarte.intentos.at(-1);
+    ok(m.partida().ventana.cerrada, "la ventana se resuelve igual");
+    ok(ultimo?.resultado === "rivalAcierto" && ultimo?.entregaAlAzar === true,
+       "con el acierto, y la carta al azar", ultimo);
+    ok(fin.jugadores[m.rival].mano[m.va]?.id !== m.deRival[m.va].id,
+       "la del rival se fue");
+  }
 }
 
 console.log(fallos ? `\n❌ ${fallos} FALLOS` : "\n✅ TODO OK");

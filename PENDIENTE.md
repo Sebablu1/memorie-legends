@@ -478,6 +478,11 @@ Encontrado mientras se trabajaba en otra cosa. Ninguno rompe nada hoy.
   abajo, y deja esa otra rama sin uso. Desde el descarte al rival la entrega
   va antes que este bloque —era lo que la bloqueaba—, pero el bloque sigue ahí.
 
+- **En entrenamiento, el aviso «la carta salió al azar» dura un instante** cuando
+  la ventana ya había vencido: el cierre que esperaba la entrega escribe
+  enseguida la pista siguiente («CORTAR O PASAR»). La carta sí sale y se oye el
+  acierto; lo que se pierde es el texto. En red el aviso queda.
+
 ---
 
 ## 12. App Check — resolver los navegadores donde reCAPTCHA falla

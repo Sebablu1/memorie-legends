@@ -28,8 +28,10 @@ import {
   MS_DESCARTE,
   MS_REAPERTURA,
   MS_CUENTA_REGRESIVA,
+  MS_PARA_ENTREGAR,
   cartasMiradasEn,
   cartasExpuestas,
+  evaluarAtaque,
   posicionesAtacablesDe,
   ventanaTrasPoder,
 } from "./reglas/motor.js";
@@ -64,6 +66,7 @@ import {
   esperaUnaDecision,
   decisionQueVence,
   MS_PARA_DECIDIR,
+  MS_GRACIA_ENTREGA,
 } from "./reglas/red.js";
 import { MS_REVELACION } from "./reglas/vista.js";
 import { abandonarPartida, ErrorDeServidor } from "./servidor.js";
@@ -1951,6 +1954,60 @@ function resolverUltimoDescarte() {
 }
 
 /**
+ * Un acierto sobre un rival, en entrenamiento: ahora se elige la carta.
+ *
+ * Con su propio reloj de `MS_PARA_ENTREGAR`, que reemplaza en pantalla al de la
+ * ventana mientras dure. Al vencer, la carta sale al azar —lo decide el motor,
+ * con la semilla de la partida, igual que el servidor en red—.
+ */
+function empezarEntregaLocal(objetivo) {
+  let avisar;
+  const terminada = new Promise((listo) => { avisar = listo; });
+  atacando = {
+    ...objetivo,
+    terminada,
+    avisar,
+    vence: setTimeout(() => completarEntregaLocal(null), MS_PARA_ENTREGAR),
+  };
+  sonidos.aviso();
+  correrTemporizador(MS_PARA_ENTREGAR);
+  pista("¡Le acertaste! Elegí una carta tuya para darle.");
+  dibujar();
+}
+
+/**
+ * Aplica el acierto con la carta elegida, o al azar si `posicion` es null.
+ *
+ * Después, lo que esperaba detrás: las jugadas de la IA que llegaron mientras
+ * se elegía, y el cierre de la ventana, si ya le tocaba.
+ */
+function completarEntregaLocal(posicion) {
+  const pendiente = atacando;
+  if (!pendiente) return;
+  clearTimeout(pendiente.vence);
+  atacando = null;
+
+  estado = intentarDescarteRival(
+    estado,
+    YO,
+    pendiente.indiceJugador,
+    pendiente.posicion,
+    posicion,
+  );
+  resolverUltimoDescarte();
+  if (posicion == null) pista("Se acabó el tiempo: la carta salió al azar.");
+
+  // Si la ventana sigue abierta, vuelve su reloj; si no, no queda ninguno.
+  const resta = finDeLaVentana - Date.now();
+  if (manejadorDescarte && resta > 0) correrTemporizador(resta);
+  else cancelarTemporizador();
+
+  dibujar();
+  for (const jugar of jugadasEnEspera.splice(0)) jugar();
+  pendiente.avisar();
+}
+
+/**
  * Corre la ventana de reflejos si la jugada acaba de abrir una.
  *
  * La abren tirar y cambiar por igual: las dos dejan una carta nueva arriba del
@@ -2046,6 +2103,8 @@ function faseDescarte(alCerrar, duracion = MS_DESCARTE, rotulo = "DESCARTE") {
     // Ventana nueva, nada mandado todavía. Sin esto, la carta que se tocó en
     // la ventana anterior aparece resaltada en ésta.
     posicionEnviada = null;
+    jugadasEnEspera = [];
+    finDeLaVentana = Date.now() + duracion;
     // "DESCARTE" y nada más. Antes explicaba la regla entera —sólo el primero
     // se salva, equivocarse suma una carta— y son cinco segundos en los que
     // nadie lee tres renglones: se mira la muestra y se toca. La regla se
@@ -2062,12 +2121,17 @@ function faseDescarte(alCerrar, duracion = MS_DESCARTE, rotulo = "DESCARTE") {
       if (retraso >= duracion) return;
       pendientes.push(
         setTimeout(() => {
-          const pos = IA.decidirDescarte(estado, i, memorias[i]);
-          if (pos == null) return;
-          estado = intentarDescarte(estado, i, pos);
-          memorias[i] = IA.olvidar(memorias[i], i, pos);
-          resolverUltimoDescarte();
-          dibujar();
+          const jugar = () => {
+            const pos = IA.decidirDescarte(estado, i, memorias[i]);
+            if (pos == null) return;
+            estado = intentarDescarte(estado, i, pos);
+            memorias[i] = IA.olvidar(memorias[i], i, pos);
+            resolverUltimoDescarte();
+            dibujar();
+          };
+          // Con un acierto eligiendo su carta, la IA espera detrás.
+          if (atacando) jugadasEnEspera.push(jugar);
+          else jugar();
         }, retraso),
       );
     });
@@ -2079,12 +2143,17 @@ function faseDescarte(alCerrar, duracion = MS_DESCARTE, rotulo = "DESCARTE") {
     };
 
     pendientes.push(
-      setTimeout(() => {
+      setTimeout(async () => {
         pendientes.forEach(clearTimeout);
+        // Nadie más intenta: el tiempo de la ventana se terminó.
         manejadorDescarte = null;
-        // Un ataque apuntado que no llegó a completarse muere con la ventana.
-        // Si quedaba vivo, la mesa seguía apagada y el primer toque propio de
-        // la ventana siguiente se tomaba como entrega.
+        // Pero un acierto que todavía elige su carta se espera. Resolver sin
+        // ella dejaría un hueco en la mano del rival, y un hueco puede leerse
+        // como «se quedó sin cartas» y cortar la ronda.
+        if (atacando?.terminada) await atacando.terminada;
+        // Y nada apuntado sobrevive a la ventana. Si quedaba vivo, la mesa
+        // seguía apagada y el primer toque propio de la ventana siguiente se
+        // tomaba como entrega.
         atacando = null;
         cancelarTemporizador();
         // Lo que se destapó lo vio toda la mesa, la IA incluida.
@@ -2427,14 +2496,44 @@ let manejadorDescarte = null;
 let posicionEnviada = null;
 
 /**
- * Ataque a una mano ajena a medio armar: ya se eligió la posición del rival y
- * falta elegir qué carta propia se entrega. Vive sólo en la pantalla; el
- * servidor no se entera hasta que el intento sale completo.
+ * Un acierto sobre la carta de un rival que espera la carta propia a entregar.
+ *
+ * La regla dice que esa carta se elige DESPUÉS de acertar, y nunca al errar.
+ * Así que esto sólo existe tras un acierto: en entrenamiento lo dice el motor
+ * en el momento; en red, la respuesta del servidor al ataque.
+ *
+ *   { indiceJugador, posicion }   la carta del rival que se acertó
+ *   vence                         el temporizador que la elige al azar
+ *   terminada                     (entrenamiento) promesa que la ventana
+ *                                 espera antes de cerrarse
+ *   clientActionId, ventana       (red) a qué ataque va la entrega
  */
 let atacando = null;
 
-/** Nunca hay una entrega preseleccionada: se elige en el momento, a ciegas. */
-const entregaElegida = null;
+/**
+ * Jugadas de la IA que llegaron mientras se elegía la carta de un acierto.
+ *
+ * Esperan detrás de ese acierto: el toque del jugador fue antes, y en red el
+ * servidor los ordena igual —por el momento del toque, no por cuándo llega la
+ * carta—. Aplicarlas en el medio podía llevarse la carta ya acertada.
+ */
+let jugadasEnEspera = [];
+
+/** Cuándo termina la ventana de entrenamiento en curso, para volver a su reloj. */
+let finDeLaVentana = 0;
+
+/**
+ * Suelta el acierto que esperaba su carta, sin aplicar nada.
+ *
+ * En red, cuando la ventana se resuelve o la fase cambia: el servidor ya
+ * eligió al azar. Deja la mesa como si no hubiera nada apuntado.
+ */
+function olvidarAtaque() {
+  if (!atacando) return;
+  clearTimeout(atacando.vence);
+  atacando = null;
+  cancelarTemporizador();
+}
 
 /** Deja marcada la carta que salió hacia el servidor. */
 function marcarEnviada(posicion) {
@@ -2621,31 +2720,19 @@ document.addEventListener("click", async (evento) => {
     return;
   }
 
-  // Entregar la carta propia, con un ataque ya apuntado.
+  // Entregar la carta propia, tras un acierto.
   //
   // Un solo toque, a diferencia de todo lo demás en esta fase. La decisión ya
-  // se tomó —y se confirmó con dos toques— al apuntar la carta del rival; pedir
-  // otro doble toque acá sólo gastaría la ventana, que dura cinco segundos y
-  // ya lleva un rato abierta cuando se llega hasta acá.
-  if (
-    estado.fase === "descarte" &&
-    manejadorDescarte &&
-    atacando &&
-    indiceJugador === YO
-  ) {
-    const objetivo = atacando;
-    atacando = null;
-    estado = intentarDescarteRival(
-      estado,
-      YO,
-      objetivo.indiceJugador,
-      objetivo.posicion,
-      posicion,
-    );
-    resolverUltimoDescarte();
-    dibujar();
+  // se tomó —y se confirmó con dos toques— al apuntar la carta del rival.
+  //
+  // No pide `manejadorDescarte`: la ventana puede haber terminado mientras se
+  // elegía, y esta elección tiene su propio reloj.
+  if (estado.fase === "descarte" && atacando && indiceJugador === YO) {
+    completarEntregaLocal(posicion);
     return;
   }
+  // Con un acierto esperando su carta, lo demás de la ventana espera.
+  if (estado.fase === "descarte" && atacando) return;
 
   // Descartarle a un rival una carta que conozco.
   //
@@ -2664,9 +2751,17 @@ document.addEventListener("click", async (evento) => {
       pista("¡Doble toque en la del rival!");
       return;
     }
-    atacando = { indiceJugador, posicion };
-    dibujar();
-    pista("Ahora elegí una carta tuya para entregar.");
+
+    // Primero el resultado: la carta a entregar se elige sólo si acertó.
+    const resultado = evaluarAtaque(estado, YO, indiceJugador, posicion);
+    if (resultado === "error") {
+      estado = intentarDescarteRival(estado, YO, indiceJugador, posicion, null);
+      resolverUltimoDescarte();
+      dibujar();
+      pista("No era esa: te comés una carta.");
+      return;
+    }
+    if (resultado === "acierto") empezarEntregaLocal({ indiceJugador, posicion });
     return;
   }
 
@@ -3782,9 +3877,9 @@ function pintarVista(vista) {
   // ventana. Entre una ventana y la siguiente la fase pasa por turno o por
   // postLevantada, así que salir de `descarte` es el momento exacto.
   if (vista.fase !== "descarte" && posicionEnviada != null) posicionEnviada = null;
-  // Y el ataque apuntado, igual: sin esto la mesa quedaba apagada para siempre
-  // si la ventana se cerraba antes de elegir la entrega.
-  if (vista.fase !== "descarte" && atacando) atacando = null;
+  // Y el acierto que esperaba su carta, igual: resuelta la ventana, el
+  // servidor ya eligió al azar. Sin esto la mesa quedaba apagada para siempre.
+  if (atacando && (vista.fase !== "descarte" || vista.ventana?.cerrada)) olvidarAtaque();
   estado = comoEstado(vista);
   // Antes de dibujar: si algo se expuso, tiene que verse en este mismo pintado.
   mostrarRevelaciones(vista);
@@ -4343,7 +4438,7 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
   if (!miVista) return;
 
   /**
-   * Con un ataque apuntado, tocar una carta propia es ENTREGARLA.
+   * Tras un acierto, tocar una carta propia es ENTREGARLA.
    *
    * Tiene que ir antes que el bloque de abajo, que se queda con todos los
    * toques propios de la fase: uno "mira", dos descartan. Estando después,
@@ -4351,25 +4446,20 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
    * doble toque terminaba en un descarte propio que casi siempre fallaba.
    */
   if (miVista.fase === "descarte" && atacando && indiceJugador === YO) {
-    const objetivo = atacando;
-    const ventana = miVista.ventana;
-    atacando = null;
+    const pendiente = atacando;
+    olvidarAtaque();
     dibujar();
-    if (!ventana || ventana.cerrada) return;
-
-    const tocadoEn = Date.now();
-    const r = await pedir("descartar", () =>
-      Red.intentarDescarte(salaPedida, ventana, objetivo.posicion, tocadoEn, {
-        objetivo: miVista.jugadores[objetivo.indiceJugador]?.id,
-        posicionEntrega: posicion,
-      }),
+    const r = await pedir("entregar", () =>
+      Red.entregarCarta(salaPedida, pendiente.ventana, pendiente.clientActionId, posicion),
     );
-    if (r?.anotado) {
+    if (r?.entregada) {
       sonidos.aviso();
-      pista("Jugada registrada. Se resuelve al cerrar la ventana.");
+      pista("Carta elegida. Se resuelve al cerrar la ventana.");
     }
     return;
   }
+  // Con un acierto esperando su carta, lo demás de la ventana espera.
+  if (miVista.fase === "descarte" && atacando) return;
 
   // ---- NUEVO: Permitir mirar (clic simple) en fase descarte ----
   if (miVista.fase === "descarte" && indiceJugador === YO) {
@@ -4555,17 +4645,41 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
       return;
     }
 
-    // Buscar en la mano ajena no es gratis: si se acierta hay que entregar
-    // una carta propia, y se elige AHORA, a ciegas, antes de saber si estaba
-    // bien. Si se falla no se entrega nada, pero igual se paga con una carta.
-    if (entregaElegida == null) {
-      atacando = { indiceJugador, posicion };
-      dibujar();
-      pista(
-        "Ahora tocá <b>una carta tuya</b>: es la que le darías si acertás.",
-      );
+    // El ataque sale ya, con la hora del toque. La respuesta dice si acertó:
+    // la carta a entregar se elige sólo en ese caso, y nunca al errar.
+    const tocadoEn = Date.now();
+    const r = await pedir("descartar", () =>
+      Red.intentarDescarte(salaPedida, ventana, posicion, tocadoEn, {
+        objetivo: miVista.jugadores[indiceJugador]?.id,
+      }),
+    );
+    if (!r?.anotado) return;
+
+    if (!r.acierta) {
+      sonidos.error();
+      pista("No era esa: te comés una carta al cerrar la ventana.");
       return;
     }
+
+    // El reloj que se ve es el de elegir; el servidor espera además el viaje
+    // de vuelta. Al vencer, la carta la elige el servidor al azar.
+    const hasta = r.entregaHasta - MS_GRACIA_ENTREGA;
+    const resta = Math.max(0, hasta - Red.ahoraDelServidor());
+    atacando = {
+      indiceJugador,
+      posicion,
+      ventana,
+      clientActionId: r.clientActionId,
+      vence: setTimeout(() => {
+        olvidarAtaque();
+        dibujar();
+        pista("Se acabó el tiempo: la carta sale al azar.");
+      }, resta),
+    };
+    sonidos.aviso();
+    correrTemporizador(resta);
+    pista("¡Le acertaste! Elegí <b>una carta tuya</b> para darle.");
+    dibujar();
     return;
   }
 

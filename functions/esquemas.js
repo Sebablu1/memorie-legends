@@ -138,6 +138,18 @@ export const EsquemaDescarte = z.object({
   posicionEntrega: Posicion.nullable().optional(),
 });
 
+/**
+ * La carta que da quien le acertó a un rival: a qué ataque corresponde y cuál.
+ *
+ * Una posición y nada más. Qué carta es lo sabe el servidor.
+ */
+export const EsquemaEntrega = z.object({
+  codigo: Codigo,
+  windowId: z.string().min(1).max(120),
+  clientActionId: ClaveDeAccion,
+  posicionEntrega: Posicion,
+});
+
 export const EsquemaAccion = z.object({
   codigo: Codigo,
   // Lista blanca, y sale de la misma constante que usa el motor: una acción

@@ -56,6 +56,17 @@ export const MS_VENTANA_REAPERTURA = MS_REAPERTURA;
 export const MS_GRACIA = 2000;
 
 /**
+ * Lo que el servidor espera la carta de una entrega, además de lo que el
+ * jugador ve en su pantalla (`MS_PARA_ENTREGAR`).
+ *
+ * El reloj de la pantalla arranca cuando llega la respuesta que dice «le
+ * acertaste», y la elección tarda en volver lo mismo que tardó en ir. Sin
+ * este margen, una elección hecha en el último segundo se perdería en el
+ * viaje y la carta saldría al azar.
+ */
+export const MS_GRACIA_ENTREGA = 2000;
+
+/**
  * Diferencia por debajo de la cual dos reacciones no se pueden distinguir.
  *
  * Es del orden de la incertidumbre que deja una sincronización de reloj sobre
@@ -134,8 +145,31 @@ export const aceptaLlegadas = (ventana, ahora) =>
   ahora >= ventana.abiertaEn &&
   ahora <= ventana.abiertaEn + ventana.duracionMs + ventana.graciaMs;
 
-/** ¿Ya se puede cerrar? */
-export const venceEn = (ventana) => ventana.abiertaEn + ventana.duracionMs + ventana.graciaMs;
+/**
+ * Los ataques acertados que todavía esperan que su dueño elija la carta.
+ *
+ * Mientras haya alguno, la ventana no se resuelve: resolverla sin la carta
+ * dejaría un hueco en la mano del rival, y un hueco puede ser «se quedó sin
+ * cartas» y cortar la ronda por un jugador que no se quedó sin nada.
+ */
+export const entregasPendientes = (ventana) =>
+  Object.values(ventana?.intentos ?? {}).filter(
+    (i) => i.esperaEntrega && i.posicionEntrega == null,
+  );
+
+/**
+ * ¿Ya se puede cerrar?
+ *
+ * Al final de la ventana, o al final de la última entrega pendiente, lo que
+ * pase después. Las entregas sólo pueden estirar el cierre, nunca adelantarlo.
+ * Lo que NO estiran es el tiempo para intentar: eso lo sigue diciendo
+ * `aceptaLlegadas`.
+ */
+export const venceEn = (ventana) =>
+  Math.max(
+    ventana.abiertaEn + ventana.duracionMs + ventana.graciaMs,
+    ...entregasPendientes(ventana).map((i) => i.entregaHasta),
+  );
 export const yaVencio = (ventana, ahora) => ahora > venceEn(ventana);
 
 // ------------------------------------------------- el tiempo que vale
@@ -414,6 +448,11 @@ export function registrarIntento(ventana, intento, { ahora, cantidadDeCartas }) 
           posicionEntrega: Number.isInteger(intento.posicionEntrega)
             ? intento.posicionEntrega
             : null,
+          // Acertó y todavía no eligió qué carta da: la ventana lo espera
+          // hasta `entregaHasta`, que es una hora del servidor.
+          ...(intento.esperaEntrega
+            ? { esperaEntrega: true, entregaHasta: intento.entregaHasta }
+            : {}),
           declarado: Number.isFinite(intento.declarado) ? intento.declarado : null,
           llegada,
           efectivo,

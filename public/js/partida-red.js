@@ -252,23 +252,44 @@ export const cerrarMirada = (codigo) => llamar("cerrarMirada", { codigo });
  * @param tocadoEn  Date.now() del instante del clic, no del envío. La
  *                  diferencia importa: entre uno y otro puede haber una
  *                  animación, y el jugador reaccionó en el primero.
+ * @param rival     `{ objetivo }` si va contra la mano de otro. La carta a
+ *                  entregar NO va acá: se manda después con `entregarCarta`,
+ *                  y sólo si la respuesta dice que acertó.
+ * @returns lo que contesta el servidor, más el `clientActionId` con que salió
+ *          el intento: la entrega lo necesita para decir a qué ataque va.
  */
 export function intentarDescarte(codigo, ventana, posicion, tocadoEn = Date.now(), rival = null) {
   const declarado = tocadoEn + reloj.desfase - ventana.abiertaEn;
+  const clientActionId = nuevoIdDeAccion();
   return llamar("intentarDescarte", {
     codigo,
     windowId: ventana.id,
     posicion,
-    clientActionId: nuevoIdDeAccion(),
+    clientActionId,
     declarado,
     latencia: Math.round((reloj.viaje ?? 0) / 2),
     incertidumbre: Math.round(reloj.incertidumbre),
-    // Contra la mano de un rival: a quién se apunta y qué carta propia se
-    // entrega si acierta. Van POSICIONES y un uid, nunca un valor: la carta
-    // real la saca el servidor del estado maestro.
-    ...(rival ? { objetivo: rival.objetivo, posicionEntrega: rival.posicionEntrega } : {}),
-  });
+    // Contra la mano de un rival: a quién se apunta. Un uid, nunca un valor:
+    // la carta real la saca el servidor del estado maestro.
+    ...(rival ? { objetivo: rival.objetivo } : {}),
+  }).then((respuesta) => ({ ...respuesta, clientActionId }));
 }
+
+/**
+ * La carta que se le da al rival después de acertarle.
+ *
+ * Una posición, elegida a ciegas, y a qué ataque corresponde. Va por el mismo
+ * callable que el descarte —con `entregar`— para caer en la instancia que
+ * acaba de atender el ataque, que está caliente.
+ */
+export const entregarCarta = (codigo, ventana, clientActionId, posicionEntrega) =>
+  llamar("intentarDescarte", {
+    entregar: true,
+    codigo,
+    windowId: ventana.id,
+    clientActionId,
+    posicionEntrega,
+  });
 
 /**
  * Deja lista una instancia de `intentarDescarte` antes de la ventana.

@@ -112,6 +112,17 @@ export const MS_ENTRE_RONDAS = 6000;
  */
 export const MS_CUENTA_REGRESIVA = 4000;
 
+/**
+ * Cuánto tiene quien le acertó a un rival para elegir qué carta le da.
+ *
+ * La regla dice que la carta se elige DESPUÉS de acertar, y a ciegas. Mientras
+ * tanto la ventana puede terminar: la de un poder dura tres segundos, y llegar
+ * a la carta del rival ya se come parte. Así que la elección tiene su propio
+ * reloj, y la ventana espera a que termine antes de resolverse. Al vencer, la
+ * carta sale al azar.
+ */
+export const MS_PARA_ENTREGAR = 5000;
+
 export const PODERES = {
   7: "mirarPropia",
   8: "mirarRival",
@@ -732,11 +743,33 @@ export function cartasExpuestas(intentos = []) {
 }
 
 /**
+ * Qué pasaría si `actor` atacara ahora la carta de `objetivo` en `posicion`.
+ *
+ *   "sinDerecho"  no hay intento: no la conoce, no hay ventana, o la ventana es
+ *                 de otro.
+ *   "acierto"     va con la muestra: ahora tiene que elegir qué carta entrega.
+ *   "error"       no va: se come una de castigo, y no elige nada.
+ *
+ * Es lo que se pregunta ANTES de pedir la carta a entregar, porque la regla
+ * dice que sólo se elige al acertar. No cambia nada: `intentarDescarteRival`
+ * vuelve a comprobarlo todo al aplicar.
+ */
+export function evaluarAtaque(estado, actor, objetivo, posicion) {
+  if (estado.fase !== "descarte" || !estado.ventanaDescarte) return "sinDerecho";
+  const { soloPara } = estado.ventanaDescarte;
+  if (soloPara != null && actor !== soloPara) return "sinDerecho";
+  if (!puedeAtacarEn(estado, actor, objetivo, posicion)) return "sinDerecho";
+  const carta = estado.jugadores[objetivo].mano[posicion];
+  return esDescarteValido(carta, cima(estado.descarte)) ? "acierto" : "error";
+}
+
+/**
  * Intento de descarte sobre la mano de OTRO.
  *
  * Sólo sobre una carta que `actor` conoce: ver `puedeAtacarEn`. Si no la
  * conoce no hay intento, y no pasa nada. `posicionEntrega` es la carta propia
- * que da si acierta, elegida por posición y a ciegas.
+ * que da si acierta, elegida por posición y a ciegas. Si no llega —se le
+ * acabó el tiempo de elegir—, sale una al azar.
  *
  * ACIERTO: la carta del rival va con la muestra. Se va al descarte y la
  *          propia ocupa EXACTAMENTE ese hueco, boca abajo. Quien la dio queda
@@ -783,17 +816,36 @@ export function intentarDescarteRival(
 
   let conocimientos = estado.conocimientos ?? [];
   let castigo = null;
+  let semilla = estado.semilla;
+  let alAzar = false;
 
   if (correcto) {
+    /**
+     * Sin carta elegida, una al azar entre las que tiene.
+     *
+     * Con la semilla de la partida, como toda la suerte del juego: el
+     * servidor y la mesa de entrenamiento llegan al mismo resultado, y la
+     * partida se puede repetir. La semilla avanzada vuelve al estado.
+     */
+    let entrega = posicionEntrega;
+    if (!Number.isInteger(entrega)) {
+      const propias = manoActor.map((c, p) => (c ? p : null)).filter((p) => p !== null);
+      if (!propias.length) return estado;
+      const azar = azarDesde(estado.semilla);
+      entrega = propias[Math.floor(azar() * propias.length)];
+      semilla = azar.semilla();
+      alAzar = true;
+    }
+
     // La entrega tiene que ser una carta que exista de verdad.
-    const entregada = manoActor[posicionEntrega];
+    const entregada = manoActor[entrega];
     if (!entregada) return estado;
 
     // La transferencia, en una sola transición y sin desplazar nada:
     // la del rival se va al descarte y la propia ocupa ese mismo hueco.
     descarte.unshift({ ...carta, visible: true });
     manoObjetivo[posicionObjetivo] = { ...entregada, visible: false };
-    manoActor[posicionEntrega] = null;
+    manoActor[entrega] = null;
 
     // La encontrada salió de las manos: `olvidarLoQueSalio` borra lo que se
     // sabía de ella. La entregada conserva su `id`, así que quien ya la
@@ -810,6 +862,7 @@ export function intentarDescarteRival(
       mazo,
       descarte,
       conocimientos,
+      semilla,
       jugadores: estado.jugadores.map((j, i) =>
         i === actor ? { ...j, mano: manoActor }
           : i === objetivo ? { ...j, mano: manoObjetivo }
@@ -827,6 +880,8 @@ export function intentarDescarteRival(
             // La fallada se muestra a la mesa. La acertada se fue al
             // descarte, donde ya se ve; la entregada no se muestra jamás.
             carta: correcto ? null : carta,
+            // Para que la mesa pueda decir que la carta la eligió el azar.
+            ...(alAzar ? { entregaAlAzar: true } : {}),
             ...castigoALaVista(!correcto, actor, manoActor.length - 1, castigo),
           },
         ],
