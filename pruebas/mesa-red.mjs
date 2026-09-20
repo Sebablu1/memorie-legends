@@ -36,6 +36,10 @@ function comoEstado(vista) {
   return {
     fase: vista.fase,
     ronda: vista.ronda,
+    // Con cuántos puntos se queda afuera esta mesa: lo eligió quien abrió la
+    // sala. Sin esto, la cabecera y el cartel de fin de partida dirían 150 en
+    // una mesa de 60.
+    limitePuntos: vista.limitePuntos ?? null,
     indiceMano: vista.indiceMano,
     indiceTurno: vista.indiceTurno,
     turnosRonda: vista.turnosRonda,

@@ -106,6 +106,10 @@ export const EsquemaLimpiarSalas = z.object({
 export const EsquemaCrearSala = z.object({
   entrada: z.coerce.number().int().min(0),
   nombre: z.string().max(40).optional(),
+  // Cuánto dura la partida: 60, 100 o 150. Si no viene, la de siempre.
+  // El valor se vuelve a comprobar contra `LIMITES_DE_PARTIDA` en la función:
+  // acá sólo se exige que sea un número.
+  limitePuntos: z.coerce.number().int().positive().optional(),
 });
 
 /**

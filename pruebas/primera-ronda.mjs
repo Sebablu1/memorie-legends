@@ -36,7 +36,7 @@ import {
   MS_ESPERA_LLEGADAS,
   MS_MESA_DESIERTA,
 } from "../functions/partida-red.js";
-import { MS_MIRAR } from "../public/js/reglas/motor.js";
+import { MS_MIRADA_TOTAL } from "../public/js/reglas/motor.js";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -195,7 +195,7 @@ console.log("\n=== 3. Cuando llega el último, abre — con la cuenta por delant
   ok(vista(db).ventana?.abiertaEn === p.ventana.abiertaEn,
      "y esa hora viaja en la vista, para que la mesa la dibuje");
   ok(p.plazo?.que === "cerrarMirada" &&
-     p.plazo?.hasta === p.ventana.abiertaEn + MS_MIRAR,
+     p.plazo?.hasta === p.ventana.abiertaEn + MS_MIRADA_TOTAL,
      "los dos segundos de mirada se cuentan desde que abre, no desde que llegó el último",
      p.plazo);
 }

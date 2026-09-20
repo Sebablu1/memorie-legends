@@ -13,7 +13,7 @@
 import { readFileSync } from "node:fs";
 import * as R from "../public/js/reglas/red.js";
 import * as motor from "../public/js/reglas/motor.js";
-import { crearMotorEnRed, MS_MIRAR } from "../functions/partida-red.js";
+import { crearMotorEnRed, MS_MIRADA_TOTAL } from "../functions/partida-red.js";
 import { MS_REVELACION } from "../public/js/reglas/vista.js";
 
 let fallos = 0;
@@ -464,6 +464,49 @@ console.log("\n=== 1. Modelo de datos: el estado maestro es secreto ===");
 
 // ==================================== 2. modelo de la ventana
 
+console.log("\n=== 1b. La duración de la mesa: 60, 100 o 150 ===");
+// =====================================================================
+{
+  /**
+   * Las partidas cortas existían sólo en entrenamiento, que es media regla.
+   * El reglamento dice que 60, 100 y 150 valen en los dos modos: lo elige
+   * quien abre la sala, viaja al reparto y queda en el estado de la partida.
+   *
+   * El servidor lo vuelve a comprobar al repartir aunque `crearSala` ya lo
+   * haya validado: un número raro en el documento de la sala dejaría una
+   * partida que no termina nunca —o que elimina a todos en la ronda uno—.
+   */
+  for (const limite of [60, 100, 150]) {
+    reloj = 100000;
+    const { db, red } = montar();
+    await red.repartir({
+      yaSentados: true, codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO,
+      limitePuntos: limite,
+    });
+    const estado = db.leer("partidas/ABCDEF").estado;
+    ok(estado.limitePuntos === limite,
+       `una sala de ${limite} reparte una partida de ${limite}`, estado.limitePuntos);
+
+    // Y la mesa tiene que poder decirlo: el cartel de la cabecera y el de fin
+    // de partida leen el límite de la vista, no uno escrito a mano.
+    const v = db.leer("partidas/ABCDEF/vistas/ana");
+    ok(v.limitePuntos === limite, "y la vista se lo cuenta al jugador", v.limitePuntos);
+  }
+
+  for (const raro of [undefined, null, 0, 77, "muchos", -60]) {
+    reloj = 100000;
+    const { db, red } = montar();
+    await red.repartir({
+      yaSentados: true, codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO,
+      limitePuntos: raro,
+    });
+    ok(db.leer("partidas/ABCDEF").estado.limitePuntos === 150,
+       `con ${JSON.stringify(raro)} se juega la de siempre, 150`,
+       db.leer("partidas/ABCDEF").estado.limitePuntos);
+  }
+}
+
+// =====================================================================
 console.log("\n=== 2. Modelo de la ventana ===");
 {
   const { db, red, ventana } = await partidaEnDescarte();
@@ -472,9 +515,9 @@ console.log("\n=== 2. Modelo de la ventana ===");
 
   // D2: la ventana abre con la MIRADA, no con el descarte. Por eso su hora de
   // apertura es la del reparto —100000, antes de `cerrarMirada`— y su duración
-  // cubre los 2 s de mirar más los 5 de descartar.
-  ok(ventana.duracionMs === MS_MIRAR + R.MS_VENTANA,
-     "y duración: 2 s de mirada + 5 s de descarte", ventana.duracionMs);
+  // cubre los 7 s de mirar —5 para elegir, 2 para ver— más los 5 de descartar.
+  ok(ventana.duracionMs === MS_MIRADA_TOTAL + R.MS_VENTANA,
+     "y duración: 7 s de mirada + 5 s de descarte", ventana.duracionMs);
 
   // Y es UNA sola: `abrirVentana` después de la mirada devuelve la que ya
   // estaba, no una nueva. Si creara otra, el jugador que descartó durante la

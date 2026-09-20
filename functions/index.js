@@ -57,6 +57,7 @@ import { crearInsignias } from "./insignias.js";
 import { crearTorneos } from "./torneos.js";
 import { crearRankingDePartidas } from "./ranking.js";
 import { premioFisicoDe, umbralesValidos } from "./reglas/configuracion.js";
+import { LIMITE_ELIMINACION, LIMITES_DE_PARTIDA, esLimiteDePartida } from "./reglas/puntaje.js";
 import { COLECCION_CATALOGO, esRutaDelSitio } from "./reglas/catalogo.js";
 import {
   validar,
@@ -398,6 +399,28 @@ export const crearSala = functions.https.onCall(async (data, context) => {
     );
   }
 
+  /**
+   * Con cuántos puntos se queda afuera en esta mesa.
+   *
+   * Las partidas cortas existían sólo en entrenamiento, que es media regla:
+   * el reglamento dice que 60, 100 y 150 valen en los dos modos. Quien la
+   * abre elige, y queda escrito en la sala para que los que entran lo vean
+   * ANTES de pagar la entrada.
+   *
+   * Si no viene —un navegador viejo, o una sala abierta desde otro lado— es
+   * la de siempre, 150.
+   */
+  const limitePuntos = data?.limitePuntos == null
+    ? LIMITE_ELIMINACION
+    : Number(data.limitePuntos);
+
+  if (!esLimiteDePartida(limitePuntos)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      `Duración inválida. Las disponibles son: ${LIMITES_DE_PARTIDA.join(", ")}.`,
+    );
+  }
+
   // Fuera de la transacción a propósito: son dos lecturas y adentro sólo se
   // puede leer antes de escribir. Además, el nombre y la cara de uno mismo no
   // son datos que puedan cambiar entre esta línea y el `runTransaction`.
@@ -409,9 +432,12 @@ export const crearSala = functions.https.onCall(async (data, context) => {
 
     try {
       await db.runTransaction((tx) =>
-        abrirSalaEn(tx, { codigo, uid, entrada, nombre, nombreJugador, luce }));
+        abrirSalaEn(tx, {
+          codigo, uid, entrada, nombre, nombreJugador, luce,
+          extra: { limitePuntos },
+        }));
 
-      return { codigo, entrada };
+      return { codigo, entrada, limitePuntos };
     } catch (e) {
       if (e instanceof functions.https.HttpsError) throw e;
       if (e.message === "codigo-ocupado") continue; // otro código y de nuevo
@@ -525,6 +551,12 @@ export const revanchaDeSala = functions.https.onCall(async (data, context) => {
           extra: {
             // De dónde viene, para poder seguir la cadena hacia atrás.
             revanchaDe: codigo,
+            // Y con la misma duración: la revancha es la misma mesa otra vez,
+            // no una partida distinta. Si la vieja no la tiene escrita —salas
+            // de antes de que se pudiera elegir— es la de siempre.
+            limitePuntos: esLimiteDePartida(sala.limitePuntos)
+              ? Number(sala.limitePuntos)
+              : LIMITE_ELIMINACION,
             /**
              * Fuera de la lista de salas abiertas.
              *
@@ -717,6 +749,8 @@ export const iniciarPartida = functions.https.onCall(async (data, context) => {
       jugadores,
       nombres: sala.jugadoresNombres ?? [],
       luce: sala.jugadoresLuce ?? desdeRetratos(sala.jugadoresRetratos),
+      // Lo eligió quien abrió la sala y lo vieron todos antes de pagar.
+      limitePuntos: sala.limitePuntos,
     });
 
     tx.update(refSala, {

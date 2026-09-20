@@ -12,7 +12,7 @@
  * orquestador de por medio, que es lo que faltaba.
  */
 
-import { crearMotorEnRed, MS_MIRAR, MS_ENTRE_RONDAS } from "../functions/partida-red.js";
+import { crearMotorEnRed, MS_MIRADA_TOTAL, MS_ENTRE_RONDAS } from "../functions/partida-red.js";
 import { MS_VENTANA, MS_GRACIA } from "../public/js/reglas/red.js";
 import { MS_REVELACION } from "../public/js/reglas/vista.js";
 import { LIMITE_ELIMINACION } from "../public/js/reglas/puntaje.js";
@@ -255,7 +255,7 @@ console.log("\n=== 3. La ronda extra se reparte sola ===");
 console.log("\n=== 4. La ronda extra se juega y resuelve ===");
 {
   // Se deja correr el orquestador: mirada, ventana, cierre.
-  reloj += MS_MIRAR;
+  reloj += MS_MIRADA_TOTAL;
   await red.avanzarPartida({ codigo: CODIGO });
   ok(maestro().estado.fase === "descarte", "se cierra la mirada", maestro().estado.fase);
 

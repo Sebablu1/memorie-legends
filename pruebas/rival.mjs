@@ -408,7 +408,7 @@ console.log("\n=== 9. El conocimiento sobrevive el viaje por Firestore ===");
  */
 console.log("\n=== 10. El servidor no cree en la palabra del cliente ===");
 {
-  const { crearMotorEnRed, MS_MIRAR } = await import("../functions/partida-red.js");
+  const { crearMotorEnRed, MS_MIRADA_TOTAL } = await import("../functions/partida-red.js");
   const { MS_REVELACION } = await import("../public/js/reglas/vista.js");
 
   class E extends Error { constructor(c, m) { super(m); this.codigo = c; } }
@@ -453,7 +453,7 @@ console.log("\n=== 10. El servidor no cree en la palabra del cliente ===");
   const vista = (u) => docs.get(`partidas/${C}/vistas/${u}`).datos;
 
   await red.repartir({ yaSentados: true, codigo: C, jugadores: TRES, nombres: TRES });
-  reloj += MS_MIRAR + 1;
+  reloj += MS_MIRADA_TOTAL + 1;
   await red.avanzarPartida({ codigo: C });
   await red.avanzarPartida({ codigo: C });
   const v = partida().ventana;

@@ -6,9 +6,35 @@ import {
   cartasVivas,
   LIMITE_ELIMINACION,
 } from "./puntaje.js";
+
+// Quien arma una partida necesita las dos cosas: el límite de siempre y con
+// qué otros se puede jugar. Se re-exportan para que no haya que importar de
+// dos módulos para crear una mesa.
+export { LIMITE_ELIMINACION, LIMITES_DE_PARTIDA, esLimiteDePartida } from "./puntaje.js";
 import { azarDesde, semillaAleatoria } from "./azar.js";
 
+/** Lo que se VE la carta de la mirada inicial, una vez elegida. */
 export const MS_MIRAR = 2000;
+
+/**
+ * Lo que se tiene para ELEGIR cuál mirar, antes de verla.
+ *
+ * Son dos tiempos distintos y el reglamento los separa: cinco segundos para
+ * decidir y dos para ver. Estaban escritos a mano en la mesa de
+ * entrenamiento, y en red no estaban: la fase entera duraba los dos segundos
+ * de `MS_MIRAR` y había que elegir Y llegar al servidor dentro de ellos.
+ *
+ * Con la latencia real —unos 0,8 s por jugada— eso dejaba miradas rechazadas.
+ * Hubo una en producción el 17 de septiembre de 2026: la acción llegó a una
+ * instancia recién arrancada y la mirada ya estaba cerrada.
+ *
+ * Vive acá porque ahora lo usan los dos modos, que es la única forma de que no
+ * se separen otra vez.
+ */
+export const MS_ELEGIR_MIRADA = 5000;
+
+/** La mirada entera: elegir y ver. */
+export const MS_MIRADA_TOTAL = MS_ELEGIR_MIRADA + MS_MIRAR;
 
 /**
  * La ventana del principio de la ronda.
@@ -459,6 +485,26 @@ export function intentarDescarte(estado, indiceJugador, posicion) {
    */
   if (estado.ventanaDescarte.soloAtaques) return estado;
 
+  /**
+   * Un intento por ventana sobre la mano PROPIA.
+   *
+   * Sobre lo tuyo el descarte es una carrera de reflejos: hay un tiro y se
+   * vive con él. Sin este límite, tocar tres cartas costaba tres castigos
+   * —cuatro cartas antes, siete después— porque cada toque era un intento
+   * nuevo y todos se aplicaban.
+   *
+   * En red ya era así desde `registrarIntento`, que lo rechaza antes de
+   * anotarlo. En entrenamiento no, y la misma jugada costaba distinto según
+   * dónde se jugara. Ahora vive en el motor, que es lo único que corren los
+   * dos modos; el rechazo de la red sigue donde estaba, porque ahí además hay
+   * que distinguir un reintento técnico de un toque nuevo.
+   *
+   * Sobre la mano de un RIVAL no se limita: sobre una carta que se conoce se
+   * puede intentar de nuevo mientras dure la ventana, sumando un castigo por
+   * cada error. Es la regla.
+   */
+  if (yaIntentoLoSuyo(estado, indiceJugador)) return estado;
+
   const jugador = estado.jugadores[indiceJugador];
   const carta = jugador.mano[posicion];
   if (!carta) return estado;
@@ -556,6 +602,18 @@ export function intentarDescarte(estado, indiceJugador, posicion) {
     }),
     `${jugador.nombre}: descarte ${resultado}`,
   );
+}
+
+/**
+ * ¿Este jugador ya tiró sobre su propia mano en esta ventana?
+ *
+ * Los intentos contra un rival llevan `actor` —quien atacó— y su
+ * `indiceJugador` es el atacado. Los propios no llevan `actor`: por ahí se
+ * distinguen, y por eso un ataque recibido no gasta el tiro de la víctima.
+ */
+export function yaIntentoLoSuyo(estado, indiceJugador) {
+  const intentos = estado?.ventanaDescarte?.intentos ?? [];
+  return intentos.some((i) => i.actor == null && i.indiceJugador === indiceJugador);
 }
 
 /**

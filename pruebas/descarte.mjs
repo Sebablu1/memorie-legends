@@ -140,6 +140,69 @@ const resultados = t.ventanaDescarte.intentos.map((i) => i.resultado);
 ok(resultados.filter((r) => r === "primero").length === 1, "un solo 'primero'", resultados);
 ok(t.ventanaDescarte.huboPrimero === true, "queda marcado que ya hubo primero");
 
+console.log("\n=== Un intento por ventana sobre la mano propia ===");
+{
+  /**
+   * Sobre lo propio hay UN tiro por ventana, y se vive con él.
+   *
+   * Sin esto, tocar tres cartas costaba tres castigos: cuatro cartas antes,
+   * siete después. En red ya era así —`registrarIntento` rechaza el segundo
+   * antes de anotarlo— y en entrenamiento no, así que la misma jugada costaba
+   * distinto según dónde se jugara. Ahora el límite está en el motor, que es
+   * lo único que corren los dos modos.
+   */
+  let w = mesaDePrueba();
+
+  // Primer tiro: falla con la Copa-2, que no coincide con la muestra.
+  w = M.intentarDescarte(w, 0, 1);
+  const trasUno = { cartas: cuenta(w, 0), intentos: w.ventanaDescarte.intentos.length };
+  ok(trasUno.cartas === 5, "el primer tiro se cobra: cuatro cartas más el castigo", trasUno);
+
+  // Segundo tiro en la misma ventana: no pasa nada de nada.
+  const segundo = M.intentarDescarte(w, 0, 0);
+  ok(segundo === w, "el segundo tiro devuelve el MISMO estado, sin tocar nada");
+  ok(cuenta(segundo, 0) === trasUno.cartas, "no hay una segunda carta de castigo", cuenta(segundo, 0));
+  ok(segundo.ventanaDescarte.intentos.length === trasUno.intentos,
+     "y no queda anotado como intento", segundo.ventanaDescarte.intentos.length);
+  ok(M.yaIntentoLoSuyo(w, 0) === true, "el motor sabe que ya jugó lo suyo");
+
+  // Pero es SÓLO del que tiró, y SÓLO en esta ventana.
+  ok(M.yaIntentoLoSuyo(w, 1) === false, "a los demás no les gasta el tiro");
+  const otroJugador = M.intentarDescarte(w, 1, 0);
+  ok(cuenta(otroJugador, 1) === 3, "B acierta primero en la misma ventana", cuenta(otroJugador, 1));
+
+  const ventanaNueva = { ...w, ventanaDescarte: { huboPrimero: false, intentos: [] } };
+  ok(M.yaIntentoLoSuyo(ventanaNueva, 0) === false, "la ventana siguiente empieza limpia");
+  ok(cuenta(M.intentarDescarte(ventanaNueva, 0, 0), 0) === 4,
+     "y ahí sí puede volver a tirar: acierta y se saca una de encima");
+}
+
+console.log("\n=== Acertar tarde deja la carta a la vista, como el error ===");
+{
+  /**
+   * Los dos castigos son públicos, y tienen que serlo por el mismo motivo: el
+   * que se comió la carta ya lo sabe, la información es para los otros tres.
+   *
+   * La diferencia entre tarde y error se mantiene en lo que se muestra: el
+   * error enseña ADEMÁS la carta de castigo, y encima regala el derecho a que
+   * te la descarten. Por eso fallar sigue siendo peor que llegar tarde.
+   */
+  let z = mesaDePrueba();
+  z = M.intentarDescarte(z, 0, 0);  // A, primero
+  z = M.intentarDescarte(z, 1, 0);  // B, tarde
+
+  const tarde = z.ventanaDescarte.intentos.at(-1);
+  ok(tarde.resultado === "tarde", "B llegó tarde", tarde.resultado);
+  ok(tarde.carta?.id === "Espada-6", "y su carta viaja en el intento, para mostrarla", tarde.carta);
+  ok(!tarde.castigo, "pero no su castigo: eso es sólo del error");
+
+  const expuestas = M.cartasExpuestas([tarde]);
+  ok(expuestas.length === 1, "la mesa ve UNA carta del que llegó tarde", expuestas.length);
+  ok(expuestas[0].indiceJugador === 1 && expuestas[0].posicion === 0,
+     "en la posición en la que sigue estando", expuestas[0]);
+  ok(!M.puedeAtacarEn(z, 0, 1, 0), "verla no da derecho a descartársela: eso sólo lo da el error");
+}
+
 console.log("\n=== La carta que no coincide nunca llega al descarte ===");
 let u = mesaDePrueba();
 const cimaAntes = u.descarte[0].id;

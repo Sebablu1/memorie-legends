@@ -363,6 +363,21 @@ console.log("\n=== Los tiempos coinciden entre modos ===");
      "y la ventana de reflejos también",
      { motor: motor.MS_DESCARTE, red: red.MS_VENTANA });
 
+  // Elegir la carta de la mirada: eran cinco segundos escritos a mano en la
+  // mesa de entrenamiento y NINGUNO en red, donde la fase entera duraba los
+  // dos de ver. Ahora los dos números salen del motor.
+  ok(enRed.MS_ELEGIR_MIRADA === motor.MS_ELEGIR_MIRADA,
+     "elegir qué mirar dura lo mismo en los dos modos",
+     { motor: motor.MS_ELEGIR_MIRADA, red: enRed.MS_ELEGIR_MIRADA });
+
+  ok(motor.MS_MIRADA_TOTAL === motor.MS_ELEGIR_MIRADA + motor.MS_MIRAR,
+     "y la mirada entera es la suma de las dos partes",
+     { total: motor.MS_MIRADA_TOTAL, elegir: motor.MS_ELEGIR_MIRADA, ver: motor.MS_MIRAR });
+
+  ok(red.MS_VENTANA_TOTAL === motor.MS_MIRADA_TOTAL + red.MS_VENTANA,
+     "la ventana de la ronda cubre la mirada entera MÁS los cinco de descarte",
+     { total: red.MS_VENTANA_TOTAL, mirada: motor.MS_MIRADA_TOTAL, ventana: red.MS_VENTANA });
+
   ok(red.MS_VENTANA_REAPERTURA === motor.MS_REAPERTURA,
      "y la de las reaperturas, que es la otra",
      { motor: motor.MS_REAPERTURA, red: red.MS_VENTANA_REAPERTURA });

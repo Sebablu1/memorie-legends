@@ -24,6 +24,7 @@ import {
   saltarTurno,
   siguienteRonda,
   PODERES,
+  MS_ELEGIR_MIRADA,
   MS_MIRAR,
   MS_DESCARTE,
   MS_REAPERTURA,
@@ -31,6 +32,7 @@ import {
   MS_PARA_ENTREGAR,
   cartasMiradasEn,
   cartasExpuestas,
+  yaIntentoLoSuyo,
   evaluarAtaque,
   posicionesAtacablesDe,
   ventanaTrasPoder,
@@ -429,8 +431,9 @@ const semillaPedida = Number(new URLSearchParams(location.search).get("semilla")
  * `configMesa`. Si no viene —una configuración vieja guardada, o alguien que
  * entró por la URL— el motor usa su valor de siempre, 150.
  *
- * Sólo vale para el entrenamiento. En una partida por Leyendas el estado lo
- * arma el servidor y este número no interviene.
+ * Sólo vale para el entrenamiento. En una partida por Leyendas lo eligió quien
+ * abrió la sala y el estado lo arma el servidor: este número no interviene, y
+ * el cartel de la cabecera lee el del estado.
  */
 const limitePedido = Number(config.limitePuntos);
 const limitePuntos =
@@ -450,11 +453,14 @@ let estado = crearPartida(jugadoresConfig, opcionesDeReparto);
 // El lema de la cabecera dice el límite de ESTA partida, no uno escrito a mano.
 // Con las partidas cortas, un "límite 150" fijo estaría mintiendo — y es el
 // único lugar donde el jugador puede confirmar qué eligió antes de empezar.
-{
+function actualizarLema() {
   const lema = $("lemaMesa");
-  const cuantos = jugadoresConfig.length;
-  if (lema) lema.textContent = `Mesa de ${cuantos} · límite ${limitePuntos}`;
+  if (!lema) return;
+  const cuantos = estado?.jugadores?.length || jugadoresConfig.length;
+  const limite = estado?.limitePuntos ?? limitePuntos;
+  lema.textContent = `Mesa de ${cuantos} · límite ${limite}`;
 }
+actualizarLema();
 let memorias = estado.jugadores.map(() => IA.crearMemoria());
 
 /**
@@ -957,6 +963,9 @@ function dibujar() {
   if (!enRed()) ojosDelRegistroLocal();
 
   dom.ronda.textContent = estado.ronda || "-";
+  // En red el estado llega después de montar la mesa: el límite y cuántos se
+  // sentaron no se saben hasta el primer dibujado con datos.
+  actualizarLema();
 
   // El color del cartel sale de la fase, y de acá sale la fase.
   //
@@ -1914,7 +1923,7 @@ async function arrancarRonda() {
   await faseMirada();
 }
 
-/** Cada jugador elige una carta y la ve durante 2 segundos. */
+/** Cada jugador elige una carta —5 s— y la ve durante 2. */
 function faseMirada() {
   return new Promise((listo) => {
     // Las IAs eligen al instante y memorizan según su nivel.
@@ -1939,7 +1948,7 @@ function faseMirada() {
     }
 
     pista("MIRÁ TU CARTA");
-    correrTemporizador(5000);
+    correrTemporizador(MS_ELEGIR_MIRADA);
     dibujar();
 
     let resuelto = false;
@@ -1963,7 +1972,7 @@ function faseMirada() {
     };
 
     // Reglamento: si no elige, se toma automáticamente la primera carta.
-    const automatico = setTimeout(() => elegir(0), 5000);
+    const automatico = setTimeout(() => elegir(0), MS_ELEGIR_MIRADA);
     manejadorMirada = elegir;
   });
 }
@@ -2819,6 +2828,15 @@ document.addEventListener("click", async (evento) => {
   }
 
   if (estado.fase === "descarte" && manejadorDescarte && indiceJugador === YO) {
+    // Ya tiró en esta ventana: el motor no haría nada con el toque, así que
+    // se dice por qué en vez de dejarlo en un clic que no pasa nada.
+    if (yaIntentoLoSuyo(estado, YO)) {
+      sonidos.error();
+      pista("⚠️ Un tiro por ventana: ya jugaste el tuyo");
+      cartaEl.classList.add("rechazada");
+      setTimeout(() => cartaEl.classList.remove("rechazada"), 600);
+      return;
+    }
     if (!dobleClic) {
       destelloPrimerToque(cartaEl);
       pista("¡Doble toque si estás seguro!");
@@ -3418,6 +3436,10 @@ function comoEstado(vista) {
   return {
     fase: vista.fase,
     ronda: vista.ronda,
+    // Con cuántos puntos se queda afuera esta mesa: lo eligió quien abrió la
+    // sala. Sin esto, la cabecera y el cartel de fin de partida dirían 150 en
+    // una mesa de 60.
+    limitePuntos: vista.limitePuntos ?? null,
     indiceMano: vista.indiceMano,
     indiceTurno: vista.indiceTurno,
     turnosRonda: vista.turnosRonda,

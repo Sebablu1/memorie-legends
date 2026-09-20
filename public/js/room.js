@@ -13,6 +13,7 @@ import { iniciarPartida, salirDeSalaEnEspera, marcarListo, reportarJugador, Erro
 import { ESTADOS_SALA, MIN_JUGADORES, MAX_JUGADORES } from "./reglas/salas.js";
 import { escapar } from "./modulos/texto.js";
 import { esRutaDelSitio } from "./reglas/catalogo.js";
+import { LIMITE_ELIMINACION } from "./reglas/puntaje.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -218,6 +219,10 @@ function pintar(sala, uid) {
   $("codigoSala").textContent = sala.codigo ?? codigo;
   $("entradaSala").textContent = `${sala.entrada} Leyendas`;
   $("pozoSala").textContent = `${sala.entrada * jugadores.length} Leyendas`;
+  // Con cuántos puntos se queda afuera. Se ve ANTES de marcarse listo: una
+  // partida de 60 y una de 150 no duran lo mismo ni se juegan igual. Las salas
+  // abiertas antes de que se pudiera elegir no lo traen: son de 150.
+  $("duracionSala").textContent = `${sala.limitePuntos ?? LIMITE_ELIMINACION} puntos`;
   $("contadorJugadores").textContent = `${jugadores.length} / ${capacidad}`;
 
   // Lista: los que están, más los lugares libres.

@@ -234,6 +234,15 @@
             <span>Entrada</span>
             <select id="entradaSala"></select>
           </label>
+
+          <!-- Cuánto dura la partida, igual que en entrenamiento: 60, 100 o
+               150 puntos. Lo elige quien abre la sala, y los que entran lo ven
+               en la pantalla de la sala antes de pagar. Las dos listas las
+               llena `dashboard.js` desde las reglas. -->
+          <label class="campo" for="duracionSala">
+            <span>Duración</span>
+            <select id="duracionSala"></select>
+          </label>
           <p class="ayuda-entrada" id="ayudaEntrada"></p>
 
           <button class="accion grande" id="btnCrearSala" type="button">Crear sala</button>

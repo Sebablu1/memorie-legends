@@ -32,7 +32,7 @@
  */
 
 import * as M from "../public/js/reglas/motor.js";
-import { crearMotorEnRed, MS_MIRAR } from "../functions/partida-red.js";
+import { crearMotorEnRed, MS_MIRADA_TOTAL } from "../functions/partida-red.js";
 import { MS_VENTANA, MS_VENTANA_REAPERTURA, MS_GRACIA } from "../public/js/reglas/red.js";
 import { MS_REVELACION } from "../public/js/reglas/vista.js";
 
@@ -343,7 +343,7 @@ console.log("\n=== 5. En red: tirar abre una ventana NUEVA ===");
   const primera = partida().ventana;
 
   // Se atraviesa la ventana de la ronda sin que nadie descarte.
-  reloj += MS_MIRAR + 1;
+  reloj += MS_MIRADA_TOTAL + 1;
   await red.avanzarPartida({ codigo: C });
   reloj = vence(primera) + 1;
   await red.avanzarPartida({ codigo: C });
@@ -364,7 +364,7 @@ console.log("\n=== 5. En red: tirar abre una ventana NUEVA ===");
     ok(p.ventana.id !== primera.id, "que NO es la de la ronda", [p.ventana.id, primera.id]);
     ok(p.ventana.abiertaEn === reloj, "abierta en el instante del tiro", p.ventana.abiertaEn - reloj);
     // Dura lo de una reapertura, que es MENOS que la de la ronda: la de la
-    // ronda cubre además la mirada (MS_MIRAR + MS_VENTANA) y da cinco segundos
+    // ronda cubre además la mirada (MS_MIRADA_TOTAL + MS_VENTANA) y da cinco segundos
     // para buscar en cuatro manos; acá la mesa ya está mirando la muestra.
     ok(p.ventana.duracionMs === MS_VENTANA_REAPERTURA,
        "y dura lo de una reapertura, no lo de la ronda",

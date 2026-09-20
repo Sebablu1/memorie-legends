@@ -34,6 +34,7 @@ import { semillaAleatoria } from "./reglas/azar.js";
 import {
   MS_VENTANA,
   MS_VENTANA_REAPERTURA,
+  MS_VENTANA_TOTAL,
   crearVentana,
   registrarIntento,
   resolverVentana,
@@ -83,6 +84,16 @@ export const MS_TURNO = motor.MS_TURNO;
  * con las pruebas en verde porque cada modo miraba su propia copia.
  */
 export const MS_MIRAR = motor.MS_MIRAR;
+
+/**
+ * Los otros dos tiempos de la mirada, por lo mismo: elegir cuál, y el total.
+ *
+ * La fase `mirar` dura el TOTAL. Antes duraba `MS_MIRAR` a secas, así que en
+ * red había que elegir y llegar al servidor en dos segundos mientras que en
+ * entrenamiento había cinco para elegir y dos para ver. Ver el motor.
+ */
+export const MS_ELEGIR_MIRADA = motor.MS_ELEGIR_MIRADA;
+export const MS_MIRADA_TOTAL = motor.MS_MIRADA_TOTAL;
 
 /**
  * Lo que espera el servidor a que el del turno corte o pase.
@@ -143,23 +154,6 @@ export const ACCIONES = {
   CORTAR: "cortar",
   PASAR: "pasar",
 };
-
-/**
- * La ventana de descarte arranca cuando arranca la MIRADA, no después.
- *
- * La muestra puede ser justo la carta que acabás de memorizar, y hasta ahora
- * ese descarte era imposible: la fase todavía era `mirar` y no existía
- * ninguna ventana a la que pertenecer.
- *
- *   0 s ───────── 2 s ───────────────── 7 s ──── 9 s
- *        MIRAR          DESCARTE          gracia
- *        └───────── una sola ventana ────────┘
- *
- * Son 7 segundos porque cubre los 2 de la mirada más los 5 de descarte de
- * siempre. Lo que vive el jugador no cambia: sólo cambia dónde empieza a
- * contar la ventana.
- */
-const MS_VENTANA_TOTAL = MS_MIRAR + MS_VENTANA;
 
 /**
  * En qué fase del motor tiene sentido cada acción.
@@ -380,10 +374,11 @@ export function crearMotorEnRed({
           return nuevo("mirar", `llegadas-r${estado.ronda}`,
                        esperandoDesde + MS_ESPERA_LLEGADAS, "abrirPrimeraRonda");
         }
-        // Los dos segundos se cuentan desde que abrió la ventana, no desde
-        // este golpe: si no, una publicación posterior recortaría la mirada.
+        // Los siete segundos —cinco para elegir, dos para ver— se cuentan
+        // desde que abrió la ventana, no desde este golpe: si no, una
+        // publicación posterior recortaría la mirada.
         return nuevo("mirar", `r${estado.ronda}`,
-                     (ventana?.abiertaEn ?? ahoraMs) + MS_MIRAR, "cerrarMirada");
+                     (ventana?.abiertaEn ?? ahoraMs) + MS_MIRADA_TOTAL, "cerrarMirada");
 
       case "descarte":
         // Ventana ya resuelta: la mesa está viendo las cartas que se
@@ -680,7 +675,9 @@ export function crearMotorEnRed({
    * partida podría quedar iniciada sin documento maestro —o al revés— y no
    * habría forma de saber cuál de las dos cosas pasó.
    */
-  async function repartirEn(tx, { codigo, jugadores, nombres, luce, yaSentados = false }) {
+  async function repartirEn(
+    tx, { codigo, jugadores, nombres, luce, limitePuntos, yaSentados = false },
+  ) {
     const snap = await tx.get(refPartida(codigo));
     // Idempotente: repartir dos veces la misma partida no la reinicia.
     if (snap.exists) return { codigo, yaExistia: true, version: snap.data().version };
@@ -706,9 +703,21 @@ export function crearMotorEnRed({
     const partida = {
       codigo,
       jugadores,
-      // La semilla la elige el SERVIDOR. Si la mandara el cliente, podría
-      // probar semillas hasta dar con un reparto que le convenga.
-      estado: motor.empezarRonda(motor.crearPartida(configuracion, { semilla: semillaDe() })),
+      /**
+       * La semilla la elige el SERVIDOR, y la duración sale de la sala.
+       *
+       * Si la semilla la mandara el cliente, podría probar semillas hasta dar
+       * con un reparto que le convenga. Y el límite se vuelve a comprobar acá
+       * aunque ya lo haya validado quien creó la sala: esta función es la que
+       * arma el estado, y un valor raro en el documento dejaría una partida
+       * que no termina nunca o que elimina a todos en la primera ronda.
+       */
+      estado: motor.empezarRonda(motor.crearPartida(configuracion, {
+        semilla: semillaDe(),
+        limitePuntos: motor.esLimiteDePartida(limitePuntos)
+          ? Number(limitePuntos)
+          : motor.LIMITE_ELIMINACION,
+      })),
 
       /**
        * La ventana NO nace con el reparto: nace cuando llegan todos.

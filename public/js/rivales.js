@@ -12,6 +12,16 @@
  * renombra allá, acá deja de encontrarse y el rival cae al nivel por defecto.
  */
 
+/**
+ * Los tres límites salen de las reglas, no de acá.
+ *
+ * Son los mismos que valida el servidor al crear una sala por Leyendas: si
+ * cada lado tuviera su lista, el tablero podría ofrecer una duración que el
+ * servidor rechaza.
+ */
+import { LIMITES_DE_PARTIDA } from "./reglas/puntaje.js";
+const [CORTA, NORMAL, EXTENDIDA] = LIMITES_DE_PARTIDA;
+
 /** En el orden en que se sientan a la mesa. */
 export const NOMBRES_IA = ["Nara", "Bruno", "Vex"];
 
@@ -73,13 +83,25 @@ export function armarRivales(cantidad, nivel) {
  * tiene que seguir viniendo elegido.
  */
 export const MODOS_PARTIDA = [
-  { clave: "corta", etiqueta: "Corta", limite: 60, resumen: "unas pocas rondas" },
-  { clave: "normal", etiqueta: "Normal", limite: 100, resumen: "una partida media" },
-  { clave: "extendida", etiqueta: "Extendida", limite: 150, resumen: "la de siempre" },
+  { clave: "corta", etiqueta: "Corta", limite: CORTA, resumen: "unas pocas rondas" },
+  { clave: "normal", etiqueta: "Normal", limite: NORMAL, resumen: "una partida media" },
+  { clave: "extendida", etiqueta: "Extendida", limite: EXTENDIDA, resumen: "la de siempre" },
 ];
 
 export const MODO_POR_DEFECTO = "extendida";
 
+/**
+ * Las opciones del desplegable de duración, para las dos pantallas que abren
+ * salas. La etiqueta dice el número: «Partida de 60 puntos» se entiende sin
+ * saber qué quiere decir «corta».
+ */
+export const opcionesDeDuracion = () =>
+  MODOS_PARTIDA.map((m) => ({
+    valor: m.limite,
+    etiqueta: `Partida de ${m.limite} puntos`,
+    porDefecto: m.clave === MODO_POR_DEFECTO,
+  }));
+
 /** El límite de un modo, o el de siempre si el nombre no existe. */
 export const limiteDelModo = (clave) =>
-  MODOS_PARTIDA.find((m) => m.clave === clave)?.limite ?? 150;
+  MODOS_PARTIDA.find((m) => m.clave === clave)?.limite ?? EXTENDIDA;

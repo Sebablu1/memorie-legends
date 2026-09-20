@@ -57,7 +57,8 @@ async function llamar(nombre, datos = {}) {
  * Crea una sala por Leyendas y cobra la entrada.
  * @returns {Promise<{codigo: string, entrada: number}>}
  */
-export const crearSala = (entrada, nombre) => llamar("crearSala", { entrada, nombre });
+export const crearSala = (entrada, nombre, limitePuntos) =>
+  llamar("crearSala", { entrada, nombre, limitePuntos });
 
 /**
  * Abre —o encuentra— la revancha de una sala que ya terminó.

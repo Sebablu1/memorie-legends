@@ -27,7 +27,11 @@
  */
 
 import * as M from "../public/js/reglas/motor.js";
-import { LIMITE_ELIMINACION, CASTIGO_CORTE_FALLIDO, BONO_MANO_VACIA } from "../public/js/reglas/puntaje.js";
+import {
+  LIMITE_ELIMINACION, LIMITES_DE_PARTIDA, esLimiteDePartida,
+  CASTIGO_CORTE_FALLIDO, BONO_MANO_VACIA,
+} from "../public/js/reglas/puntaje.js";
+import { MODOS_PARTIDA } from "../public/js/rivales.js";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -50,9 +54,36 @@ ok(
   M.crearPartida(JUGADORES).limitePuntos,
 );
 
-for (const limite of [60, 100, 150]) {
+for (const limite of LIMITES_DE_PARTIDA) {
   const e = M.crearPartida(JUGADORES, { limitePuntos: limite });
   ok(e.limitePuntos === limite, `se puede pedir una partida de ${limite}`, e.limitePuntos);
+}
+
+// =====================================================================
+console.log("\n=== 1b. Una sola lista de duraciones para los dos modos ===");
+// =====================================================================
+
+/**
+ * Los tres límites valen en entrenamiento Y por Leyendas, y eso obliga a que
+ * el tablero ofrezca exactamente lo que el servidor acepta. Con dos listas,
+ * el tablero podía ofrecer una duración que la sala rechazaba.
+ */
+ok(JSON.stringify(LIMITES_DE_PARTIDA) === JSON.stringify([60, 100, 150]),
+   "los límites son 60, 100 y 150", LIMITES_DE_PARTIDA);
+
+ok(LIMITES_DE_PARTIDA.includes(LIMITE_ELIMINACION),
+   "y el de siempre es uno de ellos", LIMITE_ELIMINACION);
+
+ok(JSON.stringify(MODOS_PARTIDA.map((m) => m.limite)) === JSON.stringify(LIMITES_DE_PARTIDA),
+   "el desplegable del tablero sale de esa misma lista",
+   MODOS_PARTIDA.map((m) => m.limite));
+
+for (const raro of [0, -60, 77, 151, "muchos", null, undefined, NaN]) {
+  ok(!esLimiteDePartida(raro), `${JSON.stringify(raro)} no es una duración válida`);
+}
+for (const bueno of LIMITES_DE_PARTIDA) {
+  ok(esLimiteDePartida(bueno) && esLimiteDePartida(String(bueno)),
+     `${bueno} sí, aunque venga como texto desde un formulario`);
 }
 
 // =====================================================================

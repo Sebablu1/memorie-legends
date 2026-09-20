@@ -13,7 +13,7 @@
  *   - no golpear no congela la partida para siempre: el plazo sigue ahí.
  */
 
-import { crearMotorEnRed, MS_MIRAR, MS_TURNO, MS_ENTRE_RONDAS } from "../functions/partida-red.js";
+import { crearMotorEnRed, MS_MIRADA_TOTAL, MS_TURNO, MS_ENTRE_RONDAS } from "../functions/partida-red.js";
 import { MS_VENTANA, MS_GRACIA } from "../public/js/reglas/red.js";
 import { MS_REVELACION } from "../public/js/reglas/vista.js";
 
@@ -124,14 +124,14 @@ console.log("\n=== 1. La mirada se cierra y la ventana se abre solas ===");
   const { db, red } = await nueva();
   ok(fase(db) === "mirar", "arranca en la mirada", fase(db));
   ok(plazo(db).que === "cerrarMirada", "con un plazo para cerrarla", plazo(db));
-  ok(plazo(db).hasta === 1000000 + MS_MIRAR, "que vence en MS_MIRAR", plazo(db).hasta);
+  ok(plazo(db).hasta === 1000000 + MS_MIRADA_TOTAL, "que vence en MS_MIRADA_TOTAL", plazo(db).hasta);
 
   // D2: la ventana de descarte YA existe durante la mirada. Sin esto, la carta
   // que acabás de memorizar no se puede descartar aunque sea la muestra.
   const vInicial = db.leer(`partidas/${CODIGO}`).ventana;
   ok(Boolean(vInicial) && !vInicial.cerrada, "la ventana ya está abierta durante la mirada");
   ok(vInicial.abiertaEn === 1000000, "abierta en el reparto", vInicial.abiertaEn);
-  ok(vInicial.duracionMs === MS_MIRAR + MS_VENTANA,
+  ok(vInicial.duracionMs === MS_MIRADA_TOTAL + MS_VENTANA,
      "y dura los 2 s de mirada más los 5 de descarte", vInicial.duracionMs);
 
   // Golpear temprano no adelanta nada.
@@ -143,7 +143,7 @@ console.log("\n=== 1. La mirada se cierra y la ventana se abre solas ===");
   for (let i = 0; i < 100; i++) await red.avanzarPartida({ codigo: CODIGO });
   ok(fase(db) === "mirar", "cien golpes tempranos siguen sin mover nada", fase(db));
 
-  reloj += MS_MIRAR;
+  reloj += MS_MIRADA_TOTAL;
   const cierre = await red.avanzarPartida({ codigo: CODIGO });
   ok(cierre.hizo === "cerrarMirada", "cumplido el plazo, se cierra la mirada", cierre);
   ok(fase(db) === "descarte", "la partida pasa a descarte", fase(db));
@@ -162,7 +162,7 @@ console.log("\n=== 1. La mirada se cierra y la ventana se abre solas ===");
 console.log("\n=== 2. La ventana se cierra sola y resuelve A/B/C ===");
 {
   const { db, red } = await nueva();
-  reloj += MS_MIRAR;
+  reloj += MS_MIRADA_TOTAL;
   await red.avanzarPartida({ codigo: CODIGO });
   await red.avanzarPartida({ codigo: CODIGO });
   const { id: ventanaId, abiertaEn } = db.leer(`partidas/${CODIGO}`).ventana;
@@ -208,7 +208,7 @@ console.log("\n=== 2. La ventana se cierra sola y resuelve A/B/C ===");
 console.log("\n=== 3. Los cuatro golpean a la vez ===");
 {
   const { db, red } = await nueva();
-  reloj += MS_MIRAR;
+  reloj += MS_MIRADA_TOTAL;
   await red.avanzarPartida({ codigo: CODIGO });
   await red.avanzarPartida({ codigo: CODIGO });
   const v = db.leer(`partidas/${CODIGO}`).ventana;
@@ -232,7 +232,7 @@ console.log("\n=== 3. Los cuatro golpean a la vez ===");
 console.log("\n=== 3b. Cuatro golpes simultáneos sobre la mirada ===");
 {
   const { db, red } = await nueva();
-  reloj += MS_MIRAR;
+  reloj += MS_MIRADA_TOTAL;
   const golpes = await Promise.all(CUATRO.map(() => capturar(() => red.avanzarPartida({ codigo: CODIGO }))));
   const cerraron = golpes.filter((g) => g.valor?.hizo === "cerrarMirada");
   ok(cerraron.length === 1, "una sola cierra la mirada", cerraron.length);
@@ -244,7 +244,7 @@ console.log("\n=== 3c. Nunca se abren dos ventanas ===");
 {
   const { db, red } = await nueva();
   const antes = db.leer(`partidas/${CODIGO}`).ventana;
-  reloj += MS_MIRAR;
+  reloj += MS_MIRADA_TOTAL;
   await red.avanzarPartida({ codigo: CODIGO });
 
   const golpes = await Promise.all([...CUATRO, ...CUATRO].map(() =>
@@ -273,7 +273,7 @@ console.log("\n=== 4. Reconexión en plena ventana ===");
 {
   const { db, red } = await nueva();
   const E = espectador(db, "ana");
-  reloj += MS_MIRAR;
+  reloj += MS_MIRADA_TOTAL;
   await red.avanzarPartida({ codigo: CODIGO });
   await red.avanzarPartida({ codigo: CODIGO });
   const v = db.leer(`partidas/${CODIGO}`).ventana;
@@ -316,7 +316,7 @@ console.log("\n=== 4. Reconexión en plena ventana ===");
 console.log("\n=== 5. El reloj de turno ===");
 {
   const { db, red } = await nueva();
-  reloj += MS_MIRAR;
+  reloj += MS_MIRADA_TOTAL;
   await red.avanzarPartida({ codigo: CODIGO });
   await red.avanzarPartida({ codigo: CODIGO });
   const v = db.leer(`partidas/${CODIGO}`).ventana;
@@ -617,7 +617,7 @@ console.log("\n=== 8. Final de partida ===");
 console.log("\n=== 9. El estado sigue sano después de todo esto ===");
 {
   const { db, red } = await nueva();
-  reloj += MS_MIRAR;
+  reloj += MS_MIRADA_TOTAL;
   await red.avanzarPartida({ codigo: CODIGO });
   await red.avanzarPartida({ codigo: CODIGO });
   const v = db.leer(`partidas/${CODIGO}`).ventana;
@@ -666,7 +666,7 @@ console.log("\n=== 11. Lo que se expone se ve, y después se tapa ===");
   const { db, red } = await nueva();
   const mira = espectador(db, "beto");          // beto NO es el que se equivoca
 
-  reloj += MS_MIRAR;
+  reloj += MS_MIRADA_TOTAL;
   await red.avanzarPartida({ codigo: CODIGO }); // cierra la mirada
   await red.avanzarPartida({ codigo: CODIGO }); // abre la ventana
 

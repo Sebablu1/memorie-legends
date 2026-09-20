@@ -16,7 +16,7 @@
  *     servidor, no un cálculo propio.
  */
 
-import { crearMotorEnRed, MS_SIN_SENALES, MS_MIRAR } from "../functions/partida-red.js";
+import { crearMotorEnRed, MS_SIN_SENALES, MS_MIRADA_TOTAL } from "../functions/partida-red.js";
 import { MS_VENTANA, MS_GRACIA } from "../public/js/reglas/red.js";
 import { MS_REVELACION } from "../public/js/reglas/vista.js";
 
@@ -340,7 +340,7 @@ console.log("\n=== 8. Reproducción: se va el jugador activo, sigue el otro ==="
   await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: DOS, nombres: DOS });
 
   // Se juega hasta una fase sin reloj, por el camino normal.
-  reloj += MS_MIRAR + 1;
+  reloj += MS_MIRADA_TOTAL + 1;
   await red.avanzarPartida({ codigo: CODIGO });   // cierra la mirada
   await red.avanzarPartida({ codigo: CODIGO });   // abre la ventana
   const v = partida(db).ventana;

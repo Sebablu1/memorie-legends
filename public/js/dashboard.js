@@ -26,7 +26,9 @@ import { crearSala, unirseASala, ErrorDeServidor } from "./servidor.js";
 import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/salas.js";
 // Sólo nombres y etiquetas: el cerebro de la IA (`reglas/ia.js`, diez mil
 // caracteres) no hace falta acá y no se trae.
-import { armarRivales, NIVELES, limiteDelModo, MODOS_PARTIDA } from "./rivales.js";
+import {
+  armarRivales, NIVELES, limiteDelModo, MODOS_PARTIDA, opcionesDeDuracion,
+} from "./rivales.js";
 import { pintarAvatarCabecera, pintarInsignia } from "./equipado.js";
 import { montarLogros } from "./logros.js";
 import { montarInventario } from "./inventario.js";
@@ -255,6 +257,12 @@ $("entradaSala").innerHTML = ENTRADAS.map(
   (e) => `<option value="${e}"${e === 10 ? " selected" : ""}>${e} Leyendas</option>`,
 ).join("");
 
+// Y la duración, de la misma lista que usa el entrenamiento y que valida el
+// servidor. Las partidas cortas también existen por Leyendas.
+$("duracionSala").innerHTML = opcionesDeDuracion()
+  .map((o) => `<option value="${o.valor}"${o.porDefecto ? " selected" : ""}>${o.etiqueta}</option>`)
+  .join("");
+
 function actualizarAyudaEntrada() {
   const entrada = Number($("entradaSala").value);
   const pozo = entrada * MAX_JUGADORES;
@@ -283,7 +291,9 @@ $("btnCrearSala").addEventListener("click", async () => {
   limpiarAviso();
 
   try {
-    const { codigo } = await crearSala(entrada, `Sala de ${nombreJugador}`);
+    const { codigo } = await crearSala(
+      entrada, `Sala de ${nombreJugador}`, Number($("duracionSala").value),
+    );
     irALaSala(codigo);
   } catch (error) {
     avisar(error instanceof ErrorDeServidor ? error.message : "No pudimos crear la sala.", "error");

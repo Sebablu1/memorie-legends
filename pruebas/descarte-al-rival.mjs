@@ -344,7 +344,7 @@ console.log("\n=== 11. El 7 nunca da conocimiento de una carta ajena ===");
  * con transacciones que se reintentan, y una partida real de cuatro con la
  * ventana de la ronda abierta.
  */
-const { crearMotorEnRed, MS_MIRAR } = await import("../functions/partida-red.js");
+const { crearMotorEnRed, MS_MIRADA_TOTAL } = await import("../functions/partida-red.js");
 const { MS_REVELACION } = await import("../public/js/reglas/vista.js");
 const { MS_GRACIA_ENTREGA, yaVencio } = await import("../public/js/reglas/red.js");
 
@@ -401,7 +401,7 @@ async function montar() {
       marcaDeTiempo: () => "T", error, semillaDe: () => semilla,
     });
     await red.repartir({ yaSentados: true, codigo: COD, jugadores: UIDS, nombres: UIDS });
-    reloj += MS_MIRAR + 1;
+    reloj += MS_MIRADA_TOTAL + 1;
     await red.avanzarPartida({ codigo: COD });
     const p0 = db.docs.get(`partidas/${COD}`).datos;
     if (p0.estado.fase !== "descarte") continue;

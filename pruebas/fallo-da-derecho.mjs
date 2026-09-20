@@ -222,8 +222,14 @@ console.log("\n=== 4. Un fallo nuevo en la misma posición da un derecho nuevo =
   ok(M.puedeAtacarEn(uno, 1, 0, 1), "derecho sobre la primera");
 
   // Se le cambia la carta de esa posición y vuelve a fallar ahí.
+  //
+  // La ventana también se renueva: sobre la mano propia hay UN intento por
+  // ventana, así que el segundo fallo del mismo jugador no puede ocurrir en la
+  // misma. Lo que se prueba acá es el conocimiento, no el límite — ese tiene
+  // su propia prueba en `descarte.mjs`.
   const conOtra = {
     ...uno,
+    ventanaDescarte: { huboPrimero: false, intentos: [] },
     jugadores: uno.jugadores.map((j, i) =>
       i === 0 ? { ...j, mano: j.mano.map((c, p) => (p === 1 ? carta("a9", 2) : c)) } : j,
     ),

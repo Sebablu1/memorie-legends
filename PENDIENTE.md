@@ -520,32 +520,32 @@ navegador con bloqueo de terceros que o funciona, o explica por qué no.
 
 Desde el 17 de septiembre la ronda 1 en red espera a que lleguen todos y corre
 la cuenta regresiva antes de abrir la mirada. Tres cosas quedaron afuera a
-propósito, porque no eran ese arreglo:
+propósito, porque no eran ese arreglo. La primera ya está hecha; quedan dos.
 
-- **En red, la mirada dura dos segundos EN TOTAL; en entrenamiento, cinco para
-  elegir y dos para ver.** El servidor cierra la fase `mirar` a
-  `abiertaEn + MS_MIRAR` (`plazoDe`, caso `mirar`, acción `cerrarMirada`), así
-  que en red hay que elegir Y llegar al servidor dentro de esos dos segundos.
-  Con la latencia medida —unos 0,8 s por jugada— un toque al segundo y medio
-  puede llegar con la mirada ya cerrada. Es una diferencia entre modos, contra
-  la regla de «entrenamiento = red», y es lo primero a mirar si alguien
-  vuelve a decir «no puedo ver la primera carta». Cambiarlo toca la duración
-  de la ventana de la ronda (`MS_VENTANA_TOTAL = MS_MIRAR + MS_VENTANA`), que
-  hoy incluye la mirada: es una decisión de reglas, no un retoque.
+- ~~**En red, la mirada dura dos segundos EN TOTAL; en entrenamiento, cinco
+  para elegir y dos para ver.**~~ **RESUELTO el 20 de septiembre de 2026.** La
+  fase `mirar` dura `MS_MIRADA_TOTAL` —`MS_ELEGIR_MIRADA` (5 s) más `MS_MIRAR`
+  (2 s)— en los dos modos, y la ventana de la ronda se estiró con ella:
+  `MS_VENTANA_TOTAL = MS_MIRADA_TOTAL + MS_VENTANA`, ahora en `reglas/red.js`.
+  Los cinco segundos del descarte quedaron enteros. Lo comprueba
+  `pruebas/mirar-descarte.mjs`, sección 2b: una mirada al cuarto segundo se
+  acepta, y a los siete se cierra.
 
-  **Ya pasó en producción.** Partida del 17 de septiembre, 07:19:47 UTC: una
-  mirada llegó al final de los dos segundos a una instancia recién arrancada
-  —1679 ms dentro de la función— y `accionDePartida` la rechazó con 400: para
-  cuando la transacción leyó la partida, la mirada ya estaba cerrada. Se suma
-  al punto 10 (arranques en frío). Queda para después de que el usuario pruebe
-  el arreglo de la carta que no se veía, que era otra cosa: ahí el servidor sí
-  aceptaba la mirada (200) y la mesa no la dibujaba.
+  Era una diferencia entre modos contra la regla de «entrenamiento = red», y
+  **ya había pasado en producción**: partida del 17 de septiembre, 07:19:47
+  UTC, una mirada llegó al final de los dos segundos a una instancia recién
+  arrancada —1679 ms dentro de la función— y `accionDePartida` la rechazó con
+  400. Eso sigue relacionado con el punto 10 (arranques en frío): ahora hay
+  cinco segundos más de margen, pero el arranque en frío no desapareció.
 
 - **`cerrarMirada` puede cortar la mirada antes de tiempo.** Ya no antes de que
   abra —eso se tapó—, pero una vez abierta cualquiera de los cuatro puede
-  llamarla y terminarla para todos antes de los dos segundos. El plazo del
+  llamarla y terminarla para todos. **Y ahora el hueco es más grande**: la
+  mirada dura siete segundos en vez de dos, así que hay siete segundos en los
+  que un cliente modificado se la puede cortar a los otros tres. El plazo del
   servidor la cierra solo, así que el cliente no necesita llamarla: se podría
-  exigir que haya vencido `abiertaEn + MS_MIRAR`, o sacarla.
+  exigir que haya vencido `abiertaEn + MS_MIRADA_TOTAL`, o sacarla. Ninguna
+  pantalla la llama hoy — `public/js/partida-red.js` la exporta y nadie la usa.
 
 - **En entrenamiento, tocar una carta durante la cuenta regresiva dice «Una
   sola carta por ronda».** La fase ya es `mirar` pero `faseMirada` todavía no

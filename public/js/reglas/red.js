@@ -29,7 +29,7 @@
  * desfase y armar el intento) y el servidor (que es el que decide).
  */
 
-import { MS_DESCARTE, MS_REAPERTURA } from "./motor.js";
+import { MS_DESCARTE, MS_MIRADA_TOTAL, MS_REAPERTURA } from "./motor.js";
 
 // ------------------------------------------------------------ constantes
 
@@ -44,6 +44,26 @@ import { MS_DESCARTE, MS_REAPERTURA } from "./motor.js";
  */
 export const MS_VENTANA = MS_DESCARTE;
 export const MS_VENTANA_REAPERTURA = MS_REAPERTURA;
+
+/**
+ * La ventana de la ronda arranca cuando arranca la MIRADA, no después.
+ *
+ * La muestra puede ser justo la carta que acabás de memorizar, y ese descarte
+ * era imposible: la fase todavía era `mirar` y no existía ninguna ventana a la
+ * que pertenecer.
+ *
+ *   0 s ───────────────── 5 s ─── 7 s ───────────────── 12 s ──── 14 s
+ *        elegir qué mirar        verla      DESCARTE       gracia
+ *        └──────────────── una sola ventana ──────────────────┘
+ *
+ * Son doce segundos: los siete de la mirada —cinco para elegir, dos para
+ * ver— más los cinco de descarte de siempre. Lo que vive el jugador no cambia:
+ * sólo cambia dónde empieza a contar la ventana.
+ *
+ * Vive acá, con las otras duraciones, y no en el servidor: es una regla del
+ * juego y el navegador también tiene que poder leerla.
+ */
+export const MS_VENTANA_TOTAL = MS_MIRADA_TOTAL + MS_VENTANA;
 
 /**
  * Margen extra en el que todavía se aceptan intentos ya enviados.

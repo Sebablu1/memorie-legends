@@ -86,6 +86,10 @@ export function vistaDe(estado, indiceQuienMira) {
     // --- lo público de la mesa ---
     fase: estado.fase,
     ronda: estado.ronda,
+    // Con cuántos puntos se queda afuera esta mesa. Lo eligió quien abrió la
+    // sala, es público —se ve en la sala antes de pagar la entrada— y la mesa
+    // lo necesita para el cartel de la cabecera y para el de fin de partida.
+    limitePuntos: estado.limitePuntos ?? null,
     indiceMano: estado.indiceMano,
     indiceTurno: estado.indiceTurno,
     turnosRonda: estado.turnosRonda,

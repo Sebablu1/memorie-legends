@@ -14,6 +14,7 @@ import { exigirSesion, mostrarSaldo } from "./sesion.js";
 import { crearSala, unirseASala, ErrorDeServidor } from "./servidor.js";
 import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/salas.js";
 import { DIFICULTADES } from "./reglas/ia.js";
+import { opcionesDeDuracion } from "./rivales.js";
 import { escapar } from "./modulos/texto.js";
 
 const $ = (id) => document.getElementById(id);
@@ -86,6 +87,12 @@ $("entradaSala").innerHTML = ENTRADAS.map(
   (e) => `<option value="${e}">${e} Leyendas</option>`,
 ).join("");
 
+// Y la duración: los mismos tres límites que el entrenamiento, que es lo que
+// dice el reglamento y lo que el servidor valida al crear la sala.
+$("duracionSala").innerHTML = opcionesDeDuracion()
+  .map((o) => `<option value="${o.valor}"${o.porDefecto ? " selected" : ""}>${o.etiqueta}</option>`)
+  .join("");
+
 function actualizarAyudaEntrada() {
   const entrada = Number($("entradaSala").value);
   const pozo = entrada * MAX_JUGADORES;
@@ -113,7 +120,9 @@ $("btnCrearSala").addEventListener("click", async () => {
   limpiarAviso();
 
   try {
-    const { codigo } = await crearSala(entrada, `Sala de ${nombreJugador}`);
+    const { codigo } = await crearSala(
+      entrada, `Sala de ${nombreJugador}`, Number($("duracionSala").value),
+    );
     localStorage.setItem("roomCode", codigo);
     window.location.href = `room.html?code=${codigo}`;
   } catch (error) {

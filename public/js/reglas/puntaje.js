@@ -1,6 +1,24 @@
 import { puntosCarta } from "./baraja.js";
 
 export const LIMITE_ELIMINACION = 150;
+
+/**
+ * Con cuántos puntos se puede jugar una partida.
+ *
+ * Tres duraciones, y el número es lo ÚNICO que cambia entre ellas: el castigo
+ * por cortar mal, el bono por llegar sin cartas y la regla de que con el
+ * límite exacto se sigue jugando son los mismos. Lo que se elige es cuánto
+ * dura la mesa, no cómo se juega.
+ *
+ * Vive en las reglas porque ahora la lista la necesitan los dos modos: el
+ * tablero la ofrece en entrenamiento y el servidor la valida al crear una sala
+ * por Leyendas. Tenerla escrita dos veces es como se separan dos números que
+ * tenían que ser el mismo.
+ */
+export const LIMITES_DE_PARTIDA = [60, 100, LIMITE_ELIMINACION];
+
+/** ¿Es uno de los tres? Lo pregunta el servidor antes de guardar una sala. */
+export const esLimiteDePartida = (n) => LIMITES_DE_PARTIDA.includes(Number(n));
 export const BONO_MANO_VACIA = -10;
 export const CASTIGO_CORTE_FALLIDO = 10;
 
