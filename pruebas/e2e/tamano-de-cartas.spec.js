@@ -9,9 +9,20 @@
  * muestra— por encima de todo: es donde se mira para decidir. Y que nada
  * quede cortado, tapado ni con scroll.
  *
- * Antes el centro heredaba el tamaño de los rivales y quedaba en dos tercios
- * de la mano propia: las cartas más chicas de la mesa eran justamente las que
- * hay que leer. Ahora apuntan a la mano propia más un 15%.
+ * La proporción, en los ocho escalones de pantalla:
+ *
+ *     centro = mano propia + 5%        centro = rivales + 40%
+ *
+ * Primero el centro heredaba el tamaño de los rivales y quedaba en dos
+ * tercios de la mano propia: las cartas más chicas de la mesa eran las que
+ * hay que leer. Después pasó a la mano más un 15%, y ese alto salió de los
+ * rivales, que quedaron en 78 px de ancho en una pantalla de 1920 — tres
+ * cartas de cada cuatro en la mesa son de un rival.
+ *
+ * Con el +5%, el foco sigue estando donde tiene que estar y los rivales
+ * recuperan entre un 12% y un 23%. Donde el rival no crece es porque lo frena
+ * el ANCHO de su renglón, no el alto: en el teléfono su mano comparte fila
+ * con la cara y el nombre.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * POR QUÉ ESTA PRUEBA, Y NO MIRAR CAPTURAS
@@ -34,20 +45,28 @@ import { abrirMesa } from "./mesa.js";
 /**
  * [nombre, ancho, alto, densidad, mínimos]
  *
- * Los tamaños son de la carta propia y de una del centro, en píxeles de CSS.
+ * Los tamaños son de una carta propia, una del centro y una de rival, en
+ * píxeles de CSS. Van un 4% por debajo de lo medido, para que un cambio de
+ * fuente o de borde no ponga esto en rojo sin que nada esté mal de verdad.
+ *
+ * `rivalesPorAncho` marca las pantallas donde al rival lo frena el ancho de
+ * su renglón y no el alto: ahí el centro queda mucho más de un 40% por encima
+ * y no tiene sentido exigir la proporción.
  */
 const PANTALLAS = [
-  ["PC 1920×945", 1920, 945, 1, { propia: 117, centro: 135 }],
-  ["PC 1536×730", 1536, 730, 1, { propia: 74, centro: 85 }],
-  ["Notebook 1366×657", 1366, 657, 1, { propia: 62, centro: 73 }],
-  ["Notebook 1280×620", 1280, 620, 1, { propia: 60, centro: 68 }],
-  ["iPhone 390×664", 390, 664, 3, { propia: 52, centro: 60 }],
-  ["iPhone 430×740", 430, 740, 3, { propia: 59, centro: 68 }],
-  ["Android 412×780", 412, 780, 2.625, { propia: 62, centro: 71 }],
-  ["iPhone SE 375×553", 375, 553, 2, { propia: 34, centro: 39 }],
-  ["Tablet 768×950", 768, 950, 2, { propia: 98, centro: 112 }],
-  ["Tablet 1024×700", 1024, 700, 2, { propia: 71, centro: 81 }],
-  ["Teléfono acostado 740×360", 740, 360, 3, { propia: 18, centro: 20 }],
+  ["PC 1920×945", 1920, 945, 1, { propia: 119, centro: 125, rival: 89 }],
+  ["PC 1536×730", 1536, 730, 1, { propia: 76, centro: 79, rival: 53 }],
+  ["Notebook 1366×657", 1366, 657, 1, { propia: 65, centro: 68, rival: 48 }],
+  ["Notebook 1280×620", 1280, 620, 1, { propia: 61, centro: 64, rival: 46 }],
+  ["iPhone 390×664", 390, 664, 3, { propia: 53, centro: 55, rival: 36 }],
+  ["iPhone 430×740", 430, 740, 3, { propia: 57, centro: 60, rival: 42 }],
+  ["iPhone 390×844", 390, 844, 3, { propia: 71, centro: 74, rival: 38, rivalesPorAncho: true }],
+  ["Android 412×780", 412, 780, 2.625, { propia: 69, centro: 72, rival: 41, rivalesPorAncho: true }],
+  ["Pixel 412×915", 412, 915, 2.625, { propia: 74, centro: 78, rival: 41, rivalesPorAncho: true }],
+  ["iPhone SE 375×553", 375, 553, 2, { propia: 37, centro: 39, rival: 27 }],
+  ["Tablet 768×950", 768, 950, 2, { propia: 133, centro: 147, rival: 51, rivalesPorAncho: true }],
+  ["Tablet 1024×700", 1024, 700, 2, { propia: 72, centro: 75, rival: 51 }],
+  ["Teléfono acostado 740×360", 740, 360, 3, { propia: 24, centro: 25, rival: 17 }],
 ];
 
 /** Lo que mide y lo que choca, leído de la página ya dibujada. */
@@ -110,17 +129,28 @@ for (const [nombre, ancho, alto, densidad, minimos] of PANTALLAS) {
     expect(m.scrollH, `la mesa no entra a lo ancho: ${contexto}`).toBe(false);
     expect(m.scrollV, `la mesa no entra a lo alto: ${contexto}`).toBe(false);
 
-    // El centro, por encima de la mano propia y bastante más que los rivales.
-    expect(m.centro.ancho / m.propia.ancho, `centro contra mano propia: ${contexto}`)
-      .toBeGreaterThanOrEqual(1.08);
-    expect(m.centro.ancho / m.rival.ancho, `centro contra rivales: ${contexto}`)
-      .toBeGreaterThanOrEqual(1.4);
+    // El centro, por encima de la mano propia: un 5%, ni más ni menos. Si se
+    // fuera para arriba, el alto se lo estaría sacando a los otros dos.
+    const contraMano = m.centro.ancho / m.propia.ancho;
+    expect(contraMano, `centro contra mano propia: ${contexto}`).toBeGreaterThanOrEqual(1.03);
+    expect(contraMano, `el centro se comió el alto de la mano: ${contexto}`)
+      .toBeLessThanOrEqual(1.12);
+
+    // Y por encima de los rivales, pero sin aplastarlos: un 40%.
+    const contraRivales = m.centro.ancho / m.rival.ancho;
+    expect(contraRivales, `centro contra rivales: ${contexto}`).toBeGreaterThanOrEqual(1.25);
+    if (!minimos.rivalesPorAncho) {
+      expect(contraRivales, `los rivales volvieron a quedar chicos: ${contexto}`)
+        .toBeLessThanOrEqual(1.6);
+    }
 
     // Y lo más grandes que entren: si algo las achica, se ve acá.
     expect(m.propia.ancho, `la mano propia encogió: ${contexto}`)
       .toBeGreaterThanOrEqual(minimos.propia);
     expect(m.centro.ancho, `el centro encogió: ${contexto}`)
       .toBeGreaterThanOrEqual(minimos.centro);
+    expect(m.rival.ancho, `las cartas de los rivales encogieron: ${contexto}`)
+      .toBeGreaterThanOrEqual(minimos.rival);
 
     await ctx.close();
   });
