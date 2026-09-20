@@ -93,7 +93,11 @@ export function crearSalasPrivadas({
   error,
   ahora = () => Date.now(),
   marcaDeTiempo = () => new Date().toISOString(),
-  pimienta = process.env.PIMIENTA_CODIGOS ?? "",
+  /**
+   * La pimienta. Si no se inyecta —las pruebas lo hacen—, sale del entorno EN
+   * CADA LLAMADA, nunca acá: ver `exigirPimienta`.
+   */
+  pimienta = null,
   bytes = (n) => crypto.randomBytes(n),
   /** Abre la sala y cobra la entrada. El mismo que usa `crearSala`. */
   abrirSalaEn,
@@ -106,6 +110,50 @@ export function crearSalasPrivadas({
 }) {
   const refSala = (id) => db.collection(salas).doc(id);
   const refCodigo = (hash) => db.collection(codigos).doc(hash);
+
+  /**
+   * La pimienta, o nada.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * POR QUÉ ROMPE EN VEZ DE SEGUIR
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Antes esto era `process.env.PIMIENTA_CODIGOS ?? ""`. Con el secreto sin
+   * declarar en la función, el entorno no lo tiene y el `??` lo tapaba: el
+   * servidor hashheaba con pimienta vacía, contestaba 200 y nadie se
+   * enteraba. Los códigos quedaban guardados como `sha256(":" + codigo)`, que
+   * es exactamente lo que la pimienta existe para impedir — y el día que se
+   * la pusiera, todos esos códigos dejarían de abrir su sala sin que nada lo
+   * explicara.
+   *
+   * Un servicio de salas privadas caído se arregla en un despliegue. Un
+   * servicio que parece andar y guarda hashes sin pimienta, no se arregla:
+   * hay que rehacer las salas.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * POR QUÉ ACÁ Y NO AL CARGAR EL MÓDULO
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Porque `crearSalasPrivadas` se llama al cargar `index.js`, y ahí viven
+   * las otras cuarenta funciones. Reventar al cargar dejaría sin desplegar
+   * —y sin arrancar— TODO lo demás por un secreto que sólo usan dos
+   * callables. Se comprueba al usarlo: cae quien lo necesita y nadie más.
+   */
+  function exigirPimienta() {
+    const valor = pimienta ?? process.env.PIMIENTA_CODIGOS ?? "";
+    if (!valor) {
+      // Al registro del servidor, con nombre y apellido; al jugador, no.
+      console.error(
+        "PIMIENTA_CODIGOS no está en el entorno: las salas privadas quedan " +
+        "fuera de servicio. Declarar el secreto con runWith({ secrets: [...] }).",
+      );
+      throw error(
+        "failed-precondition",
+        "Las salas privadas no están disponibles en este momento.",
+      );
+    }
+    return valor;
+  }
 
   /** Los minutos pedidos, acotados a lo que se permite. */
   function vigenciaEnMs(minutos) {
@@ -129,6 +177,9 @@ export function crearSalasPrivadas({
     uid, entrada, nombre, limitePuntos, vigenciaMinutos,
   }) {
     if (!uid) throw error("unauthenticated", "Iniciá sesión para continuar.");
+    // Antes de cobrar nada: sin pimienta no se abre una sala que después
+    // nadie va a poder abrir.
+    const sazon = exigirPimienta();
 
     const { nombre: nombreJugador, luce } = await identidadEnSala(uid);
     const vigencia = vigenciaEnMs(vigenciaMinutos);
@@ -161,7 +212,7 @@ export function crearSalasPrivadas({
               codigoVence: vence,
             },
           }).then(() => {
-            tx.set(refCodigo(hashDeCodigo(codigo, pimienta)), {
+            tx.set(refCodigo(hashDeCodigo(codigo, sazon)), {
               sala: id,
               vence,
               creada: marcaDeTiempo(),
@@ -189,11 +240,12 @@ export function crearSalasPrivadas({
   async function unirseConCodigo({ uid, codigo }) {
     if (!uid) throw error("unauthenticated", "Iniciá sesión para continuar.");
 
+    const sazon = exigirPimienta();
     const limpio = normalizarCodigo(codigo);
     const noSirve = () => error("not-found", "Ese código no sirve o ya venció.");
     if (limpio.length !== LARGO_CODIGO) throw noSirve();
 
-    const hash = hashDeCodigo(limpio, pimienta);
+    const hash = hashDeCodigo(limpio, sazon);
     const { nombre: nombreJugador, luce } = await identidadEnSala(uid);
 
     return db.runTransaction(async (tx) => {
@@ -242,5 +294,11 @@ export function crearSalasPrivadas({
     return { borrados: vencidos.docs.length };
   }
 
-  return { crearSalaPrivada, unirseConCodigo, limpiarCodigosVencidos, vigenciaEnMs };
+  return {
+    crearSalaPrivada,
+    unirseConCodigo,
+    limpiarCodigosVencidos,
+    vigenciaEnMs,
+    exigirPimienta,
+  };
 }

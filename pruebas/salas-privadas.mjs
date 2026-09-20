@@ -38,6 +38,7 @@ import {
 } from "../functions/salas-privadas.js";
 import { crearLimiteDeRitmo, LIMITES_POR_IP } from "../functions/limite-de-ritmo.js";
 import { puedeUnirse, RECHAZO } from "../public/js/reglas/salas.js";
+import { readFileSync } from "node:fs";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -334,6 +335,114 @@ console.log("\n=== 10. Cinco intentos por minuto y por IP ===");
   reloj += 61_000;
   const despues = await capturar(() => limite.exigirRitmoPorIP("1.2.3.4", "unirseConCodigo"));
   ok(!despues.error, "pasado el minuto, se puede de nuevo");
+}
+
+// =====================================================================
+console.log("\n=== 11. Sin pimienta no se abre ni se entra a ninguna sala ===");
+// =====================================================================
+{
+  /**
+   * El agujero que esto tapa.
+   *
+   * La pimienta se leía con `process.env.PIMIENTA_CODIGOS ?? ""`. Las dos
+   * callables se desplegaron SIN declarar el secreto —en Functions v1 hay que
+   * pedirlo con `runWith({ secrets: [...] })`— así que el entorno no lo tenía,
+   * el `??` lo tapaba, y el servidor hasheaba con cadena vacía contestando
+   * 200. Estuvo así en producción.
+   *
+   * Un servicio caído se arregla en un despliegue. Un servicio que parece
+   * andar y guarda hashes sin pimienta hay que rehacerlo entero.
+   *
+   * Acá se monta SIN inyectar pimienta y con el entorno vacío, que es
+   * exactamente lo que había desplegado.
+   */
+  const antes = process.env.PIMIENTA_CODIGOS;
+  delete process.env.PIMIENTA_CODIGOS;
+
+  try {
+    const { db, privadas } = montar({ pimienta: null });
+
+    const alCrear = await capturar(() =>
+      privadas.crearSalaPrivada({ uid: "ana", entrada: 10 }));
+    ok(Boolean(alCrear.error), "sin pimienta, crear una sala privada FALLA", alCrear.valor);
+    ok(alCrear.error?.codigo === "failed-precondition",
+       "y falla diciendo que el servicio no está disponible", alCrear.error?.codigo);
+
+    const alEntrar = await capturar(() =>
+      privadas.unirseConCodigo({ uid: "beto", codigo: "ABCDEFGH" }));
+    ok(Boolean(alEntrar.error), "y entrar con un código, también");
+    ok(alEntrar.error?.codigo === "failed-precondition",
+       "por la misma razón, y no por «código inválido»: la diferencia importa",
+       alEntrar.error?.codigo);
+
+    ok(db.volcado() === "[]", "y no quedó nada escrito", db.volcado().slice(0, 120));
+
+    // Con el entorno puesto, lo mismo funciona y usa ESA pimienta.
+    process.env.PIMIENTA_CODIGOS = "la-del-entorno";
+    const conEntorno = montar({ pimienta: null });
+    const r = await conEntorno.privadas.crearSalaPrivada({ uid: "ana", entrada: 10 });
+    ok(conEntorno.db.docs.has(`codigos/${hashDeCodigo(r.codigo, "la-del-entorno")}`),
+       "con la pimienta en el entorno, el hash sale con ella");
+    ok(!conEntorno.db.docs.has(`codigos/${hashDeCodigo(r.codigo, "")}`),
+       "y NO con la cadena vacía, que es lo que pasaba antes");
+  } finally {
+    if (antes === undefined) delete process.env.PIMIENTA_CODIGOS;
+    else process.env.PIMIENTA_CODIGOS = antes;
+  }
+}
+
+// =====================================================================
+console.log("\n=== 12. Las dos callables DECLARAN el secreto ===");
+// =====================================================================
+{
+  /**
+   * Esto es una prueba de texto, y tiene que serlo.
+   *
+   * El bug no estuvo en la lógica: estuvo en cómo se declaró la función. En
+   * Functions v1, un secreto de Secret Manager llega al entorno sólo si la
+   * función lo pide con `runWith({ secrets: [...] })`. Las dos callables se
+   * desplegaron sin eso, así que `process.env.PIMIENTA_CODIGOS` no existía —y
+   * ninguna prueba de lógica podía verlo, porque la lógica estaba bien—.
+   *
+   * Así que se lee el archivo y se comprueba la declaración.
+   */
+  const indice = readFileSync(
+    new URL("../functions/index.js", import.meta.url), "utf8",
+  );
+
+  ok(/const conPimienta = functions\.runWith\(\{\s*secrets:\s*\[SECRETO_PIMIENTA\]\s*\}\)/
+     .test(indice),
+     "existe una envoltura que declara el secreto");
+  ok(/const SECRETO_PIMIENTA = "PIMIENTA_CODIGOS"/.test(indice),
+     "y el secreto es PIMIENTA_CODIGOS");
+
+  for (const nombre of ["crearSalaPrivada", "unirseConCodigo"]) {
+    const declara = new RegExp(
+      `export const ${nombre} = conPimienta\\.https\\.onCall`,
+    ).test(indice);
+    ok(declara, `${nombre} se declara con el secreto puesto`);
+
+    const suelta = new RegExp(
+      `export const ${nombre} = functions\\.https\\.onCall`,
+    ).test(indice);
+    ok(!suelta, `${nombre} NO se declara sin él`);
+  }
+
+  /**
+   * Y la de al lado: cualquier callable que use `salasPrivadas` tiene que ir
+   * por la misma puerta. Hoy son dos; el día que haya una tercera —una
+   * limpieza de códigos vencidos, una migración— esto la agarra.
+   */
+  const callables = [...indice.matchAll(
+    /export const (\w+) = (\w+)\.(?:runWith\([^)]*\)\.)?https\.onCall\(([\s\S]*?)\n\}\);/g,
+  )];
+  const sinSecreto = callables
+    .filter(([, , puerta, cuerpo]) => /salasPrivadas\./.test(cuerpo) && puerta !== "conPimienta")
+    .map(([, nombre]) => nombre);
+
+  ok(sinSecreto.length === 0,
+     "ninguna función que toque las salas privadas se declara sin el secreto",
+     sinSecreto);
 }
 
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);

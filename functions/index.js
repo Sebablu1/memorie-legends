@@ -697,6 +697,21 @@ async function sumarseALaSala(
  * siempre y se le pasan de afuera. Lo que este módulo agrega es el código y
  * su hash, que es lo único nuevo.
  */
+/**
+ * El secreto con la pimienta de los códigos privados.
+ *
+ * Vive en Secret Manager, no en el repositorio ni en una variable suelta. En
+ * Functions v1 hay que DECLARARLO en cada función que lo use: sin esto, el
+ * proceso arranca sin `process.env.PIMIENTA_CODIGOS` y el hash sale sin
+ * pimienta. Pasó: las dos callables se desplegaron sin declararlo y el
+ * servidor hasheaba con cadena vacía contestando 200.
+ *
+ * Toda función que hashee o compare un código va por `conPimienta`. Hoy son
+ * dos; si mañana hay una tercera —una limpieza, una migración— también.
+ */
+const SECRETO_PIMIENTA = "PIMIENTA_CODIGOS";
+const conPimienta = functions.runWith({ secrets: [SECRETO_PIMIENTA] });
+
 const salasPrivadas = crearSalasPrivadas({
   db,
   salas: SALAS,
@@ -714,7 +729,7 @@ const salasPrivadas = crearSalasPrivadas({
  * Lo que queda guardado es el hash: si quien la abrió pierde el código, no hay
  * forma de recuperarlo. Es la contrapartida de que no se pueda filtrar.
  */
-export const crearSalaPrivada = functions.https.onCall(async (data, context) => {
+export const crearSalaPrivada = conPimienta.https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "crearSalaPrivada");
   limite.exigirRitmo(uid, "crearSalaPrivada");
 
@@ -754,7 +769,7 @@ export const crearSalaPrivada = functions.https.onCall(async (data, context) => 
  * combinaciones; a cinco por minuto, probarlas lleva más de trescientos mil
  * años.
  */
-export const unirseConCodigo = functions.https.onCall(async (data, context) => {
+export const unirseConCodigo = conPimienta.https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "unirseConCodigo");
   await limite.exigirRitmoPorIP(ipDe(context), "unirseConCodigo");
 

@@ -556,7 +556,7 @@ propósito, porque no eran ese arreglo. La primera ya está hecha; quedan dos.
 
 ---
 
-## 14. La pimienta de los códigos privados — anotado al hacerlos
+## 14. ~~La pimienta de los códigos privados~~ — RESUELTO el 20/9/2026
 
 Las salas privadas guardan el HASH del código, nunca el código. El hash lleva
 una pimienta que sale del entorno de las funciones:
@@ -565,23 +565,28 @@ una pimienta que sale del entorno de las funciones:
 PIMIENTA_CODIGOS
 ```
 
-**Hoy no está puesta**, y sin ella el hash es `sha256(":" + codigo)` a secas.
-Eso alcanza contra una filtración de la base *mientras nadie la ataque en
-serio*: son 31⁸ combinaciones —unos 8,5 × 10¹¹— y SHA-256 es rápido, así que
-quien se lleve una copia puede probarlas todas por su cuenta, sin el techo de
-cinco intentos por minuto que sí frena a quien prueba contra el servidor.
+**Está en Secret Manager** y las dos callables lo declaran con
+`runWith({ secrets: ["PIMIENTA_CODIGOS"] })`, que en Functions v1 es lo único
+que hace que el secreto llegue al entorno.
 
-Con la pimienta puesta, además de la base necesita el entorno.
+**Lo que salió mal en el medio, y por qué quedó anotado igual:** el primer
+despliegue subió las dos funciones SIN declarar el secreto. El código leía
+`process.env.PIMIENTA_CODIGOS ?? ""`, así que el `??` tapaba la falta: el
+servidor hasheaba con cadena vacía y contestaba 200. Un servicio caído se
+arregla en un despliegue; uno que parece andar y guarda hashes sin pimienta
+hay que rehacerlo entero.
 
-**Qué hay que hacer:** generar una cadena larga al azar, dejarla en disco
-—nunca en el repositorio— y apuntarla como variable de entorno de las
-funciones antes del próximo despliegue. Cambiarla después invalida todos los
-códigos vivos: los que ya estén dentro de una sala siguen jugando, pero las
-invitaciones que no se hayan usado dejan de servir.
+Ahora, sin pimienta, las dos funciones fallan con `failed-precondition` y no
+escriben nada. Lo comprueban las secciones 11 y 12 de
+`pruebas/salas-privadas.mjs`, la segunda leyendo `functions/index.js`: el bug
+no estuvo en la lógica sino en cómo se declaró la función, y eso sólo se ve
+mirando el texto.
 
-**Cómo se sabe que se resolvió:** `process.env.PIMIENTA_CODIGOS` tiene valor
-en producción y una sala privada creada antes del cambio ya no acepta su
-código viejo.
+**Lo que sigue en pie:** cambiar la pimienta invalida todos los códigos vivos.
+Los que ya estén dentro de una sala siguen jugando; las invitaciones sin usar
+dejan de servir. Y las salas privadas creadas entre el despliegue del 20 de
+septiembre y este arreglo tienen su hash sin pimienta: sus códigos ya no
+abren nada.
 
 ---
 
