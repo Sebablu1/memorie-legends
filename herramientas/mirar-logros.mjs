@@ -45,8 +45,8 @@ function tarjeta(condicion) {
 
   const boton = ganada
     ? puesta
-      ? '<button class="accion sobria" type="button">Sacármela</button>'
-      : '<button class="accion" type="button">Ponérmela</button>'
+      ? '<button class="accion sobria" type="button">Desequipar</button>'
+      : '<button class="accion" type="button">Equipar</button>'
     : "";
 
   const barra =

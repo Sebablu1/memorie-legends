@@ -110,9 +110,13 @@
   width: 100%;
   margin-top: 2px;
   /* El relleno lateral y el tamaño bajan respecto del botón común. En un
-     teléfono la tarjeta mide 132px y «Ponérmela» necesitaba 128 de texto: el
-     botón la recortaba a la mitad de la última sílaba. Con esto entra, y
-     entra también «Sacármela», que es la más larga. */
+     teléfono la tarjeta mide 132px y la palabra más larga necesitaba 128 de
+     texto: el botón la recortaba a la mitad de la última sílaba. Con esto
+     entra «Desequipar», que es la más larga de las dos.
+
+     Antes decían «Ponérmela» y «Sacármela». La tienda y el inventario decían
+     «Equipar» y «Desequipar» para lo mismo, y tres palabras para dos acciones
+     es una de más. */
   padding-left: 6px;
   padding-right: 6px;
   font-size: 0.72rem;

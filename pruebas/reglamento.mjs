@@ -32,7 +32,7 @@
  * el motor espera 5000 ms, es trabajo de acá.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import * as M from "../public/js/reglas/motor.js";
 import { MS_GRACIA, MS_PARA_DECIDIR } from "../public/js/reglas/red.js";
 import { MS_REVELACION } from "../public/js/reglas/vista.js";
@@ -188,6 +188,69 @@ for (const nombre of RESUMENES) {
   ok(!/supera\s*(<b>)?\s*150 puntos/i.test(otra) && !/supera 150 queda/i.test(suTexto),
      `${nombre} no da los 150 puntos por único límite`);
 }
+
+// =====================================================================
+console.log("\n=== 6. Las insignias se EQUIPAN y se DESEQUIPAN ===");
+// =====================================================================
+
+/**
+ * Una acción, una palabra.
+ *
+ * La tienda y el inventario decían «Equipar» y «Desequipar»; la vitrina de
+ * logros, «Ponérmela» y «Sacármela» para exactamente lo mismo. Cuatro
+ * palabras para dos acciones, y el jugador tiene que darse cuenta solo de que
+ * son la misma cosa.
+ *
+ * Esto barre todo lo que el jugador puede leer —las páginas, el JavaScript
+ * del navegador y la herramienta que copia ese HTML— y no deja volver las
+ * palabras viejas ni entrar sinónimos nuevos.
+ */
+function archivosDeTexto(carpeta) {
+  const salida = [];
+  for (const entrada of readdirSync(new URL(`../${carpeta}/`, import.meta.url), { withFileTypes: true })) {
+    if (entrada.name === "vendor" || entrada.name === "node_modules") continue;
+    const ruta = `${carpeta}/${entrada.name}`;
+    if (entrada.isDirectory()) salida.push(...archivosDeTexto(ruta));
+    else if (/\.(html|js|mjs)$/.test(entrada.name)) salida.push(ruta);
+  }
+  return salida;
+}
+
+const MIRADOS = [...archivosDeTexto("public"), ...archivosDeTexto("herramientas")];
+ok(MIRADOS.length > 20, "hay archivos que mirar", MIRADOS.length);
+
+/** Las que estuvieron y no vuelven, en cualquier archivo. */
+const VIEJAS = /Pon[eé]rmela|Sac[aá]rmela|Poner insignia|Sacar insignia|Quitar insignia/i;
+
+const conViejas = MIRADOS.filter((ruta) =>
+  VIEJAS.test(readFileSync(new URL(`../${ruta}`, import.meta.url), "utf8")));
+
+ok(conViejas.length === 0,
+   "«Ponérmela» y «Sacármela» no vuelven a aparecer en ninguna parte", conViejas);
+
+/**
+ * Y en las tres pantallas donde se equipa algo, la etiqueta de un botón de
+ * esta familia sólo puede ser una de las dos palabras.
+ *
+ * `cuenta.js` también tiene un botón que dice «Quitar», y está bien: saca un
+ * segundo factor de autenticación, no una insignia. Por eso la regla mira
+ * estos archivos y no todos.
+ */
+const DONDE_SE_EQUIPA = ["public/js/logros.js", "public/js/inventario.js",
+                         "public/js/personalizacion.js"];
+const PROHIBIDAS_EN_BOTON = /^(Poner|Ponerla|Ponérmela|Sacar|Sacarla|Sacármela|Quitar|Activar|Desactivar|Mostrar|Ocultar)$/i;
+
+for (const ruta of DONDE_SE_EQUIPA) {
+  const fuente = readFileSync(new URL(`../${ruta}`, import.meta.url), "utf8");
+  const etiquetas = [...fuente.matchAll(/>([^<>{}$\n]{3,20})<\/button>/g)]
+    .map((m) => m[1].trim());
+  const malas = etiquetas.filter((t) => PROHIBIDAS_EN_BOTON.test(t));
+  ok(malas.length === 0, `${ruta}: ningún botón dice otra cosa que Equipar o Desequipar`, malas);
+}
+
+const vitrina = readFileSync(new URL("../public/js/logros.js", import.meta.url), "utf8");
+ok(/>Equipar<\/button>/.test(vitrina), "la vitrina de logros ofrece Equipar");
+ok(/>Desequipar<\/button>/.test(vitrina), "y Desequipar");
 
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);
 process.exit(fallos ? 1 : 0);

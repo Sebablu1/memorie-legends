@@ -80,8 +80,8 @@ function dibujarTarjeta(condicion) {
 
   const boton = ganada
     ? puesta
-      ? `<button class="accion sobria" type="button" data-sacar="${escapar(condicion.id)}">Sacármela</button>`
-      : `<button class="accion" type="button" data-poner="${escapar(condicion.id)}">Ponérmela</button>`
+      ? `<button class="accion sobria" type="button" data-sacar="${escapar(condicion.id)}">Desequipar</button>`
+      : `<button class="accion" type="button" data-poner="${escapar(condicion.id)}">Equipar</button>`
     : "";
 
   const barra =
