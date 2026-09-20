@@ -221,11 +221,17 @@
   box-shadow: 0 4px 16px rgba(212, 168, 67, 0.3);
 }
 
-.fase h3 {
+.fase h3,
+.panel h3 {
   color: var(--oro);
   font-size: 1.05rem;
   margin-bottom: 6px;
 }
+
+/* Un panel con varios apartados: el título de cada uno necesita aire por
+   arriba, salvo el primero, que ya lo tiene del título del panel. */
+.panel p + h3,
+.panel .lista + h3 { margin-top: 20px; }
 
 .fase.destacada {
   border-color: rgba(212, 168, 67, 0.45);
