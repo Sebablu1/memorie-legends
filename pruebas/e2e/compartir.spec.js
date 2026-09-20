@@ -42,6 +42,7 @@ const TARJETA = `${SITIO}/img/compartir.jpg`;
 const PAGINAS = [
   "index.html",
   "como-se-juega.html",
+  "reglamento-partidas.html",
   "login.html",
   "register.html",
   "dashboard.html",

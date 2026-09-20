@@ -295,6 +295,27 @@
 .tabla-ia tr:last-child td { border-bottom: none; }
 .tabla-ia .num { text-align: right; font-variant-numeric: tabular-nums; }
 
+/* Los dos botones que llevan a un reglamento, o de vuelta a la guía.
+   En un teléfono se apilan: dos botones de texto largo no entran en una
+   fila de 320 px sin recortarse. */
+.botonera-reglamentos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.botonera-reglamentos .btn-oro,
+.botonera-reglamentos .btn-plata {
+  display: inline-block;
+  text-decoration: none;
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .botonera-reglamentos { flex-direction: column; }
+}
+
 /* ----------------------------------------------------------- cierre */
 
 .cierre {

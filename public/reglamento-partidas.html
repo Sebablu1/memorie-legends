@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <!-- Una línea, y va acá arriba a propósito: corre ANTES del primer
+         dibujado y le dice al CSS que el menú plegable va a existir. Ver la
+         regla `.con-js` en app.css. -->
+    <script>document.documentElement.classList.add("con-js")</script>
+
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta
+      name="description"
+      content="El reglamento completo de una partida: las siete fases de la ronda, el descarte al rival, los tiempos de cada reloj, el corte y la eliminación."
+    />
+    <title>Reglamento de partidas - Memorie Legends</title>
+    <link rel="icon" href="img/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/tema.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/reglas.css" />
+    <link rel="stylesheet" href="css/pie.css" />
+      <!-- La tarjeta que se ve al compartir el enlace.
+
+         La imagen va con URL ABSOLUTA y en JPG a propósito. Una ruta relativa
+         no la encuentra ningún lector de enlaces —no navegan la página, sólo
+         leen estas etiquetas— y WhatsApp no muestra WebP, que es el formato
+         del resto del sitio. Pesa 75 KB: por encima de unos pocos cientos, la
+         miniatura deja de aparecer en varios clientes.
+
+         1200x630 es la proporción que piden las tarjetas grandes. Declarar
+         `width` y `height` evita que el primer visitante vea el enlace sin
+         imagen mientras el servicio la mide por su cuenta. -->
+    <link rel="canonical" href="https://memorielegends.com/reglamento-partidas.html" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Memorie Legends" />
+    <meta property="og:locale" content="es_AR" />
+    <meta property="og:url" content="https://memorielegends.com/reglamento-partidas.html" />
+    <meta property="og:title" content="Reglamento de partidas — Memorie Legends" />
+    <meta property="og:description" content="El reglamento completo de una partida: las siete fases de la ronda, el descarte al rival, los tiempos de cada reloj, el corte y la eliminación." />
+    <meta property="og:image" content="https://memorielegends.com/img/compartir.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Logo de Memorie Legends sobre fondo oscuro" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Reglamento de partidas — Memorie Legends" />
+    <meta name="twitter:description" content="El reglamento completo de una partida: las siete fases de la ronda, el descarte al rival, los tiempos de cada reloj, el corte y la eliminación." />
+    <meta name="twitter:image" content="https://memorielegends.com/img/compartir.jpg" />
+  </head>
+  <body>
+    <header class="barra">
+      <div class="barra-contenido">
+        <a href="dashboard.html" class="marca">
+          <img src="img/memorie-legends2.webp" alt="Memorie Legends" class="logo-img" />
+          <span class="logo-text">Memorie Legends</span>
+        </a>
+        <nav>
+          <a href="dashboard.html">Inicio</a>
+          <a href="login.html">Jugar</a>
+          <a href="como-se-juega.html">Cómo se juega</a>
+          <a href="ranking.html">Ranking</a>
+          <a href="tienda.html">Tienda</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <!-- ---------------------------------------------------- portada -->
+      <section class="reglas-portada">
+        <img class="mazo" src="img/claude-inspiration/logomazo.png" alt="" />
+        <div>
+          <h1 class="titulo-pagina">📜 Reglamento de partidas</h1>
+          <p class="lema-plata">
+            Todo lo que decide una mano, hasta el último segundo ·
+            <a href="como-se-juega.html">¿Venías por la guía corta?</a>
+          </p>
+          <p class="resumen">
+            Cada ronda mirás <b>una</b> de tus cuatro cartas: cinco segundos para elegir
+            cuál y dos para verla. Después hay 5 segundos de descarte por reflejos, donde
+            sólo el primero que acierta se saca la carta de encima. En tu turno levantás
+            del mazo y elegís cambiar o tirar — si tirás un 7, 8, 9 o 10 podés usar su
+            poder. Y si conocés una carta ajena, podés descartársela a su dueño. Cortás
+            cuando creés tener el puntaje más bajo. Quien <b>supera el límite</b> de la
+            mesa queda eliminado.
+          </p>
+          <a class="btn-oro" href="register.html">🎮 Crear cuenta y probar</a>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------- objetivo y mesa -->
+      <section class="rejilla dos-columnas" id="objetivo">
+        <article class="panel">
+          <h2>🎯 Objetivo</h2>
+          <p>
+            Ser el <b>último jugador en pie</b> manteniendo tu puntuación por debajo del
+            límite de la mesa: <b>150 puntos</b> por defecto, o <b>100</b> o <b>60</b> en
+            las partidas cortas. Quien lo supera queda eliminado; con el límite exacto
+            seguís jugando.
+          </p>
+          <p class="pie-nota">
+            Saber, recordar, deducir, decidir, actuar. No gana el que más memoriza: gana
+            el que mejor convierte lo que sabe en jugadas.
+          </p>
+        </article>
+
+        <article class="panel">
+          <h2>👥 Jugadores</h2>
+          <ul class="lista">
+            <li>De 2 a 4 jugadores, humanos e IAs mezclados.</li>
+            <li>Los humanos inician sesión con Google.</li>
+            <li>Las IAs tienen cuatro niveles: Fácil, Medio, Difícil y Experto.</li>
+          </ul>
+        </article>
+      </section>
+
+      <!-- ----------------------------------------------------- baraja -->
+      <section class="panel bloque" id="baraja">
+        <h2>🃏 La Baraja</h2>
+        <p>
+          48 cartas: cuatro palos de doce valores cada uno, del 1 al 12. Sin comodines.
+        </p>
+
+        <div class="palos">
+          <figure><img src="img/claude-inspiration/basto.png" alt="" /><figcaption>Basto</figcaption></figure>
+          <figure><img src="img/claude-inspiration/copa.png" alt="" /><figcaption>Copa</figcaption></figure>
+          <figure><img src="img/claude-inspiration/espada.png" alt="" /><figcaption>Espada</figcaption></figure>
+          <figure><img src="img/claude-inspiration/Oro.png" alt="" /><figcaption>Oro</figcaption></figure>
+        </div>
+
+        <div class="valores-especiales">
+          <div class="valor-carta">
+            <img src="img/claude-inspiration/Caballo.PNG" alt="" />
+            <div>
+              <b>11 · Caballo</b>
+              <span>Vale <b class="bueno">0 puntos</b> en el corte. La mejor carta que podés tener.</span>
+            </div>
+          </div>
+          <div class="valor-carta">
+            <img src="img/claude-inspiration/Rey.png" alt="" />
+            <div>
+              <b>12 · Rey</b>
+              <span>Vale <b class="malo">12 puntos</b>. La más cara de la baraja.</span>
+            </div>
+          </div>
+        </div>
+        <p class="pie-nota">
+          El resto de las cartas vale su número: un 7 son 7 puntos. El palo no importa
+          para las coincidencias — se comparan valores. Las cartas con poder son 7, 8, 9
+          y 10, y sólo lo activan si las tirás sin cambiarlas.
+        </p>
+      </section>
+
+      <!-- ------------------------------------------ fases de la ronda -->
+      <h2 class="titulo-seccion" id="fases">Las fases de una ronda</h2>
+
+      <ol class="fases">
+        <li class="panel fase" id="mirada">
+          <span class="numero">1</span>
+          <div>
+            <h3>Mirada inicial · 5 segundos para elegir, 2 para ver</h3>
+            <p>
+              Cada jugador recibe cuatro cartas boca abajo y toca <b>una sola</b>: esa se
+              le muestra a él durante dos segundos y se vuelve a tapar. Si no elegís
+              dentro de los cinco segundos, se abre la primera. Los demás ven
+              <b>dónde</b> miraste, nunca qué viste.
+            </p>
+            <p class="pie-nota">
+              Los mismos tiempos en entrenamiento y en partidas por Leyendas.
+            </p>
+          </div>
+        </li>
+
+        <li class="panel fase" id="muestra">
+          <span class="numero">2</span>
+          <div>
+            <h3>Carta muestra</h3>
+            <p>
+              Se reparte al centro junto con las manos, pero <b>se dibuja de dorso</b>
+              hasta que termina la mirada: esos segundos son para tu carta, no para la
+              muestra. Después queda boca arriba y todos la ven. Las coincidencias se
+              miran <b>por valor</b>: si la muestra es un 7, sirve cualquier 7; si es un
+              11, sólo otro 11.
+            </p>
+          </div>
+        </li>
+
+        <li class="panel fase destacada" id="reflejos">
+          <span class="numero">3</span>
+          <div>
+            <h3>Descarte por reflejos · 5 segundos</h3>
+            <p>Todos pueden descartar a la vez, y acá se define media partida:</p>
+            <ul class="lista">
+              <li><b class="bueno">Acertás primero:</b> te sacás la carta de encima, sin castigo, y pasa a ser la muestra.</li>
+              <li><b>Acertás tarde:</b> conservás tu carta y sumás una de castigo, y la que intentaste tirar queda a la vista de todos durante 2 segundos.</li>
+              <li><b class="malo">Errás:</b> conservás tu carta, sumás una de castigo, y todos ven durante 2 segundos cuál era y en qué posición estaba. La de castigo también se muestra: queda conocida por todos, vos incluido.</li>
+            </ul>
+            <p class="pie-nota">
+              Descartar es opcional: si no estás seguro, podés pasar. Sobre tu propia mano
+              tenés <b>un intento por ventana</b> — el primero que mandás es el que cuenta,
+              así que un roce no se cobra dos veces.
+            </p>
+          </div>
+        </li>
+
+        <li class="panel fase" id="levantar">
+          <span class="numero">4</span>
+          <div>
+            <h3>Levantar del mazo · 8 segundos</h3>
+            <p>
+              Por turnos, en el orden de la mesa y salteando a los eliminados, cada
+              jugador levanta una carta y tiene 10 segundos para elegir:
+            </p>
+            <ul class="lista">
+              <li><b>Cambiarla</b> por una de las suyas, en cualquier posición. La que sale queda de muestra y abre una ventana de reflejos de 3 segundos.</li>
+              <li><b>Tirarla</b> directamente, sin cambiarla. Si es 7, 8, 9 o 10, se activa su poder.</li>
+            </ul>
+            <p class="pie-nota">
+              Si se te vencen los 8 segundos, se levanta por vos; si se vencen los 10, la
+              carta se tira.
+            </p>
+          </div>
+        </li>
+
+        <li class="panel fase" id="poderes">
+          <span class="numero">5</span>
+          <div>
+            <h3>Poderes · 7, 8, 9 y 10</h3>
+            <p>
+              Sólo se activan si <b>tirás</b> la carta sin cambiarla. Se usan en el momento:
+              no se guardan. Usarlos es opcional, y tenés 10 segundos para resolverlos.
+            </p>
+            <div class="poderes">
+              <div class="poder p7"><span class="cifra">7</span><b>Mirar propia</b><small>Ves una carta tuya, la conozcas o no.</small></div>
+              <div class="poder p8"><span class="cifra">8</span><b>Mirar rival</b><small>Ves una carta de otro jugador.</small></div>
+              <div class="poder p9"><span class="cifra">9</span><b>Cambio ciego</b><small>Intercambiás con un rival sin ver ninguna.</small></div>
+              <div class="poder p10"><span class="cifra">10</span><b>Cambio con vista</b><small>Intercambiás viendo las dos cartas.</small></div>
+            </div>
+            <p class="pie-nota">
+              Primero corren los reflejos de toda la mesa y después el poder. Al terminar,
+              quien lo usó tiene una ventana privada de 3 segundos para descartarle una
+              carta a un rival, si conoce alguna.
+            </p>
+          </div>
+        </li>
+
+        <li class="panel fase destacada" id="corte">
+          <span class="numero">6</span>
+          <div>
+            <h3>El corte · 20 segundos para decidir</h3>
+            <p>
+              En tu turno, <b>después de levantar</b>, podés cortar o pasar. Al cortar se
+              revelan todas las manos y <b>todos</b> suman los puntos de la suya, el que
+              cortó incluido.
+            </p>
+            <ul class="lista">
+              <li><b class="bueno">−10 puntos</b> si cortaste sin quedarte ninguna carta.</li>
+              <li><b class="malo">+10 puntos</b> si cortaste sin tener el puntaje más bajo.</li>
+              <li>Si empatás en el más bajo, <b>no hay castigo</b>.</li>
+              <li><b>Corte automático:</b> si te quedás con 0 cartas, la ronda se corta sola y el corte es tuyo, con su −10. Si dos se vacían en la misma ventana, corta el que se vació primero.</li>
+            </ul>
+            <p class="pie-nota">
+              Si dejás vencer los 20 segundos sin tocar nada, se pasa y quedás marcado
+              como ausente.
+            </p>
+          </div>
+        </li>
+
+        <li class="panel fase" id="fin-de-ronda">
+          <span class="numero">7</span>
+          <div>
+            <h3>Fin de la ronda</h3>
+            <p>
+              La mano pasa al <b>jugador siguiente</b> en el orden de la mesa, salteando
+              eliminados; se reparten cuatro cartas nuevas y vuelve a empezar. Los totales
+              se arrastran de una ronda a la otra, y todo lo que sabías de las cartas
+              ajenas se borra.
+            </p>
+          </div>
+        </li>
+      </ol>
+
+      <!-- ------------------------------------------ descarte al rival -->
+      <h2 class="titulo-seccion" id="descarte-al-rival">El descarte al rival</h2>
+
+      <section class="panel bloque">
+        <h2>🎴 Convertir la memoria en ventaja</h2>
+        <p>
+          Si conocés una carta de otro jugador y coincide con la muestra, podés
+          descartársela vos. Es la jugada que paga todo lo que recordaste.
+        </p>
+
+        <h3>De dónde sale lo que sabés</h3>
+        <ul class="lista">
+          <li><b>Poder 8:</b> mirás una carta de un rival. Desde ahí la conocés.</li>
+          <li><b>Poder 10:</b> ves las dos cartas —la tuya y la del rival— antes de decidir. Conocés las dos, cambies o no.</li>
+          <li><b>Castigo ajeno:</b> cuando alguien erra un descarte, su carta y la de castigo quedan a la vista de todos.</li>
+          <li><b>Seguimiento con el 9:</b> el 9 no muestra nada, pero las cartas se mueven a la vista de todos. Si le pasaste una que conocías, sabés qué tiene; si te sacaron una que conocías, sabés en qué mano quedó.</li>
+        </ul>
+
+        <h3>Cómo viaja, y cómo se pierde</h3>
+        <ul class="lista">
+          <li>Lo que se conoce es <b>la carta</b>, no el lugar: si se mueve con un 9 o un 10, la seguís conociendo en su posición nueva.</li>
+          <li>Se pierde cuando la carta sale de las manos: al descartarse, al cambiarse por la levantada o al entregarse en un acierto.</li>
+          <li>Al repartir una ronda nueva se borra todo.</li>
+          <li>El <b>7 nunca</b> da conocimiento ajeno: mira una carta propia.</li>
+        </ul>
+
+        <h3>Cómo se juega</h3>
+        <p>
+          Durante una ventana de descarte tocás <b>dos veces</b> la carta del rival que
+          conocés — sólo se pueden tocar las conocidas. El juego dice en el acto si
+          acertaste:
+        </p>
+        <ul class="lista">
+          <li><b class="bueno">Acierto:</b> la carta del rival se va al descarte y él queda con una menos. Vos elegís <b>a ciegas</b> una de las tuyas, que ocupa ese mismo lugar boca abajo, y quedás con una menos. Tenés 5 segundos para elegirla; si no elegís, la elige el azar.</li>
+          <li><b class="malo">Error:</b> la carta del rival no se mueve, queda expuesta 2 segundos y vos sumás una carta de castigo.</li>
+        </ul>
+        <p class="pie-nota">
+          Sobre cartas ajenas podés intentar más de una vez en la misma ventana, y cada
+          error vuelve a costar; el límite de un intento es sólo para tu propia mano.
+          Nadie ve jamás qué carta entregaste, ni siquiera vos.
+        </p>
+      </section>
+
+      <!-- -------------------------------------------- la mesa en red -->
+      <h2 class="titulo-seccion" id="en-red">La mesa en red</h2>
+
+      <section class="rejilla">
+        <article class="panel">
+          <h2>🚦 El arranque</h2>
+          <ul class="lista">
+            <li>La primera ronda <b>espera a que lleguen todos</b>, hasta 15 segundos. Al que no llega se le pierde la mirada.</li>
+            <li>Cuando llega el último corre una <b>cuenta regresiva de 4 segundos</b> —«3, 2, 1, Preparate…»— igual en todas las pantallas.</li>
+            <li>Hasta que la cuenta termina no se puede tocar ninguna carta.</li>
+          </ul>
+        </article>
+
+        <article class="panel">
+          <h2>⏱️ Toques, gracia y empates</h2>
+          <ul class="lista">
+            <li>Un toque que llega tarde por la conexión se acepta dentro de una <b>gracia de 2 segundos</b>: vale el momento del toque, no el de la llegada.</li>
+            <li>Si dos toques quedan a menos de <b>60 milisegundos</b>, el orden se sortea de forma determinista: la misma partida da siempre el mismo resultado y la conexión no decide.</li>
+            <li>Todos los relojes los cuenta el servidor. Lo que ves en pantalla es un espejo de ese reloj.</li>
+          </ul>
+        </article>
+
+        <article class="panel">
+          <h2>💤 Ausente y «He vuelto»</h2>
+          <ul class="lista">
+            <li>Si dejás vencer los 20 segundos de cortar o pasar sin tocar nada, quedás <b>ausente</b>.</li>
+            <li>Tu asiento se ve apagado y tus turnos se saltean al instante: los demás no pierden tiempo esperándote.</li>
+            <li>Volvés apretando <b>«He vuelto»</b> y seguís desde la ronda en curso.</li>
+            <li>En Leyendas hay además una marca por <b>silencio</b>: si tu mesa deja de dar señales durante 15 segundos, se te puede saltear el turno.</li>
+          </ul>
+        </article>
+
+        <article class="panel">
+          <h2>🚪 Abandono en Leyendas</h2>
+          <ul class="lista">
+            <li>Abandonar es una decisión explícita, con aviso previo.</li>
+            <li>Cuesta <b>la mitad de la entrada</b> de esa mesa, que se descuenta al abandonar.</li>
+            <li>La mesa sigue jugando sin vos: tus turnos se saltean y tus cartas quedan fuera del reparto del pozo.</li>
+            <li><b>Perder la conexión no es abandonar:</b> no cuesta Leyendas. Lo único que pasa es que te saltean el turno mientras no des señales.</li>
+          </ul>
+        </article>
+      </section>
+
+      <!-- ------------------------------------------ tiempos y relojes -->
+      <section class="panel bloque" id="tiempos">
+        <h2>⏳ Tiempos y relojes</h2>
+        <table class="tabla-ia">
+          <thead><tr><th>Momento</th><th class="num">Tiempo</th><th>Al vencer</th></tr></thead>
+          <tbody>
+            <tr><td>Elegir la carta de la mirada inicial</td><td class="num">5 s</td><td>Se abre la primera</td></tr>
+            <tr><td>Ver la carta mirada</td><td class="num">2 s</td><td>Se tapa</td></tr>
+            <tr><td>Descarte por reflejos</td><td class="num">5 s</td><td>Se cierra la ventana</td></tr>
+            <tr><td>Gracia de red para un toque</td><td class="num">2 s</td><td>Se rechaza el intento</td></tr>
+            <tr><td>Revelación por error o acierto tarde</td><td class="num">2 s</td><td>Se tapa</td></tr>
+            <tr><td>Levantar del mazo</td><td class="num">8 s</td><td>Se levanta y se tira</td></tr>
+            <tr><td>Decidir qué hacer con la levantada</td><td class="num">10 s</td><td>Se tira</td></tr>
+            <tr><td>Resolver un poder</td><td class="num">10 s</td><td>Se saltea</td></tr>
+            <tr><td>Cortar o pasar</td><td class="num">20 s</td><td>Pasa, y quedás ausente</td></tr>
+            <tr><td>Elegir la carta que entregás tras un acierto</td><td class="num">5 s</td><td>La elige el azar</td></tr>
+            <tr><td>Ventana de reapertura al cambiar la muestra</td><td class="num">3 s</td><td>Se cierra</td></tr>
+            <tr><td>Ventana privada después de un poder</td><td class="num">3 s</td><td>Se cierra</td></tr>
+            <tr><td>Espera de jugadores en la primera ronda</td><td class="num">15 s</td><td>Arranca igual</td></tr>
+            <tr><td>Cuenta regresiva antes de la primera mirada</td><td class="num">4 s</td><td>Empieza la mirada</td></tr>
+          </tbody>
+        </table>
+        <p class="pie-nota">Los mismos tiempos en entrenamiento y en partidas por Leyendas.</p>
+      </section>
+
+      <!-- ------------------------------------------------- fin y IAs -->
+      <section class="rejilla dos-columnas" id="fin-del-juego">
+        <article class="panel">
+          <h2>🏁 Fin del juego</h2>
+          <ul class="lista">
+            <li>El puntaje se <b>acumula</b> entre rondas.</li>
+            <li>Quien <b>supera</b> el límite de la mesa —150, 100 o 60— queda eliminado. Con el límite exacto seguís jugando.</li>
+            <li>Gana el último que quede por debajo del límite.</li>
+            <li><b>Empate final:</b> si en la misma ronda se pasan todos y quedan empatados en el puntaje más bajo, vuelven sólo esos, con el puntaje que tenían, y se juegan rondas extra hasta que quede uno solo por debajo.</li>
+          </ul>
+        </article>
+
+        <article class="panel">
+          <h2>🤖 Los cuatro niveles de IA</h2>
+          <table class="tabla-ia">
+            <thead><tr><th>Nivel</th><th class="num">Error</th><th class="num">Reacción</th><th class="num">Memoria</th></tr></thead>
+            <tbody>
+              <tr><td>Fácil</td><td class="num">30%</td><td class="num">2–4 s</td><td class="num">45%</td></tr>
+              <tr><td>Medio</td><td class="num">15%</td><td class="num">1–3 s</td><td class="num">70%</td></tr>
+              <tr><td>Difícil</td><td class="num">5%</td><td class="num">0,5–1,5 s</td><td class="num">90%</td></tr>
+              <tr><td>Experto</td><td class="num">0%</td><td class="num">0,3–0,8 s</td><td class="num">100%</td></tr>
+            </tbody>
+          </table>
+          <p class="pie-nota">
+            El error es cuánto se equivocan al descartar; la memoria, cuánto retienen de
+            lo que ya vieron.
+          </p>
+        </article>
+      </section>
+
+      <!-- ------------------------------------------- anexo de cambios -->
+      <h2 class="titulo-seccion" id="anexo">Anexo de cambios</h2>
+
+      <section class="panel bloque">
+        <h2>📌 Qué cambió en esta versión</h2>
+        <p>
+          Esta página salió de una auditoría regla por regla contra el código del juego.
+          Acá está lo que cambió respecto de la versión anterior, y por qué.
+        </p>
+
+        <h3>Correcciones</h3>
+        <ul class="lista">
+          <li><b>Acierto tarde.</b> Antes decía «la descartás igual, pero recibís una carta más» —neto 0—. Ahora: conservás la carta y sumás una, <b>neto +1</b>, y queda expuesta 2 segundos. Es lo que el juego hace desde hace meses, y con razón: si el tardío se sacara la carta de encima, intentar siempre convendría.</li>
+          <li><b>Mirada inicial.</b> Antes decía «2 segundos» sin separar elegir de ver. Ahora: <b>5 segundos para elegir y 2 para ver</b>, iguales en los dos modos. En red, con la latencia real, un toque al segundo y medio podía llegar con la mirada ya cerrada.</li>
+          <li><b>Límite de puntos.</b> Antes: 150 y nada más. Ahora: <b>150 por defecto, con 100 y 60 disponibles</b>, en entrenamiento y en red.</li>
+          <li><b>Intentos por ventana.</b> No se decía. Ahora: <b>un intento sobre la mano propia por ventana</b>, en los dos modos, para que la misma jugada no cueste distinto según dónde se juegue.</li>
+        </ul>
+
+        <h3>Capítulos nuevos</h3>
+        <ul class="lista">
+          <li><b>El descarte al rival:</b> de dónde sale el conocimiento, cómo viaja con la carta, cómo se pierde y qué pasa al acertar y al errar. No estaba escrito en ninguna parte.</li>
+          <li><b>Tiempos y relojes:</b> la versión anterior decía que los poderes no tenían tiempo. Lo tienen, y todo lo demás también.</li>
+          <li><b>Corte automático:</b> quedarse sin cartas corta la ronda, con su criterio de desempate.</li>
+          <li><b>Ausente y «He vuelto»</b>, y la marca por silencio en red.</li>
+          <li><b>Arranque en red:</b> la espera de 15 segundos y la cuenta regresiva de 4.</li>
+          <li><b>Rotación de la mano</b> al terminar cada ronda.</li>
+          <li><b>Empate final:</b> quiénes vuelven a la mesa y con qué puntaje.</li>
+          <li><b>Abandono en partidas por Leyendas</b>, y por qué perder la conexión no es lo mismo.</li>
+        </ul>
+
+        <h3>Aclaraciones</h3>
+        <ul class="lista">
+          <li>Al cortar, <b>todos</b> suman su mano, incluido el que cortó.</li>
+          <li>La muestra se reparte antes de la mirada, pero se dibuja de dorso hasta que termina.</li>
+          <li>En red, el empate técnico de 60 milisegundos se resuelve por sorteo determinista.</li>
+          <li>De <b>2 a 4</b> jugadores, no sólo «máximo 4».</li>
+          <li>La IA también varía <b>cuánto recuerda</b>, además del error y la reacción.</li>
+          <li>La carta de castigo de un error se muestra a todos y queda conocida.</li>
+        </ul>
+      </section>
+
+      <section class="cierre">
+        <img src="img/claude-inspiration/Rey.png" alt="" class="rey-cierre" />
+        <div>
+          <h2>¿Listo para la mesa?</h2>
+          <p>Se aprende jugando. La partida contra la máquina no necesita cuenta.</p>
+          <div class="botonera-reglamentos">
+            <a class="btn-oro" href="register.html">🎮 Crear cuenta y jugar</a>
+            <a class="btn-plata" href="como-se-juega.html">← Volver a la guía corta</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="footer-content">
+        <div class="footer-links">
+          <a href="/como-se-juega.html">📜 Cómo se Juega</a>
+          <a href="/quienes-somos.html">Quiénes Somos</a>
+          <a href="/terminos.html">Términos y Condiciones</a>
+          <a href="/privacidad.html">Políticas de Privacidad</a>
+          <a href="/seguridad.html">Seguridad</a>
+        </div>
+        <p>&copy; 2026 Memorie Legends. Todos los derechos reservados.</p>
+      </div>
+    </footer>
+    <script type="module" src="js/menu.js"></script>
+  </body>
+</html>

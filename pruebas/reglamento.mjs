@@ -5,8 +5,9 @@
  * POR QUÉ EXISTE
  * ─────────────────────────────────────────────────────────────────────────
  *
- * `public/como-se-juega.html` es el reglamento oficial: no es un resumen de
- * otro documento, es el documento. Y un reglamento escrito a mano se separa
+ * `public/reglamento-partidas.html` es el reglamento oficial: no es un resumen
+ * de otro documento, es el documento. `como-se-juega.html` es la guía corta
+ * que lleva hasta él. Y un reglamento escrito a mano se separa
  * del juego sin que nadie se entere — ya pasó tres veces:
  *
  *   - decía que acertar tarde descartaba la carta «pero recibís una más»
@@ -45,7 +46,17 @@ const ok = (c, m, x) => {
   else { fallos++; console.log("  ✗", m, x !== undefined ? JSON.stringify(x) : ""); }
 };
 
+/**
+ * El reglamento completo vive en `reglamento-partidas.html` desde que
+ * `como-se-juega.html` pasó a ser la guía de dos minutos. Lo que se compara
+ * contra las constantes es el reglamento; la guía se mira aparte, al final.
+ */
 const pagina = readFileSync(
+  new URL("../public/reglamento-partidas.html", import.meta.url), "utf8",
+);
+
+/** La guía corta: la puerta de entrada, y lo primero que lee cualquiera. */
+const guia = readFileSync(
   new URL("../public/como-se-juega.html", import.meta.url), "utf8",
 );
 
@@ -251,6 +262,56 @@ for (const ruta of DONDE_SE_EQUIPA) {
 const vitrina = readFileSync(new URL("../public/js/logros.js", import.meta.url), "utf8");
 ok(/>Equipar<\/button>/.test(vitrina), "la vitrina de logros ofrece Equipar");
 ok(/>Desequipar<\/button>/.test(vitrina), "y Desequipar");
+
+// =====================================================================
+console.log("\n=== 7. La guía corta lleva a los dos reglamentos ===");
+// =====================================================================
+
+/**
+ * `como-se-juega.html` es la puerta: dos minutos de lectura y se puede
+ * jugar. Lo que se comprueba es que siga siendo eso —corta— y que no deje al
+ * jugador sin camino al detalle.
+ *
+ * Era el reglamento entero, con catorce filas de relojes y el capítulo del
+ * descarte al rival: lo primero que veía alguien que nunca jugó.
+ */
+const textoGuia = guia.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+
+ok(guia.length < pagina.length / 2,
+   "la guía es menos de la mitad del reglamento",
+   { guia: guia.length, reglamento: pagina.length });
+
+ok(!/<table/.test(guia), "y no tiene ninguna tabla: eso es del reglamento");
+
+for (const [destino, que] of [
+  ["reglamento-partidas.html", "al reglamento de partidas"],
+  ["reglamento-torneos.html", "al de torneos"],
+]) {
+  ok(new RegExp(`href="${destino}"`).test(guia), `la guía lleva ${que}`);
+}
+
+// Lo mínimo que tiene que decir para poder jugar una mano.
+for (const [patron, que] of [
+  [/cinco segundos para elegir|5 segundos para elegir/i, "cuánto dura la mirada"],
+  [/una sola/i, "que se mira una sola carta"],
+  [/supera el límite de la mesa/i, "cómo se pierde"],
+  [/7|8|9|10/, "los poderes"],
+  [/puntaje más bajo/i, "cuándo cortar"],
+]) {
+  ok(patron.test(textoGuia), `la guía explica ${que}`);
+}
+
+// Y no puede contradecir al reglamento: son las mismas frases prohibidas.
+for (const [patron, porque] of PROHIBIDAS) {
+  ok(!patron.test(guia), `la guía tampoco: ${porque}`);
+}
+
+// El reglamento de torneos avisa que no habla del juego.
+const torneos = readFileSync(
+  new URL("../public/reglamento-torneos.html", import.meta.url), "utf8",
+);
+ok(/sólo para torneos/i.test(torneos), "el reglamento de torneos dice que es sólo de torneos");
+ok(/href="\/reglamento-partidas\.html"/.test(torneos), "y manda al de partidas");
 
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);
 process.exit(fallos ? 1 : 0);

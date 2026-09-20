@@ -484,6 +484,7 @@ test("a la mesa se entra por el tablero, no desde el menú", async ({ page }) =>
     "tienda.html",
     "cuenta.html",
     "como-se-juega.html",
+    "reglamento-partidas.html",
   ];
 
   for (const pagina of conMenu) {
