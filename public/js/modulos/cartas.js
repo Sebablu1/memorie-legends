@@ -227,7 +227,15 @@ export function estiloAbanico(indice, cantidad, { anguloTotal, arco, solape }) {
   const giro = anguloTotal * t;
   // Las de los extremos caen un poco, como una mano sostenida.
   const desvio = arco * Math.pow(t * 2, 2) * (cantidad - 1);
-  return `--giro:${giro.toFixed(2)}deg;--desvio:${desvio.toFixed(1)}px;--solape:${solape.toFixed(0)}px;`;
+
+  // `--solape` se escribe SÓLO cuando hay algo que montar.
+  //
+  // Iba siempre, con su cero incluido, y un cero en el atributo `style` le
+  // gana a cualquier regla de la hoja: la del teléfono, que monta las cartas
+  // desde la sexta, quedaba sin efecto y la mano seguía encogiendo hasta ser
+  // ilegible. Sin la declaración, la regla decide; con ella, manda el abanico.
+  const montado = solape > 0 ? `--solape:${solape.toFixed(0)}px;` : "";
+  return `--giro:${giro.toFixed(2)}deg;--desvio:${desvio.toFixed(1)}px;${montado}`;
 }
 
 /** Lugar libre en la mesa: se ve, pero no juega nadie. */

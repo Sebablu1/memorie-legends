@@ -54,9 +54,18 @@
      Así, en una pantalla baja el paño encoge las cartas en vez de empujar la
      botonera fuera del viewport. `dvh` y no `vh` por la barra de direcciones
      del móvil, que cambia de alto mientras se juega. */
-  --carta-alto: clamp(66px, 13.4dvh, 136px);
+  --carta-alto: clamp(58px, 12.3dvh, 130px);
   --carta-ancho: calc(var(--carta-alto) * 0.667);
   --carta-radio: 6px;
+
+  /* El mazo, la levantada y la muestra: las tres cartas que se miran para
+     decidir. Tienen su propia medida, MÁS GRANDE que cualquier mano.
+
+     Antes heredaban la de los rivales y quedaban en dos tercios de la mano
+     propia: eran las más chicas de la mesa siendo el foco del juego. Ahora
+     apuntan a la mano propia más un 15%, y sólo bajan a igualarla donde el
+     alto no alcanza. Ver `.centro`. */
+  --carta-alto-centro: clamp(96px, 22.8dvh, 242px);
 
   --sombra-carta: 0 6px 14px rgba(0, 0, 0, 0.55), 0 2px 4px rgba(0, 0, 0, 0.4);
   --sombra-carta-alta: 0 18px 34px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(212, 168, 67, 0.3);
@@ -151,7 +160,11 @@ body::before {
 .escena {
   position: relative;
   z-index: 2;
-  max-width: 1360px;
+
+  /* En una pantalla de 1920 el paño se quedaba en 1150 px y sobraban 280 a
+     cada lado. Con más ancho los asientos laterales se abren, y las cartas
+     dejan de encogerse por falta de sitio. */
+  max-width: 1760px;
   height: 100%;
   margin: 0 auto;
   display: grid;
@@ -640,8 +653,13 @@ body::before {
    En reposo --aro-vivo es transparente, así que la capa existe y no se ve: no
    hay que agregar ni sacar reglas al empezar el turno, sólo cambiar una
    variable. */
+/* El retrato se mide contra el alto de la ventana, como las cartas.
+
+   Iba en píxeles fijos y bajaba de escalón en escalón. Eso es lo que hacía
+   que al 80% de zoom la mesa se viera mejor: los adornos encogían y el paño
+   ganaba alto, que es de donde salen las cartas. Ahora encogen solos. */
 .jugador .retrato {
-  --retrato: 62px;
+  --retrato: clamp(34px, 6dvh, 62px);
   --aro: 3px;
   --aro-vivo: transparent;
   --vuelta: 0deg;
@@ -842,13 +860,33 @@ body::before {
 /* Tus cartas son las que tocás bajo presión de reloj: se dimensionan aparte
    y son siempre las más grandes de la mesa. */
 .jugador.propio {
-  --carta-alto: clamp(100px, 20.4dvh, 210px);
+  --carta-alto: clamp(96px, 19.8dvh, 205px);
   --carta-ancho: calc(var(--carta-alto) * 0.667);
   padding: 4px 14px 6px;
 }
 
 .jugador.propio .nombre { font-size: 1.05rem; }
-.jugador.propio .retrato { --retrato: 74px; }
+.jugador.propio .retrato { --retrato: clamp(40px, 7.2dvh, 74px); }
+/* El cartel de `?debug-cartas=1`. Fuera del juego: no recibe toques y no
+   ocupa lugar en ninguna caja. */
+.debug-cartas {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  z-index: 999;
+  pointer-events: none;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(5, 8, 14, 0.92);
+  border: 1px solid var(--vidrio-borde);
+  color: var(--texto-tenue);
+  font-size: 0.68rem;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.debug-cartas b { color: var(--oro-claro); }
+
 /* ====================================================== mano */
 
 .mano {
@@ -942,10 +980,10 @@ body::before {
 
 .carta.jugable { cursor: pointer; }
 
-/* Mano de un rival sobre la que un poder 8 o 10 dejó conocimiento.
-   Se marca la mano ENTERA, a propósito: el servidor manda a quién se puede
-   atacar y jamás dónde está la carta. Señalar una posición sería regalar
-   justo lo que el jugador tiene que recordar. */
+/* Una carta ajena que se conoce: es la única que se puede atacar.
+
+   Se marca la carta exacta, no la mano: el conocimiento es de una carta y la
+   sigue si se mueve. Ver `puedeAtacarEn` en el motor. */
 .carta.atacable::before {
   content: "";
   position: absolute;
@@ -1192,19 +1230,18 @@ body::before {
   border: 0;
 }
 
-/* El mazo, la levantada y la muestra miden lo mismo que una carta de la
-   mesa.
+/* El mazo, la levantada y la muestra son las cartas más grandes de la mesa.
 
-   Tenían su propio tamaño, más chico, de cuando el centro tenía que ceder
-   alto para que entraran las manos. Con los rótulos fuera de la vista ese
-   alto volvió, y no hay ninguna razón para que una carta en el centro se vea
-   distinta de una carta en una mano: es la misma baraja.
+   La medida se pone acá, en el contenedor, y no en `.pila .carta`: el hueco
+   de la levantada vacía también es una carta que ocupa lugar, y así los tres
+   sitios miden lo mismo estén llenos o no.
 
-   Se hereda `--carta-alto` de `:root` en vez de repetir el valor. Eso es lo
-   que hace que sigan iguales en los ocho escalones de pantalla que tiene
-   esta hoja, sin tener que acordarse de tocar tres reglas cada vez. */
-.pila .carta {
-  --carta-ancho: calc(var(--carta-alto) * 0.667);
+   `--carta-alto-centro` se define una vez por escalón de pantalla, al lado de
+   las otras dos medidas, para que nadie tenga que acordarse de tocar tres
+   reglas cada vez. */
+.centro {
+  --carta-alto: var(--carta-alto-centro);
+  --carta-ancho: calc(var(--carta-alto-centro) * 0.667);
 }
 
 /* El mazo se ve como una pila de varias cartas. */
@@ -1215,11 +1252,9 @@ body::before {
     6px 6px 0 -2px rgba(255, 255, 255, 0.05);
 }
 
-/* La levantada tampoco: es una carta más. Antes era la más grande del centro
-   para que se notara cuál estaba en juego; ahora eso lo dice su marco, que
-   se enciende cuando la carta tiene poder. */
+/* La levantada mide lo mismo que las otras dos pilas: cuál está en juego lo
+   dice su marco, que se enciende cuando la carta tiene poder. */
 .levantada-caja .carta {
-  --carta-ancho: calc(var(--carta-alto) * 0.667);
   animation: aparecer 0.4s cubic-bezier(0.2, 1.2, 0.4, 1);
 }
 
@@ -2438,15 +2473,18 @@ button.accion.con-poder {
      falta cantidad y posición, no legibilidad. Las tuyas, en cambio, se tocan
      con el reloj corriendo, así que crecen respecto del diseño anterior. */
   :root {
-    --carta-alto: clamp(44px, 7.4dvh, 60px);
+    --carta-alto: min(clamp(44px, 14.6dvh, 96px), 17vw);
     --carta-ancho: calc(var(--carta-alto) * 0.667);
+    /* La mano propia de este escalón más un 15%, con techo de ancho: las tres
+       pilas van en una sola fila y tienen que entrar a lo ancho. */
+    --carta-alto-centro: min(clamp(84px, 27.2dvh, 180px), 30vw);
   }
 
   .jugador { padding: 5px 6px 6px; }
   .jugador .nombre { font-size: 0.72rem; }
   .jugador .puntos { font-size: 0.62rem; }
-  .jugador .retrato { --retrato: 38px; --aro: 2px; }
-  .jugador.propio .retrato { --retrato: 44px; }
+  .jugador .retrato { --retrato: clamp(28px, 4.6dvh, 40px); --aro: 2px; }
+  .jugador.propio .retrato { --retrato: clamp(32px, 5.4dvh, 46px); }
   .jugador .cuenta-asiento { top: -6px; font-size: 0.54rem; padding: 0 5px; }
   .mano { gap: 3px; padding-top: 4px; }
 
@@ -2454,13 +2492,37 @@ button.accion.con-poder {
      cartas el abanico casi no las monta, así que suman ancho completo más el
      hueco entre ellas. Con muchas, el solape crece más rápido que la cuenta. */
   .jugador.propio {
-    --carta-alto: min(clamp(74px, 14.5dvh, 128px), 29vw);
+    --carta-alto: min(clamp(74px, 23.6dvh, 158px), 29vw);
     --carta-ancho: calc(var(--carta-alto) * 0.667);
     padding: 6px 8px 8px;
   }
 
   .jugador.propio .nombre { font-size: 0.86rem; }
   .jugador.propio .mano { gap: 5px; }
+
+  /* Desde la sexta carta, la mano propia se MONTA en vez de encoger.
+
+     Sin esto, siete cartas en un teléfono salían a 0,66 del tamaño —una carta
+     de 37 px de ancho— y el número de la esquina dejaba de leerse. Montadas un
+     38%, las siete entran de lado a lado conservando su tamaño, y de cada una
+     se ve la esquina, que es lo único que hay que poder leer.
+
+     El `!important` pisa la escala que el abanico escribe en el atributo
+     `style`: `geometriaAbanico` la calcula para que la mano entre ENCOGIENDO,
+     sin saber en qué pantalla está. Acá se decide que en el teléfono entre
+     montándose, que conserva el tamaño. Es la única regla de esta hoja que
+     pisa al abanico, y por eso lleva este párrafo.
+
+     Sólo en el teléfono y sólo en la mano propia: las de los rivales están
+     boca abajo, y en pantallas anchas la mano entra sin montarse. */
+  .jugador.propio .mano:has(> :nth-child(6)) {
+    --escala: 1 !important;
+    gap: 2px;
+  }
+
+  .jugador.propio .mano:has(> :nth-child(6)) > .carta {
+    --solape: calc(var(--carta-ancho) * 0.38);
+  }
 
   /* Los castigos hacen crecer la mano. El abanico las monta unas sobre otras,
      pero llega un punto en que ni así entran en el ancho de un teléfono. A
@@ -2582,7 +2644,17 @@ button.accion.con-poder {
      Con 15.5vw entran las cuatro con aire de sobra, y las dos filas quedan
      para lo que se pensaron: la mano de alguien que recibió un castigo. */
   :root {
-    --carta-alto: min(clamp(40px, 8.6dvh, 84px), 15.5vw);
+    --carta-alto: min(clamp(40px, 8dvh, 84px), 15.5vw);
+    --carta-ancho: calc(var(--carta-alto) * 0.667);
+    /* Tres pilas más sus huecos entran de sobra en 30vw cada una. */
+    --carta-alto-centro: min(clamp(60px, 14.7dvh, 130px), 30vw);
+  }
+
+  /* La mano propia tiene su propio techo de ancho acá, más bajo que el de la
+     tabla: con el de 29vw, en un teléfono ancho —430 px— la mano terminaba
+     más grande que el centro y metida debajo del cartel. */
+  .jugador.propio {
+    --carta-alto: min(clamp(60px, 12.8dvh, 130px), 24vw);
     --carta-ancho: calc(var(--carta-alto) * 0.667);
   }
 }
@@ -2605,16 +2677,22 @@ button.accion.con-poder {
    en vez de repartirse alrededor del óvalo, y cinco filas piden más alto que
    tres. A 375x667 sobra sitio con el óvalo y falta con la pila. */
 @media (max-width: 560px) and (max-height: 730px) {
-  :root { --carta-alto: clamp(34px, 8.3dvh, 62px); }
-  .jugador.propio { --carta-alto: clamp(52px, 14.1dvh, 105px); padding: 4px 8px 5px; }
+  :root {
+    --carta-alto: clamp(34px, 7.8dvh, 62px);
+    --carta-alto-centro: min(clamp(56px, 14.5dvh, 120px), 30vw);
+  }
+  .jugador.propio { --carta-alto: min(clamp(52px, 12.6dvh, 104px), 24vw); padding: 4px 8px 5px; }
   .jugador { padding: 3px 7px 4px; }
   .mesa { gap: 2px; padding: 1px 0 10px; border-width: 8px; }
 }
 
 /* Y el más chico de pie, que es el único que no llega con lo de arriba. */
 @media (max-width: 560px) and (max-height: 600px) {
-  :root { --carta-alto: clamp(26px, 6.5dvh, 44px); }
-  .jugador.propio { --carta-alto: clamp(42px, 11dvh, 75px); padding: 2px 6px 3px; }
+  :root {
+    --carta-alto: clamp(26px, 6.2dvh, 44px);
+    --carta-alto-centro: min(clamp(44px, 11.5dvh, 86px), 28vw);
+  }
+  .jugador.propio { --carta-alto: clamp(42px, 10dvh, 75px); padding: 2px 6px 3px; }
   .jugador { padding: 2px 6px 3px; }
   .mesa { gap: 1px; padding: 0 0 9px; border-width: 6px; }
 }
@@ -2641,11 +2719,28 @@ button.accion.con-poder {
    Va ANTES del escalón de 660 para que aquél lo pise donde de verdad hace
    falta apretar. */
 @media (min-width: 561px) and (max-height: 820px) {
-  :root { --carta-alto: clamp(62px, 12.6dvh, 122px); }
-  .jugador.propio { --carta-alto: clamp(94px, 19.2dvh, 190px); }
-  .jugador .retrato { --retrato: 46px; }
-  .jugador.propio .retrato { --retrato: 54px; }
-  .jugador .cabecera-jugador { gap: 9px; margin-bottom: 5px; }
+  :root {
+    --carta-alto: clamp(50px, 10.1dvh, 108px);
+    --carta-alto-centro: clamp(78px, 18.7dvh, 196px);
+  }
+  .jugador.propio { --carta-alto: clamp(68px, 16.3dvh, 170px); }
+  .jugador .retrato { --retrato: clamp(32px, 5.6dvh, 46px); }
+  .jugador.propio .retrato { --retrato: clamp(36px, 6.6dvh, 54px); }
+  .jugador .cabecera-jugador { gap: 8px; margin-bottom: 4px; }
+
+  /* Y lo de arriba y lo de abajo del paño también ceden.
+
+     Son unos treinta píxeles entre la cabecera, el cartel y la botonera —un
+     10% más de carta, medido—. Se recorta el relleno y el cuerpo de letra, no
+     la altura de los botones: en un portátil se juega con el ratón, pero el
+     botón sigue midiendo lo que mide un dedo por si la pantalla es táctil. */
+  .cabecera { padding: 3px 12px; }
+  .cabecera h1 { font-size: 1rem; }
+  .cabecera .lema { display: none; }
+  .cabecera .marca { width: 28px; height: 28px; }
+  .anuncio { padding: 4px 12px; }
+  .acciones { padding: 6px 10px; gap: 7px; }
+  button.accion { padding: 7px 12px; font-size: 0.66rem; }
 }
 
 /* Pantallas bajas: un portátil chico, o una ventana que no está maximizada.
@@ -2668,10 +2763,13 @@ button.accion.con-poder {
    se lleva la mayor parte —son las cartas que se tocan contra reloj— y las
    pilas del centro, que son de consulta, ceden primero. */
 @media (min-width: 561px) and (max-height: 660px) {
-  :root { --carta-alto: clamp(42px, 9.4dvh, 76px); }
+  :root {
+    --carta-alto: clamp(42px, 9.5dvh, 84px);
+    --carta-alto-centro: clamp(66px, 17.7dvh, 154px);
+  }
 
   .jugador.propio {
-    --carta-alto: clamp(66px, 15.2dvh, 128px);
+    --carta-alto: clamp(58px, 15.4dvh, 134px);
     padding: 4px 8px 5px;
   }
 
@@ -2686,8 +2784,11 @@ button.accion.con-poder {
    pero menos: acá el margen es de verdad estrecho y el paño tiene que seguir
    cerrando abajo. */
 @media (min-width: 561px) and (max-height: 580px) {
-  :root { --carta-alto: clamp(36px, 8dvh, 62px); }
-  .jugador.propio { --carta-alto: clamp(58px, 13.2dvh, 108px); padding: 2px 6px 3px; }
+  :root {
+    --carta-alto: clamp(36px, 8dvh, 62px);
+    --carta-alto-centro: clamp(58px, 14.8dvh, 118px);
+  }
+  .jugador.propio { --carta-alto: clamp(50px, 12.9dvh, 103px); padding: 2px 6px 3px; }
   .jugador { padding: 2px 6px 3px; }
   .mesa { gap: 1px; padding: 0 0 9px; border-width: 6px; }
 }
@@ -2703,7 +2804,10 @@ button.accion.con-poder {
  * contadores se quedan, que deciden cuándo cortar—. Entra, pero apretado; de
  * pie se juega mejor. */
 @media (min-width: 561px) and (max-height: 500px) {
-  :root { --carta-alto: clamp(20px, 4.8dvh, 34px); }
+  :root {
+    --carta-alto: clamp(20px, 4.8dvh, 34px);
+    --carta-alto-centro: clamp(32px, 9.2dvh, 58px);
+  }
   .jugador.propio { --carta-alto: clamp(30px, 8.4dvh, 52px); padding: 1px 6px 2px; }
 
   .jugador { padding: 1px 5px 2px; }

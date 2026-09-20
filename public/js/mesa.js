@@ -1840,6 +1840,52 @@ async function cuentaRegresiva() {
   caja.hidden = true;
 }
 
+/**
+ * `?debug-cartas=1`: un cartel con lo que mide cada carta.
+ *
+ * Para no tener que adivinar al ajustar tamaños. Dice el tamaño de la
+ * ventana, qué mide una carta de cada grupo y qué valor tienen las variables
+ * en ese escalón de pantalla. No cambia nada: lee y muestra.
+ *
+ * Apagado salvo que se pida, y sin temporizador propio: se repinta cuando la
+ * ventana cambia de tamaño, que es cuando pueden cambiar las medidas.
+ */
+function encenderDebugDeCartas() {
+  if (new URLSearchParams(location.search).get("debug-cartas") !== "1") return;
+
+  const caja = document.createElement("div");
+  caja.className = "debug-cartas";
+  caja.setAttribute("aria-hidden", "true");
+  document.body.appendChild(caja);
+
+  const medir = () => {
+    const tam = (sel) => {
+      const el = document.querySelector(sel);
+      return el ? `${el.offsetWidth}×${el.offsetHeight}` : "—";
+    };
+    const raiz = getComputedStyle(document.documentElement);
+    const propia = document.querySelector(".jugador.propio .mano > .carta");
+    const centro = document.querySelector("#muestraCarta .carta");
+    const proporcion =
+      propia && centro ? (centro.offsetWidth / propia.offsetWidth).toFixed(2) : "—";
+
+    caja.innerHTML = `
+      <b>${innerWidth}×${innerHeight}</b> · ${devicePixelRatio}x
+      <br>mano: ${tam(".jugador.propio .mano > .carta")}
+      <br>rival: ${tam(".jugador:not(.propio) .mano > .carta")}
+      <br>centro: ${tam("#muestraCarta .carta")} (×${proporcion})
+      <br>alto: ${raiz.getPropertyValue("--carta-alto").trim()}
+      <br>centro: ${raiz.getPropertyValue("--carta-alto-centro").trim()}`;
+  };
+
+  medir();
+  window.addEventListener("resize", medir);
+  // Y con cada repintado de la mesa, que es cuando cambian las manos.
+  document.addEventListener("click", () => setTimeout(medir, 50));
+}
+
+encenderDebugDeCartas();
+
 /** La primera ronda es la única que lleva cuenta regresiva. */
 let primeraRonda = true;
 
