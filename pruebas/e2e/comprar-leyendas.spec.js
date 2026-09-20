@@ -89,6 +89,8 @@ const servidorFalso = (respuesta) => `
   export async function revanchaDeSala() { return {}; }
   export async function abandonarPartida() { return {}; }
   export async function unirseASala() { return {}; }
+  export async function crearSalaPrivada() { return {}; }
+  export async function unirseConCodigo() { return {}; }
   export async function marcarListo() { return {}; }
   export async function iniciarPartida() { return {}; }
   export async function salirDeSalaEnEspera() { return {}; }

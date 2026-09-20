@@ -79,6 +79,121 @@ async function abrirTablero(page) {
   return errores;
 }
 
+/**
+ * Un `servidor.js` de mentira: anota lo que se le pide y contesta.
+ *
+ * Las Cloud Functions no existen en esta suite. Lo que se comprueba acá es lo
+ * del NAVEGADOR: qué llamada sale con qué largo de código, y que el código de
+ * una sala privada no termine en la URL.
+ */
+const SERVIDOR_FALSO = `
+  export class ErrorDeServidor extends Error {}
+  window.__llamadas = [];
+  export const crearSala = async (entrada, nombre, limitePuntos) => {
+    window.__llamadas.push(["crearSala", entrada, limitePuntos]);
+    return { codigo: "PUB123" };
+  };
+  export const crearSalaPrivada = async (entrada, nombre, limitePuntos) => {
+    window.__llamadas.push(["crearSalaPrivada", entrada, limitePuntos]);
+    return { sala: "SAL001", codigo: "K7M2PQRS" };
+  };
+  export const unirseASala = async (codigo) => {
+    window.__llamadas.push(["unirseASala", codigo]);
+    return { codigo };
+  };
+  export const unirseConCodigo = async (codigo) => {
+    window.__llamadas.push(["unirseConCodigo", codigo]);
+    return { sala: "SAL001" };
+  };
+  export const misItems = async () => ({ items: [] });
+  export const misInsignias = async () => ({ insignias: [] });
+  export const equiparItem = async () => ({});
+  export const desequiparItem = async () => ({});
+  export const listarTorneos = async () => ({ torneos: [] });
+  export const inscribirseATorneo = async () => ({});
+  // El resto de la puerta: un doble tiene que exportar TODO lo que exporta el
+  // real, aunque esta prueba no lo use. Lo vigila pruebas/dobles-de-partida.mjs.
+  export const revanchaDeSala = async () => ({});
+  export const abandonarPartida = async () => ({});
+  export const marcarListo = async () => ({});
+  export const iniciarPartida = async () => ({});
+  export const salirDeSalaEnEspera = async () => ({});
+  export const reportarJugador = async () => ({});
+  export const comprarItem = async () => ({});
+  export const listarPacks = async () => ({ packs: [] });
+  export const crearOrdenDeCompra = async () => ({});
+  export const comprarPack = async () => ({});
+`;
+
+/**
+ * El tablero con el servidor sustituido, en el modo por Leyendas y sin
+ * navegar a ningún lado.
+ */
+async function tableroConServidorFalso(page) {
+  await page.route("**/js/servidor.js", (r) =>
+    r.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body: SERVIDOR_FALSO }),
+  );
+  // Ir a la sala es una navegación: se bloquea para poder mirar lo que quedó.
+  await page.route("**/room.html*", (r) =>
+    r.fulfill({ status: 200, contentType: "text/html", body: "<html><body>sala</body></html>" }),
+  );
+  const errores = await abrirTablero(page);
+  // El panel de Leyendas está escondido hasta que se elige ese modo, y lo que
+  // se prueba acá vive adentro.
+  await elegirModo(page, "modoLeyendas");
+  return errores;
+}
+
+test("la sala privada muestra su código, y el código no va en la URL", async ({ page }) => {
+  await tableroConServidorFalso(page);
+
+  await expect(page.locator("#salaPrivada")).toHaveCount(1);
+
+  await page.locator("#salaPrivada").check();
+  await page.locator("#btnCrearSala").click();
+
+  const caja = page.locator("#codigoPrivado");
+  await expect(caja).toBeVisible();
+  await expect(page.locator("#codigoPrivadoTexto")).toHaveText("K7M2PQRS");
+  await expect(caja).toContainText(/no se muestra otra vez/i);
+
+  // Lo que se llamó, y lo que NO: una sala privada no pasa por `crearSala`.
+  const llamadas = await page.evaluate(() => window.__llamadas);
+  expect(llamadas.map((l) => l[0])).toEqual(["crearSalaPrivada"]);
+
+  // Y el código no está en la URL ni en el almacenamiento del navegador.
+  expect(page.url()).not.toContain("K7M2PQRS");
+  const guardado = await page.evaluate(() =>
+    JSON.stringify([{ ...localStorage }, { ...sessionStorage }]),
+  );
+  expect(guardado, "el código quedó guardado en el navegador").not.toContain("K7M2PQRS");
+
+  // Al entrar, lo que viaja es el identificador de la sala.
+  await page.locator("#btnEntrarPrivada").click();
+  await expect.poll(() => page.url()).toContain("SAL001");
+  expect(page.url()).not.toContain("K7M2PQRS");
+});
+
+test("seis caracteres entran por una puerta y ocho por la otra", async ({ page }) => {
+  await tableroConServidorFalso(page);
+
+  // Seis: la puerta de siempre, donde el código ES la sala.
+  await page.locator("#codigoSala").fill("ABC234");
+  await page.locator("#btnUnirse").click();
+  await expect.poll(() => page.url()).toContain("ABC234");
+
+  // Ocho: la otra puerta. El servidor traduce el código a un identificador de
+  // sala, y es ÉSE el que llega a la URL.
+  await page.goto("/dashboard.html");
+  await page.waitForFunction(() => document.querySelectorAll("#entradaSala option").length > 0);
+  await elegirModo(page, "modoLeyendas");
+  await page.locator("#codigoSala").fill("K7M2PQRS");
+  await page.locator("#btnUnirse").click();
+
+  await expect.poll(() => page.url()).toContain("SAL001");
+  expect(page.url(), "el código privado terminó en la URL").not.toContain("K7M2PQRS");
+});
+
 test("los módulos cargan: ningún import roto", async ({ page }) => {
   const errores = await abrirTablero(page);
   await page.waitForTimeout(1500);
@@ -211,7 +326,10 @@ test("el campo de código fuerza mayúsculas y descarta lo que no va", async ({ 
   await campo.fill("");
   await campo.type("ab-c 2*3");
   expect(await campo.inputValue()).toBe("ABC23");
-  await expect(campo).toHaveAttribute("maxlength", "6");
+  // Ocho, no seis: el mismo campo recibe el código de una sala privada, que
+  // es más largo. El de una sala normal sigue siendo de seis y lo comprueba
+  // el servidor.
+  await expect(campo).toHaveAttribute("maxlength", "8");
 });
 
 test("el modo se puede elegir con el teclado", async ({ page }) => {

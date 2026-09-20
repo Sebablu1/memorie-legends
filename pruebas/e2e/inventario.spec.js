@@ -114,7 +114,9 @@ const servidorFalso = `
   export const listarTorneos = async () => ({ torneos: [] });
   export const inscribirseATorneo = async () => ({});
   export const crearSala = async () => ({});
+  export const crearSalaPrivada = async () => ({});
   export const unirseASala = async () => ({});
+  export const unirseConCodigo = async () => ({});
   export const ErrorDeRed = Error;
 
   // El resto de la superficie de servidor.js, para que el doble no le deba

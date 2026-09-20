@@ -48,6 +48,7 @@ import { PUESTO_MENSUAL_CON_INSIGNIA } from "./reglas/insignias.js";
 
 import { crearMoverLeyendas } from "./leyendas.js";
 import { crearAbandonarPartida } from "./abandono.js";
+import { crearSalasPrivadas } from "./salas-privadas.js";
 import { crearMotorEnRed } from "./partida-red.js";
 import { crearCierre } from "./cierre.js";
 import { crearPacks } from "./packs.js";
@@ -81,6 +82,8 @@ import {
   EsquemaActivarItem,
   EsquemaDesposeer,
   EsquemaRevancha,
+  EsquemaCrearSalaPrivada,
+  EsquemaUnirseConCodigo,
   EsquemaCancelarSala,
   EsquemaEditarSala,
   EsquemaLimpiarSalas,
@@ -214,6 +217,24 @@ const SALAS = "rooms";
 
 /** Azar criptográfico para los códigos de sala. */
 const azarCodigo = () => crypto.randomInt(0, 2 ** 32) / 2 ** 32;
+
+/**
+ * De qué IP viene una llamada.
+ *
+ * Lo usa el único techo que se cuenta por IP y no por cuenta: adivinar el
+ * código de una sala privada es algo que se hace con una cuenta nueva cada
+ * vez, así que contar por uid no frenaría nada.
+ *
+ * `x-forwarded-for` lo escribe la infraestructura de Google delante de la
+ * función y puede traer una lista; la primera es la del cliente. Si no
+ * hubiera ninguna —una llamada local, una prueba— se cuenta como "sin-ip",
+ * que es un cubo más y no un permiso.
+ */
+function ipDe(context) {
+  const req = context?.rawRequest;
+  const reenviada = String(req?.headers?.["x-forwarded-for"] ?? "").split(",")[0].trim();
+  return reenviada || req?.ip || "sin-ip";
+}
 
 /**
  * Con qué nombre y con qué cara entra alguien a una sala.
@@ -612,44 +633,133 @@ export const unirseASala = functions.https.onCall(async (data, context) => {
     const snapSala = await tx.get(refSala);
     const sala = snapSala.exists ? snapSala.data() : null;
 
-    const snapUsuario = await tx.get(db.collection(USUARIOS).doc(uid));
-    const saldo = snapUsuario.exists ? (snapUsuario.data()[CAMPO_SALDO] ?? 0) : 0;
-
-    // La MISMA función que usa el navegador para avisar antes de intentarlo.
-    const veredicto = puedeUnirse(sala, uid, saldo);
-    if (!veredicto.puede) {
-      throw new functions.https.HttpsError("failed-precondition", veredicto.mensaje);
-    }
-
-    const r = await moverLeyendas(tx, {
-      uid,
-      delta: -Number(sala.entrada),
-      motivo: MOTIVOS.ENTRADA_PARTIDA,
-      referencia: codigo,
-      idempotencia: `entrada_${codigo}_${uid}`,
-    });
-    if (!r.aplicado) {
-      throw new functions.https.HttpsError("already-exists", "Ya pagaste la entrada a esta sala.");
-    }
-
-    // La lista se rellena hasta donde haga falta antes de sumar la propia.
-    //
-    // Una sala creada antes de que esto existiera tiene jugadores y no tiene
-    // la lista; empujando la del recién llegado sobre una vacía, su cara
-    // terminaría en el asiento del primer jugador. Los huecos van vacíos, que
-    // es lo que la mesa entiende como «usá lo de la casa».
-    const luces = [...(sala.jugadoresLuce ?? desdeRetratos(sala.jugadoresRetratos))];
-    while (luces.length < (sala.jugadores ?? []).length) luces.push({ ...SIN_NADA });
-
-    tx.update(refSala, {
-      jugadores: [...(sala.jugadores ?? []), uid],
-      jugadoresNombres: [...(sala.jugadoresNombres ?? []), nombreJugador],
-      jugadoresLuce: [...luces, luce],
-      pozo: Number(sala.entrada) * ((sala.jugadores ?? []).length + 1),
-    });
-
-    return { codigo, entrada: sala.entrada, saldo: r.saldo };
+    return sumarseALaSala(tx, { refSala, sala, codigo, uid, nombreJugador, luce });
   });
+});
+
+/**
+ * Sentarse en una sala que ya se leyó, y pagar la entrada.
+ *
+ * Existe separado porque hay DOS puertas que sientan a alguien: `unirseASala`,
+ * con el identificador, y `unirseConCodigo`, con el código de una privada. Lo
+ * que no puede diferir entre las dos es el cobro.
+ *
+ * LEE ANTES DE ESCRIBIR: el saldo y `moverLeyendas` primero, el `update` de la
+ * sala después. Firestore rechaza una lectura posterior a una escritura dentro
+ * de la misma transacción, y `pruebas/transacciones.mjs` audita ese orden.
+ */
+async function sumarseALaSala(
+  tx, { refSala, sala, codigo, uid, nombreJugador, luce, conCodigo = false },
+) {
+  const snapUsuario = await tx.get(db.collection(USUARIOS).doc(uid));
+  const saldo = snapUsuario.exists ? (snapUsuario.data()[CAMPO_SALDO] ?? 0) : 0;
+
+  // La MISMA función que usa el navegador para avisar antes de intentarlo.
+  const veredicto = puedeUnirse(sala, uid, saldo, { conCodigo });
+  if (!veredicto.puede) {
+    throw new functions.https.HttpsError("failed-precondition", veredicto.mensaje);
+  }
+
+  const r = await moverLeyendas(tx, {
+    uid,
+    delta: -Number(sala.entrada),
+    motivo: MOTIVOS.ENTRADA_PARTIDA,
+    referencia: codigo,
+    idempotencia: `entrada_${codigo}_${uid}`,
+  });
+  if (!r.aplicado) {
+    throw new functions.https.HttpsError("already-exists", "Ya pagaste la entrada a esta sala.");
+  }
+
+  // La lista se rellena hasta donde haga falta antes de sumar la propia.
+  //
+  // Una sala creada antes de que esto existiera tiene jugadores y no tiene
+  // la lista; empujando la del recién llegado sobre una vacía, su cara
+  // terminaría en el asiento del primer jugador. Los huecos van vacíos, que
+  // es lo que la mesa entiende como «usá lo de la casa».
+  const luces = [...(sala.jugadoresLuce ?? desdeRetratos(sala.jugadoresRetratos))];
+  while (luces.length < (sala.jugadores ?? []).length) luces.push({ ...SIN_NADA });
+
+  tx.update(refSala, {
+    jugadores: [...(sala.jugadores ?? []), uid],
+    jugadoresNombres: [...(sala.jugadoresNombres ?? []), nombreJugador],
+    jugadoresLuce: [...luces, luce],
+    pozo: Number(sala.entrada) * ((sala.jugadores ?? []).length + 1),
+  });
+
+  return { codigo, entrada: sala.entrada, saldo: r.saldo };
+}
+
+/**
+ * Las salas privadas: abrir una y entrar con su código.
+ *
+ * El cobro no vive acá: `abrirSalaEn` y `sumarseALaSala` son los mismos de
+ * siempre y se le pasan de afuera. Lo que este módulo agrega es el código y
+ * su hash, que es lo único nuevo.
+ */
+const salasPrivadas = crearSalasPrivadas({
+  db,
+  salas: SALAS,
+  error: errorHttp,
+  marcaDeTiempo: () => admin.firestore.FieldValue.serverTimestamp(),
+  abrirSalaEn,
+  sumarse: (tx, datos) => sumarseALaSala(tx, { ...datos, conCodigo: true }),
+  identidadEnSala,
+  generarIdDeSala: () => generarCodigo(azarCodigo),
+});
+
+/**
+ * Abre una sala privada y devuelve su código UNA sola vez.
+ *
+ * Lo que queda guardado es el hash: si quien la abrió pierde el código, no hay
+ * forma de recuperarlo. Es la contrapartida de que no se pueda filtrar.
+ */
+export const crearSalaPrivada = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context, "crearSalaPrivada");
+  limite.exigirRitmo(uid, "crearSalaPrivada");
+
+  const { entrada, nombre, limitePuntos, vigenciaMinutos } =
+    validar(EsquemaCrearSalaPrivada, data, errorHttp);
+
+  if (!esEntradaValida(entrada)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      `Entrada inválida. Las disponibles son: ${ENTRADAS.join(", ")}.`,
+    );
+  }
+
+  const limite_ = limitePuntos == null ? LIMITE_ELIMINACION : Number(limitePuntos);
+  if (!esLimiteDePartida(limite_)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      `Duración inválida. Las disponibles son: ${LIMITES_DE_PARTIDA.join(", ")}.`,
+    );
+  }
+
+  return salasPrivadas.crearSalaPrivada({
+    uid,
+    entrada,
+    nombre: String(nombre ?? "Sala privada").slice(0, 40),
+    limitePuntos: limite_,
+    vigenciaMinutos,
+  });
+});
+
+/**
+ * Entra a una sala privada con su código.
+ *
+ * Cinco intentos por minuto y POR IP, no por cuenta: adivinar un código es
+ * algo que se hace con una cuenta nueva cada vez, y el techo por uid no
+ * frenaría nada. Ocho caracteres de un alfabeto de 31 son 8,5 × 10¹¹
+ * combinaciones; a cinco por minuto, probarlas lleva más de trescientos mil
+ * años.
+ */
+export const unirseConCodigo = functions.https.onCall(async (data, context) => {
+  const uid = exigirSesion(context, "unirseConCodigo");
+  await limite.exigirRitmoPorIP(ipDe(context), "unirseConCodigo");
+
+  const { codigo } = validar(EsquemaUnirseConCodigo, data, errorHttp);
+  return salasPrivadas.unirseConCodigo({ uid, codigo });
 });
 
 /**

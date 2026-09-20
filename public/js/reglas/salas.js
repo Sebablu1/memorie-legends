@@ -123,6 +123,8 @@ export const RECHAZO = {
   LLENA: "llena",
   YA_ESTA: "ya_esta",
   SIN_SALDO: "sin_saldo",
+  // A una privada se entra con su código, no desde una lista.
+  PRIVADA: "privada",
   // Los dos de la revancha: se pide desde la mesa cuando la partida
   // terminó, y sólo la puede pedir alguien que la jugó.
   NO_TERMINO: "no_termino",
@@ -137,6 +139,7 @@ export const MENSAJES_RECHAZO = {
   [RECHAZO.LLENA]: "La sala ya está completa.",
   [RECHAZO.YA_ESTA]: "Ya estás en esta sala.",
   [RECHAZO.SIN_SALDO]: "No tenés suficientes Leyendas.",
+  [RECHAZO.PRIVADA]: "Esta sala es privada: hace falta su código.",
   [RECHAZO.NO_TERMINO]: "Esta partida todavía no terminó.",
   [RECHAZO.NO_JUGASTE]: "No jugaste esta partida.",
 };
@@ -155,10 +158,21 @@ export const ESTADOS_SALA = {
  * servidor (que es quien decide de verdad, dentro de una transacción).
  * Devuelve `{ puede: true }` o `{ puede: false, motivo, mensaje }`.
  */
-export function puedeUnirse(sala, jugadorId, saldo) {
+export function puedeUnirse(sala, jugadorId, saldo, { conCodigo = false } = {}) {
   const no = (motivo) => ({ puede: false, motivo, mensaje: MENSAJES_RECHAZO[motivo] });
 
   if (!sala) return no(RECHAZO.NO_EXISTE);
+
+  /**
+   * A una sala privada NO se entra por su identificador.
+   *
+   * El identificador está en la URL de quien ya entró: si alcanzara para
+   * sumarse, compartir una captura de pantalla sería compartir la llave, que
+   * es exactamente lo que una sala privada evita. Se entra con el código, que
+   * es otra cosa y no está escrito en ninguna parte.
+   */
+  if (sala.privada && !conCodigo) return no(RECHAZO.PRIVADA);
+
   if (sala.estado === ESTADOS_SALA.CANCELADA) return no(RECHAZO.CANCELADA);
   if (sala.estado === ESTADOS_SALA.TERMINADA) return no(RECHAZO.TERMINADA);
   if (sala.estado === ESTADOS_SALA.JUGANDO) return no(RECHAZO.YA_EMPEZO);

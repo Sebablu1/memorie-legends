@@ -491,6 +491,73 @@
   white-space: nowrap;
 }
 
+/* ------------------------------------------ sala privada */
+
+/* La casilla de «sala privada», con su explicación debajo del título. Va en
+   una fila propia: es una decisión que cambia cómo se entra a la sala, no un
+   ajuste más al lado de la entrada. */
+.campo-casilla {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 6px 0 2px;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+}
+
+.campo-casilla input { margin-top: 3px; accent-color: var(--oro); }
+.campo-casilla b { display: block; font-size: 0.86rem; }
+.campo-casilla small {
+  display: block;
+  color: var(--texto-tenue);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+/* El código, la única vez que se ve. Grande y en monoespaciada: se lee para
+   dictarlo por teléfono, y un 8 y una B no se pueden confundir. */
+.codigo-privado {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--oro-hondo);
+  border-radius: 14px;
+  background: rgba(212, 168, 67, 0.06);
+  text-align: center;
+}
+
+.codigo-privado .titulo-codigo {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 1.6px;
+  color: var(--oro);
+}
+
+.codigo-grande {
+  margin: 8px 0;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 1.7rem;
+  letter-spacing: 6px;
+  color: var(--oro-claro);
+  word-break: break-all;
+}
+
+.codigo-privado .aviso-codigo {
+  font-size: 0.74rem;
+  color: var(--texto-tenue);
+  line-height: 1.6;
+}
+
+.botonera-codigo {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
 /* ------------------------------------------- tabla de salas */
 
 .panel-salas {

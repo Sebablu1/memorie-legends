@@ -61,6 +61,16 @@ export const crearSala = (entrada, nombre, limitePuntos) =>
   llamar("crearSala", { entrada, nombre, limitePuntos });
 
 /**
+ * Abre una sala privada. Devuelve el código UNA vez: no se guarda en claro en
+ * ninguna parte, así que si se pierde hay que abrir otra sala.
+ */
+export const crearSalaPrivada = (entrada, nombre, limitePuntos, vigenciaMinutos) =>
+  llamar("crearSalaPrivada", { entrada, nombre, limitePuntos, vigenciaMinutos });
+
+/** Entra a una sala privada con su código. Devuelve el id de la sala. */
+export const unirseConCodigo = (codigo) => llamar("unirseConCodigo", { codigo });
+
+/**
  * Abre —o encuentra— la revancha de una sala que ya terminó.
  *
  * Devuelve `{ codigo, entrada, laAbrioOtro, dentro }`. `dentro` dice si

@@ -245,23 +245,56 @@
           </label>
           <p class="ayuda-entrada" id="ayudaEntrada"></p>
 
+          <!-- Sala privada: no aparece en la lista y se entra con un código
+               que el servidor no guarda en claro. La casilla va acá y no en
+               otro panel porque lo demás —entrada y duración— es lo mismo. -->
+          <label class="campo-casilla" for="salaPrivada">
+            <input type="checkbox" id="salaPrivada" />
+            <span>
+              <b>Sala privada</b>
+              <small>No se lista. Se entra con un código que se muestra una sola vez.</small>
+            </span>
+          </label>
+
           <button class="accion grande" id="btnCrearSala" type="button">Crear sala</button>
 
           <div class="separador-o"><span>o entrá con un código</span></div>
 
           <div class="unirse-fila">
+            <!-- Seis caracteres para una sala normal, ocho para una privada:
+                 el mismo campo acepta los dos y el largo decide por qué puerta
+                 entra. Dos campos separados obligarían al que recibe un código
+                 a saber de qué tipo es. -->
             <input
               id="codigoSala"
               type="text"
-              maxlength="6"
+              maxlength="8"
               inputmode="latin"
               autocomplete="off"
               autocapitalize="characters"
               spellcheck="false"
               placeholder="ABC234"
-              aria-label="Código de la sala, seis caracteres"
+              aria-label="Código de la sala: seis caracteres, u ocho si es privada"
             />
             <button class="accion sobria" id="btnUnirse" type="button">Unirse</button>
+          </div>
+
+          <!-- El código de una sala privada, la única vez que se puede ver.
+               Aparece recién cuando el servidor lo devuelve: no existe en el
+               HTML hasta entonces, y no vuelve a existir después. -->
+          <div class="codigo-privado" id="codigoPrivado" hidden>
+            <p class="titulo-codigo">Tu sala privada está abierta</p>
+            <p class="codigo-grande" id="codigoPrivadoTexto">········</p>
+            <p class="aviso-codigo">
+              Copialo y pasáselo a quien quieras invitar. <b>No se muestra otra vez</b>:
+              no lo guardamos en ninguna parte.
+            </p>
+            <div class="botonera-codigo">
+              <button class="accion sobria" id="btnCopiarCodigoPrivado" type="button">
+                Copiar código
+              </button>
+              <button class="accion" id="btnEntrarPrivada" type="button">Entrar a la sala</button>
+            </div>
           </div>
         </div>
       </section>

@@ -69,6 +69,11 @@ export const LIMITES = {
 
   // Sala: se tocan unas pocas veces por partida.
   crearSala: 20,
+  // La privada abre una sala y cobra una entrada, igual que `crearSala`.
+  // Entrar con código tiene además su propio techo POR IP, que es el que
+  // importa: ver `LIMITES_POR_IP`.
+  crearSalaPrivada: 20,
+  unirseConCodigo: 20,
   // La revancha abre una sala y cobra una entrada: es `crearSala` con otra
   // puerta, y lleva su mismo techo. No va en la tabla de plata por lo mismo
   // que no va `crearSala` —está en el camino del juego, y un contador en
@@ -224,6 +229,21 @@ export const cuantasClaves = () => marcas.size;
  * @param ahora  Reloj, inyectable para las pruebas.
  * @param ritmos Colección donde viven los contadores de plata.
  */
+/**
+ * Lo que se cuenta por IP y no por cuenta.
+ *
+ * Sólo entrar a una sala privada. El código es un secreto de ocho caracteres
+ * y quien lo adivine entra a una mesa ajena: contra eso el techo tiene que
+ * ser por origen, porque crear cuentas nuevas es gratis.
+ *
+ * Cinco por minuto. Una persona que recibió un código por mensaje lo copia y
+ * lo pega: si se equivoca cinco veces en un minuto, esperar unos segundos no
+ * le arruina nada.
+ */
+export const LIMITES_POR_IP = {
+  unirseConCodigo: 5,
+};
+
 export function crearLimiteDeRitmo({ db, error, ahora = () => Date.now(), ritmos = "ritmos" }) {
   /**
    * El aviso que ve el jugador.
@@ -272,5 +292,33 @@ export function crearLimiteDeRitmo({ db, error, ahora = () => Date.now(), ritmos
     });
   }
 
-  return { exigirRitmo, exigirRitmoDePlata };
+  /**
+   * Por IP, y en Firestore.
+   *
+   * En memoria no serviría: cada instancia tiene su propio contador y una
+   * ráfaga reparte los intentos entre varias, que es justo lo que haría quien
+   * está probando códigos. Acá la exactitud vale lo que cuesta, porque entrar
+   * a una sala privada pasa una vez por partida y no está en ningún camino
+   * sensible al tiempo.
+   *
+   * Lee y después escribe, como `exigirRitmoDePlata`.
+   */
+  async function exigirRitmoPorIP(ip, accion) {
+    const limite = LIMITES_POR_IP[accion] ?? LIMITE_POR_OMISION;
+    const ref = db.collection(ritmos).doc(`ip_${String(ip).replace(/[^\w.:-]/g, "_")}_${accion}`);
+    const t = ahora();
+
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref); // ← leer primero
+      const previas = snap.exists ? (snap.data().marcas ?? []) : [];
+      const vivas = previas.filter((x) => t - x < UN_MINUTO);
+
+      if (vivas.length >= limite) throw demasiado();
+
+      vivas.push(t);
+      tx.set(ref, { marcas: vivas, ip: String(ip), accion }); // ← escribir después
+    });
+  }
+
+  return { exigirRitmo, exigirRitmoDePlata, exigirRitmoPorIP };
 }

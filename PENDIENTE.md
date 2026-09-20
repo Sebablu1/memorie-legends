@@ -556,6 +556,35 @@ propósito, porque no eran ese arreglo. La primera ya está hecha; quedan dos.
 
 ---
 
+## 14. La pimienta de los códigos privados — anotado al hacerlos
+
+Las salas privadas guardan el HASH del código, nunca el código. El hash lleva
+una pimienta que sale del entorno de las funciones:
+
+```
+PIMIENTA_CODIGOS
+```
+
+**Hoy no está puesta**, y sin ella el hash es `sha256(":" + codigo)` a secas.
+Eso alcanza contra una filtración de la base *mientras nadie la ataque en
+serio*: son 31⁸ combinaciones —unos 8,5 × 10¹¹— y SHA-256 es rápido, así que
+quien se lleve una copia puede probarlas todas por su cuenta, sin el techo de
+cinco intentos por minuto que sí frena a quien prueba contra el servidor.
+
+Con la pimienta puesta, además de la base necesita el entorno.
+
+**Qué hay que hacer:** generar una cadena larga al azar, dejarla en disco
+—nunca en el repositorio— y apuntarla como variable de entorno de las
+funciones antes del próximo despliegue. Cambiarla después invalida todos los
+códigos vivos: los que ya estén dentro de una sala siguen jugando, pero las
+invitaciones que no se hayan usado dejan de servir.
+
+**Cómo se sabe que se resolvió:** `process.env.PIMIENTA_CODIGOS` tiene valor
+en producción y una sala privada creada antes del cambio ya no acepta su
+código viejo.
+
+---
+
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del

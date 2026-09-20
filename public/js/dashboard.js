@@ -22,7 +22,9 @@ import { db, collection, query, where, onSnapshot } from "./firebase.js";
 import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
 import { estadoMfa } from "./mfa.js";
 import { SUPPORT_EMAIL } from "./firebase.js";
-import { crearSala, unirseASala, ErrorDeServidor } from "./servidor.js";
+import {
+  crearSala, crearSalaPrivada, unirseASala, unirseConCodigo, ErrorDeServidor,
+} from "./servidor.js";
 import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/salas.js";
 // Sólo nombres y etiquetas: el cerebro de la IA (`reglas/ia.js`, diez mil
 // caracteres) no hace falta acá y no se trae.
@@ -291,9 +293,20 @@ $("btnCrearSala").addEventListener("click", async () => {
   limpiarAviso();
 
   try {
-    const { codigo } = await crearSala(
-      entrada, `Sala de ${nombreJugador}`, Number($("duracionSala").value),
-    );
+    const duracion = Number($("duracionSala").value);
+
+    // La privada devuelve DOS cosas distintas: el identificador de la sala,
+    // con el que se abre su pantalla, y el código, que se muestra una vez y
+    // no vuelve a estar disponible en ninguna parte.
+    if ($("salaPrivada")?.checked) {
+      const { sala, codigo } = await crearSalaPrivada(
+        entrada, `Sala de ${nombreJugador}`, duracion,
+      );
+      mostrarCodigoPrivado(codigo, sala);
+      return;
+    }
+
+    const { codigo } = await crearSala(entrada, `Sala de ${nombreJugador}`, duracion);
     irALaSala(codigo);
   } catch (error) {
     avisar(error instanceof ErrorDeServidor ? error.message : "No pudimos crear la sala.", "error");
@@ -301,6 +314,38 @@ $("btnCrearSala").addEventListener("click", async () => {
     boton.textContent = "Crear sala";
   }
 });
+
+/** Los caracteres de un código privado. Los de uno normal son seis. */
+const LARGO_CODIGO_PRIVADO = 8;
+
+/**
+ * El código de una sala privada, mostrado la única vez que se puede.
+ *
+ * No está guardado en claro en ninguna parte: si se cierra esta ventana sin
+ * copiarlo, la única salida es abrir otra sala. Por eso el aviso, y por eso
+ * el botón de entrar está DESPUÉS del de copiar.
+ */
+function mostrarCodigoPrivado(codigo, sala) {
+  const caja = $("codigoPrivado");
+  if (!caja) {
+    // Sin la ventana —un HTML viejo en caché— igual no se pierde la sala.
+    irALaSala(sala);
+    return;
+  }
+
+  $("codigoPrivadoTexto").textContent = codigo;
+  caja.hidden = false;
+
+  $("btnCopiarCodigoPrivado").onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(codigo);
+      $("btnCopiarCodigoPrivado").textContent = "¡Copiado!";
+    } catch {
+      $("btnCopiarCodigoPrivado").textContent = "Copialo a mano";
+    }
+  };
+  $("btnEntrarPrivada").onclick = () => irALaSala(sala);
+}
 
 // ------------------------------------------------------ entrar por código
 
@@ -323,8 +368,12 @@ $("btnUnirse").addEventListener("click", () => entrarA($("codigoSala").value, $(
 async function entrarA(codigoCrudo, boton) {
   const codigo = String(codigoCrudo ?? "").trim().toUpperCase();
 
-  if (!esCodigoValido(codigo)) {
-    avisar("El código tiene que ser de seis caracteres.", "error");
+  // Ocho caracteres es el código de una sala privada, y va por otra puerta:
+  // el servidor busca su hash y devuelve a qué sala pertenece.
+  const esPrivado = codigo.length === LARGO_CODIGO_PRIVADO;
+
+  if (!esPrivado && !esCodigoValido(codigo)) {
+    avisar("El código tiene que ser de seis caracteres, u ocho si es privado.", "error");
     $("codigoSala").focus();
     return;
   }
@@ -337,6 +386,11 @@ async function entrarA(codigoCrudo, boton) {
   limpiarAviso();
 
   try {
+    if (esPrivado) {
+      const { sala } = await unirseConCodigo(codigo);
+      irALaSala(sala);
+      return;
+    }
     await unirseASala(codigo);
     irALaSala(codigo);
   } catch (error) {

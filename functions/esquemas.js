@@ -113,6 +113,32 @@ export const EsquemaCrearSala = z.object({
 });
 
 /**
+ * Abrir una sala privada.
+ *
+ * `vigenciaMinutos` es opcional y lo acota el servidor —de 5 minutos a un
+ * día—: acá sólo se exige que sea un número, porque un texto o un objeto no
+ * tiene por qué llegar hasta la lógica.
+ */
+export const EsquemaCrearSalaPrivada = z.object({
+  entrada: z.coerce.number().int().min(0),
+  nombre: z.string().max(40).optional(),
+  limitePuntos: z.coerce.number().int().positive().optional(),
+  vigenciaMinutos: z.coerce.number().int().positive().optional(),
+});
+
+/**
+ * Entrar con el código de una sala privada.
+ *
+ * Ocho caracteres, pero se acepta cualquier texto corto y lo normaliza el
+ * servidor: quien lo dicta por teléfono escribe guiones y espacios, y
+ * rechazarlo acá sería devolver «código inválido» por un espacio de más.
+ * Un texto largo, en cambio, no es un código escrito a mano.
+ */
+export const EsquemaUnirseConCodigo = z.object({
+  codigo: z.string().min(1).max(40),
+});
+
+/**
  * La revancha: de qué sala viene y con qué apuesta se vuelve a jugar.
  *
  * El nombre NO se acepta del cliente. Lo arma el servidor a partir del de

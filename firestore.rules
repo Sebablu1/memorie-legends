@@ -120,6 +120,20 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Los códigos de las salas privadas.
+    //
+    // NADIE los lee desde el navegador, ni siquiera quien abrió la sala. El
+    // documento se llama como el HASH del código y guarda a qué sala apunta:
+    // poder listarlos sería poder recorrer las salas privadas que hay, y
+    // poder leer uno sería tener la mitad del problema resuelto para probar
+    // códigos afuera, sin el techo de cinco por minuto.
+    //
+    // Los escribe el servidor con credenciales de administrador, que no pasan
+    // por estas reglas.
+    match /codigos/{hash} {
+      allow read, write: if false;
+    }
+
     // ------------------------------------- colecciones del servidor
     // Todas de sólo lectura para el cliente. Las escribe únicamente el
     // servidor con credenciales de administrador.
