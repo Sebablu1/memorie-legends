@@ -55,6 +55,7 @@ import {
 } from "./modulos/cartas.js";
 import { retratoDe, usarRetratoPropio, RETRATO_INICIAL } from "./modulos/retratos.js";
 import { esRutaDelSitio } from "./reglas/catalogo.js";
+import { caraDeCarta } from "./reglas/baraja.js";
 import { guardarVestuario, vestuarioGuardado } from "./modulos/vestuario.js";
 import { LIMITE_ELIMINACION, puntosMano } from "./reglas/puntaje.js";
 import * as IA from "./reglas/ia.js";
@@ -2851,7 +2852,7 @@ function abrirModalDecisionPoder() {
 
   abrirModal(`
     <div class="carta-poder">
-      <img src="${carta.imagen}" alt="${carta.numero} de ${carta.palo}" />
+      <img src="${caraDeCarta(carta)}" alt="${carta.numero} de ${carta.palo}" />
     </div>
     <h2>¡Levantaste un PODER ${carta.numero}!</h2>
     <p class="nombre-poder">${TITULOS_PODER[tipo]}</p>
@@ -3139,13 +3140,13 @@ function preguntarSiCambia(revelada, posicionPropia, indiceRival, posicionRival)
     <h2>Cambio viendo ambas cartas</h2>
     <div class="cartas-del-diez">
       <figure>
-        <img src="${revelada.propia?.imagen ?? ""}"
+        <img src="${caraDeCarta(revelada.propia)}"
              alt="Tu carta: ${revelada.propia?.numero} de ${revelada.propia?.palo}" />
         <figcaption>La tuya · <b>${revelada.propia?.numero ?? "?"}</b></figcaption>
       </figure>
       <span class="flecha" aria-hidden="true">⇄</span>
       <figure>
-        <img src="${revelada.rival?.imagen ?? ""}"
+        <img src="${caraDeCarta(revelada.rival)}"
              alt="Carta de ${escapar(nombreRival)}: ${revelada.rival?.numero} de ${revelada.rival?.palo}" />
         <figcaption>${escapar(nombreRival)} · <b>${revelada.rival?.numero ?? "?"}</b></figcaption>
       </figure>

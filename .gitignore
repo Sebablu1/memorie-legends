@@ -25,6 +25,12 @@ yarn-error.log*
 *.swo
 *~
 
+# Los originales de las cartas, en alta resolución (1023×1537, unos 2,7 MB
+# cada uno, 137 MB en total). Lo que se sirve son las copias WebP de
+# public/assets; éstos quedan en el disco para volver a generarlas si hiciera
+# falta otro tamaño. No se versionan por el peso: conviene respaldarlos aparte.
+originales/
+
 # Sistema
 .DS_Store
 Thumbs.db

@@ -16,8 +16,45 @@ export function puntosCarta(numero) {
   return numero === 11 ? 0 : numero;
 }
 
+/**
+ * La versión de las caras de las cartas. Se sube cada vez que se reemplazan.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ HACE FALTA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Las imágenes se guardan en el navegador un mes (ver `firebase.json`). Si
+ * una carta se reemplaza con el MISMO nombre, quien ya la tenía guardada
+ * sigue viendo la vieja hasta que venza — y cambiar el encabezado no lo
+ * arregla, porque la copia guardada no vuelve a preguntar.
+ *
+ * Pasó: las cartas se rediseñaron con los mismos nombres y algunas mesas
+ * mostraban frentes viejos. Con la versión en la URL, cada reemplazo es una
+ * dirección nueva y el navegador la pide de nuevo.
+ *
+ * 2 — las cartas rediseñadas, en WebP de 512×768.
+ */
+export const VERSION_CARTAS = 2;
+
 export function imagenCarta(palo, numero) {
-  return `/assets/${palo}/${numero}.png`;
+  return `/assets/${palo}/${numero}.webp?v=${VERSION_CARTAS}`;
+}
+
+/**
+ * La cara con la que se dibuja una carta.
+ *
+ * Sale del palo y el número, no del campo `imagen` que trae la carta. Ese
+ * campo lo escribió quien repartió —el servidor, en una partida en red— y
+ * queda guardado en el estado: una partida empezada antes de cambiar las
+ * cartas seguiría pidiendo las viejas. Armada acá, la dirección es siempre la
+ * de ahora.
+ *
+ * Sin palo o sin número —un marcador tapado— devuelve lo que venga en
+ * `imagen`, que es lo que se hacía siempre.
+ */
+export function caraDeCarta(carta) {
+  if (carta?.palo && carta?.numero) return imagenCarta(carta.palo, carta.numero);
+  return carta?.imagen ?? "";
 }
 
 export function crearBaraja() {

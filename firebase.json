@@ -25,7 +25,7 @@
         ]
       },
       {
-        "//": "Las imágenes cambian de nombre cuando cambian de verdad (memorie-legends2.png -> .webp), así que un mes es seguro. Eran 7 días.",
+        "//": "Un mes. Es seguro SOLO si una imagen que cambia cambia de dirección: de nombre (memorie-legends2.png -> .webp) o de versión (las cartas llevan ?v=VERSION_CARTAS, en reglas/baraja.js). Reemplazar un archivo con el mismo nombre deja la copia vieja en cada navegador que ya la tenía, hasta que venza: pasó con las cartas rediseñadas. Eran 7 días.",
         "source": "**/*.@(png|jpg|jpeg|gif|webp|svg|ico|avif)",
         "headers": [
           { "key": "Cache-Control", "value": "public, max-age=2592000, stale-while-revalidate=604800" }

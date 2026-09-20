@@ -12,7 +12,7 @@
  * entre sí no son seis módulos: son el mismo archivo con más pasos.
  */
 
-import { dorsoDeAsiento } from "../reglas/baraja.js";
+import { caraDeCarta, dorsoDeAsiento } from "../reglas/baraja.js";
 
 /**
  * El dorso comprado, que sólo se aplica a las cartas de uno.
@@ -160,7 +160,7 @@ export function dibujarCarta(
       ${posicion != null ? `<span class="posicion">${posicion}</span>` : ""}
       <span class="lados" aria-hidden="true">
         <span class="dorso"><img src="${dorso}" alt="" /></span>
-        <span class="cara"><img src="${carta.imagen}" alt="" /></span>
+        <span class="cara"><img src="${caraDeCarta(carta)}" alt="" /></span>
       </span>
       <span class="zona-carta" aria-hidden="true"></span>
     </button>`;

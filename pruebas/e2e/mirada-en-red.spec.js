@@ -78,9 +78,19 @@ const firebaseFalso = `
   export const SUPPORT_EMAIL = "soporte@memorie-legends.com";
 `;
 
-/** Las cartas que el servidor de mentira revela, con la forma de `crearBaraja`. */
+/**
+ * Las cartas que el servidor de mentira revela, con la forma de `crearBaraja`.
+ *
+ * `imagen` va con la dirección VIEJA a propósito: es lo que tiene guardado una
+ * partida empezada antes de rediseñar las cartas. La mesa la dibuja con la de
+ * ahora, que arma con el palo y el número. Ver `caraDeCarta`.
+ */
 const SIETE = { id: "Oro-7", palo: "Oro", numero: 7, puntos: 7, imagen: "/assets/Oro/7.png" };
 const DOCE = { id: "Copa-12", palo: "Copa", numero: 12, puntos: 12, imagen: "/assets/Copa/12.png" };
+
+/** La cara que tiene que pedir la mesa: WebP y con versión. */
+const caraDe = (carta) =>
+  new RegExp(`/assets/${carta.palo}/${carta.numero}\\.webp\\?v=\\d+$`);
 
 const partidaFalsa = `
   const tapada = { oculta: true };
@@ -208,7 +218,7 @@ const carta = (page, jugador, pos) =>
 /** Boca arriba y con la cara que mandó el servidor. */
 async function seVe(page, jugador, pos, cual) {
   await expect(carta(page, jugador, pos), "la carta sigue de dorso").toHaveClass(/\bvisible\b/);
-  await expect(carta(page, jugador, pos).locator(".cara img")).toHaveAttribute("src", cual.imagen);
+  await expect(carta(page, jugador, pos).locator(".cara img")).toHaveAttribute("src", caraDe(cual));
 }
 
 test("la carta de la mirada inicial se da vuelta, y a los dos segundos se tapa", async ({ page }) => {
