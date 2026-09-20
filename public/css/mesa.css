@@ -1192,7 +1192,25 @@ body::before {
   100% { box-shadow: 0 0 0 22px rgba(212, 168, 67, 0); }
 }
 
+/* El número de posición de cada carta: 0, 1, 2, 3.
+   ─────────────────────────────────────────────────────────────────────────
+   NO SE VE JUGANDO
+   ─────────────────────────────────────────────────────────────────────────
+
+   Estaba dibujado en la esquina de las dieciséis cartas de la mesa, incluidas
+   las de los rivales. Sobre la mano propia era ruido —el jugador sabe dónde
+   tocó— y sobre la ajena, un dato que en la mesa de verdad no existe: para
+   señalar «la tercera de Bruno» hay que mirar y contar, que es justamente la
+   parte del juego que se está jugando.
+
+   El número NO se pierde para quien no ve la pantalla: viaja en el
+   `aria-label` del botón —«Posición 2, boca abajo»—, que es donde tiene que
+   estar. Lo que se saca es la tinta, no el dato.
+
+   Con `?debug-cartas=1` vuelve: ahí sirve para decir qué carta es cuál
+   mientras se miden tamaños. */
 .posicion {
+  display: none;
   position: absolute;
   bottom: 3px;
   left: 5px;
@@ -1202,6 +1220,8 @@ body::before {
   color: rgba(255, 255, 255, 0.6);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
 }
+
+.con-debug-cartas .posicion { display: block; }
 
 /* ==================================================== centro */
 

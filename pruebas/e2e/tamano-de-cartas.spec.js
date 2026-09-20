@@ -167,12 +167,32 @@ test("el cartel de medidas sólo aparece si se lo pide", async ({ page }) => {
   await expect(page.locator(".debug-cartas"), "el cartel de medidas se coló en la mesa")
     .toHaveCount(0);
 
+  /**
+   * Y con él, el número de posición de cada carta.
+   *
+   * Estaba dibujado en las dieciséis cartas de la mesa, las de los rivales
+   * incluidas: sobre la mano propia era ruido, y sobre la ajena un dato que en
+   * una mesa de verdad no existe. Sigue viajando en el `aria-label` del botón,
+   * que es donde lo necesita quien no ve la pantalla.
+   */
+  const numeros = page.locator(".carta .posicion");
+  await expect(numeros.first(), "la carta trae su número, oculto").toBeAttached();
+  await expect(numeros.first(), "el número de posición se ve jugando").toBeHidden();
+  await expect(
+    page.locator('.jugador.propio .mano > .carta').first(),
+    "y el número sigue anunciándose para quien no ve la pantalla",
+  ).toHaveAttribute("aria-label", /Posición \d/);
+
   await page.goto("/mesa.html?semilla=29&debug-cartas=1");
   await page.waitForSelector('.jugador[data-jugador="0"] .mano > .carta');
   const cartel = page.locator(".debug-cartas");
   await expect(cartel).toBeVisible();
   await expect(cartel).toContainText("mano:");
   await expect(cartel).toContainText("centro:");
+
+  // Y ahí sí: el número vuelve, que es para lo que sirve.
+  await expect(page.locator(".carta .posicion").first(),
+               "con la bandera puesta el número se ve").toBeVisible();
 });
 
 test("con siete cartas, la mano del teléfono se monta en vez de desaparecer", async ({

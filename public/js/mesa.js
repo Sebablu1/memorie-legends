@@ -1903,6 +1903,15 @@ async function cuentaRegresiva() {
 function encenderDebugDeCartas() {
   if (new URLSearchParams(location.search).get("debug-cartas") !== "1") return;
 
+  /**
+   * La marca que destapa el número de posición de cada carta.
+   *
+   * Va en la raíz y no en cada carta: las cartas se vuelven a dibujar enteras
+   * en cada jugada y habría que acordarse de ponérsela cada vez. Ver
+   * `.posicion` en mesa.css.
+   */
+  document.documentElement.classList.add("con-debug-cartas");
+
   const caja = document.createElement("div");
   caja.className = "debug-cartas";
   caja.setAttribute("aria-hidden", "true");
