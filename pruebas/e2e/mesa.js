@@ -55,7 +55,9 @@ export const SEL = {
  * un módulo ocurre antes de que corra una sola línea del juego, y engancharse
  * después no lo vería.
  */
-export async function abrirMesa(page, { semilla = SEMILLA, config, esperarMirada = true } = {}) {
+export async function abrirMesa(
+  page, { semilla = SEMILLA, config, esperarMirada = true, parametros = {} } = {},
+) {
   const errores = [];
 
   // Una `configMesa` a medida, para las pruebas que necesitan una mesa
@@ -118,7 +120,11 @@ export async function abrirMesa(page, { semilla = SEMILLA, config, esperarMirada
     }),
   );
 
-  await page.goto(`/mesa.html?semilla=${semilla}`);
+  // `parametros` son los interruptores de la URL —`debug-tiempos=1`,
+  // `debug-cartas=1`—, que van por acá y no con un `goto` suelto: la mesa
+  // exige sesión y quien la saltea es esta función.
+  const consulta = new URLSearchParams({ semilla: String(semilla), ...parametros });
+  await page.goto(`/mesa.html?${consulta}`);
   // Con `esperarMirada: false` se vuelve sin esperar a que la mesa pida elegir
   // carta. Lo necesita la prueba de la cuenta regresiva: lo que mide ocurre
   // ANTES de eso, y esperar acá sería llegar tarde a propio pedido.

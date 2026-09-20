@@ -40,6 +40,7 @@ import {
 
 
 import { crearTemporizadores, esperar } from "./modulos/temporizadores.js";
+import { crearMedidorDeTiempos, encenderPanelDeTiempos } from "./modulos/tiempos.js";
 import { crearInterfaz, escapar } from "./modulos/ui.js";
 import { mostrarCargando, ocultarCargando } from "./spinner.js";
 import {
@@ -579,8 +580,37 @@ async function heVuelto() {
  * se ve fácil en el diff; lo primero no.
  */
 const relojes = crearTemporizadores({ dom, msTurno: MS_TURNO });
-const correrTemporizador = relojes.correr;
-const cancelarTemporizador = relojes.cancelar;
+
+/**
+ * Cuánto dura de verdad cada fase.
+ *
+ * Mide siempre, aunque nadie mire: el panel de `?debug-tiempos=1` se puede
+ * abrir a mitad de partida y el historial tiene que estar entero. Cuesta un
+ * objeto por fase.
+ *
+ * Mide la BARRA GRANDE, que es el reloj de la fase: mirada, descarte, entrega
+ * y los poderes. El aro del turno es otro reloj, con su propio dibujo, y no
+ * pasa por acá.
+ */
+const tiempos = crearMedidorDeTiempos();
+
+const correrTemporizador = (ms, fase) => {
+  tiempos.abrir(fase ?? estadoDeFase(), ms);
+  relojes.correr(ms);
+};
+const cancelarTemporizador = () => {
+  tiempos.cerrar("cancelado");
+  relojes.cancelar();
+};
+
+/**
+ * El nombre por defecto de una fase medida: el que usa el motor.
+ *
+ * Sale de `estado` y no de la vista aunque se juegue en red: allá `estado` es
+ * lo que devuelve `comoEstado(vista)`, o sea la misma fase, y así esto no
+ * depende de una variable que se declara mil líneas más abajo.
+ */
+const estadoDeFase = () => estado?.fase ?? "?";
 const cancelarRelojTurno = relojes.cancelarRelojTurno;
 const pintarReloj = relojes.pintarReloj;
 // El remate se queda acá: qué hacer al llegar a cero depende de la partida.
@@ -963,6 +993,9 @@ function dibujar() {
   if (!enRed()) ojosDelRegistroLocal();
 
   dom.ronda.textContent = estado.ronda || "-";
+  // Las fases que vengan se anotan en esta ronda. Va acá porque el dibujado
+  // es lo único que corre en los dos modos cada vez que algo cambia.
+  tiempos.ronda(estado.ronda);
   // En red el estado llega después de montar la mesa: el límite y cuántos se
   // sentaron no se saben hasta el primer dibujado con datos.
   actualizarLema();
@@ -1903,6 +1936,19 @@ function encenderDebugDeCartas() {
 
 encenderDebugDeCartas();
 
+/**
+ * `?debug-tiempos=1`: el panel con lo que dura cada fase de verdad.
+ *
+ * Igual que el de las cartas: fuera del juego, sin toques, y sólo si se lo
+ * pide. `window.__tiempos` es la misma medición, para poder preguntarla desde
+ * una prueba sin leer la tabla del panel — y también sólo con la bandera
+ * puesta, porque una mesa normal no tiene por qué exponer nada.
+ */
+if (new URLSearchParams(location.search).get("debug-tiempos") === "1") {
+  window.__tiempos = tiempos;
+  encenderPanelDeTiempos(tiempos);
+}
+
 /** La primera ronda es la única que lleva cuenta regresiva. */
 let primeraRonda = true;
 
@@ -1956,7 +2002,7 @@ function faseMirada() {
     }
 
     pista("MIRÁ TU CARTA");
-    correrTemporizador(MS_ELEGIR_MIRADA);
+    correrTemporizador(MS_ELEGIR_MIRADA, "elegir mirada");
     dibujar();
 
     let resuelto = false;
@@ -1969,7 +2015,7 @@ function faseMirada() {
 
       estado = mirar(estado, YO, pos);
       pista("Memorizá esta carta…");
-      correrTemporizador(MS_MIRAR);
+      correrTemporizador(MS_MIRAR, "mirar");
       await revelarUnMomento(YO, pos);
       cancelarTemporizador();
 
@@ -2034,7 +2080,7 @@ function empezarEntregaLocal(objetivo) {
     vence: setTimeout(() => completarEntregaLocal(null), MS_PARA_ENTREGAR),
   };
   sonidos.aviso();
-  correrTemporizador(MS_PARA_ENTREGAR);
+  correrTemporizador(MS_PARA_ENTREGAR, "entrega");
   pista("¡Le acertaste! Elegí una carta tuya para entregarle.");
   dibujar();
 }
@@ -2063,7 +2109,7 @@ function completarEntregaLocal(posicion) {
 
   // Si la ventana sigue abierta, vuelve su reloj; si no, no queda ninguno.
   const resta = finDeLaVentana - Date.now();
-  if (manejadorDescarte && resta > 0) correrTemporizador(resta);
+  if (manejadorDescarte && resta > 0) correrTemporizador(resta, "descarte (resto)");
   else cancelarTemporizador();
 
   dibujar();
@@ -2174,7 +2220,7 @@ function faseDescarte(alCerrar, duracion = MS_DESCARTE, rotulo = "DESCARTE") {
     // nadie lee tres renglones: se mira la muestra y se toca. La regla se
     // aprende en "Cómo se juega", no en la ventana en la que hay que usarla.
     pista(rotulo);
-    correrTemporizador(duracion);
+    correrTemporizador(duracion, rotulo.toLowerCase());
     sonidos.aviso();
     dibujar();
 
@@ -3150,7 +3196,7 @@ dom.modal.addEventListener("click", async (evento) => {
     estado = r.estado;
     cerrarModal();
     pista("Memorizá…");
-    correrTemporizador(MS_MIRAR, "Mirando");
+    correrTemporizador(MS_MIRAR, "poder: mirar");
     // El que mira ve la carta; el resto de la mesa, sólo el aviso de que la
     // miró. Son dos cosas distintas y por eso van por caminos distintos.
     cartel(tipo);
@@ -4764,7 +4810,7 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
       }, resta),
     };
     sonidos.aviso();
-    correrTemporizador(resta);
+    correrTemporizador(resta, "entrega");
     pista("¡Le acertaste! Elegí <b>una carta tuya</b> para entregarle.");
     dibujar();
     return;

@@ -894,6 +894,35 @@ body::before {
 
 .debug-cartas b { color: var(--oro-claro); }
 
+/* El cartel de `?debug-tiempos=1`, del otro lado para que no se pisen.
+
+   Dice qué fase está corriendo, cuánto lleva y cuánto le queda, y debajo las
+   últimas doce ya cerradas con lo que se pidió, lo que duró y la diferencia.
+   Las que se desviaron más de medio segundo salen en rojo. */
+.debug-tiempos {
+  position: fixed;
+  right: 8px;
+  bottom: 8px;
+  z-index: 999;
+  pointer-events: none;
+  max-width: 260px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(5, 8, 14, 0.92);
+  border: 1px solid var(--vidrio-borde);
+  color: var(--texto-tenue);
+  font-size: 0.64rem;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+.debug-tiempos b { color: var(--oro-claro); }
+.debug-tiempos .en-curso { margin: 4px 0 6px; }
+.debug-tiempos table { border-collapse: collapse; width: 100%; }
+.debug-tiempos th { text-align: left; color: var(--oro); font-weight: 600; }
+.debug-tiempos td { padding-right: 6px; }
+.debug-tiempos .lejos td { color: #e08b7f; }
+
 /* ====================================================== mano */
 
 .mano {
