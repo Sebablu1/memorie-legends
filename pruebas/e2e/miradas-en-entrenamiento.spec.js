@@ -54,7 +54,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { abrirMesa, elegirCartaParaMirar } from "./mesa.js";
+import { abrirMesa, elegirCartaParaMirar, esperarPista } from "./mesa.js";
 
 /**
  * Mira la mesa durante `ms` y devuelve todas las cartas que llevaron marca,
@@ -97,6 +97,64 @@ function marcasQueAparecen(page, ms) {
     });
   }, ms);
 }
+
+test("durante la cuenta regresiva, tocar una carta no dice nada", async ({ browser }) => {
+  /**
+   * La fase ya es `mirar` mientras corre «3, 2, 1, Preparate…», pero
+   * `faseMirada` todavía no puso su manejador: un toque caía en la rama del
+   * «ya elegiste» y la mesa contestaba «una sola carta por ronda» a alguien
+   * que no había mirado ninguna. En red no pasaba, porque `miradaTodaviaCerrada`
+   * apaga las cartas hasta que la cuenta termina.
+   *
+   * Lo que se comprueba es lo que NO pasa: que el cartel no diga eso mientras
+   * la cuenta está a la vista.
+   *
+   * Con su propio contexto y SIN `reducedMotion`, que es lo que el resto de la
+   * suite pide: con movimiento reducido la cuenta no corre —`sinMovimiento`
+   * la saltea— y el caso no existiría.
+   */
+  const ctx = await browser.newContext({ baseURL: "http://localhost:5000" });
+  const page = await ctx.newPage();
+  await abrirMesa(page, { esperarMirada: false });
+
+  const cuenta = page.locator("#cuentaAtras");
+  await expect(cuenta).toBeVisible();
+
+  /**
+   * Se anota todo lo que el cartel diga desde ahora, y recién después se
+   * toca.
+   *
+   * Un `not.toContainText` no serviría: se cumple en el primer intento
+   * —antes de que el cartel llegue a cambiar— y pasa en verde aunque un
+   * instante más tarde aparezca el aviso. Lo que hay que comprobar es que no
+   * lo diga NUNCA, no que no lo diga todavía.
+   */
+  await page.evaluate(() => {
+    window.__dichos = [];
+    const pista = document.querySelector("#pista");
+    new MutationObserver(() => window.__dichos.push(pista.textContent))
+      .observe(pista, { childList: true, subtree: true, characterData: true });
+  });
+
+  await page.locator('.jugador[data-jugador="0"] .mano > .carta').first().click();
+
+  // Se deja correr la cuenta entera: si el aviso saliera, sale en este rato.
+  await expect(cuenta).toBeHidden();
+  const dichos = await page.evaluate(() => window.__dichos);
+  expect(
+    dichos.filter((t) => /carta por ronda/i.test(t)),
+    `la mesa contestó durante la cuenta: ${JSON.stringify(dichos)}`,
+  ).toHaveLength(0);
+
+  // Y después de mirar sí lo dice, que es su lugar: el toque de más.
+  await esperarPista(page, /tu carta/i);
+  const mias = page.locator('.jugador[data-jugador="0"] .mano > .carta');
+  await mias.first().click();
+  await mias.nth(1).click();
+  await expect(page.locator("#pista")).toContainText(/ya miraste/i);
+
+  await ctx.close();
+});
 
 test("la mirada inicial deja su marca también en entrenamiento", async ({ page }) => {
   await abrirMesa(page);

@@ -164,5 +164,30 @@ ok(M.MS_ELEGIR_MIRADA === 5000 && M.MS_MIRAR === 2000,
    "y son los 5 + 2 que dice el reglamento",
    { elegir: M.MS_ELEGIR_MIRADA, ver: M.MS_MIRAR });
 
+// =====================================================================
+console.log("\n=== 5. Las otras páginas cuentan lo mismo ===");
+// =====================================================================
+
+/**
+ * El tablero y la portada resumen las reglas en un párrafo, y un resumen que
+ * dice otra cosa es tan malo como un reglamento equivocado: la mayoría de los
+ * jugadores lee ESO y no la página entera.
+ *
+ * Los dos decían «durante 2 segundos» y «supera 150 puntos» cuando ya había
+ * cinco segundos para elegir y partidas de 60 y de 100.
+ */
+const RESUMENES = ["dashboard.html", "index.html"];
+
+for (const nombre of RESUMENES) {
+  const otra = readFileSync(new URL(`../public/${nombre}`, import.meta.url), "utf8")
+    .replace(/<!--[\s\S]*?-->/g, " ");
+  const suTexto = otra.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+
+  ok(!/cuatro cartas durante 2 segundos/i.test(suTexto),
+     `${nombre} no dice que la mirada dure 2 segundos`);
+  ok(!/supera\s*(<b>)?\s*150 puntos/i.test(otra) && !/supera 150 queda/i.test(suTexto),
+     `${nombre} no da los 150 puntos por único límite`);
+}
+
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);
 process.exit(fallos ? 1 : 0);

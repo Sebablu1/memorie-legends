@@ -55,7 +55,7 @@ export const SEL = {
  * un módulo ocurre antes de que corra una sola línea del juego, y engancharse
  * después no lo vería.
  */
-export async function abrirMesa(page, { semilla = SEMILLA, config } = {}) {
+export async function abrirMesa(page, { semilla = SEMILLA, config, esperarMirada = true } = {}) {
   const errores = [];
 
   // Una `configMesa` a medida, para las pruebas que necesitan una mesa
@@ -119,7 +119,10 @@ export async function abrirMesa(page, { semilla = SEMILLA, config } = {}) {
   );
 
   await page.goto(`/mesa.html?semilla=${semilla}`);
-  await expect(page.locator(SEL.pista)).toContainText(/Elegí|carta/i);
+  // Con `esperarMirada: false` se vuelve sin esperar a que la mesa pida elegir
+  // carta. Lo necesita la prueba de la cuenta regresiva: lo que mide ocurre
+  // ANTES de eso, y esperar acá sería llegar tarde a propio pedido.
+  if (esperarMirada) await expect(page.locator(SEL.pista)).toContainText(/Elegí|carta/i);
   return errores;
 }
 

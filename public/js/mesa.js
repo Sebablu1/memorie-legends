@@ -1834,6 +1834,9 @@ function pintarPasoDeLaCuenta(numero, paso) {
  * En red no corre ésta sino `cuentaRegresivaEnRed`, que cuenta contra el
  * reloj del servidor.
  */
+/** Mientras corre, tocar una carta no hace nada Y NO DICE NADA. */
+let enCuentaRegresiva = false;
+
 async function cuentaRegresiva() {
   if (enRed() || sinMovimiento()) return;
 
@@ -1841,12 +1844,17 @@ async function cuentaRegresiva() {
   const numero = $("cuentaAtrasNumero");
   if (!caja || !numero) return;
 
+  enCuentaRegresiva = true;
   caja.hidden = false;
-  for (const paso of PASOS_DE_LA_CUENTA) {
-    pintarPasoDeLaCuenta(numero, paso);
-    await esperar(MS_POR_PASO);
+  try {
+    for (const paso of PASOS_DE_LA_CUENTA) {
+      pintarPasoDeLaCuenta(numero, paso);
+      await esperar(MS_POR_PASO);
+    }
+  } finally {
+    caja.hidden = true;
+    enCuentaRegresiva = false;
   }
-  caja.hidden = true;
 }
 
 /**
@@ -2027,7 +2035,7 @@ function empezarEntregaLocal(objetivo) {
   };
   sonidos.aviso();
   correrTemporizador(MS_PARA_ENTREGAR);
-  pista("¡Le acertaste! Elegí una carta tuya para darle.");
+  pista("¡Le acertaste! Elegí una carta tuya para entregarle.");
   dibujar();
 }
 
@@ -2759,9 +2767,19 @@ document.addEventListener("click", async (evento) => {
     if (manejadorMirada) {
       manejadorMirada(posicion);
     } else {
+      /**
+       * Durante la cuenta regresiva no se dice nada.
+       *
+       * La fase ya es `mirar` pero `faseMirada` todavía no puso su manejador,
+       * así que un toque caía acá y la mesa contestaba «una sola carta por
+       * ronda» a alguien que no había mirado ninguna. En red no pasaba:
+       * `miradaTodaviaCerrada` apaga las cartas hasta que la cuenta termina.
+       */
+      if (enCuentaRegresiva) return;
+
       // Ya eligió: se explica por qué no pasa nada, en vez de ignorar el clic.
       sonidos.error();
-      pista("⚠️ Una sola carta por ronda");
+      pista("⚠️ Ya miraste: una carta por ronda");
       const carta = cartaEl;
       carta.classList.add("rechazada");
       setTimeout(() => carta.classList.remove("rechazada"), 600);
@@ -4747,7 +4765,7 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
     };
     sonidos.aviso();
     correrTemporizador(resta);
-    pista("¡Le acertaste! Elegí <b>una carta tuya</b> para darle.");
+    pista("¡Le acertaste! Elegí <b>una carta tuya</b> para entregarle.");
     dibujar();
     return;
   }
