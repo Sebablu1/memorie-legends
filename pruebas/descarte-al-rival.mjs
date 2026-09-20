@@ -6,7 +6,7 @@
  * ─────────────────────────────────────────────────────────────────────────
  *
  * Sólo se puede intentar sobre una carta del rival que se CONOCE. Se conoce
- * por un 8, por un 10, por el castigo de un error —que ven todos—, o porque
+ * por un 8, por un 10, por la carta que alguien falló —que ven todos—, o porque
  * una carta que uno conocía pasó a su mano. El conocimiento viaja con la
  * carta cuando se mueve, y se pierde cuando sale de la mesa. El 7 nunca da
  * conocimiento de una carta ajena.
@@ -213,46 +213,69 @@ console.log("\n=== 7. El 9 no muestra nada, pero se puede seguir una carta conoc
   ok(b.jugadores[C].mano[0].id === "Basto-5", "C se llevó el 5 de B");
   ok(donde(b, A) === en([C, 0]), "y lo sigo hasta la mano de C", M.posicionesAtacablesDe(b, A));
 
-  // c) Una carta de castigo —que ven todos— que después se mueve con un 9.
+  // c) La carta que alguien falló —que ven todos— y después se mueve con un 9.
+  //
+  //     Antes acá se seguía la carta de CASTIGO, que también se mostraba. Ya
+  //     no: el castigo entra boca abajo. Lo que queda conocido es la carta que
+  //     se tocó mal, y es ésa la que se puede seguir.
   const fallo = M.intentarDescarte(enVentana(mesa()), B, 0);   // B falla con su 7
-  const castigo = fallo.ventanaDescarte.intentos.at(-1).castigo;
+  const fallada = fallo.jugadores[B].mano[0];
   const cerrado = M.cerrarVentanaDescarte(fallo);
-  const c = nueve(cerrado, D, 3, B, castigo.posicion);    // D se la lleva a su posición 3
-  ok(c.jugadores[D].mano[3].id === castigo.carta.id, "D se llevó el castigo de B");
-  ok(M.puedeAtacarEn(c, A, D, 3), "y lo sigo hasta la mano de D");
-  ok(!M.puedeAtacarEn(c, A, B, castigo.posicion), "ya no está en la de B");
-  ok(M.puedeAtacarEn(c, B, D, 3), "B también lo sigue: lo vio entrar en su mano");
+  const c = nueve(cerrado, D, 3, B, 0);                  // D se la lleva a su posición 3
+  ok(c.jugadores[D].mano[3].id === fallada.id, "D se llevó la carta que B falló");
+  ok(M.puedeAtacarEn(c, A, D, 3), "y la sigo hasta la mano de D");
+  ok(!M.puedeAtacarEn(c, A, B, 0), "ya no está en la de B");
+  ok(M.puedeAtacarEn(c, B, D, 3), "B también la sigue: la vio entrar en su mano");
 }
 
 // ==================================================================== 8
 
-console.log("\n=== 8. La carta de castigo de un error la ven todos ===");
+console.log("\n=== 8. La carta de castigo NO la ve nadie ===");
 {
+  /**
+   * Se mostraba a los cuatro y quedaba conocida, así que errar costaba dos
+   * cosas: una carta más Y una carta marcada que los otros tres podían
+   * descartarle en cuanto saliera su número.
+   *
+   * Lo que se castiga es el error. La carta que entra es nueva, nadie la
+   * jugó mal, y no tiene por qué nacer marcada.
+   */
+
   // Descarte propio errado.
   const s = enVentana(mesa());
   const r = M.intentarDescarte(s, B, 0);                  // B falla con su 7
-  const castigo = r.ventanaDescarte.intentos.at(-1).castigo;
-  ok(castigo?.indiceJugador === B && castigo?.posicion === 4, "el castigo es de B, al final", castigo);
+  const intento = r.ventanaDescarte.intentos.at(-1);
+  ok(intento.castigo === undefined, "el intento no lleva ninguna carta de castigo", intento.castigo);
+
+  const entro = r.jugadores[B].mano[4];
+  ok(Boolean(entro), "B recibió su castigo, al final de la mano", entro?.id);
 
   for (const quien of [A, B, C, D]) {
     const v = V.vistaDe(r, quien);
-    ok(v.jugadores[B].mano[castigo.posicion]?.id === castigo.carta.id,
-       `el jugador ${"ABCD"[quien]} la ve`);
-    ok(V.filtracionesEn(v, r).length === 0, `sin filtrar nada más (${"ABCD"[quien]})`);
-    ok(M.conoceCarta(r, quien, castigo.carta.id), `y ${"ABCD"[quien]} la conoce desde ahora`);
+    ok(v.jugadores[B].mano[4]?.oculta === true,
+       `el jugador ${"ABCD"[quien]} NO la ve`, v.jugadores[B].mano[4]);
+    ok(V.filtracionesEn(v, r).length === 0, `sin filtrar nada (${"ABCD"[quien]})`);
+    ok(!M.conoceCarta(r, quien, entro.id), `y ${"ABCD"[quien]} no la conoce`);
   }
-  ok([A, C, D].every((i) => M.puedeAtacarEn(r, i, B, castigo.posicion)),
-     "los tres rivales pueden ir sobre ella");
+  ok([A, C, D].every((i) => !M.puedeAtacarEn(r, i, B, 4)),
+     "así que nadie puede ir sobre ella");
 
-  // Ataque errado: el castigo es de quien atacó, y también lo ven todos.
+  // Lo que SÍ queda expuesto es la carta que se tocó mal.
+  ok(intento.carta?.id === r.jugadores[B].mano[0]?.id, "la fallada sí viaja en el intento");
+  ok([A, C, D].every((i) => M.puedeAtacarEn(r, i, B, 0)),
+     "y sobre ésa sí pueden ir los tres");
+
+  // Ataque errado: el castigo es de quien atacó, y tampoco lo ve nadie.
   const t = M.intentarDescarteRival(enVentana(ocho(mesa(), A, B, 0)), A, B, 0, 0);
-  const suyo = t.ventanaDescarte.intentos.at(-1).castigo;
-  ok(suyo?.indiceJugador === A, "al errar un ataque, el castigo es de quien atacó", suyo);
-  ok(V.revelacionesDe(t).some((x) => x.indiceJugador === A && x.carta.id === suyo.carta.id),
-     "y viaja entre las revelaciones de la mesa");
-  ok([B, C, D].every((i) => M.puedeAtacarEn(t, i, A, suyo.posicion)), "y los demás pueden ir sobre él");
+  const suyo = t.ventanaDescarte.intentos.at(-1);
+  ok(suyo.castigo === undefined, "al errar un ataque, el castigo tampoco viaja", suyo.castigo);
+  const entroA = t.jugadores[A].mano.at(-1);
+  ok(!V.revelacionesDe(t).some((x) => x.carta?.id === entroA.id),
+     "no está entre las revelaciones de la mesa");
+  ok([B, C, D].every((i) => !M.puedeAtacarEn(t, i, A, t.jugadores[A].mano.length - 1)),
+     "y nadie puede ir sobre él");
 
-  // Un acierto tarde NO muestra el castigo: la regla habla de errar.
+  // Un acierto tarde tampoco muestra el suyo, como siempre.
   const primero = M.intentarDescarte(enVentana(mesa()), B, 1);    // B descarta su 5: primero
   const tarde = M.intentarDescarte(primero, C, 1);                // C descarta su 5: tarde
   ok(tarde.ventanaDescarte.intentos.at(-1).resultado === "tarde", "C llegó tarde");
@@ -496,24 +519,39 @@ console.log("\n=== 12. En red, el servidor aplica la misma regla ===");
   ok(miaDespues === miaAntes - 1 + 2, "a: una menos por el acierto, dos más por los errores",
      { antes: miaAntes, despues: miaDespues });
 
-  const castigos = resuelta.ventanaDescarte.intentos.map((i) => i.castigo).filter(Boolean);
-  ok(castigos.length === 2, "dos castigos, uno por error", castigos.length);
+  /**
+   * Los dos castigos entraron, y no los vio nadie.
+   *
+   * Se mostraban, y errar un ataque costaba dos cosas: la carta de más y una
+   * carta marcada que los otros tres podían descartarle. Lo que se castiga es
+   * el error; la carta que entra no tiene por qué nacer marcada.
+   */
+  ok(resuelta.ventanaDescarte.intentos.every((i) => i.castigo === undefined),
+     "ningún intento lleva la carta de castigo");
+
+  const entraron = resuelta.jugadores[0].mano.filter(Boolean).slice(-2);
+  ok(entraron.length === 2, "a recibió sus dos cartas de castigo", entraron.length);
   for (const u of UIDS) {
     const mano = m.vista(u).jugadores[0].mano;
-    ok(castigos.every((k) => mano[k.posicion]?.id === k.carta.id),
-       `${u} ve los dos castigos de a mientras dura la revelación`);
+    const posiciones = resuelta.jugadores[0].mano
+      .map((c, i) => (c && entraron.some((k) => k.id === c.id) ? i : null))
+      .filter((i) => i !== null);
+    ok(posiciones.every((p) => mano[p]?.oculta === true),
+       `${u} NO ve los castigos de a, ni durante la revelación`);
   }
-  ok(castigos.every((k) => [0, 1, 2, 3].every((i) => M.conoceCarta(resuelta, i, k.carta.id))),
-     "y los cuatro los conocen");
+  ok(entraron.every((k) => [0, 1, 2, 3].every((i) => !M.conoceCarta(resuelta, i, k.id))),
+     "y no los conoce nadie");
 
-  // Pasada la revelación, las cartas se tapan pero lo conocido queda.
+  // Pasada la revelación, lo que se había expuesto se tapa y lo conocido
+  // queda. Los castigos siguen sin estar ni en una lista ni en la otra.
   m.adelantar(MS_REVELACION + 1);
   await m.golpe();
   const b = m.vista("b");
-  ok(castigos.every((k) => b.jugadores[0].mano[k.posicion]?.oculta),
-     "después se tapan");
-  ok(castigos.every((k) => b.puedeAtacarEn.some((x) => x.objetivo === 0 && x.posicion === k.posicion)),
-     "y b los sigue teniendo marcados como atacables");
+  ok(b.jugadores[0].mano.every((c) => c === null || c.oculta),
+     "la mano de a vuelve a estar tapada entera");
+  ok(!b.puedeAtacarEn.some((x) => x.objetivo === 0),
+     "y b no tiene nada marcado sobre a: los castigos no le dieron ningún derecho",
+     b.puedeAtacarEn);
   ok(V.filtracionesEn(b, m.partida().estado).length === 0, "sin filtraciones");
 }
 

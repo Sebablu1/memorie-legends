@@ -222,15 +222,20 @@ console.log("\n=== 4. Equivocarse cuesta, y se puede volver a intentar ===");
   const igual = M.intentarDescarteRival(s, 0, 1, 2, 0);   // Y[2]: no la conoce
   ok(igual === s, "sobre una carta que no conoce no hay intento, ni castigo");
 
-  // La de castigo se ve y la conocen todos.
-  const castigo = primero.castigo;
-  ok(castigo?.indiceJugador === 0 && castigo?.posicion === antesX,
-     "el castigo es de X y entra al final de su mano", castigo);
-  ok(s.jugadores[0].mano[castigo?.posicion]?.id === castigo?.carta?.id, "es la carta que está ahí");
-  ok([0, 1, 2].every((i) => M.conoceCarta(s, i, castigo?.carta?.id)),
-     "y la conocen los tres, X incluido");
-  ok(M.puedeAtacarEn(s, 1, 0, castigo?.posicion) && M.puedeAtacarEn(s, 2, 0, castigo?.posicion),
-     "así que Y y Z pueden ir sobre ella");
+  /**
+   * La de castigo entra BOCA ABAJO, y nadie la conoce.
+   *
+   * Se mostraba, y errar un ataque costaba dos cosas: una carta más y una
+   * carta marcada que los otros dos podían descartarle en cuanto saliera su
+   * número. Lo que se castiga es el error, no la carta que entra.
+   */
+  ok(primero.castigo === undefined, "el intento no lleva la carta de castigo", primero.castigo);
+  const entroX = s.jugadores[0].mano[antesX];
+  ok(Boolean(entroX), "X sí recibió su castigo", entroX?.id);
+  ok([0, 1, 2].every((i) => !M.conoceCarta(s, i, entroX.id)),
+     "pero no la conoce nadie, ni el que la recibió");
+  ok(!M.puedeAtacarEn(s, 1, 0, antesX) && !M.puedeAtacarEn(s, 2, 0, antesX),
+     "así que nadie puede ir sobre ella");
 
   // Ahora sí: el 5.
   s = M.intentarDescarteRival(s, 0, 1, 1, 0);   // Y[1] = 5 → acierto

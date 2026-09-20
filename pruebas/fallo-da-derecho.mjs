@@ -112,14 +112,15 @@ console.log("\n=== 1. Fallar le da derecho a los demás, y sólo ahí ===");
   }
 
   /**
-   * Lo atacable es exactamente la fallada y la de castigo.
+   * Lo atacable es exactamente la fallada, y nada más.
    *
-   * Si apareciera cualquier otra posición, el fallo estaría regalando la mano
-   * entera.
+   * La de castigo entra boca abajo desde que se dejó de mostrar: nadie la
+   * vio, así que nadie la conoce. Si apareciera cualquier otra posición, el
+   * fallo estaría regalando la mano entera.
    */
   ok(JSON.stringify(M.posicionesAtacablesDe(tras, 1)) ===
-       '[{"objetivo":0,"posicion":1},{"objetivo":0,"posicion":3}]',
-     "el fallo da derecho sobre la fallada y el castigo, y nada más",
+       '[{"objetivo":0,"posicion":1}]',
+     "el fallo da derecho sobre la fallada, y nada más",
      M.posicionesAtacablesDe(tras, 1));
 
   // El que falló no gana derecho sobre sí mismo.

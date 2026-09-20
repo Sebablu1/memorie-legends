@@ -70,18 +70,25 @@ for (const quien of [0, 1, 2, 3]) {
   if (cartaEnVista?.id !== expuesta.id) { fallos++; console.log("  ✗ el jugador", quien, "no ve la carta expuesta"); }
 }
 ok(true, "los cuatro jugadores ven la carta que se expuso");
-// Un error deja DOS cartas a la vista: la fallada y la de castigo, que entra
-// al final de la mano. Las otras siguen tapadas.
-const castigo = destapadas[0].castigo;
-ok(castigo?.posicion === e.jugadores[2].mano.length - 1,
-   "la de castigo entra al final de la mano", castigo?.posicion);
-ok(vistaDe(e, 0).jugadores[2].mano[castigo?.posicion]?.id === castigo?.carta?.id,
-   "y los demás la ven");
+/**
+ * Un error deja UNA sola carta a la vista: la que se falló.
+ *
+ * La de castigo entra al final de la mano BOCA ABAJO. Se mostraba, y el
+ * castigo pegaba dos veces: una carta más y una carta que los otros tres
+ * podían descartarle en cuanto saliera su número.
+ */
+const ultima = e.jugadores[2].mano.length - 1;
+ok(destapadas[0].castigo === undefined,
+   "el intento no lleva ninguna carta de castigo", destapadas[0].castigo);
+ok(vistaDe(e, 0).jugadores[2].mano[ultima]?.oculta === true,
+   "la de castigo entra tapada para los demás", vistaDe(e, 0).jugadores[2].mano[ultima]);
+ok(vistaDe(e, 2).jugadores[2].mano[ultima]?.oculta === true,
+   "y también para quien la recibió: no la vio nadie");
 const visibles = vistaDe(e, 0).jugadores[2].mano
   .map((c, p) => (c && !c.oculta ? p : null))
   .filter((p) => p !== null);
-ok(JSON.stringify(visibles) === JSON.stringify([posMala, castigo?.posicion].sort((a, b) => a - b)),
-   "y sólo esas dos: el resto de esa mano sigue tapado", visibles);
+ok(JSON.stringify(visibles) === JSON.stringify([posMala]),
+   "y sólo esa: el resto de esa mano sigue tapado", visibles);
 ok(filtracionesEn(vistaDe(e, 0), e).length === 0, "exponer una carta no cuenta como filtración");
 
 // Y en cuanto se cierra la ventana, esa información desaparece de la vista:

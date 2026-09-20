@@ -555,18 +555,34 @@ export function intentarDescarte(estado, indiceJugador, posicion) {
   const resultado = correcto ? (fuePrimero ? "primero" : "tarde") : "error";
 
   /**
-   * Un error deja DOS cartas a la vista de los cuatro, y las dos quedan
-   * conocidas: la que se falló, que sigue en su lugar, y la de castigo, que
-   * entra al final de la mano.
+   * Un error deja UNA carta a la vista de los cuatro: la que se falló, que
+   * sigue en su lugar. Desde ahí queda conocida y cualquiera puede intentar
+   * descartársela.
    *
-   * SÓLO el error, nunca el acierto tarde. Los dos exponen la carta tocada,
-   * pero sólo el error regala el derecho sobre ella y sólo el error muestra el
-   * castigo: así fallar sigue siendo peor que llegar tarde, y llegar tarde
-   * peor que ser primero.
+   * La de castigo NO. Entra al final de la mano boca abajo y no la ve nadie,
+   * ni siquiera quien la recibe.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * POR QUÉ SE DEJÓ DE MOSTRAR
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Se mostraba, y el castigo terminaba pegando dos veces: una carta más Y
+   * una carta conocida por los otros tres, que podían descartársela en
+   * cuanto saliera su número. Equivocarse en la ventana de reflejos —que
+   * dura cinco segundos y se juega por instinto— salía más caro que
+   * cualquier otra cosa del juego.
+   *
+   * Lo que se castiga es el error: la carta que se tocó queda expuesta, y con
+   * eso alcanza. Lo que entra de castigo es una carta nueva, que nadie jugó
+   * mal, y no tiene por qué nacer marcada.
+   *
+   * SÓLO el error expone, nunca el acierto tarde: los dos muestran la carta
+   * tocada, pero sólo el error regala el derecho sobre ella. Así fallar sigue
+   * siendo peor que llegar tarde, y llegar tarde peor que ser primero.
    */
   const conocimientos =
     resultado === "error"
-      ? conocerCastigo(estado, recordarFallo(estado, carta), castigo)
+      ? recordarFallo(estado, carta)
       : (estado.conocimientos ?? []);
 
   return anotar(
@@ -595,7 +611,6 @@ export function intentarDescarte(estado, indiceJugador, posicion) {
             posicion,
             resultado,
             carta: fuePrimero ? null : carta,
-            ...castigoALaVista(resultado === "error", indiceJugador, mano.length - 1, castigo),
           },
         ],
       },
@@ -757,27 +772,18 @@ function recordarFallo(estado, carta) {
 }
 
 /**
- * La de castigo de un error se muestra a los cuatro, y desde ahí la conocen
- * todos: se sabe que la tiene, y dónde.
- */
-function conocerCastigo(estado, conocimientos, castigo) {
-  return conocer(conocimientos, enJuego(estado), castigo, "castigo", estado.ronda);
-}
-
-/** Lo que el intento lleva de la carta de castigo: nada, salvo en un error. */
-const castigoALaVista = (esError, indiceJugador, posicion, carta) =>
-  esError && carta ? { castigo: { indiceJugador, posicion, carta } } : {};
-
-/**
  * Qué cartas quedaron a la vista de la mesa en una ventana, y dónde.
  *
- * Dos por intento, como mucho: la carta que se tocó —salvo la del primero,
- * que ya está en el descarte, y la del rival acertada, que también— y la de
- * castigo de un error.
+ * UNA por intento, como mucho: la carta que se tocó — salvo la del primero,
+ * que ya está en el descarte, y la del rival acertada, que también.
+ *
+ * La de castigo no está en esta lista y no puede estarlo: entra boca abajo.
+ * Se mostraba, y era un segundo castigo encima del primero — ver
+ * `intentarDescarte`.
  *
  * Una sola lista para los tres que la leen: la vista que arma el servidor, la
- * mesa de entrenamiento y la memoria de la IA. Con una lista por lugar, la
- * carta de castigo se habría mostrado en un modo y en el otro no.
+ * mesa de entrenamiento y la memoria de la IA. Con una lista por lugar, una
+ * carta se habría mostrado en un modo y en el otro no.
  */
 export function cartasExpuestas(intentos = []) {
   const salida = [];
@@ -787,13 +793,6 @@ export function cartasExpuestas(intentos = []) {
         indiceJugador: intento.indiceJugador,
         posicion: intento.posicion,
         carta: intento.carta,
-      });
-    }
-    if (intento.castigo?.carta) {
-      salida.push({
-        indiceJugador: intento.castigo.indiceJugador,
-        posicion: intento.castigo.posicion,
-        carta: intento.castigo.carta,
       });
     }
   }
@@ -909,9 +908,10 @@ export function intentarDescarteRival(
     // sabía de ella. La entregada conserva su `id`, así que quien ya la
     // conocía —el que la dio, si la había visto— la sigue en su lugar nuevo.
   } else {
+    // La de castigo entra boca abajo, como en cualquier error: ver el
+    // comentario de `intentarDescarte`.
     castigo = mazo.length ? mazo.shift() : null;
     manoActor.push(castigo);
-    conocimientos = conocerCastigo(estado, conocimientos, castigo);
   }
 
   return anotar(
@@ -940,7 +940,6 @@ export function intentarDescarteRival(
             carta: correcto ? null : carta,
             // Para que la mesa pueda decir que la carta la eligió el azar.
             ...(alAzar ? { entregaAlAzar: true } : {}),
-            ...castigoALaVista(!correcto, actor, manoActor.length - 1, castigo),
           },
         ],
       },

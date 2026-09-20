@@ -94,12 +94,29 @@ ok(!("infoPublica" in s), "no existe ningún registro permanente de exposiciones
 
 console.log("\n=== La revelación es efímera y la ven todos ===");
 const reveladas = V.revelacionesDe(s);
-ok(reveladas.length === 3, "se destapan tres cartas: la de B, la de C y el castigo de C", reveladas.length);
-ok(reveladas.every((r) => r.carta), "las tres vienen con su carta");
+ok(reveladas.length === 2, "se destapan dos cartas: la de B y la de C", reveladas.length);
+ok(reveladas.every((r) => r.carta), "las dos vienen con su carta");
 ok(reveladas.filter((r) => r.indiceJugador === 1).length === 1,
-   "B, que llegó tarde, muestra sólo la suya: su castigo va boca abajo");
-ok(reveladas.filter((r) => r.indiceJugador === 2).length === 2,
-   "C, que se equivocó, muestra la que falló y la de castigo");
+   "B, que llegó tarde, muestra la que tocó");
+ok(reveladas.filter((r) => r.indiceJugador === 2).length === 1,
+   "y C, que se equivocó, también: una sola, la que falló");
+
+/**
+ * Y la de castigo NO, ni en el error ni en el acierto tarde.
+ *
+ * Se mostraba en el error, y el castigo pegaba dos veces: una carta más Y
+ * una carta conocida por los otros tres, que podían descartársela en cuanto
+ * saliera su número. Equivocarse en cinco segundos de reflejos salía más caro
+ * que cualquier otra cosa del juego.
+ */
+const castigoDeC = s.jugadores[2].mano.at(-1);
+ok(Boolean(castigoDeC), "C recibió su carta de castigo", castigoDeC?.id);
+ok(!reveladas.some((r) => r.carta?.id === castigoDeC.id),
+   "LA CARTA DE CASTIGO NO SE MUESTRA", reveladas.map((r) => r.carta?.id));
+ok(!s.ventanaDescarte.intentos.some((i) => i.castigo),
+   "y el intento ni siquiera la lleva: no hay nada que filtrar");
+ok(!M.conoceCarta(s, 0, castigoDeC.id),
+   "nadie la conoce, así que nadie puede descartársela");
 ok(!reveladas.some((r) => r.indiceJugador === 0), "la de A no se destapa: ya está en el descarte");
 
 for (const quien of [0, 1, 2]) {

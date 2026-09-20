@@ -142,6 +142,8 @@ const PROHIBIDAS = [
   [/la descartás igual/i, "el acierto tarde NO descarta la carta: la conserva y suma una"],
   [/Mirada · 2 segundos/i, "la mirada no dura 2 segundos: son 5 para elegir y 2 para ver"],
   [/por debajo de\s*<b>150 puntos<\/b>/i, "el límite no es siempre 150: la mesa lo elige"],
+  [/de castigo también se muestra|castigo de un error se muestra/i,
+   "la carta de castigo ya no se muestra: entra boca abajo"],
 ];
 
 ok(reglas.length > 0 && reglas.length < pagina.length,
@@ -158,6 +160,8 @@ const EXIGIDAS = [
   [/5 segundos para elegir, 2 para ver/i, "la mirada, con sus dos tiempos"],
   [/60 milisegundos/i, "el empate técnico y su sorteo determinista"],
   [/Anexo de cambios/i, "el anexo que cuenta qué cambió"],
+  [/castigo entra <b>boca abajo<\/b>|castigo entra\s+<b>boca abajo/i,
+   "que la carta de castigo entra boca abajo"],
 ];
 
 for (const [patron, que] of EXIGIDAS) {
