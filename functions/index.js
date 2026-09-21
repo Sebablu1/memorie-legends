@@ -43,13 +43,17 @@ import {
   MOTIVOS,
   MONEDA,
   claveDeEntrada,
+  motivoDeEntrada,
+  bolsillosDe,
 } from "./reglas/economia.js";
+import { JUEGO_POR_DEFECTO, juegoDe } from "./reglas/juegos.js";
 
 import { PUESTO_MENSUAL_CON_INSIGNIA } from "./reglas/insignias.js";
 
 import { crearMoverLeyendas } from "./leyendas.js";
 import { crearAbandonarPartida } from "./abandono.js";
 import { crearSalasPrivadas } from "./salas-privadas.js";
+import { crearSalasPublicas } from "./salas-publicas.js";
 import { crearMotorEnRed } from "./partida-red.js";
 import { crearCierre } from "./cierre.js";
 import { crearPacks } from "./packs.js";
@@ -88,6 +92,8 @@ import {
   EsquemaCancelarSala,
   EsquemaEditarSala,
   EsquemaLimpiarSalas,
+  EsquemaCrearSalaPublica,
+  EsquemaEditarSalaPublica,
 } from "./esquemas.js";
 import { crearSalirDeSalaEnEspera } from "./salida.js";
 import { crearAdmin } from "./admin.js";
@@ -103,6 +109,7 @@ import {
   esEntradaValida,
   puedeUnirse,
   puedeRevancha,
+  anfitrionDe,
   generarCodigo,
   esCodigoValido,
 } from "./reglas/salas.js";
@@ -372,7 +379,9 @@ async function abrirSalaEn(tx, { codigo, uid, entrada, nombre, nombreJugador, lu
   const r = await moverLeyendas(tx, {
     uid,
     delta: -entrada,
-    motivo: MOTIVOS.ENTRADA_PARTIDA,
+    // Lo decide la sala que se está abriendo: la revancha de una mesa pública
+    // trae `soloGanadas` en `extra`, y se cobra sólo de lo ganado.
+    motivo: motivoDeEntrada(extra),
     referencia: codigo,
     idempotencia: claveDeEntrada(codigo, uid),
   });
@@ -382,6 +391,9 @@ async function abrirSalaEn(tx, { codigo, uid, entrada, nombre, nombreJugador, lu
     codigo,
     nombre,
     modo: "leyendas",
+    // De qué juego es: ver `reglas/juegos.js`. Una revancha trae el de la sala
+    // original en `extra`, que va al final y manda.
+    juego: JUEGO_POR_DEFECTO,
     entrada,
     creador: uid,
     creadorNombre: nombreJugador,
@@ -408,9 +420,27 @@ async function abrirSalaEn(tx, { codigo, uid, entrada, nombre, nombreJugador, lu
   return refSala;
 }
 
-/** Crea una sala por Leyendas desde el tablero, y cobra la entrada. */
+/**
+ * Crea una sala normal —listada— y cobra la entrada. Ya no la usa nadie más
+ * que la administración.
+ *
+ * Las salas que abren los jugadores son privadas, y las públicas las abre la
+ * administración con `crearSalaPublica`. Esta función abría salas normales
+ * desde el tablero viejo y se va con el tablero nuevo; mientras tanto la regla
+ * de roles vale desde ya: un usuario común recibe un mensaje que le dice qué
+ * hacer, y no el «no es para vos» del panel, que a quien tenga abierta una
+ * página vieja no le serviría de nada.
+ */
 export const crearSala = functions.https.onCall(async (data, context) => {
   const uid = exigirSesion(context, "crearSala");
+
+  if (!(await administradores.es(context))) {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Las salas que abren los jugadores ahora son privadas. Recargá la página y creá una sala privada.",
+    );
+  }
+
   const entrada = Number(data?.entrada);
   const nombre = String(data?.nombre ?? "Sala").slice(0, 40);
 
@@ -592,6 +622,14 @@ export const revanchaDeSala = functions.https.onCall(async (data, context) => {
              * autorizar—. Es sólo dejar de ofrecérsela a quien no estuvo.
              */
             listada: false,
+            // El mismo juego que la sala original.
+            juego: juegoDe(sala),
+            /**
+             * La revancha de una mesa pública se sigue pagando sólo con
+             * ganadas: la juegan los mismos, por lo mismo. No se lista —no es
+             * `publica`—, pero cobra como una.
+             */
+            ...(sala.soloGanadas === true ? { soloGanadas: true } : {}),
           },
         });
 
@@ -653,10 +691,14 @@ async function sumarseALaSala(
   tx, { refSala, sala, codigo, uid, nombreJugador, luce, conCodigo = false },
 ) {
   const snapUsuario = await tx.get(db.collection(USUARIOS).doc(uid));
-  const saldo = snapUsuario.exists ? (snapUsuario.data()[CAMPO_SALDO] ?? 0) : 0;
+  const perfil = snapUsuario.exists ? snapUsuario.data() : {};
+  const saldo = perfil[CAMPO_SALDO] ?? 0;
+  // Las ganadas, con la misma cuenta que usa `moverLeyendas` para cobrar: una
+  // mesa pública se paga sólo con ellas.
+  const { ganado } = bolsillosDe(perfil);
 
   // La MISMA función que usa el navegador para avisar antes de intentarlo.
-  const veredicto = puedeUnirse(sala, uid, saldo, { conCodigo });
+  const veredicto = puedeUnirse(sala, uid, saldo, { conCodigo, ganadas: ganado });
   if (!veredicto.puede) {
     throw new functions.https.HttpsError("failed-precondition", veredicto.mensaje);
   }
@@ -664,7 +706,8 @@ async function sumarseALaSala(
   const r = await moverLeyendas(tx, {
     uid,
     delta: -Number(sala.entrada),
-    motivo: MOTIVOS.ENTRADA_PARTIDA,
+    // Una mesa pública —o su revancha— se cobra sólo de lo ganado.
+    motivo: motivoDeEntrada(sala),
     referencia: codigo,
     idempotencia: claveDeEntrada(codigo, uid),
   });
@@ -815,7 +858,8 @@ export const marcarListo = functions.https.onCall(async (data, context) => {
 });
 
 /**
- * Arranca la partida. Sólo el creador, y sólo con jugadores suficientes.
+ * Arranca la partida. Sólo el anfitrión —quien la creó, o en una mesa pública
+ * el primero que se sentó—, y sólo con jugadores suficientes.
  *
  * Al arrancar se congela el pozo: a partir de acá la entrada no cambia y
  * nadie más puede sumarse.
@@ -832,10 +876,14 @@ export const iniciarPartida = functions.https.onCall(async (data, context) => {
     }
 
     const sala = snap.data();
-    if (sala.creador !== uid) {
+    // La MISMA función que usa el navegador para decidir a quién mostrarle el
+    // botón. Acá es la que decide.
+    if (anfitrionDe(sala) !== uid) {
       throw new functions.https.HttpsError(
         "permission-denied",
-        "Sólo quien creó la sala puede empezar la partida.",
+        sala.publica
+          ? "La partida la empieza quien se sentó primero."
+          : "Sólo quien creó la sala puede empezar la partida.",
       );
     }
     if (sala.estado !== ESTADOS_SALA.ESPERANDO) {
@@ -863,6 +911,14 @@ export const iniciarPartida = functions.https.onCall(async (data, context) => {
       );
     }
 
+    /**
+     * Una mesa pública se reabre: cuando empieza su partida, queda otra igual
+     * esperando en el lobby. El código de la próxima se busca ACÁ, antes de
+     * repartir, porque buscarlo es leer y `repartirEn` escribe: Firestore no
+     * deja leer después. La mesa nueva se escribe al final.
+     */
+    const siguiente = sala.publica ? await publicas.reservarSiguiente(tx) : null;
+
     // El reparto va en ESTA transacción, no en otra. Si fueran dos, la sala
     // podría quedar en "jugando" sin partida detrás —o con una partida que
     // nadie inició— y no habría forma de saber cuál de las dos pasó.
@@ -877,6 +933,8 @@ export const iniciarPartida = functions.https.onCall(async (data, context) => {
       luce: sala.jugadoresLuce ?? desdeRetratos(sala.jugadoresRetratos),
       // Lo eligió quien abrió la sala y lo vieron todos antes de pagar.
       limitePuntos: sala.limitePuntos,
+      // De qué juego es la partida: el de la sala.
+      juego: juegoDe(sala),
     });
 
     tx.update(refSala, {
@@ -886,7 +944,14 @@ export const iniciarPartida = functions.https.onCall(async (data, context) => {
       iniciadaEn: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    return { codigo, jugadores: jugadores.length, pozo: Number(sala.entrada) * jugadores.length };
+    if (siguiente) publicas.abrirSiguiente(tx, siguiente, sala);
+
+    return {
+      codigo,
+      jugadores: jugadores.length,
+      pozo: Number(sala.entrada) * jugadores.length,
+      ...(siguiente ? { reabierta: siguiente.codigo } : {}),
+    };
   });
 });
 
@@ -1022,6 +1087,55 @@ const panel = crearAdmin({
   error: errorHttp,
   estados: ESTADOS_SALA,
   administradores,
+});
+
+/**
+ * Las mesas públicas. Ver `salas-publicas.js`.
+ *
+ * Se montan después de `panel` porque editar y borrar una mesa son
+ * `editarSala` y `cancelarSala` del panel: una sola forma de retocar una sala,
+ * y una sola de cancelarla con devolución.
+ */
+const publicas = crearSalasPublicas({
+  db,
+  salas: SALAS,
+  error: errorHttp,
+  marcaDeTiempo,
+  administradores,
+  panel,
+  generarCodigo: () => generarCodigo(azarCodigo),
+  estados: ESTADOS_SALA,
+});
+
+/** Abre una mesa pública, vacía. Sólo la administración. */
+export const crearSalaPublica = functions.https.onCall(async (data, context) => {
+  exigirSesion(context, "crearSalaPublica");
+  return publicas.crear(context, validar(EsquemaCrearSalaPublica, data, errorHttp));
+});
+
+/** Retoca una mesa pública. La entrada y la duración, sólo si está vacía. */
+export const editarSalaPublica = functions.https.onCall(async (data, context) => {
+  exigirSesion(context, "editarSalaPublica");
+  return publicas.editar(context, validar(EsquemaEditarSalaPublica, data, errorHttp));
+});
+
+/**
+ * Borra una mesa pública: cancela la que está esperando y devuelve las
+ * entradas. Como una mesa cancelada nunca empieza, tampoco se reabre.
+ */
+export const borrarSalaPublica = functions.https.onCall(async (data, context) => {
+  exigirSesion(context, "borrarSalaPublica");
+  return publicas.borrar(context, validar(EsquemaDeSala, data, errorHttp));
+});
+
+/**
+ * ¿Quien llama puede administrar? Para que el lobby muestre los botones de
+ * crear, editar y borrar mesas. No protege nada: las tres de arriba lo
+ * comprueban por su cuenta.
+ */
+export const soyAdministrador = functions.https.onCall(async (_data, context) => {
+  exigirSesion(context, "soyAdministrador");
+  return { admin: await administradores.es(context) };
 });
 
 /**

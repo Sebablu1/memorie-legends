@@ -125,6 +125,28 @@ export const EsquemaEditarSala = z.object({
   maxJugadores: opcional(z.coerce.number().int().min(2).max(4)),
 });
 
+/**
+ * Abrir una mesa pública. Sólo la administración.
+ *
+ * La entrada y la duración se validan contra las listas de las reglas en el
+ * servidor, como en las demás salas: acá sólo se exige que sean números.
+ */
+export const EsquemaCrearSalaPublica = z.object({
+  nombre: opcional(z.string().max(40)),
+  entrada: z.coerce.number().int().min(0),
+  limitePuntos: opcional(z.coerce.number().int().positive()),
+  maxJugadores: opcional(z.coerce.number().int().min(2).max(4)),
+});
+
+/** Retocar una mesa pública. La entrada y la duración, sólo con la mesa vacía. */
+export const EsquemaEditarSalaPublica = z.object({
+  codigo: Codigo,
+  nombre: opcional(z.string().max(40)),
+  maxJugadores: opcional(z.coerce.number().int().min(2).max(4)),
+  entrada: opcional(z.coerce.number().int().min(0)),
+  limitePuntos: opcional(z.coerce.number().int().positive()),
+});
+
 /** Cuántas salas cerradas se barren de una pasada. */
 export const EsquemaLimpiarSalas = z.object({
   tope: opcional(z.coerce.number().int().min(1).max(200)),

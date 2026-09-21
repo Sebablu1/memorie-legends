@@ -506,16 +506,17 @@ console.log("\n=== 6b. Lo que se puede retocar de una sala ===");
   ok(db2.leer("rooms", "LLENA").maxJugadores === 4, "y el cupo queda como estaba");
 }
 
-console.log("\n=== 6c. La entrada NO se toca desde el panel ===");
+console.log("\n=== 6c. La entrada, con gente adentro, no se toca ===");
 {
   /**
-   * No hay campo que mandar, y no es un olvido: la entrada queda fija en
-   * cuanto alguien pagó, y en una sala viva siempre pagó alguien —la paga el
-   * creador al crearla, y si el creador se va la sala se cancela entera—.
+   * La entrada queda fija en cuanto alguien pagó. Si se pudiera cambiar, la
+   * sala guardaría un `pozo` congelado que ya no coincide con lo que cada
+   * jugador pagó. Para cambiarla se cancela —que devuelve— y se abre otra.
    *
-   * Si se pudiera cambiar, la sala guardaría un `pozo` congelado que ya no
-   * coincide con lo que cada jugador pagó. Para cambiar la apuesta se cancela
-   * (que devuelve) y se abre otra.
+   * Antes el campo ni existía y se ignoraba en silencio: en una sala de
+   * jugador siempre hay alguien adentro. Ahora existe, porque una mesa
+   * pública nace vacía y ahí sí se puede cambiar (ver abajo); con gente
+   * adentro se rechaza, y con un mensaje que dice por qué.
    */
   const { db, admin } = montar({
     rooms: {
@@ -528,18 +529,55 @@ console.log("\n=== 6c. La entrada NO se toca desde el panel ===");
 
   const r = await capturar(() =>
     admin.editarSala(comoAdmin, { codigo: "APUESTA", entrada: 500 }));
-  ok(r.error?.codigo === "invalid-argument", "mandar sólo la entrada no cambia nada", r.error?.message);
+  ok(r.error?.codigo === "failed-precondition", "con gente adentro, la entrada se rechaza",
+     r.error?.message);
+  ok(/no se cambia/.test(r.error?.message ?? ""), "y el mensaje dice por qué", r.error?.message);
   ok(db.leer("rooms", "APUESTA").entrada === 50, "la entrada sigue siendo la de siempre");
 
-  await admin.editarSala(comoAdmin, { codigo: "APUESTA", nombre: "Otra", entrada: 500 });
-  ok(db.leer("rooms", "APUESTA").entrada === 50, "ni de contrabando junto al nombre");
-  ok(db.leer("rooms", "APUESTA").pozo === 100, "y el pozo tampoco se mueve");
+  // De contrabando junto al nombre tampoco: se rechaza el pedido entero, y no
+  // cambia ni el nombre. Mejor eso que hacer la mitad sin avisar.
+  const junto = await capturar(() =>
+    admin.editarSala(comoAdmin, { codigo: "APUESTA", nombre: "Otra", entrada: 500 }));
+  ok(junto.error?.codigo === "failed-precondition", "ni de contrabando junto al nombre",
+     junto.error?.message);
+  ok(db.leer("rooms", "APUESTA").nombre !== "Otra", "y el nombre tampoco cambió");
+  ok(db.leer("rooms", "APUESTA").pozo === 100, "ni el pozo");
+
+  const duracion = await capturar(() =>
+    admin.editarSala(comoAdmin, { codigo: "APUESTA", limitePuntos: 60 }));
+  ok(duracion.error?.codigo === "failed-precondition",
+     "la duración, con gente adentro, tampoco", duracion.error?.message);
 
   const { admin: a2 } = montar({
     rooms: { YAVA: { estado: ESTADOS_SALA.JUGANDO, entrada: 50, jugadores: ["ana"], jugadoresNombres: ["A"] } },
   });
   const jugando = await capturar(() => a2.editarSala(comoAdmin, { codigo: "YAVA", nombre: "x" }));
   ok(jugando.error?.codigo === "failed-precondition", "una sala jugando no se retoca", jugando.error?.message);
+}
+
+{
+  /**
+   * Con la sala VACÍA, sí. Es el caso de una mesa pública, que nace sin nadie
+   * sentado: mientras nadie pagó, no le debe nada a nadie.
+   */
+  const { db, admin } = montar({
+    rooms: {
+      VACIA: {
+        estado: ESTADOS_SALA.ESPERANDO, entrada: 50, pozo: 0, maxJugadores: 4,
+        limitePuntos: 150, publica: true, jugadores: [], jugadoresNombres: [],
+      },
+    },
+  });
+
+  await admin.editarSala(comoAdmin, { codigo: "VACIA", entrada: 20, limitePuntos: 60 });
+  ok(db.leer("rooms", "VACIA").entrada === 20, "vacía, la entrada se cambia");
+  ok(db.leer("rooms", "VACIA").limitePuntos === 60, "y la duración también");
+
+  const mala = await capturar(() => admin.editarSala(comoAdmin, { codigo: "VACIA", entrada: 7 }));
+  ok(mala.error?.codigo === "invalid-argument", "pero sólo a una entrada de la lista", mala.error?.message);
+  const larga = await capturar(() => admin.editarSala(comoAdmin, { codigo: "VACIA", limitePuntos: 99 }));
+  ok(larga.error?.codigo === "invalid-argument", "y sólo a una duración de las tres", larga.error?.message);
+  ok(db.leer("rooms", "VACIA").entrada === 20, "y lo rechazado no se escribió");
 }
 
 // ============================================ 6d. borrar las salas muertas

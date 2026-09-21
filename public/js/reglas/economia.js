@@ -549,6 +549,21 @@ export const MOTIVOS = {
    */
   DEVOLUCION_ENTRADA: "devolucion_entrada",
 
+  /**
+   * La entrada de una mesa PÚBLICA: la abre la administración, aparece en el
+   * lobby, y se paga SÓLO con Leyendas Ganadas —las de bienvenida y las que
+   * se ganaron jugando—, igual que un torneo.
+   *
+   * Es su propio motivo y no `ENTRADA_PARTIDA` con una marca, por lo mismo que
+   * el torneo tiene el suyo: el bolsillo sale del motivo. Con un parámetro,
+   * alguien podría cobrar una mesa pública de lo comprado y no lo notaría
+   * nadie; con un motivo, la regla está escrita en la tabla de abajo.
+   *
+   * La revancha de una mesa pública también cobra con éste: la juegan los
+   * mismos, por lo mismo. Lo decide `motivoDeEntrada`.
+   */
+  ENTRADA_SALA_PUBLICA: "entrada_sala_publica",
+
   // Sumidero de la casa: no va al pozo ni a otro jugador.
   PENALIZACION_ABANDONO: "penalizacion_abandono",
   PREMIO_PARTIDA: "premio_partida",
@@ -729,6 +744,7 @@ export const REPARTO_POR_MOTIVO = Object.freeze({
   [MOTIVOS.AJUSTE_ADMIN_COMPRADO]: REPARTOS.A_COMPRADO,
 
   [MOTIVOS.TORNEO_ENTRADA]: REPARTOS.SOLO_GANADO,
+  [MOTIVOS.ENTRADA_SALA_PUBLICA]: REPARTOS.SOLO_GANADO,
 
   [MOTIVOS.ENTRADA_PARTIDA]: REPARTOS.COMPRADO_PRIMERO,
   [MOTIVOS.COMPRA_PERSONALIZACION]: REPARTOS.COMPRADO_PRIMERO,
@@ -785,4 +801,40 @@ export function repartoDe(motivo) {
     );
   }
   return reparto;
+}
+
+/**
+ * Con qué motivo se cobra la entrada de una sala.
+ *
+ * Una sala `soloGanadas` —una mesa pública, o su revancha— cobra con
+ * `ENTRADA_SALA_PUBLICA`, que sólo acepta ganadas; cualquier otra, con
+ * `ENTRADA_PARTIDA`, que gasta lo comprado primero. Lo usan los dos cobros de
+ * entrada de `index.js`: abrir una sala y sumarse a una.
+ */
+export const motivoDeEntrada = (sala) =>
+  sala?.soloGanadas === true ? MOTIVOS.ENTRADA_SALA_PUBLICA : MOTIVOS.ENTRADA_PARTIDA;
+
+/**
+ * Los dos bolsillos de un perfil, incluso si todavía no los tiene.
+ *
+ * Un perfil de antes de la separación tiene `credits` y nada más, y todo eso
+ * es ganado: en esa época no se podía comprar. Sin este respaldo, leerlo daría
+ * cero en los dos bolsillos. El porqué, largo, está en `leyendas.js`.
+ *
+ * Vive acá para que el servidor haga esta cuenta UNA vez: la usan
+ * `moverLeyendas`, que cobra, e `index.js`, que antes de cobrar le pregunta a
+ * `puedeUnirse` si alcanzan las ganadas de una mesa pública. Dos cuentas
+ * distintas de lo mismo dirían «alcanza» y después cobrarían «no alcanza».
+ *
+ * `sesion.js` tiene su propia copia, a propósito: importar este archivo desde
+ * ahí sumaría 36 KB a cada página con sesión, por tres líneas.
+ *
+ * `campos` dice dónde vive cada bolsillo; por omisión, `CAMPOS_SALDO`.
+ */
+export function bolsillosDe(perfil, campos = CAMPOS_SALDO) {
+  const comprado = Number(perfil?.[campos.comprado] ?? 0);
+  const ganado = Number(
+    perfil?.[campos.ganado] ?? Math.max(0, Number(perfil?.[campos.total] ?? 0) - comprado),
+  );
+  return { comprado, ganado };
 }

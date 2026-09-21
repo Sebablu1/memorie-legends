@@ -119,6 +119,13 @@ export const LIMITES = {
   // La limpieza recorre la colección entera y borra en lote. Se toca una
   // vez cada tanto, como el barrido de salas en espera, y lleva su techo.
   limpiarSalasCerradasAdmin: 10,
+
+  // Las mesas públicas. Crear, editar y borrar son de la administración;
+  // `soyAdministrador` lo pregunta el lobby cada vez que se abre.
+  crearSalaPublica: 20,
+  editarSalaPublica: 30,
+  borrarSalaPublica: 20,
+  soyAdministrador: 30,
   listarReportesAdmin: 60,
   resolverReporteAdmin: 60,
 

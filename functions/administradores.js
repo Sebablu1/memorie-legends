@@ -214,5 +214,18 @@ export function crearAdministradores({
     });
   }
 
-  return { puedeAdministrar, exigir, listar, agregar, quitar, esRaiz, raiz };
+  /**
+   * Lo mismo que `exigir`, pero contesta en vez de rechazar.
+   *
+   * Lo usa `soyAdministrador`, para que el lobby sepa si mostrar los botones
+   * de administrar, y `crearSala`, para elegir qué mensaje dar. No protege
+   * nada: toda función de administración llama a `exigir` por su cuenta.
+   */
+  async function es(context) {
+    const token = context?.auth?.token;
+    if (!token || token.email_verified !== true) return false;
+    return puedeAdministrar(normalizarCorreo(token.email));
+  }
+
+  return { puedeAdministrar, exigir, es, listar, agregar, quitar, esRaiz, raiz };
 }

@@ -67,8 +67,17 @@ export function crearSalirDeSalaEnEspera({
         throw error("internal", `La entrada de la sala no es válida: ${sala.entrada}`);
       }
 
-      const esCreador = sala.creador === uid;
-      // Si se va el creador, se cancela y se devuelve a todos; si no, sólo a él.
+      /**
+       * Si se va el creador, se cancela y se devuelve a todos; si no, sólo a él.
+       *
+       * Una mesa pública no tiene creador que se siente —la abre la
+       * administración—, así que salir de ella nunca la cancela: quien se va
+       * recupera su entrada y la mesa sigue esperando, aunque quede vacía. Ni
+       * siquiera si se va el primero, que es quien la empieza: el que sigue
+       * pasa a serlo (`anfitrionDe`). Tratarlo como creador sacaría la mesa
+       * del lobby cada vez que alguien se arrepiente.
+       */
+      const esCreador = !sala.publica && sala.creador === uid;
       const aDevolver = esCreador ? [...jugadores] : [uid];
 
       // --- y recién ahora, todo junto ---

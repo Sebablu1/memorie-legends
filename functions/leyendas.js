@@ -13,7 +13,12 @@
  * producción las provee `index.js` con el Firestore y el reloj reales.
  */
 
-import { repartoDe, REPARTOS, CAMPOS_SALDO } from "./reglas/economia.js";
+import {
+  repartoDe,
+  REPARTOS,
+  CAMPOS_SALDO,
+  bolsillosDe as bolsillosDelPerfil,
+} from "./reglas/economia.js";
 
 /**
  * Los repartos que COBRAN: sacan del saldo y nunca acreditan.
@@ -118,14 +123,13 @@ export function crearMoverLeyendas({
    *
    * La migración pasa a ser prolijidad: deja el dato escrito en vez de
    * calculado. No es un requisito.
+   *
+   * La cuenta vive en `economia.js`: `index.js` la usa también, para saber
+   * si alcanzan las ganadas de una mesa pública ANTES de cobrar. Acá sólo se
+   * le dicen los nombres de los campos, que este módulo recibe inyectados.
    */
-  const bolsillosDe = (datos) => {
-    const comprado = Number(datos?.[campoComprado] ?? 0);
-    const ganado = Number(
-      datos?.[campoGanado] ?? Math.max(0, Number(datos?.[campoSaldo] ?? 0) - comprado),
-    );
-    return { comprado, ganado };
-  };
+  const bolsillosDe = (datos) =>
+    bolsillosDelPerfil(datos, { total: campoSaldo, comprado: campoComprado, ganado: campoGanado });
 
   /** Saca `falta` de un bolsillo y el resto del otro. Devuelve [dePrimero, deSegundo]. */
   const tomarDe = (primero, segundo, falta) => {

@@ -412,7 +412,11 @@ console.log("\n=== 5. index.js conecta las devoluciones como se prueban acá ===
 
   // La devolución busca la entrada por su clave: si el cobro la escribiera
   // con otra, la encontraría vacía y devolvería todo a las ganadas.
-  const cobros = index.match(/motivo: MOTIVOS\.ENTRADA_PARTIDA,\s*referencia: codigo,\s*idempotencia: [^\r\n]+/g) ?? [];
+  // El motivo lo elige `motivoDeEntrada` según la sala —una mesa pública se
+  // cobra sólo de lo ganado—, así que se busca el cobro por esa llamada.
+  const cobros = index.match(
+    /motivo: motivoDeEntrada\([^)]*\),\s*referencia: codigo,\s*idempotencia: [^\r\n]+/g,
+  ) ?? [];
   ok(cobros.length === 2, "hay dos cobros de entrada (abrir una sala y sumarse)", cobros.length);
   ok(cobros.every((c) => c.includes("claveDeEntrada(codigo, uid)")),
      "y los dos usan la clave que después busca la devolución", cobros);

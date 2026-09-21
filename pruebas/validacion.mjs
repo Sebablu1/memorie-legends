@@ -228,10 +228,11 @@ console.log("\n=== Ninguna callable lee el código sin validarlo ===");
   //   - 11 → 12: el PRECALENTAMIENTO de `intentarDescarte`. Es el mismo
   //     callable, pero ese camino no es un descarte: sólo lleva el código y se
   //     valida con el esquema de sala, antes del de descarte.
+  //   - 12 → 13: `borrarSalaPublica`, que sólo lleva el código de la mesa.
   //
   // Lo que esta cuenta vigila es que BAJE sin que se haya borrado ninguna
   // callable, que sería una que dejó de validar.
-  ok(validadas.length === 12,
+  ok(validadas.length === 13,
      `y ${validadas.length} pasan por el esquema de sala`, validadas.length);
 
   // Las dos que llevan más datos usan el suyo, no el de sala a secas.

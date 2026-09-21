@@ -31,6 +31,7 @@
 import { vistaDe, filtracionesEn, MS_REVELACION } from "./reglas/vista.js";
 import * as motor from "./reglas/motor.js";
 import { semillaAleatoria } from "./reglas/azar.js";
+import { JUEGO_POR_DEFECTO } from "./reglas/juegos.js";
 import {
   MS_VENTANA,
   MS_VENTANA_REAPERTURA,
@@ -676,7 +677,7 @@ export function crearMotorEnRed({
    * habría forma de saber cuál de las dos cosas pasó.
    */
   async function repartirEn(
-    tx, { codigo, jugadores, nombres, luce, limitePuntos, yaSentados = false },
+    tx, { codigo, jugadores, nombres, luce, limitePuntos, juego, yaSentados = false },
   ) {
     const snap = await tx.get(refPartida(codigo));
     // Idempotente: repartir dos veces la misma partida no la reinicia.
@@ -703,6 +704,10 @@ export function crearMotorEnRed({
     const partida = {
       codigo,
       jugadores,
+      // De qué juego es. Lo dice la sala: ver `reglas/juegos.js`. Hoy todo es
+      // Memorie; el campo existe para que un segundo juego no obligue a
+      // reescribir las partidas ni a adivinar de qué eran las viejas.
+      juego: juego ?? JUEGO_POR_DEFECTO,
       /**
        * La semilla la elige el SERVIDOR, y la duración sale de la sala.
        *

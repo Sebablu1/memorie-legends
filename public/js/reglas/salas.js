@@ -123,6 +123,8 @@ export const RECHAZO = {
   LLENA: "llena",
   YA_ESTA: "ya_esta",
   SIN_SALDO: "sin_saldo",
+  // Una mesa pública se paga sólo con Leyendas Ganadas.
+  SIN_GANADAS: "sin_ganadas",
   // A una privada se entra con su código, no desde una lista.
   PRIVADA: "privada",
   // Los dos de la revancha: se pide desde la mesa cuando la partida
@@ -139,6 +141,7 @@ export const MENSAJES_RECHAZO = {
   [RECHAZO.LLENA]: "La sala ya está completa.",
   [RECHAZO.YA_ESTA]: "Ya estás en esta sala.",
   [RECHAZO.SIN_SALDO]: "No tenés suficientes Leyendas.",
+  [RECHAZO.SIN_GANADAS]: "Esta mesa se paga sólo con Leyendas Ganadas, y no te alcanzan.",
   [RECHAZO.PRIVADA]: "Esta sala es privada: hace falta su código.",
   [RECHAZO.NO_TERMINO]: "Esta partida todavía no terminó.",
   [RECHAZO.NO_JUGASTE]: "No jugaste esta partida.",
@@ -158,7 +161,7 @@ export const ESTADOS_SALA = {
  * servidor (que es quien decide de verdad, dentro de una transacción).
  * Devuelve `{ puede: true }` o `{ puede: false, motivo, mensaje }`.
  */
-export function puedeUnirse(sala, jugadorId, saldo, { conCodigo = false } = {}) {
+export function puedeUnirse(sala, jugadorId, saldo, { conCodigo = false, ganadas = null } = {}) {
   const no = (motivo) => ({ puede: false, motivo, mensaje: MENSAJES_RECHAZO[motivo] });
 
   if (!sala) return no(RECHAZO.NO_EXISTE);
@@ -183,9 +186,41 @@ export function puedeUnirse(sala, jugadorId, saldo, { conCodigo = false } = {}) 
   const capacidad = Math.min(sala.maxJugadores ?? MAX_JUGADORES, MAX_JUGADORES);
   if (jugadores.length >= capacidad) return no(RECHAZO.LLENA);
 
-  if (usaLeyendas(sala) && Number(saldo) < Number(sala.entrada)) return no(RECHAZO.SIN_SALDO);
+  /**
+   * Con qué se paga.
+   *
+   * Una sala `soloGanadas` —una mesa pública, o su revancha— se paga sólo con
+   * Leyendas Ganadas. Mirar el saldo total le diría «alcanza» a quien sólo
+   * tiene compradas, y el cobro lo rechazaría después con otro mensaje. Sin
+   * el dato de las ganadas, no alcanza: es la respuesta segura.
+   */
+  if (usaLeyendas(sala)) {
+    const entrada = Number(sala.entrada);
+    if (sala.soloGanadas) {
+      if (!(Number(ganadas) >= entrada)) return no(RECHAZO.SIN_GANADAS);
+    } else if (Number(saldo) < entrada) {
+      return no(RECHAZO.SIN_SALDO);
+    }
+  }
 
   return { puede: true };
+}
+
+/**
+ * Quién empieza la partida.
+ *
+ * En una sala que abrió un jugador, quien la abrió. Una mesa pública la abrió
+ * la administración, que no se sienta: la empieza quien se sentó primero, y
+ * si se va, el siguiente —la lista de jugadores ya está en orden de
+ * llegada—. Sin nadie sentado, nadie.
+ *
+ * Como `puedeUnirse`: la misma función en el navegador —que decide a quién
+ * mostrarle el botón— y en el servidor, que es quien decide de verdad.
+ */
+export function anfitrionDe(sala) {
+  if (!sala) return null;
+  if (sala.publica) return (sala.jugadores ?? [])[0] ?? null;
+  return sala.creador ?? null;
 }
 
 /**

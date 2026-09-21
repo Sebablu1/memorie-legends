@@ -23,7 +23,14 @@
  * resumen que se arma en el servidor y no lleva ni una carta.
  */
 
-import { ESTADOS_SALA, MIN_JUGADORES, MAX_JUGADORES } from "./reglas/salas.js";
+import {
+  ENTRADAS,
+  ESTADOS_SALA,
+  MIN_JUGADORES,
+  MAX_JUGADORES,
+  esEntradaValida,
+} from "./reglas/salas.js";
+import { LIMITES_DE_PARTIDA, esLimiteDePartida } from "./reglas/puntaje.js";
 import { claveDeEntrada, claveDeDevolucion } from "./reglas/economia.js";
 
 /** Lo mismo que corta `crearSala`: un nombre de sala no pasa de 40. */
@@ -304,20 +311,19 @@ export function crearAdmin({
    * Retoca lo que se puede retocar de una sala en espera.
    *
    * ───────────────────────────────────────────────────────────────────────
-   * LA ENTRADA NO ESTÁ ACÁ, Y NO ES UN OLVIDO
+   * LA ENTRADA Y LA DURACIÓN, SÓLO CON LA SALA VACÍA
    * ───────────────────────────────────────────────────────────────────────
    *
-   * La regla es que la entrada queda fija en cuanto alguien pagó. Y en una
-   * sala viva siempre pagó alguien: la paga el creador en la misma
-   * transacción que crea la sala, y si el creador se va, la sala se cancela
-   * entera —lo hace `salida.js`—. O sea que no existe una sala en espera con
-   * cero jugadores.
+   * La regla es que la entrada queda fija en cuanto alguien pagó: cada
+   * jugador ya pagó SU número, y cambiarlo desincronizaría lo que se reparte.
+   * Lo mismo la duración, que cada uno vio antes de pagar.
    *
-   * Así que la regla, aplicada, dice «nunca». Aceptar el campo igual sería
-   * escribir una rama que no se puede alcanzar y que el día que alguien la
-   * alcance va a desincronizar el pozo: la sala guarda `pozo` congelado y
-   * cada jugador ya pagó SU número. Para cambiar la apuesta se cancela —con
-   * devolución— y se abre otra.
+   * En una sala de jugador eso dice «nunca»: la paga el creador en la misma
+   * transacción que la crea, y si se va, la sala se cancela entera. Pero una
+   * mesa pública nace VACÍA —la abre la administración, que no se sienta— y
+   * mientras nadie se siente no le debe nada a nadie. Ahí sí se puede. Con
+   * gente adentro se sigue negando: para cambiar la entrada se borra la mesa,
+   * que devuelve todo, y se abre otra.
    *
    * ───────────────────────────────────────────────────────────────────────
    * EL CUPO SÍ, PERO NO POR DEBAJO DE LOS QUE YA ESTÁN
@@ -327,7 +333,7 @@ export function crearAdmin({
    * que lugares: el panel mostraría 4/2 y `puedeUnirse` diría que está llena
    * desde antes de estarlo.
    */
-  async function editarSala(context, { codigo, nombre, maxJugadores }) {
+  async function editarSala(context, { codigo, nombre, maxJugadores, entrada, limitePuntos }) {
     const quien = await exigirAdmin(context);
     const codigoLimpio = String(codigo ?? "").trim().toUpperCase();
     if (!codigoLimpio) throw error("invalid-argument", "Falta el código de la sala.");
@@ -370,6 +376,39 @@ export function crearAdmin({
           );
         }
         cambios.maxJugadores = cupo;
+      }
+
+      // La entrada y la duración, sólo con la sala vacía: ver arriba.
+      const sentados = (sala.jugadores ?? []).length;
+
+      if (entrada !== undefined) {
+        if (sentados > 0) {
+          throw error(
+            "failed-precondition",
+            `Ya hay ${sentados} jugador(es) adentro y pagaron ${sala.entrada}: la entrada ` +
+              "no se cambia. Para cambiarla, borrá la mesa —se devuelve todo— y abrí otra.",
+          );
+        }
+        if (!esEntradaValida(entrada)) {
+          throw error("invalid-argument", `Entrada inválida. Las disponibles son: ${ENTRADAS.join(", ")}.`);
+        }
+        cambios.entrada = Number(entrada);
+      }
+
+      if (limitePuntos !== undefined) {
+        if (sentados > 0) {
+          throw error(
+            "failed-precondition",
+            `Ya hay ${sentados} jugador(es) adentro: la duración que vieron al entrar no se cambia.`,
+          );
+        }
+        if (!esLimiteDePartida(limitePuntos)) {
+          throw error(
+            "invalid-argument",
+            `Duración inválida. Las disponibles son: ${LIMITES_DE_PARTIDA.join(", ")}.`,
+          );
+        }
+        cambios.limitePuntos = Number(limitePuntos);
       }
 
       if (!Object.keys(cambios).length) {

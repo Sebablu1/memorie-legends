@@ -296,5 +296,25 @@ console.log("\n=== 8. Un desactivado no puede nada ===");
 
 // ====================================================================
 
+console.log("\n=== 9. `es` contesta lo mismo que `exigir`, sin tirar ===");
+{
+  /**
+   * Lo pregunta el lobby para saber si muestra los botones de administrar, y
+   * `crearSala` para elegir qué mensaje dar. Tiene que decir exactamente lo
+   * que diría `exigir` —incluido el correo sin verificar— y no tirar nunca.
+   */
+  reloj = 1_700_000_000_000;
+  const { admins } = montar();
+
+  ok(await admins.es(como(RAIZ)) === true, "el raíz, con el correo verificado, sí");
+  ok(await admins.es(como(RAIZ, false)) === false,
+     "con el correo sin verificar, no: igual que `exigir`");
+  ok(await admins.es(como("otro@x.com")) === false, "un correo cualquiera, no");
+  ok(await admins.es({}) === false, "sin sesión, no, y sin tirar");
+
+  await admins.agregar(como(RAIZ), { correo: "ana@x.com" });
+  ok(await admins.es(como("ana@x.com")) === true, "uno agregado a la lista, sí");
+}
+
 console.log(fallos ? `\n❌ ${fallos} fallo(s)` : "\n✅ TODO OK");
 process.exit(fallos ? 1 : 0);

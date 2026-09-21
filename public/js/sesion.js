@@ -54,6 +54,10 @@ export async function leerPerfil(uid) {
      * Leyendas son todas ganadas: nadie habia comprado nunca. Derivarlo igual
      * que `moverLeyendas` es lo que evita que la pantalla diga una cosa y el
      * servidor cobre otra — que seria peor que no mostrarlo.
+     *
+     * Es la misma cuenta que `bolsillosDe` en `reglas/economia.js`, que es la
+     * que usa el servidor. No se importa de ahí a proposito: ese archivo pesa
+     * 36 KB y esta pantalla lo cargaria en cada pagina, por tres lineas.
      */
     comprado: Number(datos.creditosComprados ?? 0),
     ganado: Number(

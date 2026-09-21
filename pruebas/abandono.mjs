@@ -324,7 +324,12 @@ console.log("\n=== El saldo se mueve por un solo lugar ===");
   // `credits:`. Leerlo —`data()[CAMPO_SALDO]`— es legítimo y no cuenta.
   const escrituras = [...index.matchAll(/\[CAMPO_SALDO\]\s*:|credits\s*:/g)].map((m) => m[0]);
   ok(escrituras.length === 0, "index.js ya no escribe el campo del saldo por su cuenta", escrituras);
-  const lecturas = [...index.matchAll(/data\(\)\[CAMPO_SALDO\]/g)].length;
+  // Cualquier lectura cuenta —`data()[CAMPO_SALDO]`, `perfil[CAMPO_SALDO]`—
+  // mientras no sea una clave: lo que importa es que el campo siga estando,
+  // para que el «no lo escribe» de arriba no sea una prueba vacía. Buscaba
+  // sólo la primera forma, y se cayó cuando `sumarseALaSala` pasó a leer el
+  // perfil una vez para sacar de ahí el saldo y las ganadas.
+  const lecturas = [...index.matchAll(/\[CAMPO_SALDO\](?!\s*:)/g)].length;
   ok(lecturas > 0, "sí lo lee, que es otra cosa", lecturas);
   ok(!/credits/.test(abandono), "abandono.js no menciona el campo del saldo: pasa por moverLeyendas");
   ok(/moverLeyendas/.test(abandono), "y lo usa");

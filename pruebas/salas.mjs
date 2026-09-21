@@ -103,5 +103,44 @@ ok(vistos.size > 19900, `20.000 códigos, ${vistos.size} distintos: colisiones d
 ok(S.COMBINACIONES_CODIGO > 880_000_000, `${S.COMBINACIONES_CODIGO.toLocaleString("es-UY")} combinaciones posibles`);
 ok(!S.esCodigoValido("ABC1") && !S.esCodigoValido("ABCDEFG") && !S.esCodigoValido("ABCIOP"), "rechaza largos y caracteres inválidos");
 
+console.log("\n=== Quién empieza la partida ===");
+{
+  const publica = { publica: true, creador: null, jugadores: ["bea", "cami"] };
+  ok(S.anfitrionDe(publica) === "bea", "en una mesa pública, el primero que se sentó");
+  ok(S.anfitrionDe({ ...publica, jugadores: ["cami"] }) === "cami", "si se va, el siguiente");
+  ok(S.anfitrionDe({ ...publica, jugadores: [] }) === null, "sin nadie sentado, nadie");
+  // Aunque tuviera un creador escrito: la administración no se sienta.
+  ok(S.anfitrionDe({ ...publica, creador: "admin" }) === "bea", "el creador de una pública no cuenta");
+  ok(S.anfitrionDe({ creador: "ana", jugadores: ["ana", "beto"] }) === "ana",
+     "en una sala de jugador, quien la creó");
+  ok(S.anfitrionDe(null) === null, "sin sala, nadie");
+}
+
+console.log("\n=== Una mesa pública se paga sólo con Ganadas ===");
+{
+  const mesa = {
+    modo: S.MODOS.LEYENDAS, entrada: 10, estado: S.ESTADOS_SALA.ESPERANDO,
+    publica: true, soloGanadas: true, jugadores: [],
+  };
+
+  // 500 en total, pero ninguna ganada: el saldo no alcanza para esta mesa.
+  const sinGanadas = S.puedeUnirse(mesa, "lu", 500, { ganadas: 0 });
+  ok(!sinGanadas.puede && sinGanadas.motivo === S.RECHAZO.SIN_GANADAS,
+     "con 500 compradas y 0 ganadas, no entra", sinGanadas);
+  ok(/Leyendas Ganadas/.test(sinGanadas.mensaje ?? ""), "y el mensaje dice con qué se paga",
+     sinGanadas.mensaje);
+
+  ok(S.puedeUnirse(mesa, "bea", 10, { ganadas: 10 }).puede, "con 10 ganadas, entra");
+
+  // Sin el dato de las ganadas, no alcanza: es la respuesta segura.
+  ok(S.puedeUnirse(mesa, "bea", 500).motivo === S.RECHAZO.SIN_GANADAS,
+     "sin decir cuántas ganadas tiene, no entra");
+
+  // Y una sala normal sigue mirando el saldo total, como siempre.
+  const normal = { ...mesa, publica: false, soloGanadas: false };
+  ok(S.puedeUnirse(normal, "lu", 500, { ganadas: 0 }).puede,
+     "a una sala normal se entra con cualquier Leyenda");
+}
+
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);
 process.exit(fallos ? 1 : 0);
