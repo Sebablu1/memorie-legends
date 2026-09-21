@@ -23,25 +23,40 @@
  *   · `partidasPuntuadas/`. Es el guardián que impide puntuar dos veces la
  *     misma partida: si se borrara, un reintento podría volver a sumar la
  *     fila que se acaba de limpiar.
+ *   · La marca de un juego, `rankings/{juego}`: sin ella el cierre no sabría
+ *     que ese juego tiene tablas.
  *
  * Y para que eso no dependa de acordarse, `verificarRutas` frena cualquier
- * plan que quiera borrar algo fuera de las dos formas permitidas.
+ * plan que quiera borrar algo que no sea una fila o una racha.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR JUEGO, O LA ESTRUCTURA VIEJA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Los rankings son por juego: `rankings/{juego}/periodos/{clave}/jugadores`.
+ * Por omisión se limpia el juego de siempre; `--juego` elige otro.
+ *
+ * `--legado` limpia la estructura de antes —`rankings/{clave}/jugadores` y
+ * `rachas/actual`—, que queda como respaldo después de migrar. Existe por el
+ * orden del despliegue: primero se limpia lo viejo, y recién después se migra
+ * lo que quedó, así la migración no copia filas de prueba. `--juego` y
+ * `--legado` no van juntos: lo viejo no tiene juego.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * LA RACHA ES DEL JUGADOR, NO DEL PERÍODO
  * ─────────────────────────────────────────────────────────────────────────
  *
- * `jugadores/{uid}/rachas/actual` es una sola por jugador, y de ahí sale la
- * `rachaActual` de las tres tablas. Con `--periodo` se borra la fila de ese
- * período y la racha queda: borrarla cambiaría las filas de los otros dos
- * desde la próxima partida. Sin `--periodo`, se va con las filas.
+ * Hay una por jugador y por juego, y de ella sale la `rachaActual` de las
+ * tres tablas. Con `--periodo` se borra la fila de ese período y la racha
+ * queda: borrarla cambiaría las filas de los otros dos desde la próxima
+ * partida. Sin `--periodo`, se va con las filas.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * CÓMO SE SABE SI UN PERÍODO SE PAGÓ
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Sin mirar el libro mayor. `cerrarPeriodo` deja dos marcas: `cerrado: true`
- * en `rankings/{clave}` cuando termina, y `premiado: true` en cada fila que
+ * Sin mirar el libro mayor. El cierre deja dos marcas: `cerrado: true` en el
+ * documento del período cuando termina, y `premiado: true` en cada fila que
  * cobra, en la misma transacción que acredita. Con la primera, el período se
  * pagó; con filas premiadas y sin la primera, el cierre se cortó a medias.
  *
@@ -54,7 +69,8 @@
  *
  *   node herramientas/limpiar-rankings.mjs --email prueba@x.com
  *   node herramientas/limpiar-rankings.mjs --uid abc123 --periodo mensual
- *   node herramientas/limpiar-rankings.mjs --todo --escribir
+ *   node herramientas/limpiar-rankings.mjs --todo --juego otro-juego
+ *   node herramientas/limpiar-rankings.mjs --todo --legado --escribir
  *
  * Exactamente uno de --email, --uid o --todo. Sin --escribir sólo muestra lo
  * que haría. Correrla dos veces no rompe nada: la segunda no encuentra qué
@@ -65,27 +81,28 @@
  */
 
 import { pathToFileURL } from "node:url";
+import {
+  PERIODOS,
+  RUTAS_RANKING,
+  RUTAS_RANKING_VIEJAS,
+  esClaveDePeriodo,
+} from "../public/js/reglas/ranking.js";
+import { JUEGO_POR_DEFECTO } from "../public/js/reglas/juegos.js";
 
 const PROYECTO = "memorie-legends";
 
 /** Firestore admite 500 escrituras por lote. */
 const POR_LOTE = 400;
 
-export const PERIODOS = ["semanal", "mensual", "anual"];
-
 /**
- * Dónde vive cada cosa. En un solo lugar a propósito: cuando los rankings
- * pasen a ser por juego, cambian acá y en ningún otro lado.
+ * Lo ÚNICO que esta herramienta puede borrar: una fila —de la estructura
+ * nueva o de la vieja— y una racha.
  */
-export const RUTAS = Object.freeze({
-  rankings: "rankings",
-  filas: "jugadores",
-  fila: (clave, uid) => `rankings/${clave}/jugadores/${uid}`,
-  racha: (uid) => `jugadores/${uid}/rachas/actual`,
-});
-
-/** Lo ÚNICO que esta herramienta puede borrar. */
-const PERMITIDAS = [/^rankings\/[^/]+\/jugadores\/[^/]+$/, /^jugadores\/[^/]+\/rachas\/actual$/];
+const PERMITIDAS = [
+  /^rankings\/[^/]+\/periodos\/[^/]+\/jugadores\/[^/]+$/,
+  /^rankings\/[^/]+\/jugadores\/[^/]+$/,
+  /^jugadores\/[^/]+\/rachas\/[^/]+$/,
+];
 
 export const AVISO_CERRADO = "Los premios de este período ya se pagaron. No se revierten.";
 export const AVISO_A_MEDIAS =
@@ -115,6 +132,8 @@ export function leerArgumentos(argv) {
   const uid = valor("uid");
   const todo = argv.includes("--todo");
   const periodo = valor("periodo");
+  const juego = valor("juego");
+  const legado = argv.includes("--legado");
   const escribir = argv.includes("--escribir");
 
   const filtros = [email && "--email", uid && "--uid", todo && "--todo"].filter(Boolean);
@@ -127,8 +146,11 @@ export function leerArgumentos(argv) {
   if (periodo !== null && !PERIODOS.includes(periodo)) {
     throw new Error(`Período desconocido: ${periodo}. Son ${PERIODOS.join(", ")}.`);
   }
+  if (juego !== null && legado) {
+    throw new Error("--juego y --legado no van juntos: la estructura vieja no tiene juego.");
+  }
 
-  return { email, uid, todo, periodo, escribir };
+  return { email, uid, todo, periodo, juego: legado ? null : (juego ?? JUEGO_POR_DEFECTO), legado, escribir };
 }
 
 // ------------------------------------------------------------------ plan
@@ -148,15 +170,30 @@ export function verificarRutas(rutas) {
   return rutas;
 }
 
+/** Dónde vive una fila y una racha, en la estructura que se limpia. */
+function rutasDe({ juego, legado }) {
+  if (legado) return { fila: RUTAS_RANKING_VIEJAS.fila, racha: RUTAS_RANKING_VIEJAS.racha };
+  const deQueJuego = juego ?? JUEGO_POR_DEFECTO;
+  return {
+    fila: (clave, uid) => RUTAS_RANKING.fila(deQueJuego, clave, uid),
+    racha: (uid) => RUTAS_RANKING.racha(deQueJuego, uid),
+  };
+}
+
 /**
  * Qué se borra, y qué hay que saber antes. No toca nada: decide.
  *
  * @param datos.periodos  [{ clave, doc, filas: [{ uid, datos }] }], con `doc`
  *                        en null si el período no tiene documento (abierto)
  * @param datos.rachas    uids que tienen racha
- * @param filtros         { uid, todo, periodo }: el email ya resuelto a uid
+ * @param filtros         { uid, todo, periodo, juego, legado }: el email ya
+ *                        resuelto a uid
  */
-export function planDeLimpieza({ periodos, rachas }, { uid = null, todo = false, periodo = null }) {
+export function planDeLimpieza(
+  { periodos, rachas },
+  { uid = null, todo = false, periodo = null, juego = null, legado = false },
+) {
+  const rutas = rutasDe({ juego, legado });
   const tocados = [];
 
   for (const p of periodos) {
@@ -204,24 +241,23 @@ export function planDeLimpieza({ periodos, rachas }, { uid = null, todo = false,
   const rachasABorrar = periodo ? [] : candidatas;
   const rachasQueQuedan = periodo ? candidatas : [];
 
-  const rutas = verificarRutas([
-    ...tocados.flatMap((t) => t.aBorrar.map((u) => RUTAS.fila(t.clave, u))),
-    ...rachasABorrar.map((u) => RUTAS.racha(u)),
-  ]);
-
   return {
     periodos: tocados,
     rachas: rachasABorrar,
     rachasQueQuedan,
-    rutas,
+    rutas: verificarRutas([
+      ...tocados.flatMap((t) => t.aBorrar.map((u) => rutas.fila(t.clave, u))),
+      ...rachasABorrar.map((u) => rutas.racha(u)),
+    ]),
     total: { filas: tocados.reduce((s, t) => s + t.aBorrar.length, 0), rachas: rachasABorrar.length },
   };
 }
 
 // ------------------------------------------------------------- informe
 
-function informar(plan, { quien, periodo }) {
+function informar(plan, { quien, periodo, juego, legado }) {
   console.log(`A quién: ${quien}`);
+  console.log(`Estructura: ${legado ? "la vieja (--legado)" : `por juego, «${juego}»`}`);
   console.log(`Períodos: ${periodo ? `sólo los ${periodo}es` : "los tres"}\n`);
 
   if (!plan.periodos.length && !plan.rachas.length) {
@@ -278,12 +314,22 @@ async function principal() {
   const quien = args.todo ? "todos" : args.email ? `${args.email} (${uid})` : uid;
 
   // ------------------------------------------------------ lo que hay
-  const refsPeriodos = await db.collection(RUTAS.rankings).listDocuments();
+  //
+  // En la estructura vieja, los períodos son documentos de `rankings/` con
+  // clave de período; ahí mismo viven ahora las marcas de los juegos, que no
+  // lo son y se saltean. En la nueva, son `rankings/{juego}/periodos/`.
+  const refsPeriodos = args.legado
+    ? (await db.collection(RUTAS_RANKING.coleccion).listDocuments()).filter((r) => esClaveDePeriodo(r.id))
+    : await db.collection(RUTAS_RANKING.periodos(args.juego)).listDocuments();
+  const filasDe = (clave) =>
+    args.legado ? RUTAS_RANKING_VIEJAS.filas(clave) : RUTAS_RANKING.filas(args.juego, clave);
+  const rachaDe = (u) => (args.legado ? RUTAS_RANKING_VIEJAS.racha(u) : RUTAS_RANKING.racha(args.juego, u));
+
   const periodos = [];
   for (const ref of refsPeriodos) {
     if (args.periodo && tipoDe(ref.id) !== args.periodo) continue;
     const doc = await ref.get();
-    const filas = await ref.collection(RUTAS.filas).get();
+    const filas = await db.collection(filasDe(ref.id)).get();
     periodos.push({
       clave: ref.id,
       doc: doc.exists ? doc.data() : null,
@@ -294,15 +340,18 @@ async function principal() {
   const rachas = [];
   if (args.todo) {
     for (const ref of await db.collection("jugadores").listDocuments()) {
-      if ((await db.doc(RUTAS.racha(ref.id)).get()).exists) rachas.push(ref.id);
+      if ((await db.doc(rachaDe(ref.id)).get()).exists) rachas.push(ref.id);
     }
-  } else if ((await db.doc(RUTAS.racha(uid)).get()).exists) {
+  } else if ((await db.doc(rachaDe(uid)).get()).exists) {
     rachas.push(uid);
   }
 
   // ------------------------------------------------------------ plan
-  const plan = planDeLimpieza({ periodos, rachas }, { uid, todo: args.todo, periodo: args.periodo });
-  informar(plan, { quien, periodo: args.periodo });
+  const plan = planDeLimpieza(
+    { periodos, rachas },
+    { uid, todo: args.todo, periodo: args.periodo, juego: args.juego, legado: args.legado },
+  );
+  informar(plan, { quien, periodo: args.periodo, juego: args.juego, legado: args.legado });
 
   if (!plan.rutas.length) return;
   if (!args.escribir) {
@@ -320,7 +369,7 @@ async function principal() {
   // -------------------------------------------- y lo que quedó, de verdad
   console.log("Después de borrar:");
   for (const t of plan.periodos) {
-    const quedan = (await db.collection(`${RUTAS.rankings}/${t.clave}/${RUTAS.filas}`).get()).size;
+    const quedan = (await db.collection(filasDe(t.clave)).get()).size;
     console.log(`  ${t.clave.padEnd(20)} quedan ${quedan}`);
   }
   console.log(`\n✅ Borradas ${plan.total.filas} filas y ${plan.total.rachas} rachas.`);

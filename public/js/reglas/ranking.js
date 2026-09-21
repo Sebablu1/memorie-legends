@@ -109,6 +109,56 @@ export function clavesDePeriodos(fecha = new Date(), zona = ZONA_POR_DEFECTO) {
   };
 }
 
+/**
+ * Dónde vive cada tabla. En UN solo lugar: lo usan quien puntúa, el cierre de
+ * los períodos, la página del ranking y las dos herramientas —limpiar y
+ * migrar—, y si cada uno armara su ruta, la de alguno quedaría vieja.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR JUEGO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Cada juego tiene sus tablas y cada jugador una racha por juego: quien juega
+ * a dos tiene dos filas por período, que no se mezclan.
+ *
+ *   rankings/{juego}                              la marca: `{ juego }`
+ *   rankings/{juego}/periodos/{clave}             el período (lo escribe el cierre)
+ *   rankings/{juego}/periodos/{clave}/jugadores/{uid}   una fila
+ *   jugadores/{uid}/rachas/{juego}                la racha
+ *
+ * La MARCA es un documento con el campo `juego` igual a su propio id. Es lo
+ * que el cierre usa para saber qué juegos tienen tablas, y el campo no es
+ * decorativo: en la misma colección `rankings/` viven los períodos de la
+ * estructura vieja —`rankings/semanal_2026-09-07`—, que quedan como
+ * respaldo y NO son juegos.
+ *
+ * `juego` es un id abierto: ver `reglas/juegos.js`.
+ */
+export const RUTAS_RANKING = Object.freeze({
+  coleccion: "rankings",
+  juego: (juego) => `rankings/${juego}`,
+  periodos: (juego) => `rankings/${juego}/periodos`,
+  periodo: (juego, clave) => `rankings/${juego}/periodos/${clave}`,
+  filas: (juego, clave) => `rankings/${juego}/periodos/${clave}/jugadores`,
+  fila: (juego, clave, uid) => `rankings/${juego}/periodos/${clave}/jugadores/${uid}`,
+  racha: (juego, uid) => `jugadores/${uid}/rachas/${juego}`,
+});
+
+/**
+ * La estructura de antes, sin juego. Queda como respaldo después de migrar,
+ * y la leen sólo las dos herramientas: `migrar-rankings.mjs` para copiarla y
+ * `limpiar-rankings.mjs --legado` para limpiarla antes.
+ */
+export const RUTAS_RANKING_VIEJAS = Object.freeze({
+  periodo: (clave) => `rankings/${clave}`,
+  filas: (clave) => `rankings/${clave}/jugadores`,
+  fila: (clave, uid) => `rankings/${clave}/jugadores/${uid}`,
+  racha: (uid) => `jugadores/${uid}/rachas/actual`,
+});
+
+/** ¿Este id de `rankings/` es la clave de un período? (`semanal_…`, etc.) */
+export const esClaveDePeriodo = (id) => PERIODOS.includes(String(id).split("_")[0]);
+
 // -------------------------------------------------------------- puntuación
 
 /** Sólo entran al ranking las partidas donde se apostaron Leyendas. */

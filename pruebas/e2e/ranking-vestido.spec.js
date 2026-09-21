@@ -28,6 +28,7 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { JUEGO_POR_DEFECTO } from "../../public/js/reglas/juegos.js";
 
 const js = (body) => ({ status: 200, contentType: "text/javascript; charset=utf-8", body });
 
@@ -86,7 +87,9 @@ const firebaseFalso = `
   export const increment = (n) => n;
   export async function runTransaction(f) { return f({}); }
   export function onSnapshot() { return () => {}; }
-  export async function getDocs() {
+  // Anota qué se pidió: la tabla es por juego, y la prueba lo mira.
+  export async function getDocs(consulta) {
+    (window.__consultas ??= []).push(JSON.stringify(consulta));
     return { docs: (window.__filas ?? []).map((d) => ({ data: () => d })) };
   }
 `;
@@ -290,4 +293,18 @@ test("tu propia fila sigue marcándose por uid", async ({ page }) => {
 
   await expect(filaN(page, 1)).toHaveClass(/yo/);
   await expect(filaN(page, 0)).not.toHaveClass(/yo/);
+});
+
+test("pide la tabla del juego, no la de la estructura vieja", async ({ page }) => {
+  /**
+   * Las tablas son por juego: `rankings/{juego}/periodos/{clave}/jugadores`.
+   * La de antes, `rankings/{clave}/jugadores`, quedó como respaldo y ya no se
+   * escribe: leerla mostraría una tabla que no se mueve más.
+   */
+  await abrirRanking(page, [fila({ uid: "ana", nombre: "Ana" })]);
+  const consultas = await page.evaluate(() => window.__consultas ?? []);
+
+  expect(consultas.length, "la página no pidió ninguna tabla").toBeGreaterThan(0);
+  expect(consultas[0]).toContain(`rankings/${JUEGO_POR_DEFECTO}/periodos/`);
+  expect(consultas[0]).toContain("/jugadores");
 });

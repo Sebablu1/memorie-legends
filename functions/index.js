@@ -37,8 +37,6 @@ import crypto from "node:crypto";
 
 import {
   LEYENDAS_POR_REFERIDO,
-  premioPorPuesto,
-  multiplicadorDePeriodo,
   leyendasDePaquete,
   MOTIVOS,
   MONEDA,
@@ -48,21 +46,20 @@ import {
 } from "./reglas/economia.js";
 import { JUEGO_POR_DEFECTO, juegoDe } from "./reglas/juegos.js";
 
-import { PUESTO_MENSUAL_CON_INSIGNIA } from "./reglas/insignias.js";
-
 import { crearMoverLeyendas } from "./leyendas.js";
 import { crearAbandonarPartida } from "./abandono.js";
 import { crearSalasPrivadas } from "./salas-privadas.js";
 import { crearSalasPublicas } from "./salas-publicas.js";
 import { crearMotorEnRed } from "./partida-red.js";
 import { crearCierre } from "./cierre.js";
+import { crearCierreDePeriodos } from "./cierre-de-periodos.js";
 import { crearPacks } from "./packs.js";
 import { crearLimiteDeRitmo } from "./limite-de-ritmo.js";
 import { crearTienda } from "./tienda.js";
 import { crearInsignias } from "./insignias.js";
 import { crearTorneos } from "./torneos.js";
 import { crearRankingDePartidas } from "./ranking.js";
-import { premioFisicoDe, umbralesValidos } from "./reglas/configuracion.js";
+import { umbralesValidos } from "./reglas/configuracion.js";
 import { LIMITE_ELIMINACION, LIMITES_DE_PARTIDA, esLimiteDePartida } from "./reglas/puntaje.js";
 import { COLECCION_CATALOGO, esRutaDelSitio } from "./reglas/catalogo.js";
 import {
@@ -2100,127 +2097,23 @@ export const acreditarReferido = functions.https.onCall(async (data, context) =>
 // -------------------------------------------------- reinicio de rankings
 
 /**
- * Los rankings no se "borran": cada período es su propio documento y la clave
- * se deriva de la fecha. Reiniciar es, entonces, cerrar el período que termina
- * y pagar sus premios. Esta función marca el cierre y reparte.
+ * El cierre de los períodos del ranking: ver `cierre-de-periodos.js`.
+ *
+ * Vivía acá, como una función suelta que no se podía probar sin Firebase. Se
+ * mudó cuando los rankings pasaron a ser por juego: ahora cada juego que tiene
+ * tablas cierra la suya, y los tres programados de más abajo lo disparan.
  */
-async function cerrarPeriodo(periodo, fechaDelPeriodoQueCierra) {
-  const clave = clavePeriodo(periodo, fechaDelPeriodoQueCierra, ZONA);
-  const refPeriodo = db.collection("rankings").doc(clave);
-
-  const yaCerrado = await refPeriodo.get();
-  if (yaCerrado.exists && yaCerrado.data().cerrado) {
-    logger.info("El período ya estaba cerrado", { clave, periodo });
-    return { clave, premiados: 0 };
-  }
-
-  const tabla = await refPeriodo
-    .collection("jugadores")
-    .orderBy("puntos", "desc")
-    .limit(50)
-    .get();
-
-  // El período se valida ANTES de pagarle a nadie.
-  //
-  // `premioPorPuesto` se rompe con un período que no conoce, y hace bien. Pero
-  // si se rompiera adentro del bucle lo haría con veinte jugadores ya
-  // cobrados y treinta sin cobrar, y un cierre a medias es peor que uno que no
-  // arrancó: el período queda sin marcar como cerrado, así que el próximo
-  // intento vuelve a pasar por los que ya cobraron —los salva la idempotencia—
-  // pero nadie sabe, mirando, en qué estado quedó.
-  multiplicadorDePeriodo(periodo);
-
-  let premiados = 0;
-  for (let i = 0; i < tabla.docs.length; i++) {
-    const fila = tabla.docs[i];
-    const puesto = i + 1;
-    const premio = premioPorPuesto(puesto, periodo);
-    if (!premio) continue;
-
-    await db.runTransaction(async (tx) => {
-      const r = await moverLeyendas(tx, {
-        uid: fila.id,
-        delta: premio.leyendas,
-        motivo: MOTIVOS.PREMIO_RANKING,
-        referencia: clave,
-        idempotencia: `premio_${clave}_${fila.id}`,
-      });
-      if (!r.aplicado) return;
-
-      // Sólo el puesto y las Leyendas. Acá se escribían además cuatro
-      // insignias —`dorada`, `plateada`, `bronce`, `top10`— con `arrayUnion`
-      // en un campo del perfil que no lee nadie, y con ids que no existían ni
-      // en `CONDICIONES` ni en el catálogo. La única insignia del ranking es
-      // `leyenda`, y la otorga `registrarPuestoMensual` unas líneas más
-      // abajo, por el mismo camino que todas: `users/{uid}/items/`.
-      tx.set(fila.ref, { puesto, premiado: true }, { merge: true });
-    });
-    premiados++;
-  }
-
-  // ---- lo que sólo pasa al cerrar un mes ----
-  //
-  // Dos cosas que no son Leyendas: los premios FÍSICOS (remera y llavero) y la
-  // insignia de Leyenda, que se gana entrando al top 5. Van fuera del bucle de
-  // arriba —y fuera de sus transacciones— porque no mueven saldo: dejan
-  // constancia y otorgan, que son escrituras que se pueden repetir sin daño.
-  let fisicos = 0;
-  if (periodo === "mensual") {
-    const umbrales = umbralesValidos((await db.collection("configuracion").doc("ranking").get()).data());
-
-    for (let i = 0; i < tabla.docs.length; i++) {
-      const fila = tabla.docs[i];
-      const puesto = i + 1;
-
-      // El corte se lo lleva la insignia. Es lo único del ranking que queda
-      // para siempre: el puesto se pierde al mes siguiente, la insignia no.
-      //
-      // El número sale de la condición y no está escrito acá. Con una copia
-      // suelta, mover el corte de 5 a 10 en `reglas/insignias.js` habría
-      // dejado a los puestos 6 a 10 mereciendo la insignia y sin que nadie
-      // les anotara el puesto que la justifica.
-      if (puesto <= PUESTO_MENSUAL_CON_INSIGNIA) {
-        await insignias.registrarPuestoMensual(fila.id, puesto);
-      }
-
-      const premio = premioFisicoDe(puesto, Number(fila.data().puntos ?? 0), umbrales);
-      if (!premio) continue;
-
-      // `premios` es una lista de constancias, no un saldo. Nadie la cobra
-      // desde acá: la mira un humano para saber qué mandar y a quién.
-      await db.collection(USUARIOS).doc(fila.id).set(
-        {
-          premios: admin.firestore.FieldValue.arrayUnion({
-            premio: premio.premio,
-            etiqueta: premio.etiqueta,
-            periodo: clave,
-            puesto,
-            puntos: premio.puntos,
-          }),
-        },
-        { merge: true },
-      );
-      await fila.ref.set({ premioFisico: premio.premio }, { merge: true });
-      fisicos++;
-      logger.info("Premio físico otorgado", { clave, uid: fila.id, puesto, premio: premio.premio });
-    }
-  }
-
-  await refPeriodo.set(
-    {
-      tipo: periodo,
-      clave,
-      cerrado: true,
-      cerradoEn: admin.firestore.FieldValue.serverTimestamp(),
-      premiados,
-      fisicos,
-    },
-    { merge: true },
-  );
-
-  logger.info("Período de ranking cerrado", { clave, periodo, premiados });
-  return { clave, premiados };
-}
+const cierreDePeriodos = crearCierreDePeriodos({
+  db,
+  moverLeyendas,
+  motivo: MOTIVOS.PREMIO_RANKING,
+  insignias,
+  marcaDeTiempo,
+  agregarAArray: (valor) => admin.firestore.FieldValue.arrayUnion(valor),
+  logger,
+  usuarios: USUARIOS,
+  zona: ZONA,
+});
 
 /**
  * Empuja las partidas que se quedaron esperando a alguien.
@@ -2357,17 +2250,17 @@ const ayer = () => new Date(Date.now() - 86400000);
 export const cerrarRankingSemanal = functions.pubsub
   .schedule("0 0 * * 1") // lunes 00:00
   .timeZone(ZONA)
-  .onRun(() => cerrarPeriodo("semanal", ayer()));
+  .onRun(() => cierreDePeriodos.cerrarPeriodos("semanal", ayer()));
 
 export const cerrarRankingMensual = functions.pubsub
   .schedule("0 0 1 * *") // día 1 a las 00:00
   .timeZone(ZONA)
-  .onRun(() => cerrarPeriodo("mensual", ayer()));
+  .onRun(() => cierreDePeriodos.cerrarPeriodos("mensual", ayer()));
 
 export const cerrarRankingAnual = functions.pubsub
   .schedule("0 0 1 1 *") // 1 de enero 00:00
   .timeZone(ZONA)
-  .onRun(() => cerrarPeriodo("anual", ayer()));
+  .onRun(() => cierreDePeriodos.cerrarPeriodos("anual", ayer()));
 
 // ----------------------------------------------------------------- pagos
 

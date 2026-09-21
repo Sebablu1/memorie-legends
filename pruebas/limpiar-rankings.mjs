@@ -28,6 +28,11 @@ import {
   AVISO_CERRADO,
   AVISO_A_MEDIAS,
 } from "../herramientas/limpiar-rankings.mjs";
+import { RUTAS_RANKING } from "../public/js/reglas/ranking.js";
+import { JUEGO_POR_DEFECTO } from "../public/js/reglas/juegos.js";
+
+/** Las tablas son por juego; por omisión se limpia el de siempre. */
+const JUEGO = JUEGO_POR_DEFECTO;
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -180,9 +185,9 @@ console.log("\n=== 6. Correrla dos veces no hace nada la segunda ===");
   const despues = {
     periodos: DATOS.periodos.map((p) => ({
       ...p,
-      filas: p.filas.filter((f) => !borradas.has(`rankings/${p.clave}/jugadores/${f.uid}`)),
+      filas: p.filas.filter((f) => !borradas.has(RUTAS_RANKING.fila(JUEGO, p.clave, f.uid))),
     })),
-    rachas: DATOS.rachas.filter((u) => !borradas.has(`jugadores/${u}/rachas/actual`)),
+    rachas: DATOS.rachas.filter((u) => !borradas.has(RUTAS_RANKING.racha(JUEGO, u))),
   };
 
   const otraVez = planDeLimpieza(despues, { uid: "prueba" });
@@ -236,7 +241,8 @@ console.log("\n=== 8. Nada fuera del ranking ===");
    * plan entero se cae antes de borrar nada.
    */
   const plan = planDeLimpieza(DATOS, { todo: true });
-  ok(plan.rutas.every((r) => /^rankings\/[^/]+\/jugadores\/[^/]+$|^jugadores\/[^/]+\/rachas\/actual$/.test(r)),
+  ok(plan.rutas.every((r) =>
+    /^rankings\/[^/]+\/periodos\/[^/]+\/jugadores\/[^/]+$|^jugadores\/[^/]+\/rachas\/[^/]+$/.test(r)),
      "todas las rutas del plan son filas o rachas", plan.rutas.filter((r) => !r.startsWith("rankings/")));
 
   for (const ajena of [
@@ -245,6 +251,10 @@ console.log("\n=== 8. Nada fuera del ranking ===");
     "partidasPuntuadas/ABC234",
     "rooms/ABC234",
     "rankings/semanal_2026-W37",
+    // La marca del juego y el documento de un período tampoco: sin la marca
+    // el cierre no sabría que el juego tiene tablas.
+    `rankings/${JUEGO}`,
+    `rankings/${JUEGO}/periodos/semanal_2026-W37`,
   ]) {
     let frenada = false;
     try {
@@ -254,6 +264,50 @@ console.log("\n=== 8. Nada fuera del ranking ===");
     }
     ok(frenada, `frena un plan que quiere borrar ${ajena}`);
   }
+}
+
+// =====================================================================
+console.log("\n=== 9. Por juego, o la estructura vieja ===");
+// =====================================================================
+
+{
+  const porOmision = planDeLimpieza(DATOS, { uid: "prueba" });
+  ok(porOmision.rutas.includes(RUTAS_RANKING.fila(JUEGO, "mensual_2026-09", "prueba")) &&
+     porOmision.rutas.includes(RUTAS_RANKING.racha(JUEGO, "prueba")),
+     "por omisión, las tablas y la racha del juego de siempre", porOmision.rutas);
+
+  const otro = planDeLimpieza(DATOS, { uid: "prueba", juego: "otro-juego" });
+  ok(otro.rutas.length === porOmision.rutas.length && otro.rutas.every((r) => r.includes("otro-juego")),
+     "con --juego, las de ese juego y ninguna otra", otro.rutas);
+
+  /**
+   * `--legado` limpia la estructura de antes. Existe por el orden del
+   * despliegue: primero se limpia lo viejo, después se migra lo que quedó.
+   */
+  const legado = planDeLimpieza(DATOS, { uid: "prueba", legado: true });
+  ok(legado.rutas.includes("rankings/mensual_2026-09/jugadores/prueba") &&
+     legado.rutas.includes("jugadores/prueba/rachas/actual"),
+     "con --legado, la estructura vieja", legado.rutas);
+  ok(!legado.rutas.some((r) => r.includes("/periodos/") || r.endsWith(`/rachas/${JUEGO}`)),
+     "y nada de la nueva", legado.rutas);
+}
+
+{
+  const falla = (argv) => {
+    try {
+      leerArgumentos(argv);
+      return null;
+    } catch (e) {
+      return e.message;
+    }
+  };
+  ok(/no van juntos/.test(falla(["--todo", "--juego", "x", "--legado"]) ?? ""),
+     "--juego y --legado juntos se niegan: lo viejo no tiene juego");
+  ok(/Falta el valor/.test(falla(["--todo", "--juego"]) ?? ""), "un --juego sin valor se niega");
+  ok(leerArgumentos(["--todo"]).juego === JUEGO, "sin --juego, el de siempre");
+  ok(leerArgumentos(["--todo", "--juego", "otro-juego"]).juego === "otro-juego", "con --juego, ése");
+  const l = leerArgumentos(["--todo", "--legado"]);
+  ok(l.legado === true && l.juego === null, "--legado solo se entiende", l);
 }
 
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);

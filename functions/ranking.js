@@ -5,7 +5,8 @@
  * POR QUÉ ESTO EXISTÍA Y NO FUNCIONABA
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Había un `registrarPartida` en `public/js/ranking-store.js` que hacía casi
+ * Había un `registrarPartida` en `public/js/ranking-store.js` —archivo que ya
+ * no existe: se borró al pasar los rankings a ser por juego— que hacía casi
  * esto mismo, con dos problemas. El primero: no lo llamaba nadie, así que las
  * tres tablas estaban vacías y el cierre mensual repartía premios entre cero
  * jugadores. El segundo, escrito por su propio autor en la cabecera del
@@ -64,7 +65,9 @@ import {
   acumularFila,
   filaVacia,
   ZONA_POR_DEFECTO,
+  RUTAS_RANKING,
 } from "./reglas/ranking.js";
+import { juegoDe } from "./reglas/juegos.js";
 
 import { resumenPartida } from "./reglas/motor.js";
 
@@ -72,12 +75,10 @@ export function crearRankingDePartidas({
   db,
   marcaDeTiempo,
   logger,
-  rankings = "rankings",
-  // Dos colecciones distintas que se llaman parecido y NO son la misma:
-  // `rankings/{clave}/jugadores/{uid}` es una fila de la tabla, y
-  // `jugadores/{uid}/rachas/actual` es la raya de victorias en curso.
-  filasDeTabla = "jugadores",
-  perfilesDeRacha = "jugadores",
+  // Dónde vive cada tabla y cada racha lo dice `RUTAS_RANKING`, en
+  // `reglas/ranking.js`: una fila es `rankings/{juego}/periodos/{clave}/
+  // jugadores/{uid}`, y la raya, `jugadores/{uid}/rachas/{juego}`. Dos
+  // colecciones que se llaman parecido y NO son la misma.
   puntuadas = "partidasPuntuadas",
   zona = ZONA_POR_DEFECTO,
   ahora = () => new Date(),
@@ -113,10 +114,19 @@ export function crearRankingDePartidas({
    */
   identidadDe = async () => null,
 }) {
-  const refFila = (clave, uid) =>
-    db.collection(rankings).doc(clave).collection(filasDeTabla).doc(uid);
-  const refRaya = (uid) =>
-    db.collection(perfilesDeRacha).doc(uid).collection("rachas").doc("actual");
+  /** Una referencia a partir de una ruta entera: `a/b/c/d`. */
+  const refDe = (ruta) => {
+    const i = ruta.lastIndexOf("/");
+    return db.collection(ruta.slice(0, i)).doc(ruta.slice(i + 1));
+  };
+  const refFila = (juego, clave, uid) => refDe(RUTAS_RANKING.fila(juego, clave, uid));
+  const refRaya = (juego, uid) => refDe(RUTAS_RANKING.racha(juego, uid));
+  /**
+   * La marca del juego: `rankings/{juego}` con `{ juego }`. Es lo que el cierre
+   * de los períodos usa para saber qué juegos tienen tablas; ver
+   * `cierre-de-periodos.js`.
+   */
+  const refMarca = (juego) => refDe(RUTAS_RANKING.juego(juego));
   const refGuardian = (codigo) => db.collection(puntuadas).doc(codigo);
 
   /**
@@ -140,11 +150,11 @@ export function crearRankingDePartidas({
     return Object.fromEntries(pares);
   }
 
-  /** La raya de victorias que traía cada uno. Lectura suelta, antes de todo. */
-  async function rayasDe(uids) {
+  /** La raya de victorias que traía cada uno, en ESE juego. Lectura suelta, antes de todo. */
+  async function rayasDe(uids, juego) {
     const pares = await Promise.all(
       uids.map(async (uid) => {
-        const snap = await refRaya(uid).get();
+        const snap = await refRaya(juego, uid).get();
         return [uid, snap.exists ? Number(snap.data().raya ?? 0) : 0];
       }),
     );
@@ -158,9 +168,10 @@ export function crearRankingDePartidas({
    * @param estado      el estado final del motor
    * @param entrada     la apuesta, que multiplica lo ganado en la mesa
    * @param abandonaron uids que se fueron antes de terminar
+   * @param juego       de qué juego es la partida: sus filas van a SUS tablas
    * @returns los resultados escritos, o [] si no había nada que puntuar
    */
-  async function registrarPartida({ codigo, estado, entrada, abandonaron = [] }) {
+  async function registrarPartida({ codigo, estado, entrada, abandonaron = [], juego }) {
     // El mismo portero que la versión del navegador: sólo puntúan las partidas
     // jugadas con Leyendas. El entrenamiento contra la IA no entra al ranking.
     if (!esPartidaPuntuable({ dePago: true, apuesta: Number(entrada) })) return [];
@@ -179,7 +190,9 @@ export function crearRankingDePartidas({
     if (!elegibles.length) return [];
 
     const claves = clavesDePeriodos(ahora(), zona);
-    const rayas = await rayasDe(elegibles);
+    // Una partida sin el dato es de antes del campo: de Memorie.
+    const deQueJuego = juegoDe({ juego });
+    const rayas = await rayasDe(elegibles, deQueJuego);
 
     // Antes de abrir la transacción, igual que las rayas. Adentro serían
     // lecturas de más en una transacción que ya lee tres filas por jugador, y
@@ -213,7 +226,7 @@ export function crearRankingDePartidas({
       const objetivos = [];
       for (const r of resultados) {
         for (const periodo of PERIODOS) {
-          const ref = refFila(claves[periodo], r.jugadorId);
+          const ref = refFila(deQueJuego, claves[periodo], r.jugadorId);
           const snap = await tx.get(ref);
           objetivos.push({ ref, r, previo: snap.exists ? snap.data() : filaVacia() });
         }
@@ -222,6 +235,7 @@ export function crearRankingDePartidas({
       // ---- escrituras ----
       tx.set(refGuardian(codigo), {
         codigo,
+        juego: deQueJuego,
         claves,
         entrada: Number(entrada),
         ganadorId: resumen.ganadorId ?? null,
@@ -239,6 +253,11 @@ export function crearRankingDePartidas({
         })),
         puntuadaEn: marcaDeTiempo(),
       });
+
+      // La marca de que este juego tiene tablas. Se escribe en cada partida y
+      // no cuesta nada: con `merge` no pisa nada, y así un juego nuevo entra
+      // al cierre solo, el día que puntúa su primera partida.
+      tx.set(refMarca(deQueJuego), { juego: deQueJuego }, { merge: true });
 
       for (const { ref, r, previo } of objetivos) {
         const quien = identidades[r.jugadorId];
@@ -277,12 +296,13 @@ export function crearRankingDePartidas({
       }
 
       for (const r of resultados) {
-        tx.set(refRaya(r.jugadorId), { raya: r.rayaNueva, actualizada: marcaDeTiempo() });
+        tx.set(refRaya(deQueJuego, r.jugadorId), { raya: r.rayaNueva, actualizada: marcaDeTiempo() });
       }
     });
 
     logger?.info?.("Partida puntuada", {
       codigo,
+      juego: deQueJuego,
       jugadores: resultados.length,
       puntos: resultados.map((r) => ({ uid: r.jugadorId, total: r.total })),
     });

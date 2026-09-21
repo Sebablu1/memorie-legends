@@ -309,6 +309,9 @@ console.log("\n=== 4. Quién llama a moverLeyendas ===");
     "admin.js",      // devolución al cancelar una sala desde el panel
     "tienda.js",     // cobro de un avatar o un dorso
     "torneos.js",    // entrada, premio y devolución de un torneo
+    // Los premios del ranking. No es una vía nueva: es `cerrarPeriodo`, que
+    // vivía en `index.js` y se mudó a su archivo para poder probarlo.
+    "cierre-de-periodos.js",
   ]);
   const raros = llamadas.filter((c) => !CONOCIDOS.has(c.archivo));
   ok(raros.length === 0, "todas están en operaciones económicas conocidas", raros);

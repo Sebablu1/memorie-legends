@@ -41,6 +41,10 @@ import {
 import { BONOS_APUESTA, bonoDeApuesta } from "../public/js/reglas/economia.js";
 import { ENTRADAS } from "../public/js/reglas/salas.js";
 import { premioFisicoDe, umbralesValidos } from "../public/js/reglas/configuracion.js";
+import { JUEGO_POR_DEFECTO } from "../public/js/reglas/juegos.js";
+
+/** Las tablas son por juego; estas pruebas miran las del juego de siempre. */
+const JUEGO = JUEGO_POR_DEFECTO;
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -159,7 +163,7 @@ console.log("\n=== 1. Una partida de pago llena las tres tablas ===");
   ok(r.length === 4, "puntúa a los cuatro", r.length);
 
   for (const periodo of PERIODOS) {
-    const fila = db._leer(`rankings/${CLAVES[periodo]}/jugadores/ana`);
+    const fila = db._leer(`rankings/${JUEGO}/periodos/${CLAVES[periodo]}/jugadores/ana`);
     ok(Boolean(fila), `escribe la tabla ${periodo}`, CLAVES[periodo]);
     ok(fila?.partidasJugadas === 1, `  con una partida jugada`, fila?.partidasJugadas);
     ok(fila?.partidasGanadas === 1, `  y una ganada`, fila?.partidasGanadas);
@@ -168,7 +172,7 @@ console.log("\n=== 1. Una partida de pago llena las tres tablas ===");
 
   // El que salió último también entra a la tabla: el ranking cuenta a todos,
   // no sólo a los que cobraron.
-  const ultimo = db._leer(`rankings/${CLAVES.mensual}/jugadores/dani`);
+  const ultimo = db._leer(`rankings/${JUEGO}/periodos/${CLAVES.mensual}/jugadores/dani`);
   ok(Boolean(ultimo), "el último también aparece en la tabla");
   ok(ultimo?.partidasGanadas === 0, "  sin victorias", ultimo?.partidasGanadas);
 
@@ -190,11 +194,11 @@ console.log("\n=== 2. La misma partida no se puntúa dos veces ===");
   };
 
   await ranking.registrarPartida(partida);
-  const puntosTrasLaPrimera = db._leer(`rankings/${CLAVES.mensual}/jugadores/ana`).puntos;
+  const puntosTrasLaPrimera = db._leer(`rankings/${JUEGO}/periodos/${CLAVES.mensual}/jugadores/ana`).puntos;
 
   // Un reintento de red: la misma llamada, otra vez.
   await ranking.registrarPartida(partida);
-  const despues = db._leer(`rankings/${CLAVES.mensual}/jugadores/ana`);
+  const despues = db._leer(`rankings/${JUEGO}/periodos/${CLAVES.mensual}/jugadores/ana`);
 
   ok(despues.puntos === puntosTrasLaPrimera, "los puntos no se duplican", {
     antes: puntosTrasLaPrimera,
@@ -238,8 +242,8 @@ console.log("\n=== 3. El entrenamiento contra la IA NO entra ===");
     entrada: 50,
   });
 
-  ok(Boolean(db._leer(`rankings/${CLAVES.mensual}/jugadores/ana`)), "la humana puntúa");
-  ok(!db._leer(`rankings/${CLAVES.mensual}/jugadores/ia-1`), "y las IA no");
+  ok(Boolean(db._leer(`rankings/${JUEGO}/periodos/${CLAVES.mensual}/jugadores/ana`)), "la humana puntúa");
+  ok(!db._leer(`rankings/${JUEGO}/periodos/${CLAVES.mensual}/jugadores/ia-1`), "y las IA no");
 }
 
 // =====================================================================
@@ -255,9 +259,9 @@ console.log("\n=== 4. Quien abandonó no suma ===");
     abandonaron: ["dani"],
   });
 
-  ok(Boolean(db._leer(`rankings/${CLAVES.mensual}/jugadores/ana`)), "los que se quedaron suman");
+  ok(Boolean(db._leer(`rankings/${JUEGO}/periodos/${CLAVES.mensual}/jugadores/ana`)), "los que se quedaron suman");
   ok(
-    !db._leer(`rankings/${CLAVES.mensual}/jugadores/dani`),
+    !db._leer(`rankings/${JUEGO}/periodos/${CLAVES.mensual}/jugadores/dani`),
     "y el que se fue no aparece en la tabla",
   );
 }
@@ -274,13 +278,13 @@ console.log("\n=== 5. La raya de victorias se lee antes y se guarda después ===
     entrada: 50,
   });
 
-  ok(db._leer("jugadores/ana/rachas/actual").raya === 1, "el ganador arranca su raya");
-  ok(db._leer("jugadores/beto/rachas/actual").raya === 0, "y al que perdió se le corta");
+  ok(db._leer(`jugadores/ana/rachas/${JUEGO}`).raya === 1, "el ganador arranca su raya");
+  ok(db._leer(`jugadores/beto/rachas/${JUEGO}`).raya === 0, "y al que perdió se le corta");
 }
 
 {
   // La tercera seguida cobra el bono; la segunda todavía no.
-  const conRaya = (n) => ({ "jugadores/ana/rachas/actual": { raya: n } });
+  const conRaya = (n) => ({ [`jugadores/ana/rachas/${JUEGO}`]: { raya: n } });
 
   const dos = montar(conRaya(1));
   const rDos = await dos.ranking.registrarPartida({
@@ -306,7 +310,7 @@ console.log("\n=== 5. La raya de victorias se lee antes y se guarda después ===
     anaTres.desglose.raya,
   );
   ok(
-    tres.db._leer(`rankings/${CLAVES.mensual}/jugadores/ana`).mejorRacha === RAYA_MINIMA,
+    tres.db._leer(`rankings/${JUEGO}/periodos/${CLAVES.mensual}/jugadores/ana`).mejorRacha === RAYA_MINIMA,
     "y la tabla guarda la mejor racha",
   );
 }
@@ -323,7 +327,7 @@ console.log("\n=== 6. Dos partidas se acumulan, no se pisan ===");
     estado: estadoFinal({ jugadores: CUATRO, ganadorId: "ana" }),
     entrada: 50,
   });
-  const trasLaPrimera = db._leer(`rankings/${CLAVES.mensual}/jugadores/ana`).puntos;
+  const trasLaPrimera = db._leer(`rankings/${JUEGO}/periodos/${CLAVES.mensual}/jugadores/ana`).puntos;
 
   await ranking.registrarPartida({
     codigo: "P2",
@@ -331,11 +335,11 @@ console.log("\n=== 6. Dos partidas se acumulan, no se pisan ===");
     entrada: 50,
   });
 
-  const ana = db._leer(`rankings/${CLAVES.mensual}/jugadores/ana`);
+  const ana = db._leer(`rankings/${JUEGO}/periodos/${CLAVES.mensual}/jugadores/ana`);
   ok(ana.partidasJugadas === 2, "la segunda suma otra partida", ana.partidasJugadas);
   ok(ana.partidasGanadas === 1, "sin sumar una victoria que no fue", ana.partidasGanadas);
   ok(ana.puntos > trasLaPrimera, "y los puntos crecen", { trasLaPrimera, ahora: ana.puntos });
-  ok(db._leer("jugadores/ana/rachas/actual").raya === 0, "y la raya se le cortó");
+  ok(db._leer(`jugadores/ana/rachas/${JUEGO}`).raya === 0, "y la raya se le cortó");
 }
 
 // =====================================================================
@@ -579,7 +583,7 @@ console.log("\n=== 9. La fila congela quién era el jugador ===");
     entrada: 50,
   });
 
-  const ana = db._leer(`rankings/${CLAVES.semanal}/jugadores/ana`);
+  const ana = db._leer(`rankings/${JUEGO}/periodos/${CLAVES.semanal}/jugadores/ana`);
   ok(ana.nombre === "Nombre de ana", "la fila guarda el nombre", ana.nombre);
   ok(ana.retrato === "/img/avatar/ana.webp", "y la cara que tenía puesta", ana.retrato);
   ok(ana.marco === "/img/marcos/oro.webp", "y el marco", ana.marco);
@@ -592,12 +596,12 @@ console.log("\n=== 9. La fila congela quién era el jugador ===");
   // Quien no tiene nada comprado guarda `null`, no `undefined`: un campo
   // ausente y uno vacío se leen igual en la pantalla, pero sólo el explícito
   // dice "se miró y no había".
-  const beto = db._leer(`rankings/${CLAVES.semanal}/jugadores/beto`);
+  const beto = db._leer(`rankings/${JUEGO}/periodos/${CLAVES.semanal}/jugadores/beto`);
   ok(beto.marco === null && beto.titulo === null, "y sin marco ni título queda en null", beto);
 
   // En los TRES períodos, no sólo en el semanal.
   for (const periodo of PERIODOS) {
-    const f = db._leer(`rankings/${CLAVES[periodo]}/jugadores/ana`);
+    const f = db._leer(`rankings/${JUEGO}/periodos/${CLAVES[periodo]}/jugadores/ana`);
     ok(f.nombre === "Nombre de ana", `  y también en el ${periodo}`);
   }
 }
@@ -627,7 +631,7 @@ console.log("\n=== 9. La fila congela quién era el jugador ===");
 
   ok(r.length === 4, "puntúa igual a los cuatro", r.length);
 
-  const ana = db._leer(`rankings/${CLAVES.semanal}/jugadores/ana`);
+  const ana = db._leer(`rankings/${JUEGO}/periodos/${CLAVES.semanal}/jugadores/ana`);
   ok(ana.puntos > 0, "con sus puntos", ana.puntos);
   ok(!("nombre" in ana), "y sin nombre, en vez de con uno inventado", Object.keys(ana));
 }
@@ -657,7 +661,7 @@ console.log("\n=== 9. La fila congela quién era el jugador ===");
     estado: estadoFinal({ jugadores: CUATRO, ganadorId: "ana" }),
     entrada: 50,
   });
-  ok(db._leer(`rankings/${CLAVES.semanal}/jugadores/ana`).nombre === "Nombre de ana",
+  ok(db._leer(`rankings/${JUEGO}/periodos/${CLAVES.semanal}/jugadores/ana`).nombre === "Nombre de ana",
      "la primera partida deja el nombre");
 
   falla = true;
@@ -667,9 +671,55 @@ console.log("\n=== 9. La fila congela quién era el jugador ===");
     entrada: 50,
   });
 
-  const ana = db._leer(`rankings/${CLAVES.semanal}/jugadores/ana`);
+  const ana = db._leer(`rankings/${JUEGO}/periodos/${CLAVES.semanal}/jugadores/ana`);
   ok(ana.nombre === "Nombre de ana", "y la segunda, que falla, NO lo borra", ana.nombre);
   ok(ana.partidasJugadas === 2, "aunque sí suma la partida", ana.partidasJugadas);
+}
+
+// =====================================================================
+console.log("\n=== 11. Cada juego, su tabla y su racha ===");
+// =====================================================================
+
+{
+  /**
+   * Las tablas son por juego. La misma persona jugando a dos juegos tiene
+   * dos filas por período y dos rachas, y lo de un juego no toca lo del otro.
+   *
+   * La partida que no dice de qué juego es, es de antes del campo: va a las
+   * tablas del juego de siempre.
+   */
+  const { db, ranking } = montar();
+  await ranking.registrarPartida({
+    codigo: "MEM001",
+    estado: estadoFinal({ jugadores: CUATRO, ganadorId: "ana" }),
+    entrada: 50,
+  });
+  await ranking.registrarPartida({
+    codigo: "OTR001",
+    estado: estadoFinal({ jugadores: CUATRO, ganadorId: "beto" }),
+    entrada: 50,
+    juego: "otro-juego",
+  });
+
+  const deMemorie = db._leer(`rankings/${JUEGO}/periodos/${CLAVES.mensual}/jugadores/ana`);
+  const deOtro = db._leer(`rankings/otro-juego/periodos/${CLAVES.mensual}/jugadores/ana`);
+  ok(deMemorie?.partidasGanadas === 1, "en el juego de siempre, Ana ganó su partida", deMemorie);
+  ok(deOtro?.partidasGanadas === 0 && deOtro?.partidasJugadas === 1,
+     "en el otro juego tiene su propia fila, con lo que jugó ahí", deOtro);
+  ok(deMemorie?.partidasJugadas === 1, "y las dos no se sumaron entre sí", deMemorie?.partidasJugadas);
+
+  ok(db._leer(`jugadores/ana/rachas/${JUEGO}`)?.raya === 1 &&
+     db._leer("jugadores/ana/rachas/otro-juego")?.raya === 0,
+     "cada juego tiene su racha: la de uno no corta la del otro");
+
+  // La marca que el cierre usa para saber qué juegos tienen tablas.
+  ok(db._leer(`rankings/${JUEGO}`)?.juego === JUEGO, "la tabla deja la marca de su juego");
+  ok(db._leer("rankings/otro-juego")?.juego === "otro-juego", "y el otro juego, la suya");
+
+  ok(db._leer("partidasPuntuadas/OTR001")?.juego === "otro-juego",
+     "el guardián anota de qué juego fue la partida");
+  ok(db._leer("partidasPuntuadas/MEM001")?.juego === JUEGO,
+     "y la que no lo decía, quedó en el de siempre");
 }
 
 console.log(fallos ? `\n❌ ${fallos} fallos` : "\n✅ TODO OK");

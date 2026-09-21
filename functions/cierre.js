@@ -36,6 +36,7 @@
 import { posicionesFinales } from "./reglas/motor.js";
 import { repartirPozo, usaLeyendas } from "./reglas/salas.js";
 import { claveDeEntrada, claveDeDevolucion } from "./reglas/economia.js";
+import { juegoDe } from "./reglas/juegos.js";
 
 /**
  * Tres primitivas, no una función.
@@ -370,6 +371,8 @@ export function crearCierre({
         estado: partida.estado,
         entrada: Number(sala?.entrada ?? 0),
         abandonaron: plan.abandonaron ?? [],
+        // Las filas van a las tablas del juego de la sala.
+        juego: juegoDe(sala),
       },
     };
   }

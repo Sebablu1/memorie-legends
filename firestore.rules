@@ -178,13 +178,30 @@ service cloud.firestore {
     }
 
     // Rankings: públicos para leer, imposibles de escribir.
-    match /rankings/{periodo} {
+    //
+    // `{id}` es dos cosas, y por eso no se llama `{periodo}` ni `{juego}`:
+    //
+    //   - un JUEGO, en la estructura por juego: `rankings/{juego}` es su
+    //     marca, y debajo viven `periodos/{clave}/jugadores/{uid}`;
+    //   - un PERÍODO, en la estructura vieja: `rankings/{clave}/jugadores/
+    //     {uid}`. Quedó como respaldo después de migrar y ya no se escribe.
+    match /rankings/{id} {
       allow read: if true;
       allow write: if false;
 
       match /jugadores/{uid} {
         allow read: if true;
         allow write: if false;
+      }
+
+      match /periodos/{clave} {
+        allow read: if true;
+        allow write: if false;
+
+        match /jugadores/{uid} {
+          allow read: if true;
+          allow write: if false;
+        }
       }
     }
 

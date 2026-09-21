@@ -3,7 +3,8 @@ import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
 // mundo: es la pantalla de mayor alcance del sitio.
 import { escapar } from "./modulos/texto.js";
 import { db, collection, getDocs, query, orderBy, limit } from "./firebase.js";
-import { clavesDePeriodos } from "./reglas/ranking.js";
+import { clavesDePeriodos, RUTAS_RANKING } from "./reglas/ranking.js";
+import { JUEGO_POR_DEFECTO } from "./reglas/juegos.js";
 import { esRutaDelSitio } from "./reglas/catalogo.js";
 
 const $ = (id) => document.getElementById(id);
@@ -88,7 +89,13 @@ if (sesion) {
     let filas = [];
     try {
       const snap = await getDocs(
-        query(collection(db, "rankings", clave, "jugadores"), orderBy("puntos", "desc"), limit(50)),
+        // Las tablas son por juego. Hoy hay uno; el selector llega cuando la
+        // colección `juegos/` tenga dos activos.
+        query(
+          collection(db, RUTAS_RANKING.filas(JUEGO_POR_DEFECTO, clave)),
+          orderBy("puntos", "desc"),
+          limit(50),
+        ),
       );
       filas = snap.docs.map((d, i) => ({ puesto: i + 1, ...d.data() }));
     } catch (error) {

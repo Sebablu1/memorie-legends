@@ -173,6 +173,18 @@ function archivos(dir) {
      "la partida recibe el juego de su sala al repartirse");
   ok(/juego: JUEGO_POR_DEFECTO/.test(publicas) && /juego: juegoDe\(sala\)/.test(publicas),
      "una mesa pública nace con su juego, y la reapertura hereda el de la que empezó");
+
+  // El ranking: las filas van a las tablas del juego de la partida, y la
+  // página pide las del juego por omisión con la ruta compartida, no una
+  // armada a mano.
+  const cierre = readFileSync(join(RAIZ, "functions", "cierre.js"), "utf8");
+  const ranking = readFileSync(join(RAIZ, "functions", "ranking.js"), "utf8");
+  const pagina = readFileSync(join(RAIZ, "public", "js", "ranking-ui.js"), "utf8");
+  ok(/juego: juegoDe\(sala\),/.test(cierre), "lo que pasa al ranking lleva el juego de la sala");
+  ok(/const deQueJuego = juegoDe\(\{ juego \}\);/.test(ranking),
+     "y quien puntúa escribe en las tablas de ese juego");
+  ok(/RUTAS_RANKING\.filas\(JUEGO_POR_DEFECTO, clave\)/.test(pagina),
+     "la página del ranking lee la tabla del juego con la ruta compartida");
 }
 
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);
