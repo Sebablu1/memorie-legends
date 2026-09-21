@@ -203,13 +203,14 @@ body::before {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+/* La moneda. Sin el marco cuadrado ni las esquinas redondeadas que tenía el
+   logo anterior: la moneda ya es redonda y trae su propio canto, y un marco
+   alrededor encerraba aire. `contain` para no recortarle el borde. */
 .cabecera .marca {
   width: 34px;
   height: 34px;
-  border-radius: 10px;
-  object-fit: cover;
-  border: 1px solid rgba(212, 168, 67, 0.4);
-  box-shadow: 0 0 18px rgba(212, 168, 67, 0.2);
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px rgba(212, 168, 67, 0.25));
 }
 
 /* La marca, en serif como en el resto del sitio.

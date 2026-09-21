@@ -18,7 +18,6 @@ import {
   auth,
   funciones,
   httpsCallable,
-  SUPPORT_EMAIL,
   signInWithEmailAndPassword,
   signInWithPopup,
   googleProvider,
@@ -34,6 +33,7 @@ import {
 
 // El catálogo de la tienda vive en su propio módulo: este archivo ya lleva
 // siete secciones, y el CRUD trae formulario, lista y estado propio.
+import { CORREO_ADMINISTRACION } from "../js/administracion.js";
 import { montarTiendaAdmin } from "./tienda-admin.js";
 import { montarTorneosAdmin } from "./torneos-admin.js";
 import { montarPacksAdmin } from "./packs-admin.js";
@@ -240,7 +240,7 @@ dom.formSegundoPaso.addEventListener("submit", async (evento) => {
 
 onAuthStateChanged(auth, (usuario) => {
   const correo = (usuario?.email ?? "").toLowerCase();
-  const esAdmin = correo === SUPPORT_EMAIL.toLowerCase();
+  const esAdmin = correo === CORREO_ADMINISTRACION.toLowerCase();
 
   dom.quien.textContent = usuario ? usuario.email : "Sin sesión";
   dom.btnSalir.hidden = !usuario;

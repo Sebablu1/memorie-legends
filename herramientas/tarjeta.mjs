@@ -41,11 +41,20 @@ import { pathToFileURL } from "node:url";
 import { writeFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 
-/** El logo que va en la tarjeta: el horizontal, con corona y laureles. */
-export const LOGO = "img/memorie-legends3.png";
+/**
+ * El escudo: corona, laureles, la moneda y la cinta con el nombre.
+ *
+ * Sale del original sin pérdida y no de un WebP del sitio: la tarjeta se
+ * guarda en JPG, y comprimir dos veces suma los defectos de las dos.
+ * La ruta es relativa a la plantilla, que se escribe dentro de `public/`.
+ */
+export const LOGO = "../diseno/escudo.png";
 
 /** Dónde queda la miniatura, y con qué medidas. */
-export const SALIDA = "public/img/compartir.jpg";
+// El nombre cambió con el escudo: las imágenes quedan un mes en caché
+// (`firebase.json`), y con el mismo nombre los que ya tenían la vieja la
+// seguirían mostrando.
+export const SALIDA = "public/img/compartir-escudo.jpg";
 export const ANCHO = 1200;
 export const ALTO = 630;
 
@@ -65,8 +74,8 @@ const PLANTILLA = `<!doctype html>
   body { width: ${ANCHO}px; height: ${ALTO}px; overflow: hidden; }
   .tarjeta {
     width: ${ANCHO}px; height: ${ALTO}px; position: relative;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 20px; padding: 54px 54px 104px;
+    display: flex; flex-direction: row; align-items: center; justify-content: center;
+    gap: 54px; padding: 50px 90px 96px;
     background:
       radial-gradient(circle at 50% 34%, rgba(212,168,67,0.24) 0%, rgba(212,168,67,0) 56%),
       linear-gradient(160deg, #0d0d10 0%, #05070b 55%, #0a0a0a 100%);
@@ -81,15 +90,18 @@ const PLANTILLA = `<!doctype html>
   .e3 { bottom: 22px; left: 22px; border-right: 0; border-top: 0; border-radius: 0 0 0 18px; }
   .e4 { bottom: 22px; right: 22px; border-left: 0; border-top: 0; border-radius: 0 0 18px 0; }
 
-  /* El logo manda: es lo único que se reconoce a tamaño de miniatura, cuando
-     la tarjeta entra en un chat con 300px de ancho y el texto ya no se lee. */
-  .logo { width: 500px; height: auto; filter: drop-shadow(0 0 50px rgba(212,168,67,0.55)); }
+  /* El escudo manda: es lo único que se reconoce a tamaño de miniatura,
+     cuando la tarjeta entra en un chat con 300px de ancho y el texto ya no se
+     lee. Es casi cuadrado, así que va a la izquierda y el texto al lado: uno
+     arriba del otro, el escudo habría tenido que achicarse a la mitad. */
+  .logo { height: 440px; width: auto; flex: none; filter: drop-shadow(0 0 50px rgba(212,168,67,0.55)); }
+  .textos { display: flex; flex-direction: column; gap: 22px; max-width: 520px; }
 
   .lema {
     font-family: "Playfair Display", Georgia, serif;
-    font-size: 40px; color: #f0d060; text-align: center; line-height: 1.15;
+    font-size: 48px; color: #f0d060; line-height: 1.12;
   }
-  .bajada { font-size: 22px; color: #b9c0cc; text-align: center; max-width: 830px; line-height: 1.45; }
+  .bajada { font-size: 24px; color: #b9c0cc; line-height: 1.45; }
   .sello {
     position: absolute; bottom: 52px; left: 50%; transform: translateX(-50%);
     display: flex; align-items: center; gap: 14px;
@@ -102,8 +114,10 @@ const PLANTILLA = `<!doctype html>
     <span class="esquina e1"></span><span class="esquina e2"></span>
     <span class="esquina e3"></span><span class="esquina e4"></span>
     <img class="logo" src="${LOGO}" alt="" />
-    <p class="lema">Memoria, reflejos y estrategia</p>
-    <p class="bajada">Cuatro cartas boca abajo. Mirás una sola. Lo demás depende de lo que puedas recordar.</p>
+    <div class="textos">
+      <p class="lema">Memoria, reflejos y estrategia</p>
+      <p class="bajada">Cuatro cartas boca abajo. Mirás una sola. Lo demás depende de lo que puedas recordar.</p>
+    </div>
     <p class="sello"><i></i>memorielegends.com<i></i></p>
   </div>
 </body></html>`;
@@ -131,7 +145,9 @@ async function generar() {
     // captura sale a veces con la tipografía de reserva.
     await pagina.waitForTimeout(700);
 
-    await pagina.screenshot({ path: SALIDA, type: "jpeg", quality: 88 });
+    // 82 y no 88: el escudo tiene más detalle que el logo anterior, y a 88 la
+    // tarjeta pesaba 118 KB. A 82 queda en 97, sin diferencia a la vista.
+    await pagina.screenshot({ path: SALIDA, type: "jpeg", quality: 82 });
   } finally {
     await navegador.close();
     unlinkSync(TEMPORAL);

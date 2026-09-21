@@ -4,11 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Memorie Legends - Registro</title>
-    <link rel="icon" href="img/favicon.png" />
+    <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="img/apple-touch-icon.png" />
 
     <!-- El logo empieza a bajar YA: es lo más grande de la pantalla, y sin
          esto el navegador no se entera de que existe hasta terminar el CSS. -->
-    <link rel="preload" as="image" href="img/memorie-legends3.webp" fetchpriority="high" />
+    <link rel="preload" as="image" imagesrcset="img/escudo-160.webp 160w, img/escudo-320.webp 320w, img/escudo-480.webp 480w, img/escudo-640.webp 640w" imagesizes="(max-width: 357px) 150px, (max-width: 500px) 42vw, 210px" />
     <link rel="stylesheet" href="css/tema.css" />
     <link rel="stylesheet" href="css/style.css" />
     <style>
@@ -49,7 +50,7 @@
     <meta property="og:url" content="https://memorielegends.com/register.html" />
     <meta property="og:title" content="Crear cuenta — Memorie Legends" />
     <meta property="og:description" content="Creá tu cuenta gratis en Memorie Legends y llevate Leyendas de regalo. Juego de memoria y estrategia con baraja española, contra la IA o con amigos." />
-    <meta property="og:image" content="https://memorielegends.com/img/compartir.jpg" />
+    <meta property="og:image" content="https://memorielegends.com/img/compartir-escudo.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -57,7 +58,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Crear cuenta — Memorie Legends" />
     <meta name="twitter:description" content="Creá tu cuenta gratis en Memorie Legends y llevate Leyendas de regalo. Juego de memoria y estrategia con baraja española, contra la IA o con amigos." />
-    <meta name="twitter:image" content="https://memorielegends.com/img/compartir.jpg" />
+    <meta name="twitter:image" content="https://memorielegends.com/img/compartir-escudo.jpg" />
   </head>
   <body class="acceso">
     <div class="container">
@@ -78,11 +79,12 @@
       <h1 class="marca-login">
         <img
           class="logo-login"
-          src="img/memorie-legends3.webp"
+          src="img/escudo-320.webp"
+          srcset="img/escudo-160.webp 160w, img/escudo-320.webp 320w, img/escudo-480.webp 480w, img/escudo-640.webp 640w"
+          sizes="(max-width: 357px) 150px, (max-width: 500px) 42vw, 210px"
           alt="Memorie Legends"
-          width="420"
-          height="280"
-          fetchpriority="high"
+          width="640"
+          height="598"
         />
       </h1>
       <h2>Crear Cuenta</h2>
@@ -154,8 +156,8 @@
       <div class="support-footer">
         <p>
           ¿Necesitas ayuda?
-          <a href="mailto:soporte.memorie.legends@gmail.com">
-            soporte.memorie.legends@gmail.com
+          <a href="mailto:soporte@memorielegends.com">
+            soporte@memorielegends.com
           </a>
         </p>
         <p style="color: #555; font-size: 0.7rem; margin-top: 5px">

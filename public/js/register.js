@@ -172,7 +172,7 @@ function explicar(error) {
     "auth/popup-closed-by-user": "Cerraste la ventana de Google. Probá de nuevo.",
     "auth/cancelled-popup-request": "Cerraste la ventana de Google. Probá de nuevo.",
     "auth/popup-blocked": "El navegador bloqueó la ventana. Permitile abrir ventanas a este sitio.",
-    "auth/unauthorized-domain": "Dominio no autorizado. Escribinos a soporte.memorie.legends@gmail.com",
+    "auth/unauthorized-domain": "Dominio no autorizado. Escribinos a soporte@memorielegends.com",
     "auth/network-request-failed": "No hay conexión. Revisá tu red y probá de nuevo.",
     // Pasa cuando ese correo ya está registrado con contraseña. Decirlo con
     // claridad ahorra el rato de probar el botón una y otra vez.

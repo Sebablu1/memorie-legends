@@ -95,17 +95,9 @@ body {
   }
 }
 
-.barra .marca span {
-  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
-  font-size: 1.15rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  background: linear-gradient(180deg, var(--oro-claro), var(--oro));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  white-space: nowrap;
-}
+/* El nombre: tipografía, dorado y relieve están en `.marca-texto`, en
+   `tema.css`, que comparten todas las páginas. Acá sólo se ajusta el tamaño a
+   lo que entra en cada ancho. */
 
 .barra nav {
   display: flex;
@@ -596,7 +588,7 @@ footer {
     gap: 10px;
   }
 
-  .barra .marca span { font-size: 1rem; }
+  .barra .marca-texto { font-size: 1rem; }
 
   .barra nav {
     order: 3;
@@ -987,7 +979,7 @@ body.con-menu-abierto {
 @media (max-width: 560px) {
   .barra-contenido { padding: 8px 12px; gap: 8px; }
   .barra .marca { gap: 8px; }
-  .barra .marca span { font-size: 1rem; }
+  .barra .marca-texto { font-size: 1rem; }
   .saldo { padding: 5px 11px; gap: 6px; }
   .saldo b { font-size: 0.98rem; }
   .saldo small { font-size: 0.62rem; letter-spacing: 0.6px; }
@@ -999,35 +991,37 @@ body.con-menu-abierto {
   .saldo small { display: none; }
 }
 
-/* El nombre de la marca NO se esconde en pantallas angostas.
+/* El nombre de la marca NO se esconde en pantallas angostas, y tampoco se corta.
  *
  * Estuvo escondido a 360px o menos, que es el ancho declarado de casi todos
  * los Android: la mitad de los teléfonos veía el escudo sin el nombre al lado.
- * La regla existía por miedo a que no entrara, y medido no era cierto —
- * «Memorie Legends» ocupa 121px y en la cabecera más cargada, la que lleva el
- * saldo, quedan 166px libres a 360 y 126 a 320.
+ * Después, para que un saldo enorme no rompiera la barra, se recortaba con
+ * puntos suspensivos.
  *
- * A 320 el margen es de cinco píxeles, así que ahí sí se achica un punto la
- * letra: no para que entre, sino para que siga entrando el día que alguien
- * junte un saldo de seis cifras.
+ * En Cinzel y en mayúsculas el nombre ocupa más que en Playfair, y en la
+ * barra que lleva saldo, avatar y menú no entra en un renglón en un teléfono.
+ * Ahí las dos palabras se apilan —MEMORIE arriba, LEGENDS abajo— y cada una
+ * necesita la mitad del ancho. Es la forma de un logotipo, no un texto que se
+ * partió: por eso va decidido acá y no queda librado a `flex-wrap`.
+ *
+ * Sólo se apila la barra con saldo. La de la portada y la de las páginas sin
+ * sesión tienen lugar para el renglón entero hasta 320 px.
  */
 @media (max-width: 360px) {
-  .barra .marca span { font-size: 0.92rem; }
+  .barra .marca-texto { font-size: 0.92rem; }
 }
 
-/* El último recurso, para que un saldo enorme no rompa la barra.
- *
- * Sin esto, un número más largo de lo previsto empuja el nombre fuera de la
- * pantalla y aparece la barra horizontal. Con esto, el nombre se recorta con
- * puntos suspensivos y la barra aguanta: perder la última letra del nombre es
- * mucho menos grave que una página que se mueve de costado. */
+@media (max-width: 480px) {
+  .barra-contenido:has(#saldo) .marca-texto {
+    display: inline-flex;
+    flex-direction: column;
+    font-size: 0.86rem;
+    line-height: 1.08;
+  }
+}
+
 .barra .marca {
   min-width: 0;
-}
-
-.barra .marca span {
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* El hamburguesa de una barra SIN menú —la portada— sólo aparece cuando el

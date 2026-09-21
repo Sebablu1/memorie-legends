@@ -63,7 +63,9 @@ const auth = getAuth(app);
 
 const googleProvider = new GoogleAuthProvider();
 
-const SUPPORT_EMAIL = "soporte.memorie.legends@gmail.com";
+// El correo de CONTACTO, el que se le muestra a la gente. La cuenta con la que
+// entra la administración es otra cosa: ver `administracion.js`.
+const SUPPORT_EMAIL = "soporte@memorielegends.com";
 
 export {
   app,

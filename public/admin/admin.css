@@ -44,11 +44,11 @@ body {
   box-shadow: var(--sombra-negra);
 }
 
+/* La moneda: `contain` y sin esquinas redondeadas, que recortaban su borde. */
 .barra .marca {
   width: 38px;
   height: 38px;
-  border-radius: 10px;
-  object-fit: cover;
+  object-fit: contain;
   flex: 0 0 auto;
 }
 

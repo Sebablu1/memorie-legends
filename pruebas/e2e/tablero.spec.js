@@ -343,8 +343,8 @@ test("el logo carga y entra en la caja en cualquier pantalla", async ({ page }) 
   // consola con un error de JavaScript y no lo ve nadie hasta que un jugador
   // abre el tablero y encuentra un hueco donde va la marca.
   //
-  // Y que el tamaño CREZCA Y SE ACHIQUE: el logo es horizontal, y un ancho
-  // fijo que se ve bien en el escritorio desborda la caja en un teléfono.
+  // Y que el tamaño CREZCA Y SE ACHIQUE: un ancho fijo que se ve bien en el
+  // escritorio desborda la caja en un teléfono.
   for (const [donde, ancho] of [["escritorio", 1440], ["tablet", 768], ["móvil", 390], ["móvil chico", 320]]) {
     await page.setViewportSize({ width: ancho, height: 800 });
     await abrirTablero(page);
@@ -367,7 +367,7 @@ test("el logo carga y entra en la caja en cualquier pantalla", async ({ page }) 
       };
     });
 
-    expect(m.cargo, `la imagen del logo no cargó (¿falta public/img/memorie-legends3-chico.webp?)`).toBe(true);
+    expect(m.cargo, `la imagen del logo no cargó (¿falta public/img/escudo-320.webp?)`).toBe(true);
     expect(m.texto, "el logo necesita alt: es lo que se lee si no carga").toBeTruthy();
     expect(m.desborde, `el logo se sale ${m.desborde}px de la caja en ${donde}`).toBe(0);
 
