@@ -608,6 +608,19 @@ abren nada.
   Authentication, cambiar `CORREO_ADMIN` y desplegar las funciones, y recién
   después `public/js/administracion.js`. Al revés, la administración queda
   afuera. `pruebas/sitio.mjs` comprueba que las dos digan lo mismo.
+- **Para el abogado, junto con lo demás: la licencia de Playfair Display.**
+  Las tres tipografías son OFL y se sirven desde el sitio, con su licencia
+  al lado. Inter y Cinzel no reservan nombre. Playfair sí («Reserved Font
+  Name "Playfair Display"»), y la OFL no deja usar ese nombre en una versión
+  modificada. Lo que se publica es el archivo tal cual lo entrega Google
+  Fonts —el recorte al alfabeto latino lo hace Google, no nosotros—, que es
+  lo que hacen también Fontsource y los demás que sirven estas fuentes. Si el
+  abogado prefiere no discutirlo, la salida es volver a pedir Playfair a
+  Google en las páginas que la usan, o cambiarla por una sin nombre
+  reservado.
+- **`herramientas/tarjeta.mjs` todavía pide las tipografías a Google** para
+  dibujar la imagen de compartir. No es una página y no se publica, así que
+  no afecta a nadie; sólo hace falta conexión para regenerarla.
 
 ---
 

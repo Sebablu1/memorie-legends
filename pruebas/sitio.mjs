@@ -8,7 +8,8 @@
  *   5. La cabecera es la misma en todas las páginas.
  *   6. El correo de contacto es uno solo, y no es la cuenta de administración.
  *   7. Cada página se declara con su dirección canónica, sin www.
- *   8. Cada fuente servida desde el sitio lleva su licencia al lado.
+ *   8. Las tipografías salen del sitio, no de Google, y no se precargan.
+ *   9. Cada fuente servida desde el sitio lleva su licencia al lado.
  *
  * Nada de esto rompe una prueba del navegador cuando falla. Un `src` mal
  * escrito no tira ningún error de JavaScript: deja un hueco donde iba la marca,
@@ -284,7 +285,42 @@ console.log("\n=== 7. La dirección canónica, sin www ===");
   }
 }
 
-console.log("\n=== 8. Cada fuente con su licencia ===");
+console.log("\n=== 8. Las tipografías, desde el sitio y sin precarga ===");
+{
+  // Google Fonts eran dos servidores más antes de la primera letra: la hoja en
+  // fonts.googleapis.com y los archivos en fonts.gstatic.com.
+  // Sin los comentarios: los que cuentan por qué ya no se usa Google lo nombran.
+  const GOOGLE = /fonts\.(googleapis|gstatic)\.com/;
+  const conGoogle = [];
+  for (const [pagina, texto] of Object.entries(html)) {
+    if (GOOGLE.test(texto.replace(/<!--[\s\S]*?-->/g, ""))) conGoogle.push(deRepo(pagina));
+  }
+  for (const f of readdirSync(join(PUBLIC, "css")).filter((f) => f.endsWith(".css"))) {
+    const hoja = leer(join(PUBLIC, "css", f)).replace(/\/\*[\s\S]*?\*\//g, "");
+    if (GOOGLE.test(hoja)) conGoogle.push(`public/css/${f}`);
+  }
+  ok(conGoogle.length === 0, "ninguna página ni hoja le pide tipografías a Google", conGoogle);
+
+  // Medido: precargar Cinzel llevó el FCP de 856 a 1928 ms y el LCP de 1680
+  // a 1952. El comentario en `index.html` tiene los números.
+  const conPrecarga = PAGINAS
+    .filter((p) => etiquetas(html[p], "link").some((l) => l.rel === "preload" && l.as === "font"))
+    .map(deRepo);
+  ok(conPrecarga.length === 0, "ninguna página precarga tipografías", conPrecarga);
+
+  const tema = leer(join(PUBLIC, "css", "tema.css")).replace(/\/\*[\s\S]*?\*\//g, "");
+  const caras = [...tema.matchAll(/@font-face\s*\{([^}]*)\}/g)].map((m) => m[1]).filter((c) => /url\(/.test(c));
+  const archivos = readdirSync(join(PUBLIC, "fonts")).filter((f) => f.endsWith(".woff2"));
+  ok(archivos.every((f) => caras.some((c) => c.includes(`/fonts/${f}`))),
+     "cada archivo de public/fonts/ está declarado en tema.css", archivos);
+  ok(caras.length > 0 && caras.every((c) => /font-display:\s*swap/.test(c)),
+     "y todos con font-display: swap: el texto sale con el respaldo mientras baja");
+  const inter = caras.find((c) => /font-family:\s*"Inter"/.test(c));
+  ok(/font-weight:\s*100 900/.test(inter ?? ""),
+     "Inter declara todos sus pesos: es un solo archivo variable");
+}
+
+console.log("\n=== 9. Cada fuente con su licencia ===");
 {
   const fuentes = readdirSync(join(PUBLIC, "fonts")).filter((f) => f.endsWith(".woff2"));
   ok(fuentes.length > 0, "hay fuentes servidas desde el sitio", fuentes);
