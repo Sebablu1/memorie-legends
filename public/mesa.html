@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#05070b" />
     <title>Memorie Legends — Mesa</title>
-    <link rel="icon" href="img/favicon.png" />
+    <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="img/apple-touch-icon.png" />
     <link rel="stylesheet" href="css/tema.css" />
     <link rel="stylesheet" href="css/mesa.css" />
     <meta name="description" content="La mesa de Memorie Legends: cuatro cartas boca abajo, memoria, reflejos y estrategia con baraja española. Entrenamiento contra la IA o por Leyendas." />
@@ -27,7 +28,7 @@
     <meta property="og:url" content="https://memorielegends.com/mesa.html" />
     <meta property="og:title" content="Mesa — Memorie Legends" />
     <meta property="og:description" content="La mesa de Memorie Legends: cuatro cartas boca abajo, memoria, reflejos y estrategia con baraja española. Entrenamiento contra la IA o por Leyendas." />
-    <meta property="og:image" content="https://memorielegends.com/img/compartir.jpg" />
+    <meta property="og:image" content="https://memorielegends.com/img/compartir-escudo.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -35,7 +36,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Mesa — Memorie Legends" />
     <meta name="twitter:description" content="La mesa de Memorie Legends: cuatro cartas boca abajo, memoria, reflejos y estrategia con baraja española. Entrenamiento contra la IA o por Leyendas." />
-    <meta name="twitter:image" content="https://memorielegends.com/img/compartir.jpg" />
+    <meta name="twitter:image" content="https://memorielegends.com/img/compartir-escudo.jpg" />
   </head>
   <body>
     <!--
@@ -54,10 +55,12 @@
     <div class="velo-carga" id="veloCarga">
       <img
         class="velo-carga-logo"
-        src="img/memorie-legends3.webp"
+        src="img/escudo-320.webp"
+        srcset="img/escudo-160.webp 160w, img/escudo-320.webp 320w, img/escudo-480.webp 480w, img/escudo-640.webp 640w"
+        sizes="(max-width: 347px) 160px, (max-width: 565px) 46vw, 260px"
         alt="Memorie Legends"
-        width="420"
-        height="280"
+        width="640"
+        height="598"
       />
       <span class="velo-carga-aro" aria-hidden="true"></span>
       <p class="velo-carga-texto" role="status">Cargando entrenamiento…</p>
@@ -70,7 +73,7 @@
 
     <div class="escena">
       <header class="cabecera">
-        <img class="marca" src="img/memorie-legends2.webp" alt="Memorie Legends" />
+        <img class="marca" src="img/moneda-80.webp" srcset="img/moneda-40.webp 40w, img/moneda-80.webp 80w, img/moneda-120.webp 120w" sizes="34px" width="34" height="34" alt="" />
         <div>
           <h1>Memorie Legends</h1>
           <div class="lema" id="lemaMesa">Mesa de 4 · límite 150</div>

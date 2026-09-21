@@ -61,9 +61,25 @@ import {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
+// La marca que lee la portada para decidir si baja Firebase (ver el final de
+// `index.html`). Dice sólo que en este navegador hay una sesión, no de quién.
+// Vive acá porque todas las páginas que saben si hay sesión pasan por este
+// archivo: la que inicia sesión la pone, la que la cierra la saca.
+onAuthStateChanged(auth, (usuario) => {
+  try {
+    if (usuario) localStorage.setItem("ml-sesion", "1");
+    else localStorage.removeItem("ml-sesion");
+  } catch {
+    // Almacenamiento bloqueado: la portada, sin poder leerla, baja Firebase
+    // como antes. No hay nada que hacer acá.
+  }
+});
+
 const googleProvider = new GoogleAuthProvider();
 
-const SUPPORT_EMAIL = "soporte.memorie.legends@gmail.com";
+// El correo de CONTACTO, el que se le muestra a la gente. La cuenta con la que
+// entra la administración es otra cosa: ver `administracion.js`.
+const SUPPORT_EMAIL = "soporte@memorielegends.com";
 
 export {
   app,

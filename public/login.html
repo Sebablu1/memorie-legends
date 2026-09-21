@@ -4,7 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Memorie Legends - Login</title>
-    <link rel="icon" href="img/favicon.png" />
+    <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="img/apple-touch-icon.png" />
 
     <!-- El logo empieza a bajar YA.
 
@@ -12,7 +13,7 @@
          leer el CSS, y es el elemento más grande de la pantalla: lo que
          Lighthouse mide como LCP. Adelanta el momento en que la página se ve
          completa, sin cambiar nada de lo que se ve. -->
-    <link rel="preload" as="image" href="img/memorie-legends3.webp" fetchpriority="high" />
+    <link rel="preload" as="image" imagesrcset="img/escudo-160.webp 160w, img/escudo-320.webp 320w, img/escudo-480.webp 480w, img/escudo-640.webp 640w" imagesizes="(max-width: 326px) 150px, (max-width: 500px) 46vw, 230px" />
     <link rel="stylesheet" href="css/tema.css" />
     <link rel="stylesheet" href="css/style.css" />
     <style>
@@ -153,7 +154,7 @@
     <meta property="og:url" content="https://memorielegends.com/login.html" />
     <meta property="og:title" content="Entrar — Memorie Legends" />
     <meta property="og:description" content="Entrá a tu cuenta de Memorie Legends para jugar el entrenamiento contra la IA, competir por Leyendas, ver tu ranking y revisar tu saldo de cartas." />
-    <meta property="og:image" content="https://memorielegends.com/img/compartir.jpg" />
+    <meta property="og:image" content="https://memorielegends.com/img/compartir-escudo.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -161,7 +162,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Entrar — Memorie Legends" />
     <meta name="twitter:description" content="Entrá a tu cuenta de Memorie Legends para jugar el entrenamiento contra la IA, competir por Leyendas, ver tu ranking y revisar tu saldo de cartas." />
-    <meta name="twitter:image" content="https://memorielegends.com/img/compartir.jpg" />
+    <meta name="twitter:image" content="https://memorielegends.com/img/compartir-escudo.jpg" />
   </head>
   <body class="acceso">
     <!-- Tapado de entrada. Ver la nota en el <style>: destaparlo es la
@@ -171,7 +172,7 @@
            logos distintos en la misma pantalla —el velo mostraba uno y el
            formulario otro— y encima obligaba a bajar dos imágenes cuando con
            una alcanza: ésta ya está en la caché cuando el velo aparece. -->
-      <img src="img/memorie-legends3.webp" alt="Memorie Legends" width="420" height="280" />
+      <img src="img/escudo-320.webp" srcset="img/escudo-160.webp 160w, img/escudo-320.webp 320w, img/escudo-480.webp 480w, img/escudo-640.webp 640w" sizes="(max-width: 326px) 150px, (max-width: 500px) 46vw, 230px" alt="Memorie Legends" width="640" height="598" />
       <div class="girador" aria-hidden="true"></div>
       <p id="veloTexto">Cargando…</p>
     </div>
@@ -195,11 +196,12 @@
       <div class="marca-login">
         <img
           class="logo-login"
-          src="img/memorie-legends3.webp"
+          src="img/escudo-320.webp"
+          srcset="img/escudo-160.webp 160w, img/escudo-320.webp 320w, img/escudo-480.webp 480w, img/escudo-640.webp 640w"
+          sizes="(max-width: 326px) 150px, (max-width: 500px) 46vw, 230px"
           alt="Memorie Legends"
-          width="420"
-          height="280"
-          fetchpriority="high"
+          width="640"
+          height="598"
         />
       </div>
 
@@ -324,8 +326,8 @@
       <div class="support-footer">
         <p>
           ¿Necesitas ayuda?
-          <a href="mailto:soporte.memorie.legends@gmail.com">
-            soporte.memorie.legends@gmail.com
+          <a href="mailto:soporte@memorielegends.com">
+            soporte@memorielegends.com
           </a>
         </p>
         <p style="color: #555; font-size: 0.7rem; margin-top: 5px">

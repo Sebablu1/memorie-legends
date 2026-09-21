@@ -4,18 +4,24 @@
  * No reemplaza a `firebase serve`: no tiene emuladores ni reescrituras. Sirve
  * para lo único que hace falta acá, que es abrir la mesa en modo entrenamiento
  * y comprobar que el cliente hace lo que dice.
+ *
+ *   node herramientas/servir.mjs      sirve public/ en el puerto 5000
+ *
+ * `crearServidor` sirve cualquier carpeta: `medir-portada.mjs` lo usa para
+ * medir, con las mismas condiciones, una versión anterior de `public/`.
  */
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
+import { pathToFileURL } from "node:url";
 
 // normalize() para que la raíz use los mismos separadores que join(): en
 // Windows la URL trae barras normales y join() devuelve invertidas, y comparar
 // una contra otra rechazaba todo.
-const RAIZ = normalize(
+const PUBLIC = normalize(
   new URL("../public/", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"),
 );
-const TIPOS = {
+export const TIPOS = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
   // `.mjs` también. Sin esto sale como `application/octet-stream`, el navegador
   // rechaza el módulo por el tipo, y el import falla entero: la pantalla queda
@@ -24,23 +30,34 @@ const TIPOS = {
   ".css": "text/css; charset=utf-8", ".json": "application/json",
   ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml",
   ".webp": "image/webp", ".mp3": "audio/mpeg", ".ico": "image/x-icon",
+  // Las tipografías, con el tipo que manda Firebase Hosting. Chrome las acepta
+  // igual sin él, pero una medición tiene que parecerse a producción.
+  ".woff2": "font/woff2",
 };
 
-createServer(async (pedido, respuesta) => {
-  const ruta = decodeURIComponent(new URL(pedido.url, "http://x").pathname);
-  const archivo = join(RAIZ, normalize(ruta));
-  // Después de normalizar, cualquier ../.. ya se resolvió: si el resultado se
-  // fue de public/, se corta acá. Sirve sólo en esta máquina, pero un servidor
-  // que entrega archivos arbitrarios no se escribe "sólo para probar".
-  if (!archivo.startsWith(RAIZ)) {
-    respuesta.writeHead(403).end("no");
-    return;
-  }
-  try {
-    const cuerpo = await readFile(archivo.endsWith("/") ? join(archivo, "index.html") : archivo);
-    respuesta.writeHead(200, { "Content-Type": TIPOS[extname(archivo)] ?? "application/octet-stream" });
-    respuesta.end(cuerpo);
-  } catch {
-    respuesta.writeHead(404).end("no está");
-  }
-}).listen(5000, () => console.log("sirviendo public/ en http://localhost:5000"));
+/** Un servidor que entrega los archivos de `raiz`. No escucha todavía. */
+export function crearServidor(raiz = PUBLIC) {
+  const base = normalize(raiz.endsWith("/") || raiz.endsWith("\\") ? raiz : raiz + "/");
+  return createServer(async (pedido, respuesta) => {
+    const ruta = decodeURIComponent(new URL(pedido.url, "http://x").pathname);
+    const archivo = join(base, normalize(ruta));
+    // Después de normalizar, cualquier ../.. ya se resolvió: si el resultado se
+    // fue de la raíz, se corta acá. Sirve sólo en esta máquina, pero un servidor
+    // que entrega archivos arbitrarios no se escribe "sólo para probar".
+    if (!archivo.startsWith(base)) {
+      respuesta.writeHead(403).end("no");
+      return;
+    }
+    try {
+      const cuerpo = await readFile(archivo.endsWith("/") || archivo.endsWith("\\") ? join(archivo, "index.html") : archivo);
+      respuesta.writeHead(200, { "Content-Type": TIPOS[extname(archivo)] ?? "application/octet-stream" });
+      respuesta.end(cuerpo);
+    } catch {
+      respuesta.writeHead(404).end("no está");
+    }
+  });
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  crearServidor().listen(5000, () => console.log("sirviendo public/ en http://localhost:5000"));
+}

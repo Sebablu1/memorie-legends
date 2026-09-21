@@ -4,6 +4,49 @@
    ============================================================ */
 
 /* ============================================================
+   LAS TIPOGRAFÍAS, SERVIDAS DESDE EL SITIO
+
+   Venían de Google Fonts: una hoja de fonts.googleapis.com que a su vez pedía
+   los archivos a fonts.gstatic.com. Dos servidores más que visitar antes de
+   la primera letra, y en 4G lenta cada visita cuesta varios viajes de ida y
+   vuelta. Desde acá viajan por la conexión que ya está abierta.
+
+   Sólo el alfabeto latino, que es el que usa el sitio (con las tildes, la ñ,
+   ¿ ¡ « » y las rayas). Una letra de otro alfabeto —un nombre de jugador en
+   cirílico, por ejemplo— sale con el respaldo; con Google pasaba lo mismo
+   con cualquier alfabeto que no se pidiera.
+
+   Inter es UN archivo para todos los pesos: es variable, y Google entrega el
+   mismo archivo se le pida 400 o de 100 a 900. Playfair es el 700 fijo, el
+   único que usa el sitio.
+
+   La versión va en el nombre porque `firebase.json` guarda las fuentes un año
+   sin volver a preguntar. Las licencias, OFL, están al lado de los archivos.
+   ============================================================ */
+
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter-v20-latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Playfair Display";
+  src: url("/fonts/playfair-v40-700-latin.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ============================================================
    RESPALDOS CON LAS MEDIDAS AJUSTADAS
 
    Mientras las tipografías del juego bajan, el texto se dibuja con la del
@@ -57,6 +100,41 @@
   size-adjust: 89%;
   ascent-override: 121.3%;
   descent-override: 28.1%;
+  line-gap-override: 0%;
+}
+
+/* ============================================================
+   CINZEL, SÓLO PARA EL NOMBRE DE LA BARRA
+
+   El archivo trae únicamente las letras de MEMORIE LEGENDS: 1,8 KB en vez de
+   los ~30 del alfabeto entero. Google Fonts lo recorta así si se le pide con
+   `text=`. Si algún día Cinzel se usa para otro texto, hay que bajar el
+   alfabeto completo: las letras que falten saldrían con el respaldo.
+
+   Se sirve desde el sitio y no desde Google: un servidor más que visitar en
+   4G lenta cuesta más que el archivo. La versión va en el nombre porque las
+   fuentes quedan un año en caché sin volver a preguntar (`firebase.json`).
+
+   Licencia OFL, al lado del archivo: `public/fonts/OFL-cinzel.txt`.
+   ============================================================ */
+@font-face {
+  font-family: "Cinzel";
+  src: url("/fonts/cinzel-v26-700-marca.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Georgia con las medidas de Cinzel, como los respaldos de arriba. Medido en
+   el navegador con «MEMORIE LEGENDS» en mayúsculas a 100 px: Cinzel ocupa
+   1032 y este respaldo 995, o sea 103,7 %. Las cajas son las de Cinzel (98 y
+   37) divididas por ese mismo 103,7 %, porque `size-adjust` las agranda. */
+@font-face {
+  font-family: "Cinzel respaldo";
+  src: local("Georgia"), local("Times New Roman"), local("Liberation Serif");
+  size-adjust: 103.7%;
+  ascent-override: 94.5%;
+  descent-override: 35.7%;
   line-gap-override: 0%;
 }
 
@@ -237,6 +315,75 @@ input::placeholder {
   opacity: 0.45;
   cursor: not-allowed;
   transform: none;
+}
+
+/* ------------------------------------------------ la marca de la barra */
+
+/* La moneda. Va con `alt=""` en el HTML porque el nombre está escrito al
+   lado: con el nombre también en el `alt`, un lector de pantalla lo lee dos
+   veces seguidas. */
+.marca-moneda {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+  .marca-moneda {
+    width: 50px;
+    height: 50px;
+  }
+}
+
+/* El nombre, en texto y no en imagen: pesa cero, escala sin perder nitidez,
+   lo lee un lector de pantalla y se corrige en una línea.
+
+   En el HTML dice «Memorie Legends»; las mayúsculas las pone
+   `text-transform`. Escrito en mayúsculas, algunos lectores de pantalla lo
+   deletrean letra por letra.
+
+   Cada palabra va en su propio <span> para que, cuando no entra en un
+   renglón, se apilen una arriba de la otra (ver `app.css`) y cada una tenga su
+   degradado entero. */
+.marca-texto {
+  display: inline-block;
+  font-family: "Cinzel", "Cinzel respaldo", Georgia, serif;
+  font-weight: 700;
+  font-size: 1.15rem;
+  line-height: 1.1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  /* El volumen. `text-shadow` no sirve acá: con el degradado recortado a las
+     letras, se pinta ENCIMA y ensucia el dorado. `drop-shadow` se aplica a
+     las letras ya pintadas: dos capas de un píxel hacen el canto, como una
+     letra en relieve, y la tercera la despega del fondo. */
+  filter:
+    drop-shadow(0 1px 0 #4a3510)
+    drop-shadow(0 1px 0 #261c00)
+    drop-shadow(0 2px 3px rgba(0, 0, 0, 0.7));
+}
+
+/* El dorado es el de la moneda de al lado, como se ve a su tamaño.
+
+   Muestreado de `moneda-80.webp` y no del PNG grande: achicada, la moneda es
+   un oro viejo, apagado —sus píxeles más claros son #dbbd6a, el medio
+   #bda05a, el hondo #9d7a3a—. Tomado del PNG grande el texto salía amarillo
+   brillante, y al lado de la moneda parecía otro metal. El primer tono es un
+   poco más claro que la moneda para que las letras se lean a 16 px. */
+.marca-texto > span {
+  background: linear-gradient(
+    180deg,
+    #f6e3a1 0%,
+    #dbbd6a 30%,
+    #bda05a 52%,
+    #9d7a3a 76%,
+    #7c5a1e 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* ------------------------------------------------------ utilidades */

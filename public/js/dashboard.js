@@ -21,7 +21,7 @@
 import { db, collection, query, where, onSnapshot } from "./firebase.js";
 import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
 import { estadoMfa } from "./mfa.js";
-import { SUPPORT_EMAIL } from "./firebase.js";
+import { CORREO_ADMINISTRACION } from "./administracion.js";
 import {
   crearSala, crearSalaPrivada, unirseASala, unirseConCodigo, ErrorDeServidor,
 } from "./servidor.js";
@@ -120,7 +120,7 @@ if (sesion) {
   // son las ocho Cloud Functions, que miran el correo del token verificado y
   // rechazan a todos los demás — está probado con una cuenta real. Esto sólo
   // ahorra tener que acordarse de la URL.
-  if ((usuario.email ?? "").toLowerCase() === SUPPORT_EMAIL.toLowerCase()) {
+  if ((usuario.email ?? "").toLowerCase() === CORREO_ADMINISTRACION.toLowerCase()) {
     const enlace = $("enlaceAdmin");
     if (enlace) enlace.hidden = false;
   }

@@ -5035,7 +5035,7 @@ async function entrarDesdeSala() {
 function mostrarMesaEnRedPendiente(sala) {
   document.body.innerHTML = `
     <div class="mesa-pendiente">
-      <img src="img/memorie-legends2.webp" alt="" class="logo-img grande" />
+      <img src="img/moneda-120.webp" alt="" class="logo-img grande" width="84" height="84" />
       <h1>La mesa en red todavía no está lista</h1>
       <p>
         Estás en la sala <b>${salaPedida}</b> con

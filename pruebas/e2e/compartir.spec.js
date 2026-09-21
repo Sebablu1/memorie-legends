@@ -36,7 +36,7 @@ import { readFileSync } from "node:fs";
  * si alguien cambia los metadatos de una página y se olvida de las otras.
  */
 const SITIO = "https://memorielegends.com";
-const TARJETA = `${SITIO}/img/compartir.jpg`;
+const TARJETA = `${SITIO}/img/compartir-escudo.jpg`;
 
 /** Las páginas que alguien podría llegar a compartir. */
 const PAGINAS = [
@@ -154,7 +154,7 @@ test("los títulos y las descripciones son distintos entre páginas", async ({
 });
 
 test("la miniatura existe, es JPG, mide 1200x630 y pesa poco", async ({ page }) => {
-  const r = await page.request.get("/img/compartir.jpg");
+  const r = await page.request.get("/img/compartir-escudo.jpg");
   expect(r.status(), "la miniatura no está servida").toBe(200);
 
   // JPG y no WebP: WhatsApp no muestra WebP, y el resto del sitio es WebP.
@@ -176,7 +176,7 @@ test("la miniatura existe, es JPG, mide 1200x630 y pesa poco", async ({ page }) 
         const img = new Image();
         img.onload = () => listo({ ancho: img.naturalWidth, alto: img.naturalHeight });
         img.onerror = () => listo(null);
-        img.src = "/img/compartir.jpg";
+        img.src = "/img/compartir-escudo.jpg";
       }),
   );
   expect(medida, "la miniatura no se pudo cargar").not.toBeNull();
@@ -198,7 +198,7 @@ test("las tres descripciones de una página dicen lo mismo", async ({ page }) =>
   }
 });
 
-test("la miniatura sale del logo con corona y laureles", async () => {
+test("la miniatura sale del escudo, desde el original sin pérdida", async () => {
   // No se puede mirar un JPG y saber de qué archivo salió. Lo que sí se puede
   // es comprobar la RECETA: `herramientas/tarjeta.mjs` es lo que la genera, y
   // vive en el repositorio justamente para que esto sea comprobable.
@@ -208,13 +208,13 @@ test("la miniatura sale del logo con corona y laureles", async () => {
   // saber qué logo tenía adentro.
   const receta = readFileSync("herramientas/tarjeta.mjs", "utf8");
 
-  expect(receta, "la tarjeta ya no usa el logo con corona y laureles").toContain(
-    "img/memorie-legends3.png",
+  expect(receta, "la tarjeta ya no sale del escudo original").toContain(
+    'export const LOGO = "../diseno/escudo.png"',
   );
   expect(receta).toContain("export const ANCHO = 1200");
   expect(receta).toContain("export const ALTO = 630");
 
   // Y que siga escribiendo un JPG donde las etiquetas dicen que está.
-  expect(receta).toContain("public/img/compartir.jpg");
+  expect(receta).toContain("public/img/compartir-escudo.jpg");
   expect(receta).toContain('type: "jpeg"');
 });
