@@ -23,6 +23,7 @@
  */
 
 import { ESTADOS_SALA } from "./reglas/salas.js";
+import { claveDeEntrada, claveDeDevolucion } from "./reglas/economia.js";
 
 export function crearSalirDeSalaEnEspera({
   db,
@@ -81,9 +82,13 @@ export function crearSalirDeSalaEnEspera({
           delta: entrada,
           motivo,
           referencia: codigoLimpio,
+          // La entrada que deshace: lo que salió de lo comprado vuelve a lo
+          // comprado. Sin esto, una entrada pagada con Leyendas compradas
+          // volvía como ganadas.
+          origen: claveDeEntrada(codigoLimpio, jugador),
           // Una devolución por sala y jugador: repetir la operación no
           // devuelve dos veces.
-          idempotencia: `devolucion_${codigoLimpio}_${jugador}`,
+          idempotencia: claveDeDevolucion(codigoLimpio, jugador),
         })),
       );
 

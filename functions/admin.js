@@ -24,6 +24,7 @@
  */
 
 import { ESTADOS_SALA, MIN_JUGADORES, MAX_JUGADORES } from "./reglas/salas.js";
+import { claveDeEntrada, claveDeDevolucion } from "./reglas/economia.js";
 
 /** Lo mismo que corta `crearSala`: un nombre de sala no pasa de 40. */
 const LARGO_NOMBRE_SALA = 40;
@@ -250,9 +251,11 @@ export function crearAdmin({
               delta: entrada,
               motivo,
               referencia: codigoLimpio,
+              // Deshace SU entrada: a cada bolsillo vuelve lo que salió de él.
+              origen: claveDeEntrada(codigoLimpio, jugador),
               // La MISMA clave que usa `salida.js`: si el jugador ya había
               // salido y cobrado su devolución, esto no se la paga dos veces.
-              idempotencia: `devolucion_${codigoLimpio}_${jugador}`,
+              idempotencia: claveDeDevolucion(codigoLimpio, jugador),
             })),
           )
         : [];

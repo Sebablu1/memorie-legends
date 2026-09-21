@@ -122,7 +122,8 @@ function montar({ estado = ESTADOS_SALA.JUGANDO, abandonaron = [] } = {}) {
   });
   const cierre = crearCierre({
     db, salas: "rooms", partidas: "partidas", moverLeyendas,
-    motivo: "premio_partida", marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
+    motivo: "premio_partida", motivoDevolucion: "devolucion_entrada",
+    marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
   });
   const enRed = crearMotorEnRed({
     db, partidas: "partidas", ahora: () => reloj, idAleatorio: () => `v${reloj}`,
@@ -136,7 +137,7 @@ function montar({ estado = ESTADOS_SALA.JUGANDO, abandonaron = [] } = {}) {
     partidaEnRed: { leer: enRed.leerPartidaParaAbandono, marcar: enRed.marcarAbandonoEn },
   });
   const salir = crearSalirDeSalaEnEspera({
-    db, salas: "rooms", moverLeyendas, motivo: "entrada_partida",
+    db, salas: "rooms", moverLeyendas, motivo: "devolucion_entrada",
     marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
   });
   return { db, enRed, cierre, abandonar, salir };

@@ -56,6 +56,12 @@ import {
   MINIMO_PARA_TORNEO,
 } from "./reglas/configuracion.js";
 
+/**
+ * La clave del cobro de una inscripción. La usan el cobro y las dos
+ * devoluciones, que tienen que nombrar ESE cobro para deshacerlo.
+ */
+const claveDeInscripcion = (torneo, uid) => `torneo_entrada_${torneo}_${uid}`;
+
 export function crearTorneos({
   db,
   moverLeyendas,
@@ -285,7 +291,7 @@ export function crearTorneos({
         referencia: id,
         // Un reintento de red no cobra dos veces. El documento de inscripción
         // defiende del doble clic; esto, de la red que reintenta sola.
-        idempotencia: `torneo_entrada_${id}_${uid}`,
+        idempotencia: claveDeInscripcion(id, uid),
       });
 
       tx.set(refInscripcion(id, uid), {
@@ -519,6 +525,10 @@ export function crearTorneos({
           delta: monto,
           motivo: motivoDevolucion,
           referencia: id,
+          // La inscripción que deshace. Hoy vuelve todo a lo ganado, porque un
+          // torneo sólo cobra de ahí; pero toda devolución dice qué deshace, y
+          // así lo que cobre un torneo mañana vuelve a su lugar sin tocar esto.
+          origen: claveDeInscripcion(id, uid),
           idempotencia: clave,
         }),
       );

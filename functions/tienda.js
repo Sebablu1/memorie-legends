@@ -64,6 +64,8 @@ export function crearTienda({
   catalogo = "catalogo",
   items = "items",
   auditoria = "auditoria",
+  // El libro mayor, para encontrar la compra que deshace una devolución.
+  movimientos = "movimientos",
   // Quién puede administrar el catálogo. Se inyecta desde `administradores.js`,
   // que es el único lugar donde se decide eso.
   administradores,
@@ -778,6 +780,11 @@ export function crearTienda({
   async function desposeer(context, { itemId, uid }) {
     const quien = await administradores.exigir(context);
 
+    // El cobro que deshace la devolución. Fuera de la transacción: un
+    // asiento del libro mayor no cambia nunca, así que leerlo antes no puede
+    // quedar viejo.
+    const compra = await compraDe(uid, itemId);
+
     return db.runTransaction(async (tx) => {
       // Todas las lecturas antes de cualquier escritura. `moverLeyendas`
       // lee el saldo y escribe, así que va después de éstas y antes del
@@ -801,6 +808,11 @@ export function crearTienda({
               motivo: motivoDevolucion,
               referencia: itemId,
               idempotencia: `desposesion_${itemId}_${uid}`,
+              // La compra que deshace: lo que salió de lo comprado vuelve a lo
+              // comprado. Si no aparece —una compra de antes del libro
+              // mayor—, vuelve a lo ganado, que es lo que era todo en esa
+              // época, y la auditoría lo dice.
+              ...(compra ? { origen: compra } : { reparto: { comprado: 0 } }),
             })
           : { aplicado: false };
 
@@ -827,6 +839,8 @@ export function crearTienda({
         uid,
         admin: quien?.email ?? quien?.uid ?? null,
         precioDevuelto: devolucion.aplicado ? precio : 0,
+        // La compra que se deshizo, o null si no se encontró.
+        compra: compra ?? null,
         desequipado,
         cuando: marcaDeTiempo(),
       });
@@ -839,6 +853,32 @@ export function crearTienda({
         desequipado,
       };
     });
+  }
+
+  /**
+   * El asiento de la compra de un artículo: el cobro que deshace su devolución.
+   *
+   * La posesión no guarda la clave de su compra, y esa clave no se puede
+   * reconstruir para un pack: lleva los ids de todo lo que se compró junto.
+   * Así que se la busca en el libro mayor, entre las compras de esa persona
+   * cuya referencia nombra el artículo. Si lo compró, se lo sacaron y lo volvió
+   * a comprar, vale la última.
+   */
+  async function compraDe(uid, itemId) {
+    const snap = await db
+      .collection(movimientos)
+      .where("uid", "==", uid)
+      .where("motivo", "==", motivoCompra)
+      .get();
+
+    let ultima = null;
+    snap.forEach((d) => {
+      const datos = d.data();
+      if (!String(datos.referencia ?? "").split(",").includes(itemId)) return;
+      const cuando = datos.creado?.toMillis?.() ?? 0;
+      if (!ultima || cuando >= ultima.cuando) ultima = { id: d.id, cuando };
+    });
+    return ultima?.id ?? null;
   }
 
   /**

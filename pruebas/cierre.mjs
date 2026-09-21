@@ -19,6 +19,7 @@ import { crearCierre } from "../functions/cierre.js";
 import { crearMotorEnRed } from "../functions/partida-red.js";
 import { crearAbandonarPartida } from "../functions/abandono.js";
 import { ESTADOS_SALA, MODOS, repartirPozo } from "../public/js/reglas/salas.js";
+import { MOTIVOS, claveDeEntrada, claveDeDevolucion } from "../public/js/reglas/economia.js";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -113,9 +114,20 @@ function montar({
   // El estado de la sala. Por omisión JUGANDO, que es de donde sale un
   // cierre normal; se pisa para probar las salas que ya salieron del juego.
   estado = ESTADOS_SALA.JUGANDO,
+  // Los perfiles, para las pruebas que miran los dos bolsillos; y cuánto de
+  // cada entrada salió de lo comprado, que se asienta con la misma clave y
+  // la misma forma que el cobro de verdad.
+  perfiles = {},
+  pagos = null,
 } = {}) {
   const inicial = {};
-  for (const uid of CUATRO) inicial[`users/${uid}`] = { credits: SALDO_INICIAL };
+  for (const uid of CUATRO) inicial[`users/${uid}`] = perfiles[uid] ?? { credits: SALDO_INICIAL };
+  for (const [uid, comprado] of Object.entries(pagos ?? {})) {
+    inicial[`movimientos/${claveDeEntrada(CODIGO, uid)}`] = {
+      uid, delta: -entrada, motivo: MOTIVOS.ENTRADA_PARTIDA, referencia: CODIGO,
+      deltaComprado: -comprado, deltaGanado: -(entrada - comprado),
+    };
+  }
 
   inicial[`rooms/${CODIGO}`] = {
     codigo: CODIGO, modo: MODOS.LEYENDAS, estado,
@@ -158,7 +170,8 @@ function montar({
   // cambiara, esta suite —escrita antes de partir el módulo— se pondría roja.
   const { cerrarPartida } = crearCierre({
     db, salas: "rooms", partidas: "partidas", moverLeyendas,
-    motivo: "premio_partida", marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
+    motivo: "premio_partida", motivoDevolucion: MOTIVOS.DEVOLUCION_ENTRADA,
+    marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
     usuarios: "users",
     // El mismo `FieldValue.increment` que en producción, de mentira. Se inyecta
     // para poder montar el cierre sin un Firestore de verdad.
@@ -368,6 +381,37 @@ console.log("\n=== 4c. Una sala CANCELADA no reparte nada ===");
   );
 }
 
+console.log("\n=== 4d. Y cada entrada vuelve a su bolsillo ===");
+{
+  /**
+   * Abandonaron todos: la plata vuelve. Pero cada uno pagó distinto —Ana y
+   * Beto con compradas, Caro mitad y mitad, Dani con ganadas— y la devolución
+   * iba entera a las ganadas. Ahora cada una nombra la entrada que deshace.
+   */
+  const pagos = { ana: 100, beto: 100, caro: 50, dani: 0 };
+  const vacio = { credits: 0, creditosComprados: 0, creditosGanados: 0 };
+  const perfiles = Object.fromEntries(CUATRO.map((u) => [u, { ...vacio }]));
+  const { db, cerrar } = montar({ orden: CUATRO, abandonaron: [...CUATRO], perfiles, pagos });
+
+  const r = await capturar(() => cerrar({ uid: "ana", codigo: CODIGO }));
+  ok(r.valor && !r.error, "cierra igual", r.error?.message);
+
+  for (const uid of CUATRO) {
+    const p = db.leer(`users/${uid}`);
+    ok(
+      p.creditosComprados === pagos[uid] && p.creditosGanados === ENTRADA - pagos[uid],
+      `${uid}: vuelven ${pagos[uid]} compradas y ${ENTRADA - pagos[uid]} ganadas`,
+      [p.creditosComprados, p.creditosGanados],
+    );
+  }
+
+  const asiento = db.leer(`movimientos/${claveDeDevolucion(CODIGO, "caro")}`);
+  ok(asiento?.origen === claveDeEntrada(CODIGO, "caro"), "la devolución dice qué entrada deshizo",
+     asiento?.origen);
+  ok(asiento?.motivo === MOTIVOS.DEVOLUCION_ENTRADA, "y se asienta como devolución, no como premio",
+     asiento?.motivo);
+}
+
 console.log("\n=== 5. Dos y tres elegibles ===");
 {
   const dos = montar({ orden: ["ana", "beto", "caro", "dani"], abandonaron: ["caro", "dani"] });
@@ -548,7 +592,8 @@ console.log("\n=== 9. Cierre después de un abandono real ===");
   });
   const { cerrarPartida: cerrar } = crearCierre({
     db, salas: "rooms", partidas: "partidas", moverLeyendas,
-    motivo: "premio_partida", marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
+    motivo: "premio_partida", motivoDevolucion: MOTIVOS.DEVOLUCION_ENTRADA,
+    marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
   });
 
   await enRed.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO.map((u) => NOMBRES[u]) });

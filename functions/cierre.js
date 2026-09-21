@@ -35,6 +35,7 @@
 
 import { posicionesFinales } from "./reglas/motor.js";
 import { repartirPozo, usaLeyendas } from "./reglas/salas.js";
+import { claveDeEntrada, claveDeDevolucion } from "./reglas/economia.js";
 
 /**
  * Tres primitivas, no una función.
@@ -77,6 +78,18 @@ export function crearCierre({
    */
   incremento = null,
 }) {
+  /**
+   * Sin motivo de devolución, el cierre no se arma.
+   *
+   * Antes caía en `motivo`, que es el del PREMIO: quien se olvidara de pasarlo
+   * devolvía la plata de una partida sin ganadores asentada como premio, y a
+   * lo ganado aunque se hubiera pagado con compradas. Un olvido así no da
+   * error en ningún lado; éste sí, y al arrancar.
+   */
+  if (!motivoDevolucion) {
+    throw new Error("crearCierre: falta `motivoDevolucion`, el motivo con que vuelven las entradas.");
+  }
+
   /**
    * Quiénes pueden cobrar, en orden.
    *
@@ -205,8 +218,10 @@ export function crearCierre({
             monto: porCabeza,
             // Su propia clave y su propio motivo: en el libro mayor esto no
             // es un premio, es la entrada que vuelve.
-            idempotencia: `devolucion_${codigo}_${uid}`,
-            motivo: motivoDevolucion ?? motivo,
+            idempotencia: claveDeDevolucion(codigo, uid),
+            motivo: motivoDevolucion,
+            // Y deshace SU entrada: a cada bolsillo vuelve lo que salió de él.
+            origen: claveDeEntrada(codigo, uid),
           }))
         : [];
 
@@ -255,6 +270,8 @@ export function crearCierre({
             // la clave de idempotencia una impediría la otra.
             motivo: p.motivo ?? motivo,
             referencia: codigo,
+            // Sólo las devoluciones lo traen: un premio no deshace nada.
+            origen: p.origen,
             // La del premio incluye el puesto: dos cierres simultáneos chocan
             // en el mismo documento y sólo uno paga.
             idempotencia: p.idempotencia ?? `premio_${codigo}_${p.puesto}`,

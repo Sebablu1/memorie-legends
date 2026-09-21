@@ -16,6 +16,47 @@
 import { repartoDe, REPARTOS, CAMPOS_SALDO } from "./reglas/economia.js";
 
 /**
+ * Los repartos que COBRAN: sacan del saldo y nunca acreditan.
+ *
+ * Si uno de sus motivos llega con un número positivo, es una devolución
+ * disfrazada de cobro, y ése fue exactamente el agujero: las entradas de sala
+ * se devolvían como `ENTRADA_PARTIDA` en positivo, y lo positivo iba entero a
+ * lo ganado aunque se hubiera pagado con compradas.
+ */
+const COBRAN = new Set([
+  REPARTOS.SOLO_GANADO,
+  REPARTOS.COMPRADO_PRIMERO,
+  REPARTOS.GANADO_PRIMERO,
+]);
+
+/**
+ * Cuánto de una devolución vuelve a lo COMPRADO, según el cobro que deshace.
+ *
+ * `cobro` es el asiento del cobro original —el que guarda `deltaComprado`—, y
+ * `monto` lo que se devuelve. Lo comprado se devuelve en la misma proporción
+ * en que se cobró: una entrada de 100 pagada con 60 compradas y 40 ganadas
+ * vuelve 60 y 40. Si se devuelve parte —un artículo de un pack—, la parte
+ * comprada es proporcional.
+ *
+ * El redondeo va hacia lo comprado, y a propósito: lo que sobre de una
+ * división nunca puede terminar en lo ganado, que es la dirección que se está
+ * cerrando. Y nunca vuelve a lo comprado más de lo que el cobro sacó de ahí.
+ *
+ * Sin cobro, o con uno de antes de los bolsillos, todo vuelve a lo ganado: en
+ * esa época no había otra cosa. Es la regla de siempre, pero ahora sale de un
+ * dato —el asiento no tiene bolsillos— y no de que alguien se olvidó de un
+ * parámetro.
+ */
+export function repartoSegunOrigen(cobro, monto) {
+  const total = -Number(cobro?.delta);
+  const comprado = -Number(cobro?.deltaComprado);
+  if (!(total > 0) || !Number.isFinite(comprado)) return { comprado: 0 };
+
+  const parte = Math.ceil((Number(monto) * comprado) / total);
+  return { comprado: Math.min(comprado, Math.max(0, parte)) };
+}
+
+/**
  * @param {object} deps
  * @param {object} deps.db            Firestore
  * @param {string} deps.usuarios      colección de perfiles
@@ -103,11 +144,38 @@ export function crearMoverLeyendas({
   function repartir({ delta, motivo, reparto, comprado, ganado }) {
     const regla = repartoDe(motivo);
 
+    /**
+     * Los dos candados de las devoluciones.
+     *
+     * Un cobro no acredita: con un número positivo es una devolución que no
+     * dice de dónde salió la plata. Y una devolución no cobra, y siempre
+     * trae su reparto, que casi siempre sale del cobro que deshace —ver
+     * `origen`—. Sin ellos, olvidarse de decir de dónde vino algo mandaba la
+     * devolución entera a lo ganado sin avisar: así pasaron inadvertidas la
+     * de las salas y la de los artículos de la tienda.
+     */
+    if (delta > 0 && COBRAN.has(regla)) {
+      throw error(
+        "internal",
+        `«${motivo}» es un cobro y no puede acreditar. Una devolución va con su ` +
+          "propio motivo y dice qué cobro deshace.",
+      );
+    }
+    if (regla === REPARTOS.AL_ORIGEN && delta < 0) {
+      throw error("internal", `«${motivo}» es una devolución y no puede cobrar.`);
+    }
+    if (regla === REPARTOS.AL_ORIGEN && delta > 0 && !reparto) {
+      throw error(
+        "internal",
+        `«${motivo}» es una devolución y no dice qué cobro deshace.`,
+      );
+    }
+
     if (delta >= 0) {
       if (regla === REPARTOS.A_COMPRADO) return { dComprado: delta, dGanado: 0 };
       if (regla === REPARTOS.AL_ORIGEN) {
-        // Sin `reparto`, todo vuelve a ganado: es lo comprado antes de que
-        // existieran los bolsillos, y eso fue todo ganado por definición.
+        // El reparto llega siempre —lo exige el candado de arriba— y casi
+        // siempre sale del cobro que se deshace: ver `repartoSegunOrigen`.
         const aComprado = Math.max(0, Math.min(delta, Number(reparto?.comprado ?? 0)));
         return { dComprado: aComprado, dGanado: delta - aComprado };
       }
@@ -165,6 +233,31 @@ export function crearMoverLeyendas({
     return { dComprado: -deComprado, dGanado: -deGanado };
   }
 
+  /**
+   * El reparto de una devolución que nombra el cobro que deshace.
+   *
+   * El cobro tiene que ser un cobro —un número negativo— y de la misma
+   * persona. Las dos comprobaciones son baratas y cierran el error que no
+   * haría ruido: una clave equivocada que apunta a la entrada de OTRO
+   * jugador devolvería con los bolsillos de otro.
+   *
+   * Si el asiento no existe, no es un error: es una entrada de antes del
+   * libro mayor, y `repartoSegunOrigen` la manda a lo ganado.
+   */
+  function repartoDelOrigen({ uid, delta, origen }, snapCobro) {
+    const cobro = snapCobro?.exists ? snapCobro.data() : null;
+    if (cobro && cobro.uid !== uid) {
+      throw error(
+        "internal",
+        `La devolución a ${uid} dice deshacer ${origen}, que es de otra persona.`,
+      );
+    }
+    if (cobro && !(Number(cobro.delta) < 0)) {
+      throw error("internal", `${origen} no es un cobro: una devolución sólo deshace cobros.`);
+    }
+    return repartoSegunOrigen(cobro, delta);
+  }
+
   /** Aplica el reparto a un perfil y devuelve los tres números nuevos. */
   function aplicar({ delta, motivo, reparto, comprado, ganado }) {
     const { dComprado, dGanado } = repartir({ delta, motivo, reparto, comprado, ganado });
@@ -217,12 +310,21 @@ export function crearMoverLeyendas({
     // --- fase 1: todas las lecturas ---
     const saldos = new Map();
     const yaAsentado = new Map();
+    // Los cobros que deshacen las devoluciones del lote. Se leen acá, con
+    // todo lo demás: en la fase 2 ya se escribió y Firestore no deja leer.
+    const cobros = new Map();
 
     for (const m of lista) {
       if (!m.uid)
         throw error("internal", "Falta el jugador al mover Leyendas.");
       if (!Number.isInteger(m.delta)) {
         throw error("internal", "Las Leyendas se mueven en números enteros.");
+      }
+      if (m.origen && m.reparto) {
+        throw error("internal", "Una devolución dice su origen o su reparto, no las dos cosas.");
+      }
+      if (m.origen && !cobros.has(m.origen)) {
+        cobros.set(m.origen, await tx.get(refAsiento(m.origen)));
       }
       if (m.idempotencia && !yaAsentado.has(m.idempotencia)) {
         yaAsentado.set(
@@ -236,9 +338,16 @@ export function crearMoverLeyendas({
       }
     }
 
+    // El reparto de cada devolución, todavía sin escribir nada: si un cobro
+    // no cuadra, el lote entero se cae antes de tocar un saldo.
+    const planes = lista.map((m) => ({
+      ...m,
+      reparto: m.origen ? repartoDelOrigen(m, cobros.get(m.origen)) : (m.reparto ?? null),
+    }));
+
     // --- fase 2: todas las escrituras ---
     const resultados = [];
-    for (const m of lista) {
+    for (const m of planes) {
       if (m.idempotencia && yaAsentado.get(m.idempotencia)) {
         resultados.push({ aplicado: false, saldo: null, saldoPrevio: null });
         continue;
@@ -267,6 +376,8 @@ export function crearMoverLeyendas({
         delta: m.delta,
         motivo: m.motivo,
         referencia: m.referencia ?? null,
+        // Qué cobro deshace, si es una devolución.
+        ...(m.origen ? { origen: m.origen } : {}),
         saldoPrevio,
         saldoNuevo: r.saldoNuevo,
         deltaComprado: r.dComprado,
@@ -293,7 +404,11 @@ export function crearMoverLeyendas({
 
   async function moverLeyendas(
     tx,
-    { uid, delta, motivo, referencia = null, idempotencia = null, reparto = null },
+    {
+      uid, delta, motivo, referencia = null, idempotencia = null, reparto = null,
+      // La clave del cobro que deshace, si esto es una devolución.
+      origen = null,
+    },
   ) {
     if (!uid) throw error("internal", "Falta el jugador al mover Leyendas.");
     if (!Number.isInteger(delta)) {
@@ -316,7 +431,18 @@ export function crearMoverLeyendas({
     const { comprado, ganado } = bolsillosDe(snap.exists ? snap.data() : null);
     const saldoPrevio = comprado + ganado;
 
-    const r = aplicar({ delta, motivo, reparto, comprado, ganado });
+    if (origen && reparto) {
+      throw error("internal", "Una devolución dice su origen o su reparto, no las dos cosas.");
+    }
+    // La última lectura: después de ésta, `aplicar` decide y se escribe.
+    const repartoFinal = origen
+      ? repartoDelOrigen(
+          { uid, delta, origen },
+          await tx.get(db.collection(movimientos).doc(origen)),
+        )
+      : reparto;
+
+    const r = aplicar({ delta, motivo, reparto: repartoFinal, comprado, ganado });
 
     tx.set(refJugador, perfilCon(r), { merge: true });
 
@@ -325,6 +451,7 @@ export function crearMoverLeyendas({
       delta,
       motivo,
       referencia,
+      ...(origen ? { origen } : {}),
       saldoPrevio,
       saldoNuevo: r.saldoNuevo,
       // El detalle por bolsillo. Un cobro puede cruzar los dos —60 comprados

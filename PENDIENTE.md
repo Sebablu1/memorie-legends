@@ -590,6 +590,36 @@ abren nada.
 
 ---
 
+## 15. `desposeer` devuelve el precio de lista, no lo que se pagó
+
+**Estado:** anotado el 21/9/2026, al arreglar las devoluciones (Bloque 0 del
+rediseño del lobby). Sin tocar, por decisión.
+
+Cada posesión guarda `precioPagado: a.precio`, que es el precio de LISTA del
+artículo. Pero un pack de artículos se cobra con descuento (`precioDePack`), así
+que lo que la persona pagó de verdad por cada uno es menos. Cuando la
+administración le saca un artículo con `desposeer`, se le devuelve el precio de
+lista: más de lo que le costó.
+
+Ejemplo: tres artículos de 100 en un pack con 20 % de descuento se cobran 240.
+Sacarle uno devuelve 100, no 80; sacarle los tres devuelve 300.
+
+- **Por qué no urge:** `desposeer` sólo lo dispara un administrador, y hasta
+  hoy se usó sobre artículos de prueba de la propia cuenta de administración.
+- **Qué falta:** una decisión. Lo más directo es guardar en la posesión lo que
+  se pagó de verdad —el total del pack repartido entre sus artículos— y
+  devolver eso.
+- **Cómo se sabe que se resolvió:** una prueba en `pruebas/tienda.mjs` compra
+  un pack con descuento, le saca sus artículos uno por uno y comprueba que lo
+  devuelto no supera lo cobrado.
+
+Desde el Bloque 0, la devolución vuelve a cada bolsillo en la proporción del
+cobro del pack. Con este exceso eso significa que se crean Leyendas de más en
+los dos bolsillos, en esa misma proporción: no es una conversión de compradas en
+ganadas, pero sigue siendo plata que no existía.
+
+---
+
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del

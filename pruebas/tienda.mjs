@@ -85,11 +85,21 @@ function crearFirestore(inicial = {}) {
   let siguienteId = 0;
   const idAutomatico = () => `auto${++siguienteId}`;
 
-  const coleccion = (prefijo) => ({
+  const coleccion = (prefijo, filtros = []) => ({
     doc: (id) => documento(`${prefijo}/${id ?? idAutomatico()}`),
+    /**
+     * Sólo igualdades, que es lo único que pide la tienda: buscar en el libro
+     * mayor la compra que deshace una devolución. Cualquier otro operador
+     * rompe, en vez de devolver algo que el Firestore de verdad no devolvería.
+     */
+    where(campo, operador, valor) {
+      if (operador !== "==") throw new Error(`Este doble sólo sabe "==", no "${operador}".`);
+      return coleccion(prefijo, [...filtros, [campo, valor]]);
+    },
     async get() {
       const filas = [...docs.entries()]
         .filter(([r]) => r.startsWith(`${prefijo}/`) && !r.slice(prefijo.length + 1).includes("/"))
+        .filter(([, d]) => filtros.every(([campo, valor]) => d?.[campo] === valor))
         .map(([r, d]) => ({ id: r.slice(prefijo.length + 1), data: () => ({ ...d }) }));
       return { size: filas.length, forEach: (fn) => filas.forEach(fn) };
     },
@@ -166,8 +176,9 @@ function crearFirestore(inicial = {}) {
 }
 
 /** Monta la tienda sobre un catálogo y un saldo dados. */
-function montar({ saldo = 5000, catalogo = CATALOGO_INICIAL } = {}) {
-  const inicial = { "users/ana": { credits: saldo, username: "Ana" } };
+function montar({ saldo = 5000, catalogo = CATALOGO_INICIAL, perfil = null } = {}) {
+  // `perfil` reemplaza el saldo, para las pruebas que miran los dos bolsillos.
+  const inicial = { "users/ana": { username: "Ana", ...(perfil ?? { credits: saldo }) } };
   for (const item of catalogo) inicial[`catalogo/${item.id}`] = { ...item };
 
   const db = crearFirestore(inicial);
@@ -1083,6 +1094,79 @@ console.log("\n=== 25. Quitar y forzar exigen ser administrador ===");
     } catch (e) {
       ok(e.codigo === "permission-denied", `${nombre} exige ser administrador`, e.codigo);
     }
+  }
+}
+
+console.log("\n=== 26. Lo que se devuelve vuelve al bolsillo de donde salió ===");
+{
+  /**
+   * `desposeer` devolvía todo a las ganadas, aunque el artículo se hubiera
+   * pagado con compradas: sacarle a alguien algo que compró le dejaba
+   * Leyendas que abren torneos. Ahora busca la compra en el libro mayor y a
+   * cada bolsillo le vuelve lo suyo.
+   */
+  const soloCompradas = { credits: 5000, creditosComprados: 5000, creditosGanados: 0 };
+  const bolsillos = (db) => [
+    db._leer("users/ana").creditosComprados,
+    db._leer("users/ana").creditosGanados,
+  ];
+  const como = {};
+
+  {
+    const { db, tienda } = montar({ perfil: soloCompradas });
+    await tienda.sembrarCatalogo(como);
+    await tienda.comprar("ana", DRAGON);
+    ok(bolsillos(db)[0] === 5000 - precioDe(DRAGON), "lo pagó con compradas", bolsillos(db));
+
+    await tienda.desposeer(como, { itemId: DRAGON, uid: "ana" });
+    ok(JSON.stringify(bolsillos(db)) === "[5000,0]",
+       "al sacárselo, vuelve a las compradas y no a las ganadas", bolsillos(db));
+
+    const dev = db._leer(`movimientos/desposesion_${DRAGON}_ana`);
+    ok(dev?.origen === `compra_ana_${DRAGON}`, "la devolución nombra la compra que deshace",
+       dev?.origen);
+    const nota = db._rutas()
+      .filter((r) => r.startsWith("auditoria/"))
+      .map((r) => db._leer(r))
+      .find((a) => a.accion === "desposeer");
+    ok(nota?.compra === `compra_ana_${DRAGON}`, "y la auditoría también", nota?.compra);
+  }
+
+  {
+    // Un artículo de un pack: la clave de la compra lleva los ids de todo lo
+    // que se compró junto, así que no se puede reconstruir. Se la encuentra
+    // igual, por la referencia.
+    const { db, tienda } = montar({ perfil: soloCompradas });
+    await tienda.sembrarCatalogo(como);
+    await tienda.comprarVarios("ana", [DRAGON, ZORRO]);
+    await tienda.desposeer(como, { itemId: ZORRO, uid: "ana" });
+
+    const dev = db._leer(`movimientos/desposesion_${ZORRO}_ana`);
+    ok(dev?.origen === `compra_ana_${[DRAGON, ZORRO].sort().join("_")}`,
+       "un artículo de un pack encuentra la compra del pack", dev?.origen);
+    ok(dev?.deltaGanado === 0 && dev?.deltaComprado === precioDe(ZORRO),
+       "y vuelve a las compradas, porque el pack se pagó con compradas", dev);
+  }
+
+  {
+    // Una posesión sin compra en el libro mayor: de antes de que existiera.
+    // Vuelve a las ganadas, que es lo que era todo en esa época, y la
+    // auditoría deja dicho que no se encontró la compra.
+    const { db, tienda } = montar({
+      perfil: { credits: 0, creditosComprados: 0, creditosGanados: 0 },
+    });
+    await tienda.sembrarCatalogo(como);
+    await db.collection("users").doc("ana").collection("items").doc(ZORRO)
+      .set({ tipo: "avatar", nombre: "Zorro", precioPagado: 100 });
+
+    const r = await capturar(() => tienda.desposeer(como, { itemId: ZORRO, uid: "ana" }));
+    ok(!r.error, "sin compra en el libro mayor, se lo saca igual", r.error?.message);
+    ok(JSON.stringify(bolsillos(db)) === "[0,100]", "y vuelve a las ganadas", bolsillos(db));
+    const nota = db._rutas()
+      .filter((x) => x.startsWith("auditoria/"))
+      .map((x) => db._leer(x))
+      .find((a) => a.accion === "desposeer");
+    ok(nota?.compra === null, "la auditoría dice que no se encontró la compra", nota?.compra);
   }
 }
 

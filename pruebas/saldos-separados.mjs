@@ -83,9 +83,12 @@ function crearFirestore(inicial = {}) {
   };
 }
 
-/** Un banco sobre un perfil dado. `perfil` se siembra tal cual. */
-function montar(perfil) {
-  const db = crearFirestore({ "users/ana": { username: "Ana", ...perfil } });
+/**
+ * Un banco sobre un perfil dado. `perfil` se siembra tal cual, y `otros` son
+ * documentos más —un asiento viejo del libro mayor, por ejemplo—.
+ */
+function montar(perfil, otros = {}) {
+  const db = crearFirestore({ "users/ana": { username: "Ana", ...perfil }, ...otros });
   const mover = crearMoverLeyendas({
     db,
     usuarios: "users",
@@ -326,18 +329,48 @@ console.log("\n=== 7. La devolución vuelve al bolsillo de origen ===");
 
 {
   /**
-   * Sin `reparto`, todo a ganados.
+   * Lo que se cobró ANTES de que existieran los bolsillos vuelve todo a
+   * ganados.
    *
-   * Es el caso de lo comprado ANTES de que existieran los bolsillos: sus
-   * documentos de posesión no guardan el detalle, y no lo guardan porque en
-   * ese momento todo el saldo era ganado. Devolver todo a ganados no es una
-   * aproximación: es exacto.
+   * Sus asientos no guardan el detalle, y no lo guardan porque en ese momento
+   * todo el saldo era ganado. Devolver todo a ganados no es una aproximación:
+   * es exacto.
+   *
+   * Lo que cambió es cómo se llega acá. Antes alcanzaba con NO decir nada, y
+   * así se colaron dos devoluciones que no eran de esa época —las entradas de
+   * sala y los artículos de la tienda— sin que nada avisara. Ahora la
+   * devolución nombra su cobro, y es el cobro el que dice que no tiene
+   * bolsillos. Ver `pruebas/devoluciones.mjs`.
    */
+  const { db, mover } = montar(
+    { credits: 0, creditosComprados: 0, creditosGanados: 0 },
+    // Una compra de antes: tiene monto y no tiene bolsillos.
+    { "movimientos/compra_vieja": { uid: "ana", delta: -100, motivo: MOTIVOS.COMPRA_PERSONALIZACION } },
+  );
+
+  await mover1(db, mover, {
+    delta: 100,
+    motivo: MOTIVOS.DEVOLUCION_ARTICULO,
+    origen: "compra_vieja",
+    idempotencia: "d2",
+  });
+  ok(perfil(db).creditosGanados === 100 && perfil(db).creditosComprados === 0,
+     "un cobro de antes de los bolsillos vuelve entero a ganados", perfil(db));
+}
+
+{
+  // Y sin decir nada ya no pasa: se rompe, y no se mueve nada.
   const { db, mover } = montar({ credits: 0, creditosComprados: 0, creditosGanados: 0 });
 
-  await mover1(db, mover, { delta: 100, motivo: MOTIVOS.DEVOLUCION_ARTICULO, idempotencia: "d2" });
-  ok(perfil(db).creditosGanados === 100 && perfil(db).creditosComprados === 0,
-     "sin `reparto`, la devolución vuelve entera a ganados", perfil(db));
+  let rechazo = null;
+  try {
+    await mover1(db, mover, { delta: 100, motivo: MOTIVOS.DEVOLUCION_ARTICULO, idempotencia: "d3" });
+  } catch (e) {
+    rechazo = e;
+  }
+  ok(/no dice qué cobro deshace/.test(rechazo?.message ?? ""),
+     "una devolución que no nombra su cobro se rechaza", rechazo?.message);
+  ok(perfil(db).credits === 0, "y no acredita nada", perfil(db));
 }
 
 // =====================================================================

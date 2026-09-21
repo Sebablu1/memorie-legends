@@ -42,6 +42,7 @@ import {
   leyendasDePaquete,
   MOTIVOS,
   MONEDA,
+  claveDeEntrada,
 } from "./reglas/economia.js";
 
 import { PUESTO_MENSUAL_CON_INSIGNIA } from "./reglas/insignias.js";
@@ -373,7 +374,7 @@ async function abrirSalaEn(tx, { codigo, uid, entrada, nombre, nombreJugador, lu
     delta: -entrada,
     motivo: MOTIVOS.ENTRADA_PARTIDA,
     referencia: codigo,
-    idempotencia: `entrada_${codigo}_${uid}`,
+    idempotencia: claveDeEntrada(codigo, uid),
   });
   if (!r.aplicado) throw new Error("ya-pagada");
 
@@ -665,7 +666,7 @@ async function sumarseALaSala(
     delta: -Number(sala.entrada),
     motivo: MOTIVOS.ENTRADA_PARTIDA,
     referencia: codigo,
-    idempotencia: `entrada_${codigo}_${uid}`,
+    idempotencia: claveDeEntrada(codigo, uid),
   });
   if (!r.aplicado) {
     throw new functions.https.HttpsError("already-exists", "Ya pagaste la entrada a esta sala.");
@@ -901,7 +902,8 @@ const salida = crearSalirDeSalaEnEspera({
   db,
   salas: SALAS,
   moverLeyendas,
-  motivo: MOTIVOS.ENTRADA_PARTIDA,
+  // Devuelve cada entrada a su bolsillo: ver `DEVOLUCION_ENTRADA`.
+  motivo: MOTIVOS.DEVOLUCION_ENTRADA,
   marcaDeTiempo,
   error: errorHttp,
   estados: ESTADOS_SALA,
@@ -1015,7 +1017,7 @@ const panel = crearAdmin({
   // Una cancelación devuelve la entrada: mismo motivo que cualquier otra
   // devolución, y la misma clave de idempotencia que usa `salida.js`, para que
   // a nadie se le pague dos veces por la misma sala.
-  motivo: MOTIVOS.ENTRADA_PARTIDA,
+  motivo: MOTIVOS.DEVOLUCION_ENTRADA,
   marcaDeTiempo,
   error: errorHttp,
   estados: ESTADOS_SALA,
@@ -1467,11 +1469,11 @@ const cierre = crearCierre({
   partidas: "partidas",
   moverLeyendas,
   motivo: MOTIVOS.PREMIO_PARTIDA,
-  // Si abandonaron todos no hay a quién premiar y el pozo vuelve a quien lo
-  // puso. En el libro mayor eso es la apuesta que regresa, igual que la
-  // devolución de una sala cancelada: mismo motivo, para que todas las
-  // devoluciones de sala se lean iguales.
-  motivoDevolucion: MOTIVOS.ENTRADA_PARTIDA,
+  // Si abandonaron todos no hay a quién premiar y cada entrada vuelve a quien
+  // la puso. En el libro mayor es la misma devolución que la de una sala
+  // cancelada: mismo motivo, para que todas las devoluciones de sala se lean
+  // iguales, y cada una a su bolsillo.
+  motivoDevolucion: MOTIVOS.DEVOLUCION_ENTRADA,
   marcaDeTiempo,
   error: errorHttp,
   estados: ESTADOS_SALA,

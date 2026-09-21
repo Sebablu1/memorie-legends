@@ -560,6 +560,16 @@ console.log("\n=== 5. Con menos de cuatro se cancela y se devuelve todo ===");
   ok(db._leer(`torneos/${id}`).estado === ESTADOS.CANCELADO, "queda cancelado");
   ok(r.devueltos === 3, "y devuelve las tres entradas", r.devueltos);
 
+  // Cada devolución nombra la inscripción que deshace. Hoy vuelve todo a las
+  // ganadas, porque un torneo sólo cobra de ahí; pero toda devolución dice
+  // qué deshace, y sin esto el candado de `leyendas.js` la rechazaría.
+  const devolucion = db._leer(`movimientos/torneo_devolucion_${id}_j1`);
+  ok(
+    devolucion?.origen === `torneo_entrada_${id}_j1`,
+    "cada devolución nombra la inscripción que deshace",
+    devolucion?.origen,
+  );
+
   for (let i = 1; i <= 3; i++) {
     ok(db._leer(`users/j${i}`).credits === 10000, `  j${i} recuperó todo`, db._leer(`users/j${i}`).credits);
   }

@@ -20,6 +20,7 @@
 import { crearMoverLeyendas } from "../functions/leyendas.js";
 import { crearSalirDeSalaEnEspera } from "../functions/salida.js";
 import { ESTADOS_SALA, MODOS } from "../public/js/reglas/salas.js";
+import { MOTIVOS, claveDeEntrada, claveDeDevolucion } from "../public/js/reglas/economia.js";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -86,8 +87,16 @@ const ENTRADA = 100;
 const SALDO = 1000;
 const NOMBRE = { ana: "Ana", beto: "Beto", caro: "Caro", dani: "Dani" };
 
-/** Una sala en espera con los jugadores que se le pasen; el primero la creó. */
-function montar(jugadores, { estado = ESTADOS_SALA.ESPERANDO, entrada = ENTRADA } = {}) {
+/**
+ * Una sala en espera con los jugadores que se le pasen; el primero la creó.
+ *
+ * `perfiles` reemplaza el saldo de quien haga falta, para las pruebas que
+ * miran los dos bolsillos.
+ */
+function montar(
+  jugadores,
+  { estado = ESTADOS_SALA.ESPERANDO, entrada = ENTRADA, perfiles = {} } = {},
+) {
   const inicial = {
     [`rooms/${CODIGO}`]: {
       codigo: CODIGO, modo: MODOS.LEYENDAS, estado, entrada,
@@ -98,17 +107,17 @@ function montar(jugadores, { estado = ESTADOS_SALA.ESPERANDO, entrada = ENTRADA 
       pozo: entrada * jugadores.length,
     },
   };
-  for (const uid of jugadores) inicial[`users/${uid}`] = { credits: SALDO };
+  for (const uid of jugadores) inicial[`users/${uid}`] = perfiles[uid] ?? { credits: SALDO };
 
   const db = crearFirestore(inicial);
   const moverLeyendas = crearMoverLeyendas({
     db, usuarios: "users", campoSaldo: "credits", marcaDeTiempo: () => "T", error,
   });
   const salir = crearSalirDeSalaEnEspera({
-    db, salas: "rooms", moverLeyendas, motivo: "entrada_partida",
+    db, salas: "rooms", moverLeyendas, motivo: MOTIVOS.DEVOLUCION_ENTRADA,
     marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
   });
-  return { db, salir };
+  return { db, salir, moverLeyendas };
 }
 
 const capturar = async (fn) => {
@@ -340,6 +349,47 @@ console.log("\n=== 8. La regla de Firestore se respeta ===");
     ok(r.valor && !r.error, `con ${n} jugadores no hay lectura después de escritura`,
        r.error?.message);
   }
+}
+
+console.log("\n=== 9. Cada entrada vuelve al bolsillo de donde salió ===");
+{
+  /**
+   * Ana pagó con compradas; Beto, mitad y mitad. La devolución iba entera a
+   * las ganadas, y las ganadas abren los torneos: entrar a una sala y salir
+   * convertía unas Leyendas en otras.
+   *
+   * Las entradas se cobran por el mismo camino que `index.js` —compradas
+   * primero, con su clave—, así que el asiento que la devolución lee es el de
+   * verdad y no uno sembrado a mano.
+   */
+  const perfiles = {
+    ana: { credits: 150, creditosComprados: 100, creditosGanados: 50 },
+    beto: { credits: 100, creditosComprados: 60, creditosGanados: 40 },
+  };
+  const { db, salir, moverLeyendas } = montar(["ana", "beto"], { perfiles });
+  for (const uid of ["ana", "beto"]) {
+    await db.runTransaction((tx) => moverLeyendas(tx, {
+      uid, delta: -ENTRADA, motivo: MOTIVOS.ENTRADA_PARTIDA, referencia: CODIGO,
+      idempotencia: claveDeEntrada(CODIGO, uid),
+    }));
+  }
+
+  const r = await capturar(() => salir({ uid: "ana", codigo: CODIGO }));
+  ok(!r.error, "el creador sale y la sala se cancela", r.error?.message);
+
+  const bolsillos = (uid) => {
+    const p = db.leer(`users/${uid}`);
+    return [p.creditosComprados, p.creditosGanados];
+  };
+  ok(JSON.stringify(bolsillos("ana")) === "[100,50]",
+     "a Ana le vuelven 100 compradas, no 100 ganadas", bolsillos("ana"));
+  ok(JSON.stringify(bolsillos("beto")) === "[60,40]",
+     "a Beto, 60 compradas y 40 ganadas: lo que puso de cada una", bolsillos("beto"));
+
+  const asiento = db.leer(`movimientos/${claveDeDevolucion(CODIGO, "beto")}`);
+  ok(asiento?.motivo === MOTIVOS.DEVOLUCION_ENTRADA, "se asienta como devolución, no como entrada",
+     asiento?.motivo);
+  ok(asiento?.origen === claveDeEntrada(CODIGO, "beto"), "y dice qué entrada deshizo", asiento?.origen);
 }
 
 console.log(fallos === 0 ? "\n✅ TODO OK\n" : `\n❌ ${fallos} FALLOS\n`);

@@ -134,7 +134,7 @@ const montar = (datos) => {
   const banco = crearBanco();
   const admin = crearAdmin({
     db, salas: "rooms", partidas: "partidas",
-    moverLeyendas: banco.moverLeyendas, motivo: "entrada_partida",
+    moverLeyendas: banco.moverLeyendas, motivo: "devolucion_entrada",
     marcaDeTiempo: () => "T", error, estados: ESTADOS_SALA,
     administradores: crearAdministradores({ db, error, correoRaiz: ADMIN }),
   });
@@ -271,6 +271,13 @@ console.log("\n=== 4. Cancelar devuelve las entradas ===");
   ok(banco.movimientos.length === 3, "un movimiento por jugador", banco.movimientos.length);
   ok(banco.movimientos.every((m) => m.delta === 100), "cada uno por el valor de la entrada");
   ok(banco.movimientos.every((m) => m.referencia === "ESPERA1"), "con la sala como referencia");
+  // La devolución nombra la entrada que deshace: así vuelve a su bolsillo.
+  // Sin esto, una entrada pagada con Leyendas compradas volvía como ganadas.
+  ok(
+    banco.movimientos.every((m) => m.origen === `entrada_ESPERA1_${m.uid}`),
+    "y cada una dice qué entrada deshace",
+    banco.movimientos.map((m) => m.origen),
+  );
 
   const sala = db.leer("rooms", "ESPERA1");
   ok(sala.estado === ESTADOS_SALA.CANCELADA, "la sala queda cancelada", sala.estado);

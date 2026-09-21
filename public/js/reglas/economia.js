@@ -529,6 +529,26 @@ export const MOTIVOS = {
    * se escribe.
    */
   ENTRADA_PARTIDA: "entrada_partida",
+
+  /**
+   * La entrada de una sala que vuelve: el jugador salió antes de empezar, la
+   * administración canceló la sala, o abandonaron todos y no hubo a quién
+   * premiar.
+   *
+   * Hasta septiembre de 2026 se asentaba como `ENTRADA_PARTIDA` en positivo.
+   * Ese motivo cobra de lo comprado primero, pero al acreditar mandaba todo a
+   * lo ganado: una entrada pagada con Leyendas compradas volvía como ganadas.
+   * Entrar a una sala y salir convertía las unas en las otras, y las ganadas
+   * son las que habilitan los torneos.
+   *
+   * Ahora es su propio motivo, vuelve AL ORIGEN y dice qué entrada deshace
+   * —ver `origen` en `leyendas.js`—. Los asientos viejos no se reescriben: un
+   * libro mayor se corrige con asientos nuevos. Hasta esa fecha sólo los
+   * administradores podían comprar Leyendas, y se revisó en producción que
+   * ninguna devolución hubiera salido de lo comprado.
+   */
+  DEVOLUCION_ENTRADA: "devolucion_entrada",
+
   // Sumidero de la casa: no va al pozo ni a otro jugador.
   PENALIZACION_ABANDONO: "penalizacion_abandono",
   PREMIO_PARTIDA: "premio_partida",
@@ -608,6 +628,19 @@ export const MOTIVOS = {
   AJUSTE_ADMIN_COMPRADO: "ajuste_admin_comprado",
 };
 
+/**
+ * Las dos claves del libro mayor de una sala: la entrada de un jugador y su
+ * devolución.
+ *
+ * Estaban escritas a mano en cinco lugares —los dos cobros de `index.js` y
+ * las devoluciones de `salida.js`, `admin.js` y `cierre.js`—. Ahora además la
+ * devolución tiene que NOMBRAR la entrada que deshace, y una clave copiada con
+ * una letra de menos no falla: apunta a un asiento que no existe, y la
+ * devolución vuelve entera a lo ganado.
+ */
+export const claveDeEntrada = (sala, uid) => `entrada_${sala}_${uid}`;
+export const claveDeDevolucion = (sala, uid) => `devolucion_${sala}_${uid}`;
+
 // ------------------------------------------- los dos bolsillos del saldo
 
 /**
@@ -675,6 +708,10 @@ export const REPARTOS = Object.freeze({
  * Las entradas de partida y las compras de la tienda gastan lo COMPRADO
  * primero, que es lo que deja libre el bolsillo ganado: es el único que
  * habilita torneos, así que gastarlo último es lo que conviene al jugador.
+ *
+ * Las tres devoluciones van AL ORIGEN, y un cobro no acredita nunca: una
+ * devolución dice qué cobro deshace, y a cada bolsillo vuelve lo que salió de
+ * él. Las dos cosas las hace cumplir `leyendas.js`.
  */
 export const REPARTO_POR_MOTIVO = Object.freeze({
   [MOTIVOS.REGISTRO]: REPARTOS.A_GANADO,
@@ -698,6 +735,7 @@ export const REPARTO_POR_MOTIVO = Object.freeze({
 
   [MOTIVOS.PENALIZACION_ABANDONO]: REPARTOS.GANADO_PRIMERO,
 
+  [MOTIVOS.DEVOLUCION_ENTRADA]: REPARTOS.AL_ORIGEN,
   [MOTIVOS.TORNEO_DEVOLUCION]: REPARTOS.AL_ORIGEN,
   [MOTIVOS.DEVOLUCION_ARTICULO]: REPARTOS.AL_ORIGEN,
 });
