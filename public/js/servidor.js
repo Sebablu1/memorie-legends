@@ -37,6 +37,17 @@ export class ErrorDeServidor extends Error {
  * Los mensajes que el servidor manda con HttpsError ya vienen redactados
  * para el usuario, así que se usan tal cual; el resto cae en la tabla.
  */
+/**
+ * Saca del payload las claves que no tienen valor.
+ *
+ * El SDK convierte `undefined` en `null` al serializar, así que una clave que
+ * quedó sin argumento no llega «vacía»: llega con un null adentro. El
+ * servidor ya lo acepta —ver `opcional` en `functions/esquemas.js`— pero no
+ * hay motivo para mandarlo: lo que no se pidió, no se manda.
+ */
+const sinVacios = (datos) =>
+  Object.fromEntries(Object.entries(datos).filter(([, v]) => v !== undefined && v !== null));
+
 async function llamar(nombre, datos = {}) {
   try {
     const { data } = await httpsCallable(funciones, nombre)(datos);
@@ -65,7 +76,7 @@ export const crearSala = (entrada, nombre, limitePuntos) =>
  * ninguna parte, así que si se pierde hay que abrir otra sala.
  */
 export const crearSalaPrivada = (entrada, nombre, limitePuntos, vigenciaMinutos) =>
-  llamar("crearSalaPrivada", { entrada, nombre, limitePuntos, vigenciaMinutos });
+  llamar("crearSalaPrivada", sinVacios({ entrada, nombre, limitePuntos, vigenciaMinutos }));
 
 /** Entra a una sala privada con su código. Devuelve el id de la sala. */
 export const unirseConCodigo = (codigo) => llamar("unirseConCodigo", { codigo });

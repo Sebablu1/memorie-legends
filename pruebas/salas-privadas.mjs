@@ -254,6 +254,18 @@ console.log("\n=== 6. La vigencia se puede elegir, dentro de lo razonable ===");
   const max = MINUTOS_VIGENCIA_MAXIMA * 60_000;
 
   ok(privadas.vigenciaEnMs(undefined) === 30 * 60_000, "sin pedir nada, media hora");
+
+  /**
+   * Y `null` es lo mismo que no pedir nada.
+   *
+   * Es lo que manda el SDK cuando el cliente omite el argumento. Sin esto,
+   * `Number(null)` daba 0 —finito— y el 0 se recortaba al MÍNIMO: toda sala
+   * creada desde el tablero caducaba a los cinco minutos en vez de a los
+   * treinta, sin que nada fallara.
+   */
+  ok(privadas.vigenciaEnMs(null) === 30 * 60_000,
+     "null es no pedir nada: media hora, no el mínimo",
+     privadas.vigenciaEnMs(null) / 60_000);
   ok(privadas.vigenciaEnMs(90) === 90 * 60_000, "lo pedido, si es razonable");
   ok(privadas.vigenciaEnMs(1) === min, "un minuto se sube al mínimo", privadas.vigenciaEnMs(1));
   ok(privadas.vigenciaEnMs(99999) === max, "y un año se baja al máximo");

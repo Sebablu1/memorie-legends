@@ -25,6 +25,7 @@ import {
   EsquemaCompra,
   EsquemaReferido,
 } from "../functions/esquemas.js";
+import * as Esquemas from "../functions/esquemas.js";
 import { LARGO_CODIGO } from "../public/js/reglas/salas.js";
 import { TAM_MANO } from "../public/js/reglas/baraja.js";
 import { ACCIONES } from "../functions/partida-red.js";
@@ -240,6 +241,79 @@ console.log("\n=== Ninguna callable lee el código sin validarlo ===");
      "accionDePartida usa el suyo");
   ok(fuente.includes("validar(EsquemaEntrega, data, errorHttp)"),
      "y la entrega tras un acierto, el suyo");
+}
+
+// ═══════════════════════════════════ lo que el SDK manda cuando falta algo
+
+console.log("\n=== Todo campo opcional tiene que aceptar el null del SDK ===");
+{
+  /**
+   * EL BUG QUE ESTO ATAJA, Y LA CLASE ENTERA A LA QUE PERTENECE
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * El tablero llamaba a `crearSalaPrivada(entrada, nombre, limitePuntos)`
+   * sin el cuarto argumento, así que `vigenciaMinutos` quedaba `undefined` en
+   * el objeto. Y el SDK de Firebase, al serializar una llamada callable,
+   * convierte `undefined` en `null`: es el protocolo, no un error nuestro.
+   *
+   * Del otro lado, `z.coerce.number().int().positive().optional()` acepta
+   * `undefined` pero NO `null` — y encima `z.coerce` convierte `null` en 0,
+   * que no es positivo. El servidor contestaba 400 «Los datos de la jugada no
+   * son válidos» y no se podía crear ninguna sala privada.
+   *
+   * La regla, entonces, es una sola y vale para los treinta esquemas:
+   *
+   *     si un campo acepta `undefined`, TIENE que aceptar `null`.
+   *
+   * Se comprueba campo por campo y no con payloads de ejemplo, porque un
+   * payload de ejemplo sólo cubre el camino que a alguien se le ocurrió
+   * escribir. Esto los recorre todos, incluidos los que todavía no existen.
+   */
+  const esObjeto = (e) => Boolean(e && typeof e === "object" && e.shape);
+
+  /** Los campos de un esquema, entrando un nivel en los objetos anidados. */
+  function campos(nombre, esquema, salida = []) {
+    for (const [clave, tipo] of Object.entries(esquema.shape)) {
+      salida.push([`${nombre}.${clave}`, tipo]);
+      // `objetivo: z.object({ indice, posicion }).optional()` y parientes: lo
+      // de adentro viaja en el mismo JSON y se encuentra con el mismo null.
+      const dentro = tipo?.unwrap?.() ?? tipo?._def?.innerType;
+      if (esObjeto(dentro)) campos(`${nombre}.${clave}`, dentro, salida);
+    }
+    return salida;
+  }
+
+  const todos = Object.entries(Esquemas)
+    .filter(([, e]) => esObjeto(e))
+    .flatMap(([nombre, e]) => campos(nombre, e));
+
+  ok(todos.length > 40, "hay campos que revisar en todos los esquemas", todos.length);
+
+  const opcionales = todos.filter(([, tipo]) => tipo.safeParse(undefined).success);
+  ok(opcionales.length > 10, "y varios son opcionales", opcionales.length);
+
+  const rechazan = opcionales
+    .filter(([, tipo]) => !tipo.safeParse(null).success)
+    .map(([nombre]) => nombre);
+
+  ok(rechazan.length === 0,
+     "ningún campo opcional rechaza el null que manda el SDK",
+     rechazan);
+
+  /**
+   * Y el caso concreto, entero, tal como sale del tablero: tres argumentos y
+   * el cuarto en null.
+   */
+  const comoElTablero = {
+    entrada: 10,
+    nombre: "Sala de Seba",
+    limitePuntos: 150,
+    vigenciaMinutos: null,
+  };
+  const r = pasa(Esquemas.EsquemaCrearSalaPrivada, comoElTablero);
+  ok(r.ok, "una sala privada del tablero pasa la puerta", r.mensaje);
+  ok(r.valor?.entrada === 10 && r.valor?.limitePuntos === 150,
+     "con su entrada y su duración intactas", r.valor);
 }
 
 console.log(fallos ? `\n❌ ${fallos} fallos\n` : "\n✅ TODO OK\n");

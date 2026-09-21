@@ -38,6 +38,33 @@ import { ACCIONES } from "./partida-red.js";
 import { MOTIVOS, LARGO_COMENTARIO } from "./reportes.js";
 
 /**
+ * Un campo que el cliente puede no mandar.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ NO ALCANZA CON `.optional()`
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * El SDK de Firebase convierte `undefined` en `null` al serializar una
+ * llamada callable. Es el protocolo: lo que el cliente OMITE llega como
+ * `null`, no como `undefined`.
+ *
+ * Y `.optional()` acepta `undefined` y rechaza `null`. Con `z.coerce` encima
+ * es peor, porque el null se convierte en 0 y falla contra `.positive()` con
+ * un mensaje que habla de números: «Too small».
+ *
+ * Eso rompió la creación de salas privadas en producción el 20 de septiembre
+ * de 2026: el tablero llamaba sin el cuarto argumento, `vigenciaMinutos`
+ * llegaba en `null` y el servidor contestaba 400 a todo.
+ *
+ * Esto acepta las dos formas y las unifica en `undefined`, que es lo que hay
+ * que pasarle al esquema de adentro para que un `.default()` siga aplicando.
+ *
+ * La regla la vigila `pruebas/validacion.mjs`: si un campo acepta
+ * `undefined`, tiene que aceptar `null`.
+ */
+const opcional = (esquema) => z.preprocess((v) => v ?? undefined, esquema.optional());
+
+/**
  * El código de sala.
  *
  * Se normaliza antes de validar —recortar y pasar a mayúsculas— porque es lo
@@ -94,22 +121,22 @@ export const EsquemaCancelarSala = z.object({
  */
 export const EsquemaEditarSala = z.object({
   codigo: Codigo,
-  nombre: z.string().max(40).optional(),
-  maxJugadores: z.coerce.number().int().min(2).max(4).optional(),
+  nombre: opcional(z.string().max(40)),
+  maxJugadores: opcional(z.coerce.number().int().min(2).max(4)),
 });
 
 /** Cuántas salas cerradas se barren de una pasada. */
 export const EsquemaLimpiarSalas = z.object({
-  tope: z.coerce.number().int().min(1).max(200).optional(),
+  tope: opcional(z.coerce.number().int().min(1).max(200)),
 });
 
 export const EsquemaCrearSala = z.object({
   entrada: z.coerce.number().int().min(0),
-  nombre: z.string().max(40).optional(),
+  nombre: opcional(z.string().max(40)),
   // Cuánto dura la partida: 60, 100 o 150. Si no viene, la de siempre.
   // El valor se vuelve a comprobar contra `LIMITES_DE_PARTIDA` en la función:
   // acá sólo se exige que sea un número.
-  limitePuntos: z.coerce.number().int().positive().optional(),
+  limitePuntos: opcional(z.coerce.number().int().positive()),
 });
 
 /**
@@ -121,9 +148,9 @@ export const EsquemaCrearSala = z.object({
  */
 export const EsquemaCrearSalaPrivada = z.object({
   entrada: z.coerce.number().int().min(0),
-  nombre: z.string().max(40).optional(),
-  limitePuntos: z.coerce.number().int().positive().optional(),
-  vigenciaMinutos: z.coerce.number().int().positive().optional(),
+  nombre: opcional(z.string().max(40)),
+  limitePuntos: opcional(z.coerce.number().int().positive()),
+  vigenciaMinutos: opcional(z.coerce.number().int().positive()),
 });
 
 /**
@@ -201,11 +228,12 @@ export const EsquemaAccion = z.object({
    * el esquema las contemple: sin el booleano, la segunda mitad del 10 se
    * rechazaba en la puerta con "los datos de la jugada no son validos".
    */
-  objetivo: z
-    .object({ indice: z.coerce.number().int().min(0).max(3), posicion: Posicion.optional() })
-    .or(z.string().min(1).max(128))
-    .or(z.boolean())
-    .optional(),
+  objetivo: opcional(
+    z
+      .object({ indice: z.coerce.number().int().min(0).max(3), posicion: Posicion.optional() })
+      .or(z.string().min(1).max(128))
+      .or(z.boolean()),
+  ),
 });
 
 export const EsquemaCompra = z.object({ paqueteId: z.string().min(1).max(64) });
@@ -283,12 +311,12 @@ export const EsquemaDesposeer = z.object({
 export const EsquemaTorneo = z.object({
   // Las dos que le cuentan al jugador qué compra: de qué va el torneo y
   // cuándo se juega. Opcionales: un borrador puede no saberlo todavía.
-  descripcion: z.string().max(300).optional(),
+  descripcion: opcional(z.string().max(300)),
   comienzaEn: z.coerce.number().int().positive().nullable().optional(),
   nombre: z.string().min(1).max(80),
-  tipo: z.enum(["especial", "semanal"]).optional().default("especial"),
+  tipo: opcional(z.enum(["especial", "semanal"])).default("especial"),
   entrada: z.coerce.number().int(),
-  maxJugadores: z.coerce.number().int().min(4).optional(),
+  maxJugadores: opcional(z.coerce.number().int().min(4)),
 });
 
 /** El id de un torneo, que lo genera Firestore. */
@@ -328,7 +356,7 @@ export const EsquemaUmbrales = z.object({
 
 /** Cancelar, con un motivo opcional que queda escrito. */
 export const EsquemaCancelarTorneo = EsquemaIdTorneo.extend({
-  motivo: z.string().max(300).optional().default(""),
+  motivo: opcional(z.string().max(300)).default(""),
 });
 
 /**
@@ -349,7 +377,7 @@ export const EsquemaItemAdmin = z.object({
   id: z.string().min(2).max(64),
   tipo: z.string().min(1).max(32),
   nombre: z.string().min(1).max(80),
-  descripcion: z.string().max(400).optional().default(""),
+  descripcion: opcional(z.string().max(400)).default(""),
   precio: z.coerce.number().int(),
   imagen: z.string().min(1).max(500),
   activo: z.coerce.boolean().optional().default(true),
@@ -379,7 +407,7 @@ export const EsquemaItemAdmin = z.object({
     .optional()
     .default(null),
 
-  metadata: z.record(z.string(), z.unknown()).optional().default({}),
+  metadata: opcional(z.record(z.string(), z.unknown())).default({}),
 });
 
 /** Encender o apagar un artículo. */
@@ -402,14 +430,14 @@ export const EsquemaActivarItem = z.object({
 export const EsquemaReporte = z.object({
   denunciado: z.string().min(1).max(128),
   motivo: z.enum(MOTIVOS),
-  comentario: z
-    .string()
-    .max(LARGO_COMENTARIO * 4)
-    .transform((t) => t.trim().slice(0, LARGO_COMENTARIO))
-    .optional()
-    .default(""),
+  comentario: opcional(
+    z
+      .string()
+      .max(LARGO_COMENTARIO * 4)
+      .transform((t) => t.trim().slice(0, LARGO_COMENTARIO)),
+  ).default(""),
   // La sala donde pasó. Opcional: también se puede reportar desde fuera de una.
-  codigo: Codigo.optional(),
+  codigo: opcional(Codigo),
 });
 
 export const EsquemaReferido = z.object({ referidoUid: z.string().min(1).max(128) });

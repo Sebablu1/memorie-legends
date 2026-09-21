@@ -155,8 +155,18 @@ export function crearSalasPrivadas({
     return valor;
   }
 
-  /** Los minutos pedidos, acotados a lo que se permite. */
+  /**
+   * Los minutos pedidos, acotados a lo que se permite.
+   *
+   * `null` es «no pidieron nada», igual que `undefined`: es lo que manda el
+   * SDK cuando el cliente omite el argumento. Sin esta línea, `Number(null)`
+   * daba 0 —un número finito— y el 0 se recortaba al MÍNIMO: toda sala creada
+   * sin pedir vigencia caducaba a los cinco minutos en vez de a la media hora.
+   * En silencio, porque no falla nada: simplemente el código dejaba de servir
+   * mucho antes.
+   */
   function vigenciaEnMs(minutos) {
+    if (minutos == null) return MINUTOS_VIGENCIA_POR_DEFECTO * 60_000;
     const pedidos = Number(minutos);
     if (!Number.isFinite(pedidos)) return MINUTOS_VIGENCIA_POR_DEFECTO * 60_000;
     const acotados = Math.min(
