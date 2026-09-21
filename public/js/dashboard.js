@@ -494,8 +494,13 @@ function filaDeSala(sala) {
 }
 
 function arrancarSalas() {
+  // Sólo las salas en las que estoy sentado. No es un filtro de gusto: las
+  // reglas de Firestore dejan leer una sala si es pública o si estás en ella,
+  // y una consulta que PODRÍA traer una sala ajena la rechazan entera. Por
+  // eso el filtro va en la consulta y no después, en el navegador.
   const consulta = query(
     collection(db, "rooms"),
+    where("jugadores", "array-contains", miUid),
     where("estado", "==", ESTADOS_SALA.ESPERANDO),
   );
 
@@ -507,12 +512,8 @@ function arrancarSalas() {
 
       const salas = snap.docs
         .map((d) => d.data())
-        // Las salas de revancha no se ofrecen a quien no jugó esa partida.
-        // Si YA estoy adentro sí aparece, que es como se vuelve tras un
-        // corte de conexión.
-        .filter((s) => s.listada !== false || (s.jugadores ?? []).includes(miUid))
-        // Las llenas se muestran igual —para saber que existen— pero las mías
-        // van primero: si me cayó la conexión, lo que quiero es volver.
+        // Antes se filtraban acá las revanchas ajenas (`listada: false`).
+        // Ya no llegan: la consulta sólo trae salas en las que estoy.
         .sort((a, b) => {
           const miaA = (a.jugadores ?? []).includes(miUid) ? 0 : 1;
           const miaB = (b.jugadores ?? []).includes(miUid) ? 0 : 1;

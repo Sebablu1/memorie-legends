@@ -222,9 +222,9 @@ const FIREBASE_CON_SALAS = `
   export async function updateDoc() {}
   export const arrayUnion = (x) => x;
   export const arrayRemove = (x) => x;
-  export const collection = (...a) => a;
-  export const query = (c) => c;
-  export const where = () => ({});
+  export const collection = (db, nombre) => ({ nombre });
+  export const query = (c, ...filtros) => ({ ...c, filtros });
+  export const where = (campo, op, valor) => ({ campo, op, valor });
   export const orderBy = () => ({});
   export const limit = () => ({});
   export async function getDocs() { return { docs: [], forEach() {} }; }
@@ -237,9 +237,19 @@ const FIREBASE_CON_SALAS = `
   // mismo tick en que se lo registra. Llamándolo en el acto, el tablero
   // todavía no había terminado de cargar su módulo y \`filaDeSala\` se
   // encontraba con constantes sin inicializar.
+  //
+  // Y FILTRA, como el real: lo que devuelve es lo que la consulta pidió, no
+  // todo. Cada consulta queda anotada en \`window.__consultas\` para ver qué
+  // se pidió.
   export const onSnapshot = (ref, alRecibir) => {
+    const filtros = ref?.filtros ?? [];
+    (window.__consultas ??= []).push({ coleccion: ref?.nombre, filtros });
+    const cumple = (s) => filtros.every(({ campo, op, valor }) =>
+      op === "==" ? s[campo] === valor
+      : op === "array-contains" ? (s[campo] ?? []).includes(valor)
+      : true);
     setTimeout(() => {
-      const salas = window.__salas ?? [];
+      const salas = (window.__salas ?? []).filter(cumple);
       alRecibir({ docs: salas.map((s) => ({ data: () => s })) });
     }, 0);
     return () => {};
@@ -248,10 +258,13 @@ const FIREBASE_CON_SALAS = `
 
 test("una sala privada propia se lista como privada, sin su identificador", async ({ page }) => {
   /**
-   * La tabla le muestra a cada uno las salas en las que YA está, aunque no
-   * estén listadas: así se vuelve después de un corte. Una privada propia
-   * aparece por eso — y aparecía con su identificador bajo «Código», que no
-   * sirve para entrar y que cualquiera podía copiar y pasar.
+   * La tabla le muestra a cada uno las salas en las que YA está: así se
+   * vuelve después de un corte. Una privada propia aparece por eso — y
+   * aparecía con su identificador bajo «Código», que no sirve para entrar y
+   * que cualquiera podía copiar y pasar.
+   *
+   * Desde el Bloque 2 el tablero pide SÓLO las salas propias, así que la
+   * pública ajena tampoco aparece: las públicas se ofrecen en el lobby.
    */
   await page.addInitScript(() => {
     window.__salas = [
@@ -270,13 +283,52 @@ test("una sala privada propia se lista como privada, sin su identificador", asyn
   await elegirModo(page, "modoLeyendas");
 
   const filas = page.locator("#filasSalas tr");
-  await expect(filas).toHaveCount(2);
+  await expect(filas).toHaveCount(1);
 
   const tabla = await page.locator("#filasSalas").innerText();
-  expect(tabla, "la pública se ve con su código").toContain("PUB234");
+  expect(tabla, "una sala ajena se coló en el tablero").not.toContain("PUB234");
   expect(tabla, "la privada propia se ve como privada").toMatch(/privada/i);
   expect(tabla, "el identificador de la privada quedó a la vista").not.toContain("MESCME");
   expect(tabla, "una privada ajena se coló en la tabla").not.toContain("AJENA9");
+});
+
+test("el tablero le pide a Firestore sólo las salas propias", async ({ page }) => {
+  /**
+   * Las reglas dejan leer una sala si es pública o si estás en ella, y una
+   * consulta que PODRÍA traer una sala ajena la rechazan entera. Antes el
+   * tablero pedía todas las salas en espera y filtraba después: con las
+   * reglas nuevas esa consulta falla y la tabla queda vacía para siempre.
+   *
+   * Se mira la consulta misma —qué filtros lleva— y lo que termina en la
+   * tabla con un Firestore de mentira que filtra como el real.
+   */
+  await page.addInitScript(() => {
+    window.__salas = [
+      { codigo: "MIA234", estado: "esperando", entrada: 10, jugadores: ["uid-de-prueba", "otro"] },
+      { codigo: "PUB234", estado: "esperando", entrada: 10, publica: true, jugadores: ["otro"] },
+      { codigo: "PRV234", estado: "esperando", entrada: 10, jugadores: ["otro"] },
+      { codigo: "JUG234", estado: "jugando", entrada: 10, jugadores: ["uid-de-prueba"] },
+    ];
+  });
+  await page.route("**/js/firebase.js", (r) =>
+    r.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body: FIREBASE_CON_SALAS }),
+  );
+  await abrirTablero(page);
+  await elegirModo(page, "modoLeyendas");
+
+  const deSalas = await page.evaluate(() => (window.__consultas ?? []).filter((c) => c.coleccion === "rooms"));
+  expect(deSalas.length, "el tablero no escuchó las salas").toBeGreaterThan(0);
+  for (const { filtros } of deSalas) {
+    expect(filtros, "la consulta no se limita a las salas propias").toContainEqual(
+      { campo: "jugadores", op: "array-contains", valor: "uid-de-prueba" },
+    );
+    expect(filtros).toContainEqual({ campo: "estado", op: "==", valor: "esperando" });
+  }
+
+  await expect(page.locator("#filasSalas tr")).toHaveCount(1);
+  const tabla = await page.locator("#filasSalas").innerText();
+  expect(tabla).toContain("MIA234");
+  for (const ajena of ["PUB234", "PRV234", "JUG234"]) expect(tabla).not.toContain(ajena);
 });
 
 test("la casilla de sala privada es una casilla, no una barra", async ({ page }) => {

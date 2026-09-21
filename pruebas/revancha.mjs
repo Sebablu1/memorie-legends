@@ -211,19 +211,19 @@ console.log("\n=== La revancha no se le ofrece a quien no jugó ===");
   const cuerpo = cuerpoDe(lee("../functions/index.js"), "revanchaDeSala");
   ok(/listada: false/.test(cuerpo), "la sala de revancha nace fuera de la lista");
 
-  for (const pantalla of ["dashboard", "lobby"]) {
-    const fuente = lee(`../public/js/${pantalla}.js`);
-    ok(/s\.listada !== false/.test(fuente), `${pantalla} la saltea`);
-  }
+  // El lobby pide las públicas —una revancha nunca lo es— y además descarta
+  // las no listadas.
+  ok(/s\.listada !== false/.test(lee("../public/js/lobby.js")), "lobby la saltea");
 
-  // Pero el que YA está adentro tiene que verla igual: es como se vuelve a
-  // una sala después de un corte de conexión.
-  ok(
-    /s\.listada !== false \|\| \(s\.jugadores \?\? \[\]\)\.includes\(miUid\)/.test(
-      lee("../public/js/dashboard.js"),
-    ),
-    "salvo para quien ya está en ella, que necesita poder volver",
-  );
+  // El tablero ya no la filtra en el navegador: desde el Bloque 2 le pide a
+  // Firestore SÓLO las salas en las que está sentado. Una revancha ajena no
+  // llega nunca —las reglas ni siquiera dejan leerla—, y la propia llega
+  // siempre, que es como se vuelve a una sala después de un corte.
+  const tablero = lee("../public/js/dashboard.js");
+  ok(/where\("jugadores",\s*"array-contains",\s*miUid\)/.test(tablero),
+     "dashboard la saltea: sólo pide las salas en las que ya está");
+  ok(!/where\("listada"/.test(tablero),
+     "y por eso quien ya está en ella la ve, que necesita poder volver");
 }
 
 console.log("\n=== El techo de ritmo está declarado ===");

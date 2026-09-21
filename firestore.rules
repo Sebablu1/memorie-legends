@@ -115,8 +115,25 @@ service cloud.firestore {
     //
     // Antes el navegador escribía acá directamente, y eso permitía cambiar
     // el estado de la sala, sumarse sin pagar o iniciar la partida ajena.
+    //
+    // Y LEER: una sala se lee si es pública o si estás sentado en ella.
+    //
+    // Antes la leía cualquiera con sesión, y una sala privada lleva los
+    // nombres de quienes la juegan. Ahora, además, una CONSULTA tiene que
+    // pedir sólo lo que esta regla deja ver —Firestore la rechaza entera si
+    // podría traer una sala ajena—, así que el navegador pregunta de una de
+    // dos maneras: "las públicas" (`publica == true`) o "las mías"
+    // (`jugadores array-contains` mi uid). Una sala que no existe también se
+    // niega: Firestore no dice si existe antes de ver quién pregunta.
+    //
+    // Las salas anteriores al campo `publica` no lo tienen, y leerlo da error;
+    // `||` tolera ese error si el otro lado es verdadero, así que se siguen
+    // leyendo por el lado de "estoy sentado". Lo comprueba
+    // `herramientas/probar-reglas.mjs` contra el motor de reglas de Google.
     match /rooms/{salaId} {
-      allow read: if autenticado();
+      allow read: if autenticado()
+        && (resource.data.publica == true
+            || request.auth.uid in resource.data.jugadores);
       allow write: if false;
     }
 

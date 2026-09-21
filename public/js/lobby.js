@@ -175,7 +175,13 @@ $("btnUnirse").addEventListener("click", async () => {
 let dejarDeEscucharSalas = null;
 
 function escucharSalas() {
-  const consulta = query(collection(db, "rooms"), where("estado", "==", ESTADOS_SALA.ESPERANDO));
+  // Sólo las públicas: las reglas de Firestore no dejan leer una sala privada
+  // ajena, y una consulta que pudiera traer alguna la rechazan entera.
+  const consulta = query(
+    collection(db, "rooms"),
+    where("publica", "==", true),
+    where("estado", "==", ESTADOS_SALA.ESPERANDO),
+  );
 
   dejarDeEscucharSalas = onSnapshot(
     consulta,

@@ -4989,7 +4989,21 @@ async function entrarDesdeSala() {
   const sesion = await exigirSesion();
   if (!sesion) return; // exigirSesion ya redirigió al login
 
-  const snap = await getDoc(doc(db, "rooms", salaPedida));
+  // Las reglas no dejan leer una sala privada en la que no estás, y tampoco
+  // una que no existe: Firestore no dice si existe antes de ver quién
+  // pregunta. Las dos llegan como `permission-denied`, así que el mensaje
+  // cubre las dos. Sin el `try`, la mesa se quedaba en blanco.
+  let snap;
+  try {
+    snap = await getDoc(doc(db, "rooms", salaPedida));
+  } catch (error) {
+    volverAlLobby(
+      error?.code === "permission-denied"
+        ? "No estás en esa sala, o ya no existe."
+        : "No pudimos leer la sala. Probá de nuevo en un momento.",
+    );
+    return;
+  }
   if (!snap.exists()) {
     volverAlLobby(`No encontramos la sala ${salaPedida}.`);
     return;

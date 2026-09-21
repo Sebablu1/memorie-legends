@@ -24,6 +24,8 @@ const codigo = (new URLSearchParams(location.search).get("code") ?? "")
 /** Deja de escuchar la sala; se llama al salir o al irse a la mesa. */
 let dejarDeEscuchar = null;
 let yaRedirigido = false;
+/** Pedí salir: un rechazo de la escucha desde acá es la salida, no un error. */
+let saliendo = false;
 /** Última foto de la sala, para que los botones no dependan del texto. */
 let salaActual = null;
 let miUid = null;
@@ -159,6 +161,16 @@ function arrancar({ usuario, perfil }) {
       pintar(snap.data(), usuario.uid);
     },
     (error) => {
+      // Saliendo, el servidor me saca de `jugadores` y desde ese momento las
+      // reglas ya no me dejan leer la sala: la escucha falla. No es un error,
+      // es la salida funcionando, y la redirección está en camino.
+      if (saliendo) return;
+      // Una sala privada en la que no estoy, o una que no existe: Firestore
+      // niega las dos igual, sin decir cuál es.
+      if (error?.code === "permission-denied") {
+        mostrarFinal("🔒", "No podés ver esta sala", "Es privada y no estás en ella, o ya no existe.");
+        return;
+      }
       console.error("No se pudo escuchar la sala:", error);
       mostrarFinal("⚠️", "No pudimos leer la sala", "Probá de nuevo en un momento.");
     },
@@ -387,12 +399,17 @@ $("btnConfirmarSalida").addEventListener("click", async () => {
   const boton = $("btnConfirmarSalida");
   boton.disabled = true;
   boton.textContent = "Saliendo…";
+  // ANTES de pedir la salida: la escucha puede enterarse de que ya no estoy
+  // antes de que vuelva esta llamada, y sin la marca mostraría un error un
+  // instante, justo antes de irse al tablero.
+  saliendo = true;
   try {
     await salirDeSalaEnEspera(codigo);
     if (dejarDeEscuchar) dejarDeEscuchar();
     localStorage.removeItem("roomCode");
     window.location.href = "dashboard.html";
   } catch (error) {
+    saliendo = false;
     boton.disabled = false;
     boton.textContent = "Salir de la sala";
     $("textoModal").textContent =
