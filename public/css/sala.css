@@ -63,6 +63,19 @@
 
 .codigo-caja .btn-plata { padding: 9px 20px; font-size: 0.82rem; }
 
+/* La sala privada: un candado en vez de un identificador que no abre nada,
+   y una línea que dice quién tiene el código de verdad. */
+.codigo-caja .codigo.privada { letter-spacing: 0; }
+
+.nota-codigo {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--texto-tenue);
+  text-align: center;
+}
+
 /* --- datos --- */
 
 .datos-sala {

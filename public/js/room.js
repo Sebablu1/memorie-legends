@@ -216,7 +216,7 @@ function pintar(sala, uid) {
   const todosListos = jugadores.length > 0 && jugadores.every((j) => listos.has(j));
 
   $("tituloSala").textContent = sala.nombre ?? "Sala";
-  $("codigoSala").textContent = sala.codigo ?? codigo;
+  pintarCodigo(sala, soyCreador);
   $("entradaSala").textContent = `${sala.entrada} Leyendas`;
   $("pozoSala").textContent = `${sala.entrada * jugadores.length} Leyendas`;
   // Con cuántos puntos se queda afuera. Se ve ANTES de marcarse listo: una
@@ -399,6 +399,32 @@ $("btnConfirmarSalida").addEventListener("click", async () => {
       error instanceof ErrorDeServidor ? error.message : "No pudimos procesar la salida.";
   }
 });
+
+/**
+ * La caja del código: el de una sala normal, o el aviso de una privada.
+ *
+ * En una privada el identificador de la sala NO es el código para entrar.
+ * El código de invitación se mostró una sola vez, al crearla, y no está
+ * guardado en ninguna parte —el servidor tiene su hash—, así que acá no hay
+ * nada que copiar: lo que hay es un identificador que no abre la puerta. Se
+ * esconde con su botón, y se explica quién tiene el código de verdad.
+ */
+function pintarCodigo(sala, soyCreador) {
+  const privada = Boolean(sala.privada);
+
+  $("codigoRotulo").textContent = privada ? "Sala privada" : "Código de sala";
+  $("codigoSala").textContent = privada ? "🔒" : (sala.codigo ?? codigo);
+  $("codigoSala").classList.toggle("privada", privada);
+  $("btnCopiar").hidden = privada;
+
+  const nota = $("notaCodigo");
+  nota.hidden = !privada;
+  nota.textContent = !privada
+    ? ""
+    : soyCreador
+      ? "Invitá a los demás con el código que te mostramos al crearla. No se guarda en ningún lado."
+      : "Se entra con el código de invitación. Si alguien quiere sumarse, que se lo pida a quien la abrió.";
+}
 
 // --- reportar a alguien ---
 

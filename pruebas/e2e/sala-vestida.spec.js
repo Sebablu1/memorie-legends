@@ -312,6 +312,39 @@ test("una sala del formato viejo sigue dibujándose", async ({ page }) => {
   expect(errores, `la sala tiró errores: ${errores.join(" | ")}`).toEqual([]);
 });
 
+test("una sala privada no muestra su identificador como si fuera un código", async ({ page }) => {
+  /**
+   * El identificador de una privada NO sirve para entrar: el servidor pide el
+   * código de invitación, que se mostró una sola vez al crearla y no está
+   * guardado en ningún lado.
+   *
+   * Se mostraba igual, bajo «Código de sala» y con un botón de copiar. Quien
+   * lo copiaba y se lo pasaba a un amigo le pasaba algo que no abre nada.
+   */
+  await abrirSala(page, { ...salaCon([SIN_NADA]), codigo: "MESCME", privada: true,
+                          jugadores: ["ana"], jugadoresNombres: ["Ana"] });
+
+  await expect(page.locator("#codigoSala")).not.toContainText("MESCME");
+  await expect(page.locator("#codigoRotulo")).toHaveText(/privada/i);
+  await expect(page.locator("#btnCopiar"), "no hay nada que copiar").toBeHidden();
+
+  // Ana la creó: la nota le dice que el código es el que se le mostró.
+  const nota = page.locator("#notaCodigo");
+  await expect(nota).toBeVisible();
+  await expect(nota).toContainText(/te mostramos al crearla/i);
+
+  // Y el identificador no quedó en ningún texto de la página.
+  const texto = await page.locator("body").innerText();
+  expect(texto, "el identificador de la sala privada quedó a la vista").not.toContain("MESCME");
+});
+
+test("una sala normal sigue mostrando su código, con su botón", async ({ page }) => {
+  await abrirSala(page, salaCon([SIN_NADA, SIN_NADA, SIN_NADA, SIN_NADA]));
+  await expect(page.locator("#codigoSala")).toHaveText("ABC234");
+  await expect(page.locator("#btnCopiar")).toBeVisible();
+  await expect(page.locator("#notaCodigo")).toBeHidden();
+});
+
 test("sin nada comprado, la sala se ve como siempre", async ({ page }) => {
   const errores = await abrirSala(page, salaCon([SIN_NADA, SIN_NADA, SIN_NADA, SIN_NADA]));
 

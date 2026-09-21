@@ -449,8 +449,22 @@ function filaDeSala(sala) {
     return td;
   };
 
+  /**
+   * Una sala privada NO muestra su identificador en la columna «Código».
+   *
+   * El identificador de una privada no sirve para entrar —el servidor pide el
+   * código de invitación, que es otra cosa y no está guardado en ningún
+   * lado—. Mostrarlo bajo el título «Código» invita a copiarlo y pasárselo a
+   * un amigo, que lo escribe y se encuentra con «esta sala es privada».
+   *
+   * Sólo le aparece a quien ya está adentro —ver el filtro de `listada` más
+   * abajo—, y le aparece para poder volver. «Volver» sigue usando el
+   * identificador por dentro, que es para lo que sirve.
+   */
+  const rotulo = sala.privada ? "🔒 Privada" : (sala.codigo ?? "—");
+
   fila.append(
-    celda(sala.codigo ?? "—", "celda-codigo"),
+    celda(rotulo, sala.privada ? "celda-codigo privada" : "celda-codigo"),
     celda(`${ocupados}/${MAX_JUGADORES}`),
     celda(`${sala.entrada ?? 0}`),
     celda(estoyDentro ? "Ya estás" : (ETIQUETA_ESTADO[sala.estado] ?? sala.estado ?? "—")),

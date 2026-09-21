@@ -81,9 +81,12 @@
           <h1 class="titulo-pagina" id="tituloSala">Sala</h1>
 
           <div class="codigo-caja">
-            <span class="codigo-rotulo">Código de sala</span>
+            <span class="codigo-rotulo" id="codigoRotulo">Código de sala</span>
             <strong class="codigo" id="codigoSala" aria-label="Código de la sala">——————</strong>
             <button class="btn-plata" id="btnCopiar" type="button">Copiar código</button>
+            <!-- Sólo en una sala privada: ahí el identificador no sirve para
+                 entrar y no se muestra. Lo llena `pintarCodigo`. -->
+            <p class="nota-codigo" id="notaCodigo" hidden></p>
           </div>
 
           <div class="datos-sala">

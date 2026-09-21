@@ -194,6 +194,102 @@ test("seis caracteres entran por una puerta y ocho por la otra", async ({ page }
   expect(page.url(), "el código privado terminó en la URL").not.toContain("K7M2PQRS");
 });
 
+/**
+ * Un `firebase.js` de mentira que le entrega al tablero la lista de salas.
+ *
+ * Exporta todo lo que exporta el real —un `import` con nombre de algo que no
+ * existe rompe el módulo entero al enlazarlo— y `onSnapshot` contesta con
+ * `window.__salas`, que pone cada prueba.
+ */
+const FIREBASE_CON_SALAS = `
+  export const app = {};
+  export const auth = { currentUser: { uid: "uid-de-prueba" } };
+  export const googleProvider = {};
+  export const SUPPORT_EMAIL = "soporte@example.com";
+  export async function createUserWithEmailAndPassword() { return { user: {} }; }
+  export async function signInWithEmailAndPassword() { return { user: {} }; }
+  export function onAuthStateChanged(a, fn) { setTimeout(() => fn({ uid: "uid-de-prueba" }), 0); return () => {}; }
+  export async function signOut() {}
+  export async function sendPasswordResetEmail() {}
+  export const GoogleAuthProvider = class {};
+  export async function signInWithPopup() { return { user: {} }; }
+  export const db = {};
+  export const funciones = {};
+  export function httpsCallable() { return async () => ({ data: {} }); }
+  export const doc = (...a) => a;
+  export async function getDoc() { return { exists: () => false, data: () => undefined }; }
+  export async function setDoc() {}
+  export async function updateDoc() {}
+  export const arrayUnion = (x) => x;
+  export const arrayRemove = (x) => x;
+  export const collection = (...a) => a;
+  export const query = (c) => c;
+  export const where = () => ({});
+  export const orderBy = () => ({});
+  export const limit = () => ({});
+  export async function getDocs() { return { docs: [], forEach() {} }; }
+  export async function deleteDoc() {}
+  export async function addDoc() { return {}; }
+  export const serverTimestamp = () => null;
+  export const increment = (n) => n;
+  export async function runTransaction(f) { return f({}); }
+  // Contesta DESPUÉS, como el real: Firestore nunca llama al oyente en el
+  // mismo tick en que se lo registra. Llamándolo en el acto, el tablero
+  // todavía no había terminado de cargar su módulo y \`filaDeSala\` se
+  // encontraba con constantes sin inicializar.
+  export const onSnapshot = (ref, alRecibir) => {
+    setTimeout(() => {
+      const salas = window.__salas ?? [];
+      alRecibir({ docs: salas.map((s) => ({ data: () => s })) });
+    }, 0);
+    return () => {};
+  };
+`;
+
+test("una sala privada propia se lista como privada, sin su identificador", async ({ page }) => {
+  /**
+   * La tabla le muestra a cada uno las salas en las que YA está, aunque no
+   * estén listadas: así se vuelve después de un corte. Una privada propia
+   * aparece por eso — y aparecía con su identificador bajo «Código», que no
+   * sirve para entrar y que cualquiera podía copiar y pasar.
+   */
+  await page.addInitScript(() => {
+    window.__salas = [
+      { codigo: "PUB234", estado: "esperando", entrada: 10, jugadores: ["otro"] },
+      { codigo: "MESCME", estado: "esperando", entrada: 10, privada: true, listada: false,
+        jugadores: ["uid-de-prueba"] },
+      // Y una privada AJENA, que no tiene por qué aparecer.
+      { codigo: "AJENA9", estado: "esperando", entrada: 10, privada: true, listada: false,
+        jugadores: ["otro"] },
+    ];
+  });
+  await page.route("**/js/firebase.js", (r) =>
+    r.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body: FIREBASE_CON_SALAS }),
+  );
+  await abrirTablero(page);
+  await elegirModo(page, "modoLeyendas");
+
+  const filas = page.locator("#filasSalas tr");
+  await expect(filas).toHaveCount(2);
+
+  const tabla = await page.locator("#filasSalas").innerText();
+  expect(tabla, "la pública se ve con su código").toContain("PUB234");
+  expect(tabla, "la privada propia se ve como privada").toMatch(/privada/i);
+  expect(tabla, "el identificador de la privada quedó a la vista").not.toContain("MESCME");
+  expect(tabla, "una privada ajena se coló en la tabla").not.toContain("AJENA9");
+});
+
+test("la casilla de sala privada es una casilla, no una barra", async ({ page }) => {
+  // La regla general de \`input\` le ponía relleno y fondo de campo de texto,
+  // y en el teléfono se veía como una barra oscura con un cuadradito.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await abrirTablero(page);
+  await elegirModo(page, "modoLeyendas");
+  const caja = await page.locator("#salaPrivada").boundingBox();
+  expect(caja.width, "la casilla se estiró").toBeLessThanOrEqual(26);
+  expect(caja.height).toBeLessThanOrEqual(26);
+});
+
 test("los módulos cargan: ningún import roto", async ({ page }) => {
   const errores = await abrirTablero(page);
   await page.waitForTimeout(1500);
