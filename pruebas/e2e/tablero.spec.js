@@ -95,7 +95,8 @@ const SERVIDOR_FALSO = `
   };
   export const crearSalaPrivada = async (entrada, nombre, limitePuntos) => {
     window.__llamadas.push(["crearSalaPrivada", entrada, limitePuntos]);
-    return { sala: "SAL001", codigo: "K7M2PQRS" };
+    // Como el real: el vencimiento es una hora del reloj, no una duración.
+    return { sala: "SAL001", codigo: "K7M2PQRS", vence: Date.now() + 30 * 60_000 };
   };
   export const unirseASala = async (codigo) => {
     window.__llamadas.push(["unirseASala", codigo]);
@@ -147,17 +148,22 @@ async function tableroConServidorFalso(page) {
 test("la sala privada muestra su código, y el código no va en la URL", async ({ page }) => {
   await tableroConServidorFalso(page);
 
-  await expect(page.locator("#salaPrivada")).toHaveCount(1);
+  // No hay nada que elegir: desde el tablero, toda sala es privada.
+  await expect(page.locator("#salaPrivada"), "volvió la casilla de sala privada").toHaveCount(0);
+  await expect(page.locator("#ayudaPrivada")).toHaveText(
+    "Se creará una sala privada. Compartí el código con quien quieras invitar.",
+  );
 
-  await page.locator("#salaPrivada").check();
   await page.locator("#btnCrearSala").click();
 
   const caja = page.locator("#codigoPrivado");
   await expect(caja).toBeVisible();
-  await expect(page.locator("#codigoPrivadoTexto")).toHaveText("K7M2PQRS");
-  await expect(caja).toContainText(/no se muestra otra vez/i);
+  // En dos grupos, para leerlo y dictarlo.
+  await expect(page.locator("#codigoPrivadoTexto")).toHaveText("K7M2 PQRS");
+  await expect(caja).toContainText("Copiá este código ahora. No se vuelve a mostrar.");
 
-  // Lo que se llamó, y lo que NO: una sala privada no pasa por `crearSala`.
+  // Lo que se llamó, y lo que NO: el tablero ya no pasa por `crearSala`, que
+  // es de la administración.
   const llamadas = await page.evaluate(() => window.__llamadas);
   expect(llamadas.map((l) => l[0])).toEqual(["crearSalaPrivada"]);
 
@@ -169,9 +175,99 @@ test("la sala privada muestra su código, y el código no va en la URL", async (
   expect(guardado, "el código quedó guardado en el navegador").not.toContain("K7M2PQRS");
 
   // Al entrar, lo que viaja es el identificador de la sala.
-  await page.locator("#btnEntrarPrivada").click();
+  await page.locator("#btnYaLoCopie").click();
   await expect.poll(() => page.url()).toContain("SAL001");
   expect(page.url()).not.toContain("K7M2PQRS");
+});
+
+/** El cartel del código, abierto con el portapapeles y el «compartir» anotados. */
+async function abrirElCartel(page, { conCompartir = false } = {}) {
+  await page.addInitScript((compartir) => {
+    window.__copiado = null;
+    window.__compartido = null;
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async (texto) => { window.__copiado = texto; } },
+    });
+    if (compartir) navigator.share = async (datos) => { window.__compartido = datos; };
+    else delete Navigator.prototype.share;
+  }, conCompartir);
+  await tableroConServidorFalso(page);
+  await page.locator("#btnCrearSala").click();
+  await expect(page.locator("#codigoPrivado")).toBeVisible();
+}
+
+const MENSAJE =
+  "Te invito a jugar Memorie Legends conmigo. Entrá a https://memorielegends.com/lobby.html " +
+  "y usá el código K7M2PQRS para unirte a mi sala privada.";
+
+test("el cartel dice cuánto vale el código, y se copia sin el espacio", async ({ page }) => {
+  await abrirElCartel(page);
+
+  // Los minutos salen del vencimiento que manda el servidor, no de un número
+  // escrito en el tablero.
+  await expect(page.locator("#vigenciaCodigo")).toHaveText("Vale 30 minutos.");
+
+  // Se copia sin el espacio: el campo para entrar acepta ocho caracteres.
+  await page.locator("#btnCopiarCodigoPrivado").click();
+  await expect(page.locator("#btnCopiarCodigoPrivado")).toHaveText("¡Copiado!");
+  expect(await page.evaluate(() => window.__copiado)).toBe("K7M2PQRS");
+});
+
+test("compartir por WhatsApp lleva el mensaje exacto, con el logo oficial", async ({ page }) => {
+  await abrirElCartel(page);
+
+  const enlace = page.locator("#enlaceWhatsApp");
+  await expect(enlace).toHaveAttribute("href", `https://wa.me/?text=${encodeURIComponent(MENSAJE)}`);
+  await expect(enlace).toHaveAttribute("target", "_blank");
+  await expect(enlace).toHaveAttribute("rel", /noopener/);
+  await expect(enlace).toContainText("Compartir por WhatsApp");
+  // Como se VE, no como está escrito: los botones van en mayúsculas por CSS,
+  // y la marca pide «WhatsApp» exactamente así.
+  expect(await enlace.evaluate((a) => a.innerText.trim())).toBe("Compartir por WhatsApp");
+
+  // El logo: el archivo del kit, cargado, chico, y sin tomar el lugar de la
+  // palabra —por eso el `alt` vacío—.
+  const logo = enlace.locator("img");
+  await expect(logo).toHaveAttribute("src", "img/whatsapp/Digital_Glyph_Green_RGB_2026.svg");
+  await expect(logo).toHaveAttribute("alt", "");
+  const m = await logo.evaluate((img) => ({
+    cargo: img.complete && img.naturalWidth > 0,
+    ancho: img.getBoundingClientRect().width,
+    alto: img.getBoundingClientRect().height,
+  }));
+  expect(m.cargo, "el logo de WhatsApp no cargó").toBe(true);
+  expect(m.ancho).toBe(20);
+  expect(m.alto).toBe(20);
+
+  // El código sigue sin estar en ninguna dirección del sitio.
+  expect(page.url()).not.toContain("K7M2PQRS");
+});
+
+test("«Compartir…» aparece sólo donde el navegador sabe compartir", async ({ page }) => {
+  await abrirElCartel(page);
+  await expect(page.locator("#btnCompartirCodigo")).toBeHidden();
+});
+
+test("y donde sabe, comparte el mismo mensaje", async ({ page }) => {
+  await abrirElCartel(page, { conCompartir: true });
+  const boton = page.locator("#btnCompartirCodigo");
+  await expect(boton).toBeVisible();
+  await boton.click();
+  expect(await page.evaluate(() => window.__compartido)).toEqual({ text: MENSAJE });
+});
+
+test("«Mis salas» vacía invita a crear una privada", async ({ page }) => {
+  await page.addInitScript(() => { window.__salas = []; });
+  await page.route("**/js/firebase.js", (r) =>
+    r.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body: FIREBASE_CON_SALAS }),
+  );
+  await abrirTablero(page);
+  await elegirModo(page, "modoLeyendas");
+  await expect(page.locator(".panel-salas h2")).toHaveText("🏠 Mis salas");
+  await expect(page.locator("#salasVacias")).toHaveText(
+    "No estás en ninguna sala. Creá una privada y compartí el código.",
+  );
 });
 
 test("seis caracteres entran por una puerta y ocho por la otra", async ({ page }) => {
@@ -331,17 +427,6 @@ test("el tablero le pide a Firestore sólo las salas propias", async ({ page }) 
   for (const ajena of ["PUB234", "PRV234", "JUG234"]) expect(tabla).not.toContain(ajena);
 });
 
-test("la casilla de sala privada es una casilla, no una barra", async ({ page }) => {
-  // La regla general de \`input\` le ponía relleno y fondo de campo de texto,
-  // y en el teléfono se veía como una barra oscura con un cuadradito.
-  await page.setViewportSize({ width: 390, height: 844 });
-  await abrirTablero(page);
-  await elegirModo(page, "modoLeyendas");
-  const caja = await page.locator("#salaPrivada").boundingBox();
-  expect(caja.width, "la casilla se estiró").toBeLessThanOrEqual(26);
-  expect(caja.height).toBeLessThanOrEqual(26);
-});
-
 test("los módulos cargan: ningún import roto", async ({ page }) => {
   const errores = await abrirTablero(page);
   await page.waitForTimeout(1500);
@@ -491,10 +576,16 @@ test("el modo se puede elegir con el teclado", async ({ page }) => {
   await expect(page.locator("#panelLeyendas")).toBeVisible();
 });
 
-test("el tablero no ofrece el lobby viejo por ningún lado", async ({ page }) => {
+test("el tablero lleva al lobby, donde están las mesas públicas", async ({ page }) => {
+  // Hubo un tiempo en que el lobby se había dado de baja y esta prueba exigía
+  // lo contrario. Desde el rediseño, el tablero crea sólo salas privadas y las
+  // públicas se juegan desde el lobby: el tablero tiene que llevar ahí.
   await abrirTablero(page);
-  const alLobby = await page.locator('a[href*="lobby"]').count();
-  expect(alLobby, "el tablero no debe enlazar a lobby.html").toBe(0);
+  await elegirModo(page, "modoLeyendas");
+  const boton = page.locator("a.enlace-ir-lobby");
+  await expect(boton).toBeVisible();
+  await expect(boton).toHaveText("Ir al lobby");
+  await expect(boton).toHaveAttribute("href", "lobby.html");
 });
 
 // =====================================================================

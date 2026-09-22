@@ -250,16 +250,12 @@
           </label>
           <p class="ayuda-entrada" id="ayudaEntrada"></p>
 
-          <!-- Sala privada: no aparece en la lista y se entra con un código
-               que el servidor no guarda en claro. La casilla va acá y no en
-               otro panel porque lo demás —entrada y duración— es lo mismo. -->
-          <label class="campo-casilla" for="salaPrivada">
-            <input type="checkbox" id="salaPrivada" />
-            <span>
-              <b>Sala privada</b>
-              <small>No se lista. Se entra con un código que se muestra una sola vez.</small>
-            </span>
-          </label>
+          <!-- Desde el tablero se crean sólo salas privadas: las públicas las
+               abre la administración y se juegan desde el lobby. Por eso no hay
+               casilla: no hay nada que elegir. -->
+          <p class="ayuda-privada" id="ayudaPrivada">
+            Se creará una sala privada. Compartí el código con quien quieras invitar.
+          </p>
 
           <button class="accion grande" id="btnCrearSala" type="button">Crear sala</button>
 
@@ -286,19 +282,40 @@
 
           <!-- El código de una sala privada, la única vez que se puede ver.
                Aparece recién cuando el servidor lo devuelve: no existe en el
-               HTML hasta entonces, y no vuelve a existir después. -->
+               HTML hasta entonces, y no vuelve a existir después. No va en
+               ninguna dirección del sitio ni se guarda en el navegador; la base
+               tiene sólo su resumen. -->
           <div class="codigo-privado" id="codigoPrivado" hidden>
             <p class="titulo-codigo">Tu sala privada está abierta</p>
             <p class="codigo-grande" id="codigoPrivadoTexto">········</p>
-            <p class="aviso-codigo">
-              Copialo y pasáselo a quien quieras invitar. <b>No se muestra otra vez</b>:
-              no lo guardamos en ninguna parte.
-            </p>
+            <p class="aviso-codigo"><b>Copiá este código ahora. No se vuelve a mostrar.</b></p>
+            <p class="vigencia-codigo" id="vigenciaCodigo" hidden></p>
             <div class="botonera-codigo">
-              <button class="accion sobria" id="btnCopiarCodigoPrivado" type="button">
-                Copiar código
+              <button class="accion sobria" id="btnCopiarCodigoPrivado" type="button">Copiar</button>
+              <!-- El logo es el archivo oficial del kit de marca de WhatsApp,
+                   sin tocar: verde, chico y al lado de la palabra, nunca en su
+                   lugar. `pruebas/sitio.mjs` compara su huella con la del
+                   archivo del kit. -->
+              <a
+                class="accion sobria boton-whatsapp"
+                id="enlaceWhatsApp"
+                href="https://wa.me/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <img
+                  src="img/whatsapp/Digital_Glyph_Green_RGB_2026.svg"
+                  alt=""
+                  width="20"
+                  height="20"
+                />
+                <span>Compartir por WhatsApp</span>
+              </a>
+              <!-- Sólo donde el navegador sabe compartir: sobre todo, teléfonos. -->
+              <button class="accion sobria" id="btnCompartirCodigo" type="button" hidden>
+                Compartir…
               </button>
-              <button class="accion" id="btnEntrarPrivada" type="button">Entrar a la sala</button>
+              <button class="accion" id="btnYaLoCopie" type="button">Ya lo copié</button>
             </div>
           </div>
         </div>
@@ -307,11 +324,13 @@
       <div class="aviso-salas" id="mensaje" role="status" aria-live="polite"></div>
 
       <section class="panel panel-salas">
-        <h2>🏠 Mis salas / Salas activas</h2>
+        <h2>🏠 Mis salas</h2>
         <p class="nota-salas">
-          Las salas esperando jugadores, en vivo. Si ya estás en una, te la marcamos
-          para que puedas volver.
+          Las salas en las que estás, esperando jugadores, en vivo: desde acá se
+          vuelve a una si se cortó la conexión. Las mesas públicas están en el
+          <a class="enlace-lobby" href="lobby.html">lobby</a>.
         </p>
+        <a class="accion sobria enlace-ir-lobby" href="lobby.html">Ir al lobby</a>
 
         <!-- Oculta hasta que llegue la primera respuesta: una cabecera de tabla
              sola, encima de un "buscando…", parece que algo se rompió. -->

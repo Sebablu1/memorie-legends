@@ -13,6 +13,7 @@
  *  10. La portada dice qué es el juego: título, descripción, <h1> y datos estructurados.
  *  11. El sitemap tiene las páginas públicas y el robots no se las prohíbe.
  *  12. Cada página tiene título, descripción, canónica y Open Graph, sin repetir.
+ *  13. El logo de WhatsApp es el del kit de marca, sin tocar, y se usa como pide.
  *
  * Nada de esto rompe una prueba del navegador cuando falla. Un `src` mal
  * escrito no tira ningún error de JavaScript: deja un hueco donde iba la marca,
@@ -456,6 +457,36 @@ console.log("\n=== 12. Cada página con sus metadatos ===");
   const repetidos = (m) => [...m.entries()].filter(([, ps]) => ps.length > 1);
   ok(repetidos(titulos).length === 0, "ningún título repetido", repetidos(titulos));
   ok(repetidos(descripciones).length === 0, "ninguna descripción repetida", repetidos(descripciones));
+}
+
+console.log("\n=== 13. El logo de WhatsApp, tal cual lo entrega su kit de marca ===");
+{
+  // `Digital_Glyph_Green_RGB_2026.svg`, del paquete oficial del centro de marca
+  // de Meta (whatsappbrand.com), bajado el 21/9/2026. Las normas del kit no
+  // dejan modificarlo —ni el dibujo ni el color— ni usar otro. La huella lo
+  // ata byte por byte: si alguien lo retoca, esto falla.
+  const HUELLA = "f7b1311db718533e671645f57cd94b92f0e006e61d7e6581a80675fc5a478fc4";
+  const ruta = join(PUBLIC, "img", "whatsapp", "Digital_Glyph_Green_RGB_2026.svg");
+  const { createHash } = await import("node:crypto");
+  const huella = existsSync(ruta) ? createHash("sha256").update(readFileSync(ruta)).digest("hex") : null;
+  ok(huella === HUELLA, "el archivo es el del kit, sin tocar", huella);
+
+  // Donde se use: chico, con `alt` vacío y con la palabra al lado. Las normas
+  // piden no usar el logo en lugar de la palabra «WhatsApp».
+  const usos = [];
+  for (const [pagina, texto] of Object.entries(html)) {
+    for (const m of texto.matchAll(/<a\b[^>]*>(?:(?!<\/a>)[\s\S])*?img\/whatsapp\/[\s\S]*?<\/a>/g)) {
+      usos.push({ pagina: deRepo(pagina), bloque: m[0] });
+    }
+  }
+  ok(usos.length > 0, "se usa en el sitio", usos.map((u) => u.pagina));
+  for (const { pagina, bloque } of usos) {
+    const img = etiquetas(bloque, "img").find((i) => /img\/whatsapp\//.test(i.src ?? ""));
+    const texto = bloque.replace(/<[^>]+>/g, " ");
+    ok(img?.alt === "" && Number(img?.width) <= 24 && Number(img?.height) <= 24,
+       `${pagina}: el logo va chico y con alt vacío`, img?.crudo);
+    ok(/\bWhatsApp\b/.test(texto), `${pagina}: con la palabra «WhatsApp» al lado, bien escrita`);
+  }
 }
 
 // ────────────────────────────────────────────────────────────────────

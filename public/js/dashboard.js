@@ -1,9 +1,10 @@
 /**
  * El tablero: por dónde se entra a jugar.
  *
- * Absorbe lo que hacía el lobby —crear sala, entrar por código, ver las salas
- * abiertas— para que haya UNA sola puerta de entrada. `lobby.html` sigue en el
- * repositorio pero ya no se enlaza desde ninguna parte.
+ * Crea salas PRIVADAS —las públicas las abre la administración—, entra por
+ * código y lista las salas en las que ya estás, para volver después de un
+ * corte. Las mesas públicas y los torneos están en el lobby (`lobby.html`), al
+ * que se llega con «Ir al lobby».
  *
  * Las dos formas de jugar están separadas también acá:
  *
@@ -23,7 +24,7 @@ import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
 import { estadoMfa } from "./mfa.js";
 import { CORREO_ADMINISTRACION } from "./administracion.js";
 import {
-  crearSala, crearSalaPrivada, unirseASala, unirseConCodigo, ErrorDeServidor,
+  crearSalaPrivada, unirseASala, unirseConCodigo, ErrorDeServidor,
 } from "./servidor.js";
 import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/salas.js";
 // Sólo nombres y etiquetas: el cerebro de la IA (`reglas/ia.js`, diez mil
@@ -295,19 +296,14 @@ $("btnCrearSala").addEventListener("click", async () => {
   try {
     const duracion = Number($("duracionSala").value);
 
-    // La privada devuelve DOS cosas distintas: el identificador de la sala,
-    // con el que se abre su pantalla, y el código, que se muestra una vez y
-    // no vuelve a estar disponible en ninguna parte.
-    if ($("salaPrivada")?.checked) {
-      const { sala, codigo } = await crearSalaPrivada(
-        entrada, `Sala de ${nombreJugador}`, duracion,
-      );
-      mostrarCodigoPrivado(codigo, sala);
-      return;
-    }
-
-    const { codigo } = await crearSala(entrada, `Sala de ${nombreJugador}`, duracion);
-    irALaSala(codigo);
+    // Desde el tablero, siempre privada: las públicas las abre la
+    // administración. Devuelve TRES cosas: el identificador de la sala, con el
+    // que se abre su pantalla; el código, que se muestra una vez y no vuelve a
+    // estar disponible en ninguna parte; y hasta cuándo vale.
+    const { sala, codigo, vence } = await crearSalaPrivada(
+      entrada, `Sala de ${nombreJugador}`, duracion,
+    );
+    mostrarCodigoPrivado(codigo, sala, vence);
   } catch (error) {
     avisar(error instanceof ErrorDeServidor ? error.message : "No pudimos crear la sala.", "error");
     boton.disabled = false;
@@ -319,13 +315,27 @@ $("btnCrearSala").addEventListener("click", async () => {
 const LARGO_CODIGO_PRIVADO = 8;
 
 /**
+ * El mensaje para invitar. El código va SIN el espacio con que se lo muestra:
+ * el campo donde se escribe acepta ocho caracteres, y pegado con el espacio
+ * se perdería la última letra.
+ */
+const mensajeDeInvitacion = (codigo) =>
+  "Te invito a jugar Memorie Legends conmigo. Entrá a https://memorielegends.com/lobby.html " +
+  `y usá el código ${codigo} para unirte a mi sala privada.`;
+
+/** «ABCD EFGH»: en dos grupos se lee y se dicta mejor. Sólo para mostrar. */
+const agrupado = (codigo) => codigo.replace(/^(.{4})(.+)$/, "$1 $2");
+
+/**
  * El código de una sala privada, mostrado la única vez que se puede.
  *
  * No está guardado en claro en ninguna parte: si se cierra esta ventana sin
  * copiarlo, la única salida es abrir otra sala. Por eso el aviso, y por eso
- * el botón de entrar está DESPUÉS del de copiar.
+ * el botón para seguir —«Ya lo copié»— está DESPUÉS de los de copiar y
+ * compartir. El código no va en ninguna dirección del sitio ni se guarda en el
+ * navegador: viaja sólo dentro del mensaje que la persona decide mandar.
  */
-function mostrarCodigoPrivado(codigo, sala) {
+function mostrarCodigoPrivado(codigo, sala, vence) {
   const caja = $("codigoPrivado");
   if (!caja) {
     // Sin la ventana —un HTML viejo en caché— igual no se pierde la sala.
@@ -333,7 +343,25 @@ function mostrarCodigoPrivado(codigo, sala) {
     return;
   }
 
-  $("codigoPrivadoTexto").textContent = codigo;
+  $("codigoPrivadoTexto").textContent = agrupado(codigo);
+
+  // Cuánto vale, según el servidor: el número no se escribe acá.
+  const minutos = Math.round((Number(vence) - Date.now()) / 60_000);
+  const vigencia = $("vigenciaCodigo");
+  if (Number.isFinite(minutos) && minutos > 0) {
+    vigencia.textContent = `Vale ${minutos} ${minutos === 1 ? "minuto" : "minutos"}.`;
+    vigencia.hidden = false;
+  }
+
+  const mensaje = mensajeDeInvitacion(codigo);
+  $("enlaceWhatsApp").href = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+
+  if (typeof navigator.share === "function") {
+    const compartir = $("btnCompartirCodigo");
+    compartir.hidden = false;
+    compartir.onclick = () => navigator.share({ text: mensaje }).catch(() => {});
+  }
+
   caja.hidden = false;
 
   $("btnCopiarCodigoPrivado").onclick = async () => {
@@ -344,7 +372,7 @@ function mostrarCodigoPrivado(codigo, sala) {
       $("btnCopiarCodigoPrivado").textContent = "Copialo a mano";
     }
   };
-  $("btnEntrarPrivada").onclick = () => irALaSala(sala);
+  $("btnYaLoCopie").onclick = () => irALaSala(sala);
 }
 
 // ------------------------------------------------------ entrar por código
@@ -524,7 +552,7 @@ function arrancarSalas() {
 
       const hay = salas.length > 0;
       vacias.hidden = hay;
-      if (!hay) vacias.textContent = "No hay salas esperando. Creá una y pasale el código a alguien.";
+      if (!hay) vacias.textContent = "No estás en ninguna sala. Creá una privada y compartí el código.";
       $("filasSalas").closest(".tabla-salas-caja").hidden = !hay;
     },
     (error) => {
