@@ -25,24 +25,6 @@
   filter: drop-shadow(0 0 22px rgba(212, 168, 67, 0.4));
 }
 
-/* El <h1> que lo envuelve no aporta nada visual: existe para que la página
-   tenga encabezado. Se le sacan los estilos de texto, que sin texto sólo
-   agregarían espacio en blanco. */
-.titulo-portada {
-  margin: 0;
-  font-size: 0;
-  line-height: 0;
-}
-
-.portada h1 {
-  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
-  font-size: clamp(2.1rem, 6vw, 3.4rem);
-  line-height: 1.1;
-  color: var(--oro);
-  letter-spacing: 1px;
-  margin-bottom: 10px;
-}
-
 .portada .lema {
   /* Respaldo medido para MAYÚSCULAS: este texto va en versalitas y con la
      proporción de minúsculas se partía en una línea de más mientras Inter
@@ -53,6 +35,10 @@
   letter-spacing: 2px;
   text-transform: uppercase;
   margin-bottom: 22px;
+  /* El lema es el <h1> de la portada —el título que lee un buscador— pero se
+     ve como cuando era un párrafo: sin la negrita que un <h1> trae por su
+     cuenta. El margen de arriba ya lo saca la regla `*` de app.css. */
+  font-weight: inherit;
 }
 
 .portada .entrada {

@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /dashboard.html
+Disallow: /cuenta.html
+
+Sitemap: https://memorielegends.com/sitemap.xml

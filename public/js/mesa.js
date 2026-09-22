@@ -3013,8 +3013,16 @@ function abrirModalPoder() {
   const descripciones = INSTRUCCIONES_PODER;
 
   const soloPropias = tipo === "mirarPropia";
-  const grupos = estado.jugadores
-    .map((jugador, i) => {
+  // Los rivales arriba y tus cartas abajo. En el orden de los asientos tus
+  // cartas quedaban arriba, porque en el entrenamiento sos siempre el 0; así
+  // no depende del asiento. Sólo se nota en el 9 y el 10, los que muestran
+  // las dos cosas. Esta ventana es sólo del entrenamiento: en red el objetivo
+  // se elige sobre la mesa. La carta elegida se identifica por el índice del
+  // jugador, no por su lugar en la ventana.
+  const orden = [...estado.jugadores.keys()].sort((a, b) => (a === YO) - (b === YO));
+  const grupos = orden
+    .map((i) => {
+      const jugador = estado.jugadores[i];
       if (jugador.eliminado) return "";
       if (soloPropias && i !== YO) return "";
       if (tipo === "mirarRival" && i === YO) return "";

@@ -10,6 +10,9 @@
  *   7. Cada página se declara con su dirección canónica, sin www.
  *   8. Las tipografías salen del sitio, no de Google, y no se precargan.
  *   9. Cada fuente servida desde el sitio lleva su licencia al lado.
+ *  10. La portada dice qué es el juego: título, descripción, <h1> y datos estructurados.
+ *  11. El sitemap tiene las páginas públicas y el robots no se las prohíbe.
+ *  12. Cada página tiene título, descripción, canónica y Open Graph, sin repetir.
  *
  * Nada de esto rompe una prueba del navegador cuando falla. Un `src` mal
  * escrito no tira ningún error de JavaScript: deja un hueco donde iba la marca,
@@ -125,6 +128,17 @@ console.log("\n=== 2. Toda <img> reserva su lugar ===");
     }
   }
   ok(sinMedidas.length === 0, "todas tienen width y height en números", sinMedidas);
+
+  // Y todas dicen qué son. `alt=""` vale —la moneda de la barra es decorativa:
+  // el nombre está escrito al lado—, pero tiene que estar puesto: sin el
+  // atributo, un lector de pantalla lee el nombre del archivo.
+  const sinAlt = [];
+  for (const [pagina, texto] of Object.entries(html)) {
+    for (const img of etiquetas(texto, "img")) {
+      if (img.alt === undefined) sinAlt.push(`${deRepo(pagina)}: ${img.crudo.slice(0, 90)}`);
+    }
+  }
+  ok(sinAlt.length === 0, "todas tienen alt", sinAlt);
 }
 
 console.log("\n=== 3. Las precargas piden lo mismo que la imagen ===");
@@ -328,6 +342,120 @@ console.log("\n=== 9. Cada fuente con su licencia ===");
     const familia = f.split("-")[0];
     ok(existsSync(join(PUBLIC, "fonts", `OFL-${familia}.txt`)), `${f}: con su licencia OFL al lado`);
   }
+}
+
+console.log("\n=== 10. Lo que lee un buscador en la portada ===");
+{
+  const indice = html[join(PUBLIC, "index.html")];
+  const DESCRIPCION =
+    "Memorie Legends: juego de cartas online con baraja española legendaria. Memoria, habilidad y estrategia contra la IA o con amigos. Registrate gratis y jugá.";
+
+  ok(indice.includes("<title>Memorie Legends — Juego de cartas online con baraja española legendaria</title>"),
+     "el título");
+  const descripciones = [
+    etiquetas(indice, "meta").find((m) => m.name === "description")?.content,
+    etiquetas(indice, "meta").find((m) => m.property === "og:description")?.content,
+    etiquetas(indice, "meta").find((m) => m.name === "twitter:description")?.content,
+  ];
+  ok(descripciones.every((d) => d === DESCRIPCION),
+     "la descripción, la misma para buscadores, Open Graph y Twitter", descripciones);
+
+  // Sin los comentarios: el que explica el cambio nombra el <h1>.
+  const h1 = [...indice.replace(/<!--[\s\S]*?-->/g, "").matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)];
+  ok(h1.length === 1, "un solo <h1>", h1.length);
+  ok(h1[0]?.[1].trim() === "Memoria, habilidad y estrategia con baraja española legendaria",
+     "y es el lema, en texto", h1[0]?.[1]);
+  const logo = etiquetas(indice, "img").find((i) => /portada-logo/.test(i.class ?? ""));
+  ok(logo?.alt === "Memorie Legends", "el escudo dice el nombre del juego", logo?.alt);
+
+  // Los datos estructurados: JSON válido, y que no digan otra cosa que la página.
+  const bloque = indice.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)?.[1];
+  let datos = null;
+  try { datos = JSON.parse(bloque); } catch {}
+  ok(datos !== null, "los datos estructurados son JSON válido");
+  const de = (tipo) => datos?.["@graph"]?.find((n) => n["@type"] === tipo);
+  const sitio = de("WebSite");
+  const juego = de("VideoGame");
+  ok(datos?.["@context"] === "https://schema.org", "con el vocabulario de schema.org");
+  ok(sitio?.name === "Memorie Legends" && sitio?.url === `${SITIO}/` && sitio?.inLanguage === "es-AR"
+     && sitio?.description === DESCRIPCION, "el sitio: nombre, dirección, idioma y descripción", sitio);
+  ok(juego?.name === "Memorie Legends" && juego?.url === `${SITIO}/` && juego?.inLanguage === "es-AR"
+     && juego?.description === DESCRIPCION && juego?.gamePlatform === "Web Browser"
+     && juego?.applicationCategory === "Game"
+     && ["Memory", "Strategy", "Card Game"].every((g) => juego?.genre?.includes(g)),
+     "el juego: nombre, plataforma, categoría, géneros, idioma y descripción", juego);
+  ok(existsSync(join(PUBLIC, (juego?.image ?? "").replace(`${SITIO}/`, ""))),
+     "y su imagen existe", juego?.image);
+}
+
+console.log("\n=== 11. El sitemap y el robots ===");
+{
+  // Las que piden sesión: un buscador que llega termina en la pantalla de
+  // ingreso. La 404 y el panel, tampoco.
+  const PRIVADAS = ["dashboard.html", "cuenta.html", "room.html", "lobby.html", "mesa.html",
+                    "ranking.html", "tienda.html", "404.html", "admin/index.html"];
+  const canonicaDe = (p) => etiquetas(html[p], "link").find((l) => l.rel === "canonical")?.href;
+  const publicas = PAGINAS.filter((p) => !PRIVADAS.includes(relative(PUBLIC, p).replaceAll("\\", "/")));
+
+  const mapa = leer(join(PUBLIC, "sitemap.xml"));
+  const urls = [...mapa.matchAll(/<url>([\s\S]*?)<\/url>/g)].map((m) => m[1]);
+  const locs = urls.map((u) => u.match(/<loc>([^<]+)<\/loc>/)?.[1]);
+  ok(mapa.includes('xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"'), "el sitemap declara su formato");
+  ok(urls.every((u) => /<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/.test(u) && /<changefreq>\w+<\/changefreq>/.test(u)
+     && /<priority>(0\.\d|1\.0)<\/priority>/.test(u)), "cada dirección con lastmod, changefreq y priority");
+
+  const esperadas = publicas.map(canonicaDe).sort();
+  ok(JSON.stringify([...locs].sort()) === JSON.stringify(esperadas),
+     "están todas las páginas públicas, con su canónica, y ninguna otra", { sitemap: locs, publicas: esperadas });
+
+  // Que ninguna página del sitemap pida sesión: la lista de arriba se podría
+  // quedar vieja el día que una página nueva la pida.
+  const conSesion = publicas.filter((p) =>
+    etiquetas(html[p], "script").some((s) => {
+      if (!s.src || !esLocal(s.src)) return false;
+      const archivo = enDisco(s.src, p);
+      return existsSync(archivo) && /await exigirSesion\(/.test(leer(archivo));
+    }),
+  ).map(deRepo);
+  ok(conSesion.length === 0, "ninguna página del sitemap pide sesión", conSesion);
+
+  const robots = leer(join(PUBLIC, "robots.txt")).split(/\r?\n/).map((l) => l.trim());
+  for (const linea of ["User-agent: *", "Allow: /", "Disallow: /admin/", "Disallow: /dashboard.html",
+                       "Disallow: /cuenta.html", "Sitemap: https://memorielegends.com/sitemap.xml"]) {
+    ok(robots.includes(linea), `robots.txt: ${linea}`);
+  }
+  const prohibidas = robots.filter((l) => l.startsWith("Disallow:")).map((l) => l.slice(9).trim());
+  const bloqueadas = locs.filter((u) => prohibidas.some((d) => new URL(u).pathname.startsWith(d)));
+  ok(bloqueadas.length === 0, "y no le prohíbe a nadie una página del sitemap", bloqueadas);
+}
+
+console.log("\n=== 12. Cada página con sus metadatos ===");
+{
+  const titulos = new Map();
+  const descripciones = new Map();
+  for (const pagina of PAGINAS) {
+    const nombre = relative(PUBLIC, pagina).replaceAll("\\", "/");
+    // La 404 es la de Firebase (PENDIENTE §16) y el panel no se indexa.
+    if (nombre === "404.html" || nombre.startsWith("admin/")) continue;
+    const texto = html[pagina];
+    const meta = etiquetas(texto, "meta");
+    const titulo = texto.match(/<title>([^<]*)<\/title>/)?.[1];
+    const descripcion = meta.find((m) => m.name === "description")?.content;
+    const faltan = [
+      !titulo && "title",
+      !descripcion && "description",
+      !etiquetas(texto, "link").some((l) => l.rel === "canonical") && "canonical",
+      !meta.some((m) => m.property === "og:title" && m.content) && "og:title",
+      !meta.some((m) => m.property === "og:description" && m.content) && "og:description",
+      !meta.some((m) => m.property === "og:image" && m.content) && "og:image",
+    ].filter(Boolean);
+    ok(faltan.length === 0, `${nombre}: título, descripción, canónica y Open Graph`, faltan);
+    titulos.set(titulo, [...(titulos.get(titulo) ?? []), nombre]);
+    descripciones.set(descripcion, [...(descripciones.get(descripcion) ?? []), nombre]);
+  }
+  const repetidos = (m) => [...m.entries()].filter(([, ps]) => ps.length > 1);
+  ok(repetidos(titulos).length === 0, "ningún título repetido", repetidos(titulos));
+  ok(repetidos(descripciones).length === 0, "ninguna descripción repetida", repetidos(descripciones));
 }
 
 // ────────────────────────────────────────────────────────────────────
