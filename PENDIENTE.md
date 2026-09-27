@@ -4,11 +4,23 @@ Lo que está esperando algo — a Meta, a un banco, a una decisión, o a una
 próxima sesión. Cada punto dice **qué falta**, **de quién depende** y **cómo se
 sabe que se resolvió**.
 
-Última revisión: 13 de septiembre de 2026.
+Última revisión: 27 de septiembre de 2026.
 
 ---
 
-## 0. Dónde quedó la sesión del 13 de septiembre
+## 0. Registro histórico — la sesión del 13 de septiembre
+
+> **Esto es un registro de aquel día, no un estado actual.** Se conserva
+> porque explica por qué los packs están como están, pero tres de sus
+> afirmaciones dejaron de ser ciertas. Verificado el 27 de septiembre:
+>
+> | Decía | Hoy |
+> |---|---|
+> | «Nada desplegado» | Se desplegó todo el 27/09: hosting, las 81 funciones y las reglas |
+> | «La suite quedó cortada en 77 de 253» | Corrió entera: **429 pasadas** |
+> | «Élite y ML hay que sembrarlos y apagarlos» | Hecho: los 5 packs están sembrados y esos dos, retirados (ver §3b) |
+>
+> Lo de abajo queda tal como se escribió aquel día.
 
 ### Lo que quedó hecho
 
@@ -34,49 +46,9 @@ sabe que se resolvió**.
   título al lado del nombre, escapado.
 - **Órdenes huérfanas**: el token se comprueba antes de escribir la orden.
 
-### Lo que falta
+### Lo que faltaba aquel día, y ya está
 
-- **Marco y título en la sala de espera** (~1–1,5 h). El dato ya está en la
-  sala; lo que falta es que la sala dibuje un avatar, porque hoy muestra una
-  inicial en un círculo.
-- **Marco y título en el ranking** (~2–3 h **más una decisión**). La tabla no
-  tiene avatares y la fila no tiene cosméticos; habría que escribirlos desde el
-  servidor en el cierre, lo que los **congela** hasta la próxima partida. Esa
-  decisión merece su propia sesión.
-
-### ⚠️ La suite de navegador no se completó
-
-Quedó cortada en **77 de 253**, sin ningún fallo hasta ahí. **Node sí pasó
-entero: 52/52.**
-
-Antes de desplegar hay que correrla completa y sola:
-
-```bash
-npx playwright test
-```
-
-Y sola de verdad: nada de Node en paralelo, que la mesa usa temporizadores
-reales y `workers: 1`.
-
-### ⚠️ Élite y ML hay que sembrarlos y apagarlos, en ese orden
-
-Se decidió no vender esos dos packs hasta que lo visual esté completo. **No
-alcanza con apagarlos**: la colección está vacía en producción, así que el
-panel muestra los cinco del código con el cartel «⚠️ Estos son los del código,
-no los de la base», y ahí el botón *Retirar* no hace nada.
-
-El orden es:
-
-1. `/admin/` → **Sembrar catálogo** — trae los 12 artículos exclusivos. Sin
-   ellos, guardar un pack que los promete se rechaza.
-2. `/admin/` → **Sembrar paquetes** — escribe los cinco. No pisa lo que ya esté.
-3. Recién ahí, **Retirar** el Élite y el ML.
-
-### Nada desplegado
-
-Este trabajo está sólo en `main`. No se desplegó hosting, ni functions, ni
-reglas.
-
+Marco y título en la sala de espera y en el ranking. Se hizo: ver §3d.
 ---
 
 ## 1. WhatsApp Business — en revisión por Meta
@@ -88,75 +60,57 @@ aprobada en el panel de WhatsApp Business.
 
 ---
 
-## 2. Secretos de Mercado Pago — esperando app estable
+## 2. Los pagos están listos, y la venta apagada a propósito
 
-**Estado:** los dos secretos **no existen** en el proyecto de Firebase.
-Decisión tomada: no se cargan todavía, para probar la app completa sin pagos
-primero.
+**Estado, verificado el 27 de septiembre:** el servidor puede cobrar. Lo que
+falta no es técnico.
 
-**Consecuencia mientras tanto — los pagos están caídos:**
-
-| Función | Qué hace hoy |
+| Qué | Estado |
 |---|---|
-| `crearOrdenDeCompra` | responde «Los pagos todavía no están habilitados» |
-| `webhookPago` | contesta HTTP 500 «Sin configurar» a cada aviso |
+| `MP_ACCESS_TOKEN` | existe desde el 14/09 (versión 3) |
+| `MP_WEBHOOK_SECRET` | existe desde el 14/09 |
+| `MP_PUBLIC_KEY` | existe desde el 14/09 |
+| `crearOrdenDeCompra` | desplegada el 27/09, recibe los dos secretos |
+| `webhookPago` | desplegada el 27/09, recibe los dos secretos |
 
-El 500 es deliberado: hace que Mercado Pago reintente en vez de dar el aviso
-por entregado y perder el pago. Pero MP reintenta con espera creciente y por
-una ventana limitada, así que **no es una red de seguridad indefinida**.
+La prueba que esta misma sección proponía ya da el resultado de «resuelto»:
 
-**Qué hay que hacer cuando se decida activarlos:**
-
-```bash
-npx firebase functions:secrets:set MP_ACCESS_TOKEN
 ```
-
-```bash
-npx firebase functions:secrets:set MP_WEBHOOK_SECRET
-```
-
-```bash
-npx firebase deploy --only functions
-```
-
-Ese despliegue está pendiente desde el 10 de septiembre: falló por estos
-secretos y sólo entraron seis funciones a mano (`avanzarPartida`,
-`cerrarPartida`, `barrerPartidas` y los tres cierres de ranking). **Las dos
-funciones de pago siguen con código viejo**, o sea que el webhook del Pack
-Élite todavía escribe `comprador-elite` en `users/{uid}.insignias`. Es inocuo
-—nadie lee ese campo— pero es lo último que falta del cambio de insignias.
-
-**Cómo se sabe que se resolvió:**
-
-```bash
 curl -s -X POST https://us-central1-memorie-legends.cloudfunctions.net/webhookPago -H "Content-Type: application/json" -d "{}"
 ```
 
-Tiene que contestar **`Firma inválida`** (401). Si dice `Sin configurar` (500),
-los secretos siguen sin llegar al runtime.
+Contesta **`Firma inválida`** (401). Cuando faltaban los secretos contestaba
+`Sin configurar` (500).
 
-### ⚠️ El panel no manda sobre el precio todavía
+### La venta está apagada, y es una decisión de negocio
 
-**Hasta que se carguen los secretos de MP, el checkout sigue con la lista vieja
-de packs. No cambiar precios esperando que tengan efecto.**
+`SOLO_ADMIN_COMPRA = true`, en `functions/index.js`. Con eso, `listarPacks`
+devuelve `compra.habilitada` en `false` para cualquiera que no sea
+administrador, y los botones de la tienda nacen apagados y no se encienden.
+**Sólo la cuenta de administración puede probar compras.**
 
-El motivo: `crearOrdenDeCompra` es la que lee el pack para cobrar, y en el
-cambio del 13 de septiembre pasó a leerlo de Firestore en vez del código. Pero
-esa función **declara los secretos de MP**, así que no se puede desplegar —
-quedó con el código anterior, que usa la constante.
+**No es un estado transitorio ni una tarea pendiente: es hasta que el juego
+esté completo.** Vender antes sería cobrar por algo que todavía se está
+armando.
 
-Hoy no tiene consecuencia real, porque esa función no cobra nada: contesta «los
-pagos todavía no están habilitados». Pero significa que editar un precio desde
-el panel **no cambia lo que se cobraría**. Se arregla solo con el
-`firebase deploy --only functions` completo de más arriba.
+**No habilitar sin una decisión explícita del dueño del sitio.** El día que se
+decida, es cambiar esa constante y desplegar las funciones — nada más. Por eso
+conviene que quede escrito acá: la facilidad del cambio es justamente el
+riesgo.
 
-**Y después, conciliar `ordenes`:** las que quedaron en `pendiente` **con**
-`transaccionId` son pagos reales sin acreditar y hay que resolverlas a mano.
-Las que están en `pendiente` **sin** `transaccionId` son intentos que nunca
-llegaron a MP y se pueden descartar. Desde el 13 de septiembre ya no se crean
-órdenes nuevas cuando faltan las credenciales, así que la basura tiene fecha de
-corte.
+### Lo que sí quedó resuelto de las notas viejas
 
+- **El panel ya manda sobre el precio.** La advertencia anterior decía que no,
+  porque `crearOrdenDeCompra` no se podía desplegar. Se desplegó el 27/09.
+- **Las órdenes viejas no esconden ningún pago.** Hay 7, todas en `pendiente`
+  y **ninguna con `transaccionId`**: según el criterio de esta misma sección,
+  son intentos que nunca llegaron a Mercado Pago y se pueden descartar. No hay
+  ningún pago real sin acreditar.
+- **El webhook ya no escribe insignias con el código viejo**, así que lo de §5
+  quedó sin efecto.
+
+**Lo que falta para cobrar de verdad:** §3, la cuenta bancaria, que bloquea
+retirar el dinero, no cobrarlo.
 ---
 
 ## 3. Cuenta bancaria de Mercado Pago — pendiente
@@ -168,21 +122,20 @@ Mercado Pago y admite transferencias.
 
 ---
 
-## 3b. Sembrar los paquetes en producción
+## ~~3b. Sembrar los paquetes en producción~~  ✅ HECHO
 
-**Estado:** los cinco packs nuevos están en el código, pero la colección
-`tienda/packs/items` está vacía en producción.
+Verificado en producción el 27 de septiembre:
 
-Mientras esté vacía la tienda funciona igual —cae a la semilla del código— y
-el panel lo dice con todas las letras. Pero **no se pueden editar** hasta que
-existan: editar algo que no está guardado no hace nada.
+- **`tienda/packs/items`: los cinco.** `basico`, `popular` y `premium`
+  activos; `elite` y `ml` **retirados**, que era el orden que pedía la nota.
+- **`catalogo`: 41 artículos**, con los **12 exclusivos** de los packs
+  presentes. Sin ellos el panel habría rechazado guardar un pack que los
+  promete, así que su presencia es la prueba de que la siembra corrió entera.
 
-**Qué hacer:** `/admin/` → *Sembrar paquetes*. No pisa lo que ya esté.
+El panel ya manda: los packs se pueden editar porque existen en la base, y no
+se cae a la semilla del código.
 
-Y antes o después, `/admin/` → *Sembrar catálogo*, que ahora también trae los
-12 artículos exclusivos de los packs. Sin ellos, guardar un pack desde el
-panel se rechaza: el servidor comprueba que lo que promete exista.
-
+Queda abierto lo visual de esos 12 artículos, que es §3c.
 ---
 
 ## 3c. Arte de los 12 artículos exclusivos
@@ -242,27 +195,18 @@ dos o tres diseños más.
 
 ---
 
-## 5. Limpiar datos viejos en los perfiles
+## ~~5. Limpiar datos viejos en los perfiles~~  ✅ SIN NADA QUE HACER
 
-**Estado:** sin hacer. No molesta a nadie, pero confunde.
+Contado en producción el 27 de septiembre: **0 de 24 perfiles** tienen el
+array `users/{uid}.insignias`. No hay nada que limpiar.
 
-**Qué hay:** el array `users/{uid}.insignias` puede tener escritos `dorada`,
-`plateada`, `bronce`, `top10` o `comprador-elite`. Son de los dos sistemas de
-insignias que no se hablaban, y ninguno de esos cinco ids existió nunca en el
-catálogo.
+La nota decía que había que esperar a desplegar las funciones completas,
+porque el webhook viejo seguía agregando ids que no existían en el catálogo
+—`dorada`, `plateada`, `bronce`, `top10`, `comprador-elite`—. Ese despliegue
+se hizo el 27/09, así que la fuente está cortada y el recuento es cero.
 
-**Por qué no urge:** ninguna función ni ninguna pantalla lee ese campo. Lo que
-un jugador tiene vive en `users/{uid}/items/`, y eso es lo que mira
-`misInsignias`. El campo ya no se escribe más —salvo desde el webhook de pago,
-que sigue con código viejo (ver punto 2)— así que la lista está congelada.
-
-**Cuándo hacerlo:** después de desplegar functions completo. Antes no tiene
-sentido, porque el webhook viejo seguiría agregando.
-
-**Cómo:** un borrado de campo por perfil, `FieldValue.delete()` sobre
-`insignias`. No toca saldos ni posesiones. Conviene contar cuántos perfiles lo
-tienen antes de decidir si vale la pena.
-
+Si alguna vez vuelve a aparecer el campo, querría decir que algo lo escribe de
+nuevo, y eso sí sería un hallazgo.
 ---
 
 ## 6. Imágenes de build en GCR
