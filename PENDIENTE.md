@@ -811,6 +811,46 @@ estilo, y el arreglo es mover la validación adentro del cuerpo.
 
 ---
 
+## 24. PASO 7 PENDIENTE — sin esto, `rooms` queda permisiva en producción
+
+**Esto es un agujero abierto, no una mejora.** Mientras esta sección esté acá,
+cualquiera con una cuenta puede leer una sala privada ajena, con los nombres de
+quienes la juegan adentro.
+
+El despliegue del lobby nuevo va en dos partes, y la de en medio deja la puerta
+abierta a propósito:
+
+- **Parte A** (desplegada): agrega `juegos` y la ruta nueva de rankings, y
+  **afloja** `rooms` a `allow read: if autenticado()`. Hace falta aflojarla
+  porque el cliente viejo que todavía está servido hace consultas que la regla
+  apretada rechazaría enteras, y el lobby se quedaría sin mesas.
+- **Parte B** (LO QUE FALTA): desplegar `firestore.rules` tal como está en el
+  repositorio, que vuelve a apretar `rooms` a «pública o estoy sentado».
+
+Cómo saber en qué estado está, sin confiar en la memoria:
+
+```
+node herramientas/probar-reglas.mjs
+```
+
+Contra el archivo del repositorio tiene que dar **22 de 22**. Con la parte A
+desplegada, cuatro de esos casos dan lo contrario **en producción**: sala
+privada, revancha y vieja leídas por alguien ajeno, y una sala que no existe
+leída por alguien con sesión. Los cuatro pasan de `DENY` a `ALLOW`.
+
+Y el archivo del repositorio **no dice** con qué reglas corre producción: la
+parte A se escribe encima y no se commitea. Lo que corre es el release
+`cloud.firestore` de la API de Firebase Rules.
+
+Cuando la parte B esté desplegada: borrar esta sección y el cartel que está
+arriba del bloque `match /rooms/{salaId}` en `firestore.rules`.
+
+**Rollback**, si la parte B rompe algo: el ruleset anterior está guardado en
+`~/respaldos-memorie/`, y el ruleset previo sigue existiendo del lado del
+servidor, así que alcanza con volver a apuntar el release a su id.
+
+---
+
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del
