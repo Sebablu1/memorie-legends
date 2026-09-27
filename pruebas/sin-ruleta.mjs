@@ -115,7 +115,23 @@ for (const carpeta of CARPETAS) {
     const buscar =
       extname(ruta) === ".html" && ruta.includes("public") ? [...RASTROS, "ruleta"] : RASTROS;
 
+    /**
+     * El único rastro que se perdona, y sólo en un archivo.
+     *
+     * `herramientas/resetear-cuentas.mjs` nombra `lastSpin` para BORRARLO del
+     * perfil. Es el caso opuesto al que esta prueba busca: el campo aparece
+     * ahí para hacerlo desaparecer, y sin nombrarlo no hay con qué.
+     *
+     * Se perdona el rastro, no el archivo: si algún día apareciera
+     * `girarLaRuleta` ahí adentro, esto lo sigue cazando.
+     *
+     * Se saca de acá el día que ningún perfil tenga el campo. Hoy la cuenta de
+     * administración todavía lo lleva, porque el reset la excluye a propósito.
+     */
+    const perdonados = ruta.endsWith("resetear-cuentas.mjs") ? ["lastspin"] : [];
+
     for (const rastro of buscar) {
+      if (perdonados.includes(rastro)) continue;
       if (texto.includes(rastro)) {
         encontrados.push(`${ruta.slice(RAIZ.length)} → ${rastro}`);
         break;

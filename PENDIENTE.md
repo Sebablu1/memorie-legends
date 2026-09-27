@@ -833,6 +833,40 @@ El repositorio **no dice** con qué reglas corre producción. Lo que corre es el
 release `cloud.firestore` de la API de Firebase Rules. Hoy coinciden, pero
 durante un despliegue en dos partes no coinciden.
 
+---
+
+## 25. Las tres herramientas de cuentas no tienen suite
+
+`resetear-cuentas.mjs`, `borrar-perfiles-huerfanos.mjs` y
+`restaurar-users.mjs` no tienen prueba en `pruebas/`. Todas las demás
+herramientas que tocan datos sí: `migrar-rankings`, `migrar-saldos`,
+`sembrar-juegos`, `limpiar-perfiles` y `limpiar-rankings`.
+
+Se probaron el 27/09 con guiones de sabotaje en un scratchpad —22 barreras,
+todas frenando o pasando según correspondía— pero eso no lo corre `npm test`.
+O sea que si mañana alguien afloja una barrera, nadie se entera.
+
+Las que más importan, porque son las que impiden un desastre:
+
+- Ninguna escritura del reset toca a un excluido.
+- Si a un excluido le cambiaron el correo, se frena. No es hipotético: §24
+  dice que la cuenta de administración se va a mudar algún día.
+- Si la cantidad de cuentas o de huérfanos no es la esperada, se frena.
+- El borrado nunca toca a alguien con cuenta de Auth.
+- El barrido del libro mayor no toca a las excluidas ni a un asiento sin
+  `uid`.
+- El sello no se desequipa.
+
+**Está listo para escribirse:** las tres exportan sus funciones puras
+—`planDeReset`, `cambiosDe`, `planDeBorrado`, `planDeMovimientosSueltos`,
+`planDeRestauracion`—, que deciden sin tocar Firestore. Es el mismo patrón que
+`pruebas/migrar-rankings.mjs`: no hace falta emulador ni red.
+
+Y acordarse de `pruebas/suites-registradas.mjs`: una suite nueva que no entre
+en `npm test` es una suite que no existe.
+
+---
+
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del
