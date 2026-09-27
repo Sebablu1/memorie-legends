@@ -3,47 +3,344 @@
 
    Lo dibuja `js/sala-privada.js` y lo usan el tablero y el lobby: un solo
    cartel y una sola hoja, para que no haya dos que se desacomoden.
+
+   Es una VENTANA, y no un cartel dentro de la página, porque el código se
+   muestra una sola vez: mientras está a la vista nada puede taparlo. El
+   módulo apaga el resto del cuerpo con `inert` y lo muda al `<body>`; acá va
+   el velo y el metal.
    ============================================================ */
 
-/* El código, la única vez que se ve. Grande y en monoespaciada: se lee para
-   dictarlo por teléfono, y un 8 y una B no se pueden confundir. */
+/* El velo. Por encima del cajón del menú (90) y de su velo (80): el cajón
+   manda sobre la página, pero el código manda sobre todo.
+
+   Tocar el velo NO cierra —eso lo decide el módulo—: el toque de más en el
+   velo es el accidente típico, y acá cuesta el código. */
 .codigo-privado {
-  margin-top: 14px;
-  padding: 16px 14px;
-  border: 1px solid var(--oro-hondo);
-  border-radius: 14px;
-  background: rgba(212, 168, 67, 0.06);
-  text-align: center;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* El cartel es alto: en un teléfono apaisado se desliza dentro del velo en
+     vez de salirse de la pantalla. */
+  overflow-y: auto;
+  padding: 16px;
+  background: rgba(4, 4, 6, 0.84);
+  backdrop-filter: blur(3px);
 }
+
+/* `hidden` solo no alcanza contra el `display: flex` de arriba. */
+.codigo-privado[hidden] {
+  display: none;
+}
+
+body.con-cartel-abierto {
+  overflow: hidden;
+}
+
+/* ------------------------------------------------------- la carta
+
+   Marco doble —un filo grueso de oro por fuera y uno fino por dentro—, fondo
+   casi negro con una luz tibia arriba, y un halo dorado alrededor para
+   despegarla del velo. */
+.cartel-tarot {
+  position: relative;
+  /* 520 y no 440: con 440 el título se partía en dos también en pantalla
+     grande, y en la referencia va en un renglón. */
+  width: min(520px, 100%);
+  margin: auto;
+  padding: 30px 24px 24px;
+  text-align: center;
+  /* La banda dorada del marco: siete píxeles con degradado, no una línea.
+
+     El truco es el borde transparente con dos fondos: los oscuros se pintan
+     dentro del relleno (`padding-box`) y el degradado dorado ocupa la caja
+     entera (`border-box`), así que asoma justo por el anillo del borde. Es la
+     única manera de tener un borde con degradado que además respete el
+     redondeo. */
+  border: 7px solid transparent;
+  border-radius: 12px;
+  background:
+    radial-gradient(ellipse 120% 60% at 50% 0%, rgba(212, 168, 67, 0.12), transparent 70%) padding-box,
+    radial-gradient(ellipse 90% 50% at 50% 100%, rgba(184, 115, 51, 0.08), transparent 70%) padding-box,
+    linear-gradient(170deg, #12100c 0%, #0a0a08 55%, #070706 100%) padding-box,
+    linear-gradient(155deg, #f6e3a1 0%, #dbbd6a 22%, #8a6d2a 46%, #f0d060 62%, #bda05a 78%, #7c5a1e 100%) border-box;
+  box-shadow:
+    inset 0 0 0 1px rgba(240, 208, 96, 0.18),
+    0 30px 70px rgba(0, 0, 0, 0.7),
+    0 0 50px -12px rgba(212, 168, 67, 0.45);
+}
+
+/* El filo interior, el que hace el marco doble. Va en un pseudoelemento y no
+   en un segundo `box-shadow`: así se despega del borde y queda el aire de una
+   carta, no dos líneas pegadas. */
+.cartel-tarot::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgba(212, 168, 67, 0.45);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.cartel-tarot:focus-visible {
+  outline: none;
+}
+
+/* ------------------------------------------- los rizos de las esquinas
+
+   Un solo dibujo, cuatro veces, espejado con CSS: una carta lleva el mismo
+   adorno en las cuatro puntas, y cuatro dibujos distintos serían cuatro cosas
+   para mantener. */
+.cartel-tarot > .rizo {
+  position: absolute;
+  width: 52px;
+  height: 52px;
+  fill: none;
+  stroke: var(--oro);
+  stroke-width: 1.6;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.cartel-tarot > .rizo .tenue {
+  opacity: 0.45;
+}
+
+.cartel-tarot > .rizo circle {
+  fill: var(--oro);
+  stroke: none;
+}
+
+.cartel-tarot > .rizo:nth-of-type(1) { top: 9px; left: 9px; }
+.cartel-tarot > .rizo:nth-of-type(2) { top: 9px; right: 9px; transform: scaleX(-1); }
+.cartel-tarot > .rizo:nth-of-type(3) { bottom: 9px; left: 9px; transform: scaleY(-1); }
+.cartel-tarot > .rizo:nth-of-type(4) { bottom: 9px; right: 9px; transform: scale(-1); }
+
+/* --------------------------------------------------- la cruz de cerrar
+
+   Cierra y deja la página como estaba: la sala ya existe y queda listada en
+   «Mis salas». Lo que no vuelve es el código, y por eso el aviso está en
+   negrita dos líneas más abajo. */
+.cerrar-cartel {
+  position: absolute;
+  /* A la altura de la corona, como en la referencia: más arriba se cruzaba
+     con el rizo de su esquina. */
+  top: 24px;
+  right: 16px;
+  z-index: 1;
+  /* Área de toque de dedo, aunque el aspa se vea chica. */
+  min-width: 40px;
+  min-height: 40px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: none;
+  color: var(--oro);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s, transform 0.2s;
+}
+
+.cerrar-cartel:hover,
+.cerrar-cartel:focus-visible {
+  color: var(--oro-claro);
+  transform: scale(1.1);
+}
+
+/* ------------------------------------------------------- la corona
+
+   Arriba del título, entre dos líneas que se desvanecen. Los dos diamantes
+   van dentro del mismo dibujo: son parte del adorno, no elementos sueltos. */
+.corona {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 8px 10px;
+}
+
+.corona::before,
+.corona::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212, 168, 67, 0.55), transparent);
+}
+
+.corona svg {
+  width: 88px;
+  height: auto;
+  flex: none;
+  fill: var(--oro);
+  filter: drop-shadow(0 0 8px rgba(212, 168, 67, 0.45));
+}
+
+/* -------------------------------------------------------- el título */
 
 .codigo-privado .titulo-codigo {
-  font-size: 0.72rem;
+  margin: 0;
+  /* Playfair y no Cinzel: el Cinzel del sitio trae sólo las letras de MEMORIE
+     LEGENDS —son 1,8 KB a propósito— y acá hacen falta la T, la U, la A, la
+     P, la V, la B y la Á. */
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(1.05rem, 5vw, 1.5rem);
+  line-height: 1.25;
   text-transform: uppercase;
   letter-spacing: 1.6px;
-  color: var(--oro);
+  /* Si no entra en un renglón, dos parejos: sin esto quedaba «ABIERTA» sola
+     abajo, que se lee como otra cosa. */
+  text-wrap: balance;
+  background: linear-gradient(180deg, #fff3cd 0%, var(--oro-claro) 38%, var(--oro) 68%, var(--oro-hondo) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  /* El relieve va con `drop-shadow`: un `text-shadow` sobre un degradado
+     recortado a las letras se pinta encima y ensucia el dorado. */
+  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.8)) drop-shadow(0 0 14px rgba(240, 208, 96, 0.3));
 }
 
+/* --------------------------------------------- la placa del código
+
+   Dos cajas apiladas y recortadas con la misma forma: la de atrás dorada y la
+   de adelante, dos píxeles más chica, casi negra. Es la única manera de tener
+   un filo que siga a un `clip-path`: `border` no lo sigue. */
+.placa-codigo {
+  --corte: 14px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 3vw, 20px);
+  margin: 18px 0 14px;
+  padding: 16px 18px;
+  background: linear-gradient(180deg, var(--oro-claro) 0%, var(--oro) 45%, var(--oro-hondo) 100%);
+  clip-path: polygon(
+    0 var(--corte), var(--corte) 0,
+    calc(100% - var(--corte)) 0, 100% var(--corte),
+    100% calc(100% - var(--corte)), calc(100% - var(--corte)) 100%,
+    var(--corte) 100%, 0 calc(100% - var(--corte))
+  );
+  filter: drop-shadow(0 0 18px rgba(212, 168, 67, 0.35));
+}
+
+.placa-codigo::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  background: linear-gradient(180deg, #16140f, #0b0b09 60%, #080807);
+  clip-path: inherit;
+}
+
+.placa-codigo > * {
+  position: relative;
+}
+
+/* Los rombos, a los costados del código.
+
+   Antes era una estrella de cuatro puntas cóncava, y a doce píxeles se leía
+   como un signo «+». Un rombo parado —más alto que ancho— se lee como lo que
+   es a cualquier tamaño, y va con los ángulos de la placa. */
+.diamante {
+  width: 9px;
+  height: 16px;
+  flex: none;
+  background: linear-gradient(180deg, #fff3cd, var(--oro));
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+/* El código, la única vez que se ve.
+
+   En serif y grande, como el resto del metal del juego. La letra de máquina
+   era por si hay que dictarlo por teléfono, y eso ya está resuelto donde
+   corresponde: el alfabeto del servidor no tiene I, L, O, 0 ni 1, que son los
+   que se confunden al dictar. A este tamaño, un 8 y una B tampoco. */
 .codigo-grande {
-  margin: 8px 0;
-  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-  font-size: 1.7rem;
-  letter-spacing: 6px;
-  color: var(--oro-claro);
+  margin: 0;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(1.45rem, 7vw, 2.6rem);
+  line-height: 1.1;
+  letter-spacing: 2px;
+  /* Los números, a la altura de las mayúsculas. Playfair los dibuja por
+     omisión más bajos —«K7M2» quedaba con el 7 y el 2 a media altura— y en la
+     referencia miden lo mismo que las letras. */
+  font-variant-numeric: lining-nums tabular-nums;
+  /* En un solo renglón: partido en dos, la placa deja de ser una placa. El
+     tamaño se achica con la pantalla hasta que entre. */
+  white-space: nowrap;
+  background: linear-gradient(180deg, #fff6d8 0%, var(--oro-claro) 40%, var(--oro) 72%, #9d7a3a 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.85)) drop-shadow(0 0 16px rgba(240, 208, 96, 0.35));
   /* En dos grupos, «ABCD EFGH»: si no entra en un renglón, se parte en el
      espacio y no a la mitad de un grupo. */
   word-break: normal;
 }
 
-.codigo-privado .vigencia-codigo {
-  margin-top: 4px;
-  font-size: 0.74rem;
+/* ------------------------------------------------- el aviso y el reloj */
+
+/* El aviso va en dorado, como el resto de la carta. Medido contra el negro
+   del fondo: 8,9:1, muy por encima del 4,5:1 que pide la WCAG AA. */
+.codigo-privado .aviso-codigo {
+  margin: 0;
+  font-size: 0.86rem;
   color: var(--oro);
+  line-height: 1.5;
 }
 
-.codigo-privado .aviso-codigo {
-  font-size: 0.74rem;
-  color: var(--texto-tenue);
-  line-height: 1.6;
+.codigo-privado .aviso-codigo b {
+  color: var(--oro-claro);
+}
+
+/* La vigencia, entre dos líneas que se desvanecen, como la corona. El reloj
+   va AL LADO del texto y no adentro: `#vigenciaCodigo` dice exactamente
+   «Vale 30 minutos.», y una prueba lo compara tal cual. */
+.fila-reloj {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 12px 8px 0;
+  color: var(--oro);
+  font-size: 0.86rem;
+}
+
+.fila-reloj[hidden] {
+  display: none;
+}
+
+.fila-reloj::before,
+.fila-reloj::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212, 168, 67, 0.45), transparent);
+}
+
+.fila-reloj .reloj {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: var(--oro);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cerrar-cartel {
+    transition: none;
+  }
+
+  .cerrar-cartel:hover,
+  .cerrar-cartel:focus-visible {
+    transform: none;
+  }
 }
 
 /* Arriba del botón de crear: qué se va a crear, sin casilla que elegir. */
@@ -62,13 +359,6 @@
   align-items: center;
   margin-top: 14px;
   flex-wrap: wrap;
-}
-
-/* `hidden` solo no alcanza: `button.accion` pone `display: inline-block` y le
-   gana. Sin esto, «Compartir…» se veía en navegadores que no saben compartir,
-   y tocarlo no hacía nada. */
-.botonera-codigo > [hidden] {
-  display: none;
 }
 
 /* ------------------------------------------------ los botones del cartel

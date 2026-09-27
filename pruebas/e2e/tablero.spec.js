@@ -179,23 +179,20 @@ test("la sala privada muestra su código, y el código no va en la URL", async (
   expect(guardado, "el código quedó guardado en el navegador").not.toContain("K7M2PQRS");
 
   // Al entrar, lo que viaja es el identificador de la sala.
-  await page.locator("#btnYaLoCopie").click();
+  await page.locator("#btnEntrarSala").click();
   await expect.poll(() => page.url()).toContain("SAL001");
   expect(page.url()).not.toContain("K7M2PQRS");
 });
 
-/** El cartel del código, abierto con el portapapeles y el «compartir» anotados. */
-async function abrirElCartel(page, { conCompartir = false } = {}) {
-  await page.addInitScript((compartir) => {
+/** El cartel del código, abierto y con el portapapeles anotado. */
+async function abrirElCartel(page) {
+  await page.addInitScript(() => {
     window.__copiado = null;
-    window.__compartido = null;
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: { writeText: async (texto) => { window.__copiado = texto; } },
     });
-    if (compartir) navigator.share = async (datos) => { window.__compartido = datos; };
-    else delete Navigator.prototype.share;
-  }, conCompartir);
+  });
   await tableroConServidorFalso(page);
   await page.locator("#btnCrearSala").click();
   await expect(page.locator("#codigoPrivado")).toBeVisible();
@@ -211,11 +208,19 @@ test("el cartel dice cuánto vale el código, y se copia sin el espacio", async 
   // Los minutos salen del vencimiento que manda el servidor, no de un número
   // escrito en el tablero.
   await expect(page.locator("#vigenciaCodigo")).toHaveText("Vale 30 minutos.");
+  // El reloj va AL LADO, no adentro: adentro no cambiaría el texto —un dibujo
+  // no escribe— pero metería una etiqueta en el único lugar donde el cartel
+  // dice cuánto vale, y eso es lo que se lee en voz alta.
+  expect(await page.locator("#vigenciaCodigo").evaluate((e) => e.childElementCount),
+    "el reloj se metió adentro de la vigencia").toBe(0);
+  await expect(page.locator(".fila-reloj > .reloj")).toBeVisible();
 
   // Se copia sin el espacio: el campo para entrar acepta ocho caracteres.
-  await page.locator("#btnCopiarCodigoPrivado").click();
-  await expect(page.locator("#btnCopiarCodigoPrivado")).toHaveText("¡Copiado!");
+  const copiar = page.locator("#btnCopiarCodigoPrivado");
+  await copiar.click();
+  await expect(copiar).toHaveText("¡Copiado!");
   expect(await page.evaluate(() => window.__copiado)).toBe("K7M2PQRS");
+
 });
 
 test("compartir por WhatsApp lleva el mensaje exacto, con el logo oficial", async ({ page }) => {
@@ -248,17 +253,121 @@ test("compartir por WhatsApp lleva el mensaje exacto, con el logo oficial", asyn
   expect(page.url()).not.toContain("K7M2PQRS");
 });
 
-test("«Compartir…» aparece sólo donde el navegador sabe compartir", async ({ page }) => {
+test("el cartel tiene TRES botones, y ninguno se convierte en otro", async ({ page }) => {
   await abrirElCartel(page);
-  await expect(page.locator("#btnCompartirCodigo")).toBeHidden();
+
+  const botones = page.locator(".botonera-codigo > *");
+  await expect(botones).toHaveCount(3);
+  await expect(botones.nth(0)).toHaveText("Copiar");
+  await expect(botones.nth(1)).toHaveText("Compartir por WhatsApp");
+  await expect(botones.nth(2)).toHaveText("Entrar a la sala");
+
+  // Ni el que compartía por el sistema ni el que decía «Ya lo copié».
+  await expect(page.locator("#btnCompartirCodigo")).toHaveCount(0);
+  await expect(page.locator("#btnYaLoCopie")).toHaveCount(0);
+
+  // Copiar acusa recibo y vuelve a decir lo que hace: no se transforma en la
+  // acción siguiente, que tiene su propio botón al lado.
+  const copiar = page.locator("#btnCopiarCodigoPrivado");
+  await copiar.click();
+  await expect(copiar).toHaveText("¡Copiado!");
+  await expect(copiar).toHaveText("Copiar", { timeout: 8000 });
+  await expect(page.locator("#btnEntrarSala")).toBeVisible();
 });
 
-test("y donde sabe, comparte el mismo mensaje", async ({ page }) => {
-  await abrirElCartel(page, { conCompartir: true });
-  const boton = page.locator("#btnCompartirCodigo");
-  await expect(boton).toBeVisible();
-  await boton.click();
-  expect(await page.evaluate(() => window.__compartido)).toEqual({ text: MENSAJE });
+test("entrar a la sala es su propio botón", async ({ page }) => {
+  await abrirElCartel(page);
+
+  await page.locator("#btnEntrarSala").click();
+  await expect.poll(() => page.url()).toContain("SAL001");
+  // Y el código no viaja: lo que llega a la dirección es el identificador.
+  expect(page.url()).not.toContain("K7M2PQRS");
+});
+
+// =====================================================================
+// La ventana del código: dos salidas, y ninguna por accidente
+// =====================================================================
+//
+// «Ya lo copié» entra a la sala; la cruz y Escape cierran y dejan la página
+// como estaba. Son dos flujos distintos y no se pueden mezclar: uno navega y
+// el otro no. Tocar el velo no hace nada, porque el toque de más en el velo
+// es el accidente típico y acá cuesta el código.
+
+test("la cruz cierra y NO navega", async ({ page }) => {
+  await abrirElCartel(page);
+
+  await page.locator("#btnCerrarCartel").click();
+
+  await expect(page.locator("#codigoPrivado")).toBeHidden();
+  await expect(page.locator(".cartel-tarot")).toHaveCount(0);
+  expect(new URL(page.url()).pathname).toBe("/dashboard.html");
+});
+
+test("al cerrar, la página vuelve a estar viva", async ({ page }) => {
+  await abrirElCartel(page);
+
+  // Mientras está abierta, el resto del cuerpo está apagado: ni el tabulado
+  // ni el lector de pantalla llegan ahí.
+  expect(await page.evaluate(() => document.querySelector("main").inert)).toBe(true);
+
+  await page.locator("#btnCerrarCartel").click();
+
+  expect(await page.evaluate(() => document.querySelector("main").inert)).toBe(false);
+  // Y el botón de crear vuelve a estar disponible: la sala quedó creada, y
+  // quien quiera abrir otra puede.
+  await expect(page.locator("#btnCrearSala")).toBeEnabled();
+  await expect(page.locator("#btnCrearSala")).toHaveText("Crear sala");
+});
+
+test("Escape cierra igual que la cruz; tocar el velo no", async ({ page }) => {
+  await abrirElCartel(page);
+
+  // El velo: se toca una esquina, lejos de la carta.
+  await page.mouse.click(8, 8);
+  await expect(page.locator("#codigoPrivado")).toBeVisible();
+  await expect(page.locator(".cartel-tarot")).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#codigoPrivado")).toBeHidden();
+  expect(new URL(page.url()).pathname).toBe("/dashboard.html");
+});
+
+test("el cartel es una ventana por encima de todo, y apaga el resto", async ({ page }) => {
+  await abrirElCartel(page);
+
+  // Es una ventana: fija y cubriendo la pantalla entera. Si dejara de serlo,
+  // sería un cartel más dentro de la página.
+  const velo = page.locator("#codigoPrivado");
+  await expect(velo).toHaveCSS("position", "fixed");
+  const cubre = await velo.evaluate((e) => {
+    const r = e.getBoundingClientRect();
+    return r.width >= innerWidth && r.height >= innerHeight;
+  });
+  expect(cubre, "el velo no cubre la pantalla").toBe(true);
+
+  // Y por encima del cajón del menú y de su propio velo: el cajón manda sobre
+  // la página, pero el código manda sobre el cajón.
+  const capas = await page.evaluate(() => ({
+    cartel: Number(getComputedStyle(document.getElementById("codigoPrivado")).zIndex),
+    cajon: Number(getComputedStyle(document.getElementById("cajonMenu")).zIndex),
+    veloCajon: Number(getComputedStyle(document.querySelector(".fondo-menu")).zIndex),
+  }));
+  expect(capas.cartel).toBeGreaterThan(capas.cajon);
+  expect(capas.cartel).toBeGreaterThan(capas.veloCajon);
+
+  // El resto de la página queda apagado: fuera del tabulado y del lector de
+  // pantalla, no sólo tapado por el velo.
+  const apagado = await page.evaluate(() =>
+    [...document.body.children]
+      .filter((e) => e.id !== "codigoPrivado")
+      .every((e) => e.inert),
+  );
+  expect(apagado, "quedó algo vivo detrás del cartel").toBe(true);
+
+  // Y el cajón, en consecuencia, no se abre.
+  await page.locator("#btnMenu").click({ force: true });
+  await expect(page.locator("#cajonMenu")).toBeHidden();
+  await expect(page.locator(".cartel-tarot")).toBeVisible();
 });
 
 test("«Mis salas» vacía invita a crear una privada", async ({ page }) => {
