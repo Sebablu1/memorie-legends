@@ -267,7 +267,7 @@ function actualizarAyudaEntrada() {
   const entrada = Number($("entradaSala").value);
   const pozo = entrada * MAX_JUGADORES;
   $("ayudaEntrada").textContent =
-    `Con ${MAX_JUGADORES} jugadores el pozo llega a ${pozo}: ` +
+    `Con ${MAX_JUGADORES} jugadores se juntan ${pozo} Leyendas: ` +
     `${Math.round(pozo * 0.75)} para el primero y ${Math.round(pozo * 0.25)} para el segundo.`;
 }
 

@@ -54,7 +54,7 @@ const SESION_FALSA = `
 const firebaseFalso = (entrada) => `
   // Arranca EN JUEGO, que es como está de verdad cuando llega el resultado:
   // la sala pasa a terminada unos segundos después, cuando el cierre reparte
-  // el pozo. La mesa además no deja entrar a una sala terminada.
+  // las Leyendas. La mesa además no deja entrar a una sala terminada.
   const SALA = {
     codigo: "ABCDEF",
     estado: "jugando",
@@ -218,7 +218,7 @@ const cerrarLaSala = (page) =>
 
 // =====================================================================
 
-test("mientras se reparte el pozo, todavía no se ofrece otra", async ({ page }) => {
+test("mientras se reparten las Leyendas, todavía no se ofrece otra", async ({ page }) => {
   /**
    * La vista dice `finPartida` unos segundos antes de que la sala quede
    * terminada: en el medio corre el cierre, que es el que paga. Y la revancha
@@ -230,7 +230,7 @@ test("mientras se reparte el pozo, todavía no se ofrece otra", async ({ page })
    */
   await abrirFinal(page);
 
-  await expect(page.locator("#panelRevancha")).toContainText(/pozo/i);
+  await expect(page.locator("#panelRevancha")).toContainText(/repartiendo las leyendas/i);
   await expect(page.locator('[data-accion="revancha-igual"]')).toHaveCount(0);
 });
 

@@ -17,6 +17,7 @@
  *  14. El menú dice lo mismo, y en el mismo orden, en todas las páginas.
  *  15. El botón flotante de soporte está en el tablero, y en ningún otro lado.
  *  16. El botón de compartir el juego está en la portada, y con su mensaje.
+ *  17. Donde se ve no dice «pozo», «apuesta» ni «cash-out».
  *
  * Nada de esto rompe una prueba del navegador cuando falla. Un `src` mal
  * escrito no tira ningún error de JavaScript: deja un hueco donde iba la marca,
@@ -723,6 +724,117 @@ console.log("\n=== 16. Compartir el juego, desde la portada y sólo desde ahí =
 
   // Lo demás que piden sus normas —`alt` vacío, tamaño y la palabra al lado—
   // lo comprueba §13, que recorre todos los usos del logo.
+}
+
+
+console.log("\n=== 17. El vocabulario: ni pozo ni apuesta donde se ve ===");
+{
+  // ─────────────────────────────────────────────────────────────────────
+  // QUÉ SE BUSCA
+  // ─────────────────────────────────────────────────────────────────────
+  //
+  // «Pozo», «apuesta», «apostar» y «cash-out» son palabras de casa de
+  // apuestas. Acá no se apuesta: se paga una entrada en Leyendas, que no se
+  // convierten en dinero. Que el sitio hable como lo que es no es cosmética:
+  // es lo primero que mira quien tenga que opinar si esto es un juego de azar.
+  //
+  // NO se busca «retirar» ni «retiro». Son palabras legítimas y de otra
+  // familia: se retira una carta, se retira un dato personal —la Ley 18.331
+  // usa ese verbo—, se retira una promoción y alguien se retira de la partida.
+  // Buscarlas daría ruido en cada barrido y enseñaría a ignorar esta prueba.
+  const PROHIBIDAS = /\b(pozos?|apuestas?|apostar|cash\s*-?\s*out|cashout)\b/i;
+
+  // ─────────────────────────────────────────────────────────────────────
+  // DÓNDE SE BUSCA: SÓLO LO QUE SE VE
+  // ─────────────────────────────────────────────────────────────────────
+  //
+  // Los nombres del código NO cuentan. El campo de Firestore se llama `pozo` y
+  // se va a seguir llamando así —renombrarlo es una migración sobre datos de
+  // gente jugando, sin nada que ganar—, y lo mismo `apuestaRevancha`. Nadie
+  // los ve.
+  //
+  // En JAVASCRIPT eso obliga a mirar al revés: no alcanza con sacar los
+  // comentarios, porque `const pozo = entrada * 4` es código y no texto. Se
+  // miran SÓLO las cadenas —lo que va entre comillas—, y dentro de ellas se
+  // sacan las interpolaciones: en `Leyendas inválidas: ${pozo}` el jugador ve
+  // un número, no la palabra.
+  const soloCadenas = (js) => {
+    const sinComentarios = js
+      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .replace(/^\s*\/\/.*$/gm, " ");
+    const cadenas = sinComentarios.match(/`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g) ?? [];
+    return cadenas
+      .join("\n")
+      // Las interpolaciones, incluso anidadas un nivel: `${a ? `${b}` : c}`.
+      .replace(/\$\{(?:[^{}]|\{[^{}]*\})*\}/g, " ")
+      // Y los atributos que son nombres: muchas de esas cadenas son HTML, y
+      // adentro viven `class="apuesta-revancha"` e `id="apuestaRevancha"`,
+      // que no los ve nadie.
+      .replace(/\b(id|class|for|name|aria-controls|aria-labelledby|data-[a-z-]+)="[^"]*"/gi, " ");
+  };
+
+  // En HTML se mira el texto y los atributos que SE LEEN —`content`, `alt`,
+  // `aria-label`, `placeholder`, `title`—, y se sacan los que son nombres:
+  // un `id="apuestaRevancha"` no lo ve nadie. También se sacan los
+  // comentarios, el CSS incrustado y el JSON de los datos estructurados no,
+  // que eso sí lo lee un buscador.
+  const soloVisible = (html) =>
+    html
+      .replace(/<!--[\s\S]*?-->/g, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/\b(id|class|for|name|aria-controls|aria-labelledby|data-[a-z-]+)="[^"]*"/gi, " ");
+
+  // ─────────────────────────────────────────────────────────────────────
+  // LAS EXCEPCIONES, UNA POR UNA Y CON SU MOTIVO
+  // ─────────────────────────────────────────────────────────────────────
+  //
+  // En las cuatro, la palabra está para NEGAR lo que nombra: sacarla
+  // debilitaría la declaración, que es lo contrario de lo que esto defiende.
+  const EXCEPCIONES = {
+    // «No pueden retirarse mediante mecanismos de cash-out» y «tampoco pueden
+    // convertirse en dinero ni ser objeto de cash-out».
+    "terminos.html": [
+      "mecanismos de <em>cash-out</em>",
+      "objeto de <em>cash-out</em>",
+    ],
+    // «No son juegos de azar ni apuestas» y «No hay cash-out: las Leyendas no
+    // se convierten en dinero real».
+    "reglamento-torneos.html": [
+      "No son juegos de azar ni apuestas",
+      "No hay <em>cash-out</em>",
+    ],
+  };
+
+  // El panel de administración no lo ve ningún jugador: es de la
+  // administración, que sí habla de pozos de torneo y de retirar artículos de
+  // la venta.
+  const paginas = PAGINAS.filter((p) => !/admin/.test(p));
+  const modulos = readdirSync(join(PUBLIC, "js"))
+    .filter((f) => f.endsWith(".js"))
+    .map((f) => join(PUBLIC, "js", f));
+
+  const sueltas = [];
+  for (const archivo of [...paginas, ...modulos]) {
+    const nombre = relative(PUBLIC, archivo).replaceAll("\\", "/");
+    const permitidas = EXCEPCIONES[basename(archivo)] ?? [];
+    const crudo = leer(archivo);
+    const texto = archivo.endsWith(".html") ? soloVisible(crudo) : soloCadenas(crudo);
+    for (const linea of texto.split(/\r?\n/)) {
+      if (!PROHIBIDAS.test(linea)) continue;
+      if (permitidas.some((p) => linea.includes(p))) continue;
+      sueltas.push(`${nombre}: ${linea.trim().slice(0, 90)}`);
+    }
+  }
+  ok(sueltas.length === 0, "ninguna palabra de casa de apuestas en lo que se ve", sueltas);
+
+  // Y que las excepciones sigan estando: si alguien borra la declaración de
+  // que esto NO son apuestas, se pierde lo que más conviene que esté escrito.
+  for (const [archivo, frases] of Object.entries(EXCEPCIONES)) {
+    const texto = leer(join(PUBLIC, archivo));
+    for (const frase of frases) {
+      ok(texto.includes(frase), `${archivo}: sigue diciendo «${frase.replace(/<[^>]+>/g, "")}»`);
+    }
+  }
 }
 
 // ────────────────────────────────────────────────────────────────────

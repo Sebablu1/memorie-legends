@@ -1689,8 +1689,8 @@ function abrirModalAbandono() {
         </li>
       </ul>
       <p class="aviso-suave">
-        Tu entrada ya está en el pozo y se queda ahí. La penalización se
-        descuenta aparte y no va al pozo ni a ningún otro jugador.
+        Tu entrada ya está en la mesa y se queda ahí. La penalización se
+        descuenta aparte y no va a la mesa ni a ningún otro jugador.
       </p>`;
 
   abrirModal(`
@@ -4324,7 +4324,7 @@ function panelDeRevancha() {
   }
 
   if (estadoDeLaSala !== ESTADOS_SALA.TERMINADA) {
-    return `<p class="aviso-suave">Repartiendo el pozo…</p>`;
+    return `<p class="aviso-suave">Repartiendo las Leyendas…</p>`;
   }
 
   return `
@@ -5061,12 +5061,12 @@ function mostrarMesaEnRedPendiente(sala) {
       <h1>La mesa en red todavía no está lista</h1>
       <p>
         Estás en la sala <b>${salaPedida}</b> con
-        <b>${(sala.jugadores ?? []).length} jugadores</b> y un pozo de
+        <b>${(sala.jugadores ?? []).length} jugadores</b> y en juego
         <b>${sala.pozo ?? sala.entrada * (sala.jugadores ?? []).length} Leyendas</b>.
       </p>
       <p class="detalle">
         El motor del juego todavía corre en cada navegador por separado, así que
-        no podemos repartir el mismo mazo a todos. Tu entrada sigue en el pozo y
+        no podemos repartir el mismo mazo a todos. Tu entrada sigue en la mesa y
         la sala sigue abierta: nadie perdió nada.
       </p>
       <div class="botonera-pendiente">

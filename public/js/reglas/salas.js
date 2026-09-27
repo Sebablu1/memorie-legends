@@ -59,7 +59,7 @@ export function calcularPozo(entrada, cantidadJugadores) {
  * `sobrante` para que quien llame decida qué hacer: nunca se inventa destino.
  */
 export function repartirPozo(pozo, posicionesPagadas = 2) {
-  if (!Number.isInteger(pozo) || pozo < 0) throw new Error(`Pozo inválido: ${pozo}`);
+  if (!Number.isInteger(pozo) || pozo < 0) throw new Error(`Leyendas en juego inválidas: ${pozo}`);
 
   const primero = posicionesPagadas >= 1 ? Math.floor(pozo * REPARTO.primero) : 0;
   const segundo = posicionesPagadas >= 2 ? pozo - primero : 0;

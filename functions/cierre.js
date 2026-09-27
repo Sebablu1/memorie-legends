@@ -167,7 +167,7 @@ export function crearCierre({
     }
 
     if (!usaLeyendas(sala)) {
-      throw error("failed-precondition", "Esta partida no tiene pozo en Leyendas.");
+      throw error("failed-precondition", "Esta partida no tiene Leyendas en juego.");
     }
     const pozo = Number(sala.pozo);
     if (!Number.isInteger(pozo) || pozo < 0) {
