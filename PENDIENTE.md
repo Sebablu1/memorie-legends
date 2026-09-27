@@ -791,6 +791,12 @@ Es como está hoy en producción, y con el tablero creando siempre salas
 privadas conviene decidir qué hacer: un barrido que las cancele y devuelva al
 vencer el código (30 minutos), o dejarlo en manos de quien la abrió.
 
+**Y los códigos sobreviven a sus salas.** El 27/09, con `rooms` en cero,
+quedaban dos documentos en `codigos` creados el 21/09 —`KJN7SD` y `TM2F9K`—
+apuntando a salas que ya no existen y vencidos hace días. No hacen daño: el
+código se busca por su hash y la sala no está, así que entrar falla igual. Pero
+se acumulan, y el mismo barrido que resuelva lo de arriba tendría que barrerlos.
+
 ---
 
 ## 23. `listarPoseedoresItemAdmin` valida el argumento antes de pedir sesión
