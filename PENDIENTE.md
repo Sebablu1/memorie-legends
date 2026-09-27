@@ -845,9 +845,66 @@ parte A se escribe encima y no se commitea. Lo que corre es el release
 Cuando la parte B esté desplegada: borrar esta sección y el cartel que está
 arriba del bloque `match /rooms/{salaId}` en `firestore.rules`.
 
-**Rollback**, si la parte B rompe algo: el ruleset anterior está guardado en
-`~/respaldos-memorie/`, y el ruleset previo sigue existiendo del lado del
-servidor, así que alcanza con volver a apuntar el release a su id.
+### Rollback: después de la parte B es COMPUESTO
+
+**Volver sólo el hosting rompe el sitio.** El cliente viejo consulta `rooms` con
+`where("estado", "==", "esperando")` y nada más, sin filtrar por `publica`. La
+regla apretada de la parte B rechaza esa consulta ENTERA —podría traer una sala
+ajena—, así que cliente viejo + reglas apretadas = ninguna sala visible, ni en
+el lobby ni en el tablero.
+
+Por eso, si hay que volver atrás después de la parte B, se vuelven **las dos
+cosas, y en este orden**:
+
+1. **Primero las reglas.** Aflojarlas no rompe nada: el cliente nuevo sigue
+   funcionando con reglas permisivas, y el viejo también.
+2. **Después el hosting.**
+
+**Nunca al revés.** Volver primero el hosting deja al cliente viejo corriendo
+contra reglas apretadas, que es exactamente el estado roto.
+
+Y si sólo hace falta aflojar las reglas, con eso alcanza: el sitio queda
+funcionando y se vuelve a intentar la parte B cuando se entienda qué falló.
+
+#### Las dos puertas
+
+**Hosting** — 10 a 20 segundos; no sube nada, sólo mueve el puntero del release:
+
+```
+npx firebase hosting:rollback
+```
+
+Vuelve a la versión anterior. La que estaba antes del lobby nuevo es
+`4dcb31df3b95a6f7`, del 21/09 21:30 UTC.
+
+**Reglas** — la vía probada, 20 segundos medidos:
+
+```
+cp ~/respaldos-memorie/firestore-vivo-a037a8ef-desplegado-2026-09-16.rules firestore.rules
+npx firebase deploy --only firestore:rules --project memorie-legends
+git checkout firestore.rules
+```
+
+La vía más rápida, apuntando el release a un ruleset que ya existe del lado del
+servidor (segundos, NO probada todavía):
+
+```
+curl -X PATCH -H "Authorization: Bearer $(gcloud auth print-access-token)" -H "x-goog-user-project: memorie-legends" -H "Content-Type: application/json" "https://firebaserules.googleapis.com/v1/projects/memorie-legends/releases/cloud.firestore" -d '{"name":"projects/memorie-legends/releases/cloud.firestore","rulesetName":"projects/memorie-legends/rulesets/RULESET"}'
+```
+
+#### A qué ruleset volver
+
+| id | qué es | cuándo |
+|---|---|---|
+| `8817ed97-8d38-4eb0-a693-7426727ad4d9` | parte A: `juegos` sí, `rooms` permisiva | **el destino seguro casi siempre** |
+| `a037a8ef-cca7-4a77-9ae8-09582d82e335` | lo de antes del despliegue (16/09 23:35 UTC) | sólo para volver del todo atrás |
+
+La parte A sirve con cualquiera de los dos clientes: tiene `juegos` para el
+nuevo y `rooms` permisiva para el viejo. El del 16/09 **no tiene `juegos`**, así
+que sólo va si el hosting también vuelve atrás.
+
+El archivo de ese ruleset está en `~/respaldos-memorie/`, con
+`sha256 72c70d1ae1070597dd9532e3ab87f56b4912c5cdc7acbf73d7b745c02e269068`.
 
 ---
 
