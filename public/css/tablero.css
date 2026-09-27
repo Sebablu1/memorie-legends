@@ -776,3 +776,140 @@
     text-align: center;
   }
 }
+
+
+/* ═══════════════════════════════════════ el soporte, flotando
+
+   Una píldora verde abajo a la derecha, sólo en el tablero. En el resto del
+   sitio el soporte vive dentro del cajón del menú; acá está a un toque porque
+   es la pantalla donde alguien mira su saldo, sus salas y su colección, que es
+   de donde salen las preguntas.
+
+   EL VERDE Y EL BLANCO SON DE LA MARCA, NO UNA ELECCIÓN
+
+   `#25d366` es el verde oficial de WhatsApp y el glifo es el BLANCO del kit
+   —el que corresponde sobre fondo verde—, sin retocar. Blanco sobre ese verde
+   da 2,3:1 de contraste, por debajo del 4,5:1 que pide la WCAG AA; se deja
+   así a propósito, porque es exactamente el botón que publica WhatsApp y sus
+   normas no dejan cambiarle el color. Está anotado en PENDIENTE.
+
+   POR QUÉ `z-index: 40`
+
+   El cajón del menú es 90 y su velo 80. Con 40, al abrir el menú el botón
+   queda detrás del velo: el cajón manda, y no hay una píldora verde flotando
+   sobre la lista.
+*/
+
+.boton-soporte {
+  position: fixed;
+  /* El `env()` es por el iPhone con notch: abajo está la barra de gestos y a
+     la derecha, en horizontal, la zona curva. Sin esto el botón queda debajo
+     de la barra del sistema. El segundo valor es para todo lo demás. */
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  right: calc(16px + env(safe-area-inset-right, 0px));
+  z-index: 40;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  /* Píldora: el radio grande se recorta solo al alto que tenga. */
+  border-radius: 999px;
+
+  background: #25d366;
+  color: #fff;
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.boton-soporte:hover,
+.boton-soporte:focus-visible {
+  /* El verde no cambia —es el de la marca—: lo que contesta es la sombra y un
+     pelo de escala. */
+  transform: scale(1.03);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4), 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+.boton-soporte img {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+
+.boton-soporte .flecha {
+  font-size: 1.25rem;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+/* ─────────────────────────────── en el teléfono, sólo el glifo
+
+   Con el texto entero la píldora medía 230 px de 390: más de media pantalla,
+   y caía justo encima de «Por Leyendas», que es una de las dos opciones de
+   «¿Cómo querés jugar?». Tapaba un control, no un adorno.
+
+   En círculo ocupa una cuarta parte de esa superficie y cae sobre el margen
+   de la tarjeta. Sigue abajo a la derecha —donde está el botón de chat en
+   todos lados, incluida la propia app de WhatsApp— y no abajo a la izquierda,
+   que en iOS y en varios Android es la zona del gesto de volver. */
+@media (max-width: 560px) {
+  .boton-soporte {
+    width: 56px;
+    height: 56px;
+    padding: 0;
+    gap: 0;
+    justify-content: center;
+    /* Más pegado al borde que la píldora: es más chico y molesta menos. */
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    right: calc(12px + env(safe-area-inset-right, 0px));
+  }
+
+  /* El texto NO se saca del HTML: es el nombre del enlace para quien escucha
+     la página, y sin él el botón sería «enlace, imagen». Se esconde a la
+     vista pero sigue en el árbol de accesibilidad, que es lo que `display:
+     none` se llevaría puesto. La flecha, que es decorativa, se va con ellos. */
+  .boton-soporte > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .boton-soporte img {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+/* El botón flota, pero el contenido respira: el aire va en el PIE, que es lo
+   último de la página, y no en `main`. Con el aire en `main`, al llegar al
+   fondo el círculo caía encima de la línea de «Todos los derechos
+   reservados»: el pie viene después y no lo alcanzaba ningún relleno.
+
+   Setenta y dos píxeles es lo que ocupa el círculo más su separación del
+   borde. En pantalla grande sobra lugar al costado. */
+@media (max-width: 700px) {
+  body:has(.boton-soporte) footer {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boton-soporte {
+    transition: none;
+  }
+
+  .boton-soporte:hover,
+  .boton-soporte:focus-visible {
+    transform: none;
+  }
+}

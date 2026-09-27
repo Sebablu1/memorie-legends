@@ -15,6 +15,7 @@
  *  12. Cada página tiene título, descripción, canónica y Open Graph, sin repetir.
  *  13. El logo de WhatsApp es el del kit de marca, sin tocar, y se usa como pide.
  *  14. El menú dice lo mismo, y en el mismo orden, en todas las páginas.
+ *  15. El botón flotante de soporte está en el tablero, y en ningún otro lado.
  *
  * Nada de esto rompe una prueba del navegador cuando falla. Un `src` mal
  * escrito no tira ningún error de JavaScript: deja un hueco donde iba la marca,
@@ -467,11 +468,21 @@ console.log("\n=== 13. El logo de WhatsApp, tal cual lo entrega su kit de marca 
   // de Meta (whatsappbrand.com), bajado el 21/9/2026. Las normas del kit no
   // dejan modificarlo —ni el dibujo ni el color— ni usar otro. La huella lo
   // ata byte por byte: si alguien lo retoca, esto falla.
-  const HUELLA = "f7b1311db718533e671645f57cd94b92f0e006e61d7e6581a80675fc5a478fc4";
-  const ruta = join(PUBLIC, "img", "whatsapp", "Digital_Glyph_Green_RGB_2026.svg");
+  //
+  // Son dos, y cada uno tiene su lugar: el verde sobre los fondos oscuros del
+  // sitio, y el blanco sobre el verde de la marca —el botón flotante del
+  // tablero—. Usar el verde sobre verde sería no verlo, y pintar el blanco de
+  // otro color sería modificarlo.
+  const KIT = {
+    "Digital_Glyph_Green_RGB_2026.svg": "f7b1311db718533e671645f57cd94b92f0e006e61d7e6581a80675fc5a478fc4",
+    "Digital_Glyph_White_RGB_2026.svg": "7fb054c0f4bea644b4a4a014d6d8581aad7e6dcb639049d17a578dc44f8e6fd4",
+  };
   const { createHash } = await import("node:crypto");
-  const huella = existsSync(ruta) ? createHash("sha256").update(readFileSync(ruta)).digest("hex") : null;
-  ok(huella === HUELLA, "el archivo es el del kit, sin tocar", huella);
+  for (const [archivo, esperada] of Object.entries(KIT)) {
+    const ruta = join(PUBLIC, "img", "whatsapp", archivo);
+    const huella = existsSync(ruta) ? createHash("sha256").update(readFileSync(ruta)).digest("hex") : null;
+    ok(huella === esperada, `${archivo}: es el del kit, sin tocar`, huella);
+  }
 
   // Donde se use: chico, con `alt` vacío y con la palabra al lado. Las normas
   // piden no usar el logo en lugar de la palabra «WhatsApp».
@@ -614,6 +625,59 @@ console.log("\n=== 14. El mismo menú, y en el mismo orden, en todas las página
   const salidas = [...cuatro.matchAll(/<a class="accion[^"]*" href="([^"]*)"/g)].map((m) => m[1]);
   ok(salidas.includes("/dashboard.html") && salidas.includes("/lobby.html"),
      "404.html: con sus dos salidas, al inicio y al lobby", salidas);
+}
+
+
+console.log("\n=== 15. El soporte que flota: en el tablero, y en ningún otro lado ===");
+{
+  // La píldora verde de WhatsApp está sólo en el tablero. En el resto del
+  // sitio el soporte vive dentro del cajón del menú (§14), que se abre cuando
+  // uno quiere: un botón fijo en cada página sería el número a la vista en
+  // todas, y tapando contenido en todas.
+  const SOPORTE = "https://wa.me/59891900968";
+  const conBoton = PAGINAS.filter((p) => /class="boton-soporte"/.test(html[p])).map(deRepo);
+  ok(JSON.stringify(conBoton) === JSON.stringify(["public/dashboard.html"]),
+     "el botón flotante existe, y sólo en el tablero", conBoton);
+
+  const tablero = html[join(PUBLIC, "dashboard.html")];
+  const boton = tablero.match(/<a\b[^>]*class="boton-soporte"[\s\S]*?<\/a>/)?.[0] ?? "";
+  ok((tablero.match(/class="boton-soporte"/g) ?? []).length === 1,
+     "dashboard.html: uno solo");
+  ok(/href="https:\/\/wa\.me\/59891900968"/.test(boton),
+     "dashboard.html: al número del sitio", boton.match(/href="[^"]*"/)?.[0]);
+  ok(/target="_blank"/.test(boton) && /rel="noopener/.test(boton),
+     "dashboard.html: abre aparte, con noopener");
+
+  // El glifo BLANCO, que es el que corresponde sobre el verde de la marca.
+  const glifo = etiquetas(boton, "img")[0];
+  ok(/img\/whatsapp\/Digital_Glyph_White_RGB_2026\.svg$/.test(glifo?.src ?? ""),
+     "dashboard.html: con el glifo blanco del kit", glifo?.src);
+  // El resto de lo que piden sus normas —tamaño, `alt` vacío y la palabra al
+  // lado— lo comprueba §13, que recorre todos los usos del logo.
+
+  // Va al final del cuerpo: flota, pero con teclado es lo último de la página
+  // y no se cruza en el medio del contenido.
+  const despues = tablero.slice(tablero.indexOf('class="boton-soporte"'));
+  ok(!/<main\b|<footer\b/.test(despues),
+     "dashboard.html: va al final del cuerpo, después del pie");
+
+  // Y sus estilos, en la hoja del tablero: fijo, en el verde de la marca, y
+  // por debajo del velo del cajón (80), para que el menú abierto lo tape.
+  const hoja = leer(join(PUBLIC, "css", "tablero.css"));
+  const reglas = hoja.replace(/\/\*[\s\S]*?\*\//g, "").match(/\.boton-soporte\s*\{([^}]*)\}/)?.[1] ?? "";
+  ok(/position:\s*fixed/.test(reglas), "tablero.css: el botón es fijo");
+  ok(/background:\s*#25d366/.test(reglas), "tablero.css: en el verde oficial");
+  const capa = Number(reglas.match(/z-index:\s*(\d+)/)?.[1]);
+  ok(capa > 0 && capa < 80, "tablero.css: por debajo del velo del cajón", capa);
+  ok(/env\(safe-area-inset-bottom/.test(reglas) && /env\(safe-area-inset-right/.test(reglas),
+     "tablero.css: respeta el borde seguro del teléfono");
+
+  // El aire de abajo va SÓLO donde está el botón. `cuenta.html` carga la misma
+  // hoja y no lo tiene: sin el `:has()`, su pie quedaría con setenta y pico de
+  // píxeles de vacío que no tapa nada.
+  const aire = hoja.match(/@media \(max-width: 700px\) \{\s*([^{]*)\{[^}]*padding-bottom[^}]*\}/);
+  ok(/body:has\(\.boton-soporte\)\s+footer/.test(aire?.[1] ?? ""),
+     "tablero.css: el aire del pie, sólo en la página que tiene el botón", aire?.[1]?.trim());
 }
 
 // ────────────────────────────────────────────────────────────────────

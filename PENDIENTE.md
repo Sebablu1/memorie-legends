@@ -651,6 +651,22 @@ ganadas, pero sigue siendo plata que no existía.
 
 ---
 
+## 17. El botón de soporte no llega al contraste que pide la WCAG
+
+El botón flotante del tablero es blanco sobre el verde oficial de WhatsApp
+(`#25d366`): **2,3:1**, por debajo del 4,5:1 que pide la WCAG 2.1 AA para
+texto. Queda así a propósito y con decisión del dueño del sitio: es
+exactamente el botón que publica WhatsApp, el glifo blanco es el que su kit
+indica para fondos verdes, y sus normas de marca no dejan cambiarle el color
+ni al fondo ni al dibujo.
+
+Está anotado acá por si alguna vez hay que justificarlo —una auditoría, un
+reclamo—: la alternativa sería no usar el verde de la marca, que es lo que las
+normas del kit no permiten. El resto del sitio sí cumple: el mismo soporte,
+dentro del cajón del menú, va en verde sobre fondo oscuro.
+
+---
+
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del
