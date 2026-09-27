@@ -114,6 +114,10 @@ const servidorFalso = `
   export const listarTorneos = async () => ({ torneos: [] });
   export const inscribirseATorneo = async () => ({});
   export const crearSala = async () => ({});
+  export const soyAdministrador = async () => ({ admin: false });
+  export const crearSalaPublica = async () => ({});
+  export const editarSalaPublica = async () => ({});
+  export const borrarSalaPublica = async () => ({});
   export const crearSalaPrivada = async () => ({});
   export const unirseASala = async () => ({});
   export const unirseConCodigo = async () => ({});

@@ -1,270 +1,336 @@
 /**
- * Lobby unificado: las dos formas de jugar en una sola pantalla.
+ * El lobby: las tres formas de jugar con otros —torneos, mesas públicas y
+ * salas privadas— y la puerta al entrenamiento.
  *
- *   🎯 Entrenamiento vs IA  — gratis, no toca Leyendas jamás.
- *   🏆 Partida por Leyendas — crear o unirse a una sala, cobrando entrada.
+ * ─────────────────────────────────────────────────────────────────────────
+ * QUÉ JUEGOS HAY NO ESTÁ ESCRITO ACÁ
+ * ─────────────────────────────────────────────────────────────────────────
  *
- * Las dos ramas están separadas también en el código: el entrenamiento no
- * llama a ninguna función del servidor ni mira el saldo, y la rama de
- * Leyendas no escribe nada en Firestore: sólo pide, y el servidor decide.
+ * Sale de la colección `juegos/{id}`: se muestran los que dicen
+ * `activo: true`, ordenados por `orden`, con su nombre y su logo. Agregar un
+ * juego es agregar un documento; ninguna línea de este archivo sabe cómo se
+ * llama. Una mesa pública de un juego inactivo —o de uno que no está en la
+ * colección— no aparece.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LO QUE ESTA PÁGINA SÓLO PIDE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Sentarse, crear una sala privada, abrir, editar o borrar una mesa pública:
+ * todo pasa por el servidor, que decide. Los controles de la administración
+ * se muestran si `soyAdministrador` dice que sí, pero no protegen nada: las
+ * tres llamadas lo vuelven a comprobar con el correo verificado.
+ *
+ * Las mesas públicas se escuchan con la consulta que las reglas permiten
+ * —`publica == true`—: una que pidiera todas las salas la rechazarían entera.
  */
 
-import { db, auth, signOut, doc, collection, query, where, onSnapshot } from "./firebase.js";
-import { exigirSesion, mostrarSaldo } from "./sesion.js";
-import { crearSala, unirseASala, ErrorDeServidor } from "./servidor.js";
-import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/salas.js";
-import { DIFICULTADES } from "./reglas/ia.js";
+import { db, collection, query, where, onSnapshot, getDocs } from "./firebase.js";
+import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
+import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES } from "./reglas/salas.js";
+import { juegoDe } from "./reglas/juegos.js";
+import { esRutaDelSitio } from "./reglas/catalogo.js";
 import { opcionesDeDuracion } from "./rivales.js";
+import {
+  soyAdministrador, crearSalaPublica, editarSalaPublica, borrarSalaPublica, ErrorDeServidor,
+} from "./servidor.js";
+import { crearYMostrar } from "./sala-privada.js";
+import { conectarCampoDeCodigo, entrarConCodigo, irALaSala } from "./entrar-por-codigo.js";
+import { montarCarteleraTorneos } from "./cartelera-torneos.js";
 import { escapar } from "./modulos/texto.js";
 
 const $ = (id) => document.getElementById(id);
 
-/** Saldo autoritativo. Sale de Firestore, nunca de localStorage. */
-let saldoActual = 0;
-let nombreJugador = "Jugador";
+conectarBotonSalir();
+
+let miUid = null;
+let saldo = 0;
+let miNombre = "Jugador";
+let esAdmin = false;
+/** Los juegos activos, en su orden. `null` mientras no llegan. */
+let juegos = null;
+/** Las mesas públicas en espera, tal como llegan. `null` mientras no llegan. */
+let mesas = null;
+/** El código de la mesa que se está editando, o `null` si se abre una nueva. */
+let editando = null;
+
+// ------------------------------------------------------------- avisos
 
 function avisar(texto, tipo = "info") {
   const caja = $("mensaje");
   caja.textContent = texto;
-  caja.className = `mensaje-global visible ${tipo}`;
+  caja.className = `aviso-salas visible ${tipo}`;
 }
 
-const limpiarAviso = () => ($("mensaje").className = "mensaje-global");
-
-// =====================================================================
-// 🎯 ENTRENAMIENTO — no toca Leyendas en ningún punto
-// =====================================================================
-
-const NOMBRES_IA = ["Nara", "Bruno", "Vex"];
-let cantidadIAs = 2;
-
-// Las dificultades salen del módulo de IA, para no repetir las etiquetas.
-$("nivelIA").innerHTML = Object.entries(DIFICULTADES)
-  .map(
-    ([clave, d]) =>
-      `<option value="${clave}"${clave === "medio" ? " selected" : ""}>${d.etiqueta}</option>`,
-  )
-  .join("");
-
-$("cantidadIAs").addEventListener("click", (evento) => {
-  const boton = evento.target.closest(".opcion");
-  if (!boton) return;
-  cantidadIAs = Number(boton.dataset.ias);
-  $("cantidadIAs")
-    .querySelectorAll(".opcion")
-    .forEach((b) => {
-      const activa = b === boton;
-      b.classList.toggle("activa", activa);
-      b.setAttribute("aria-checked", String(activa));
-    });
-});
-
-$("btnEntrenar").addEventListener("click", () => {
-  const dificultad = $("nivelIA").value;
-
-  // `modo: entrenamiento` es lo que garantiza que ninguna parte del sistema
-  // la trate como partida con entrada. Aun sin ese campo, usaLeyendas()
-  // devolvería false: hace falta modo explícito Y entrada válida.
-  localStorage.setItem(
-    "configMesa",
-    JSON.stringify({
-      modo: "entrenamiento",
-      humanos: [{ nombre: nombreJugador }],
-      ias: NOMBRES_IA.slice(0, cantidadIAs).map((nombre) => ({ nombre, dificultad })),
-    }),
-  );
-  localStorage.removeItem("roomCode");
-  window.location.href = "mesa.html";
-});
-
-// =====================================================================
-// 🏆 PARTIDA POR LEYENDAS
-// =====================================================================
-
-// El desplegable se arma desde la lista compartida: agregar una entrada en
-// salas.js la hace aparecer acá sin tocar el HTML.
-$("entradaSala").innerHTML = ENTRADAS.map(
-  (e) => `<option value="${e}">${e} Leyendas</option>`,
-).join("");
-
-// Y la duración: los mismos tres límites que el entrenamiento, que es lo que
-// dice el reglamento y lo que el servidor valida al crear la sala.
-$("duracionSala").innerHTML = opcionesDeDuracion()
-  .map((o) => `<option value="${o.valor}"${o.porDefecto ? " selected" : ""}>${o.etiqueta}</option>`)
-  .join("");
-
-function actualizarAyudaEntrada() {
-  const entrada = Number($("entradaSala").value);
-  const pozo = entrada * MAX_JUGADORES;
-  const primero = Math.floor(pozo * 0.75);
-  $("ayudaEntrada").textContent =
-    `Con la sala llena el pozo llega a ${pozo} Leyendas: ${primero} para el primero ` +
-    `y ${pozo - primero} para el segundo.`;
+function limpiarAviso() {
+  $("mensaje").textContent = "";
+  $("mensaje").className = "aviso-salas";
 }
 
-$("entradaSala").addEventListener("change", actualizarAyudaEntrada);
-actualizarAyudaEntrada();
+const mensajeDe = (error, porOmision) => (error instanceof ErrorDeServidor ? error.message : porOmision);
 
-$("btnCrearSala").addEventListener("click", async () => {
-  const entrada = Number($("entradaSala").value);
-  const boton = $("btnCrearSala");
+// ------------------------------------------------------ los desplegables
 
-  // Aviso temprano por cortesía. El servidor lo vuelve a comprobar igual.
-  if (saldoActual < entrada) {
-    avisar(`Te faltan Leyendas: la entrada es de ${entrada} y tenés ${saldoActual}.`, "error");
-    return;
-  }
+// Las entradas y las duraciones salen de las reglas, no escritas a mano.
+const opcionesDeEntrada = (elegida) =>
+  ENTRADAS.map((e) => `<option value="${e}"${e === elegida ? " selected" : ""}>${e} Leyendas</option>`).join("");
+const opcionesDeLaDuracion = () =>
+  opcionesDeDuracion()
+    .map((o) => `<option value="${o.valor}"${o.porDefecto ? " selected" : ""}>${o.etiqueta}</option>`)
+    .join("");
 
-  boton.disabled = true;
-  boton.textContent = "Creando…";
-  limpiarAviso();
+$("entradaSala").innerHTML = opcionesDeEntrada(10);
+$("duracionSala").innerHTML = opcionesDeLaDuracion();
+$("publicaEntrada").innerHTML = opcionesDeEntrada(10);
+$("publicaDuracion").innerHTML = opcionesDeLaDuracion();
 
+// ------------------------------------------------------ sesión y perfil
+
+const sesion = await exigirSesion();
+if (sesion) {
+  miUid = sesion.usuario.uid;
+  saldo = sesion.perfil.saldo;
+  miNombre = sesion.perfil.nombre;
+  mostrarSaldo(saldo);
+
+  montarCarteleraTorneos();
+  cargarJuegos();
+  escucharMesasPublicas();
+
+  // Sin `await`: si la pregunta tarda o falla, el lobby se usa igual y los
+  // controles de la administración simplemente no aparecen.
+  soyAdministrador()
+    .then((respuesta) => {
+      esAdmin = respuesta?.admin === true;
+      $("adminPublicas").hidden = !esAdmin;
+      pintarMesas();
+    })
+    .catch(() => {});
+}
+
+// --------------------------------------------------------- los juegos
+
+async function cargarJuegos() {
   try {
-    const { codigo } = await crearSala(
-      entrada, `Sala de ${nombreJugador}`, Number($("duracionSala").value),
-    );
-    localStorage.setItem("roomCode", codigo);
-    window.location.href = `room.html?code=${codigo}`;
+    const snap = await getDocs(collection(db, "juegos"));
+    juegos = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((j) => j.activo === true)
+      .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
   } catch (error) {
-    avisar(error instanceof ErrorDeServidor ? error.message : "No pudimos crear la sala.", "error");
-    boton.disabled = false;
-    boton.textContent = "Crear sala";
+    console.error("No se pudieron leer los juegos:", error);
+    juegos = [];
   }
-});
+  pintarMesas();
+}
 
-$("codigoSala").addEventListener("input", (evento) => {
-  evento.target.value = evento.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-});
+// ------------------------------------------------- las mesas públicas
 
-$("codigoSala").addEventListener("keydown", (evento) => {
-  if (evento.key === "Enter") $("btnUnirse").click();
-});
-
-$("btnUnirse").addEventListener("click", async () => {
-  const codigo = $("codigoSala").value.trim().toUpperCase();
-  const boton = $("btnUnirse");
-
-  if (!esCodigoValido(codigo)) {
-    avisar("El código tiene que ser de seis caracteres.", "error");
-    $("codigoSala").focus();
-    return;
-  }
-
-  boton.disabled = true;
-  boton.textContent = "Entrando…";
-  limpiarAviso();
-
-  try {
-    await unirseASala(codigo);
-    localStorage.setItem("roomCode", codigo);
-    window.location.href = `room.html?code=${codigo}`;
-  } catch (error) {
-    avisar(
-      error instanceof ErrorDeServidor ? error.message : "No pudimos entrar a la sala.",
-      "error",
-    );
-    boton.disabled = false;
-    boton.textContent = "Unirse a la sala";
-  }
-});
-
-// =====================================================================
-// Salas abiertas, en vivo
-// =====================================================================
-
-let dejarDeEscucharSalas = null;
-
-function escucharSalas() {
-  // Sólo las públicas: las reglas de Firestore no dejan leer una sala privada
-  // ajena, y una consulta que pudiera traer alguna la rechazan entera.
+function escucharMesasPublicas() {
+  // Sólo las públicas: las reglas no dejan leer una sala privada ajena, y una
+  // consulta que pudiera traer alguna la rechazan entera.
   const consulta = query(
     collection(db, "rooms"),
     where("publica", "==", true),
     where("estado", "==", ESTADOS_SALA.ESPERANDO),
   );
 
-  dejarDeEscucharSalas = onSnapshot(
+  onSnapshot(
     consulta,
     (snap) => {
-      const salas = snap.docs
-        .map((d) => d.data())
-        // Igual que en el tablero: la revancha es de los que jugaron.
-        .filter((s) => s.listada !== false)
-        .filter((s) => (s.jugadores ?? []).length < MAX_JUGADORES);
-
-      if (!salas.length) {
-        $("listaSalas").innerHTML =
-          '<p class="vacio-simple">No hay salas esperando. Creá una y pasale el código a alguien.</p>';
-        return;
-      }
-
-      $("listaSalas").innerHTML = salas
-        .sort((a, b) => a.entrada - b.entrada)
-        .map((s) => {
-          const ocupados = (s.jugadores ?? []).length;
-          return `
-            <div class="sala-fila">
-              <div>
-                <b>${escapar(s.nombre ?? "Sala")}</b>
-                <span class="sala-meta">${s.entrada} Leyendas · ${ocupados}/${MAX_JUGADORES} jugadores</span>
-              </div>
-              <button class="btn-plata" data-codigo="${escapar(s.codigo)}" type="button">Entrar</button>
-            </div>`;
-        })
-        .join("");
+      mesas = snap.docs.map((d) => d.data());
+      pintarMesas();
     },
     (error) => {
-      console.error("No se pudieron leer las salas:", error);
-      $("listaSalas").innerHTML = '<p class="vacio-simple">No pudimos cargar las salas.</p>';
+      console.error("No se pudieron leer las mesas públicas:", error);
+      $("listaPublicas").innerHTML =
+        '<p class="vacio-simple">No pudimos cargar las mesas. Probá recargar la página.</p>';
     },
   );
 }
 
-$("listaSalas").addEventListener("click", (evento) => {
-  const boton = evento.target.closest("[data-codigo]");
+/** El logo de un juego, sólo si es un archivo del sitio. */
+function logoDe(juego) {
+  if (!juego.logo || !esRutaDelSitio(juego.logo)) return "";
+  return `<img class="juego-logo" src="${escapar(juego.logo)}" alt="" width="28" height="28" />`;
+}
+
+function filaDeMesa(mesa) {
+  const sentados = (mesa.jugadores ?? []).length;
+  const cupo = mesa.maxJugadores ?? MAX_JUGADORES;
+  const estoy = (mesa.jugadores ?? []).includes(miUid);
+  const llena = sentados >= cupo;
+
+  const accion = estoy
+    ? `<button class="accion chica" type="button" data-volver="${escapar(mesa.codigo)}">Volver</button>`
+    : llena
+      ? '<button class="accion chica" type="button" disabled>Llena</button>'
+      : `<button class="accion chica" type="button" data-sentarse="${escapar(mesa.codigo)}">Sentarse</button>`;
+
+  const admin = esAdmin
+    ? `<button class="accion sobria chica" type="button" data-editar="${escapar(mesa.codigo)}">Editar</button>
+       <button class="accion sobria chica" type="button" data-borrar="${escapar(mesa.codigo)}">Borrar</button>`
+    : "";
+
+  return `
+    <div class="mesa-publica" data-codigo="${escapar(mesa.codigo)}">
+      <div class="mesa-nombre">${escapar(mesa.nombre ?? "Mesa")}</div>
+      <div class="mesa-datos">
+        <span>👥 ${sentados}/${cupo}</span>
+        <span>Entrada ${Number(mesa.entrada) || 0} Leyendas Ganadas</span>
+        <span>Hasta ${Number(mesa.limitePuntos) || 0} puntos</span>
+      </div>
+      <div class="mesa-acciones">${accion}${admin}</div>
+    </div>`;
+}
+
+function pintarMesas() {
+  const caja = $("listaPublicas");
+  if (juegos === null || mesas === null) return;
+
+  if (!juegos.length) {
+    caja.innerHTML = '<p class="vacio-simple">No hay juegos disponibles por ahora.</p>';
+    return;
+  }
+
+  const bloques = juegos
+    .map((juego) => ({
+      juego,
+      suyas: mesas
+        .filter((m) => juegoDe(m) === juego.id)
+        .sort((a, b) => (a.entrada ?? 0) - (b.entrada ?? 0)),
+    }))
+    .filter((b) => b.suyas.length > 0);
+
+  if (!bloques.length) {
+    caja.innerHTML = '<p class="vacio-simple">Todavía no hay mesas públicas abiertas.</p>';
+    return;
+  }
+
+  caja.innerHTML = bloques
+    .map(
+      ({ juego, suyas }) => `
+        <div class="juego-bloque" data-juego="${escapar(juego.id)}">
+          <h3 class="juego-titulo">${logoDe(juego)}<span>${escapar(juego.nombre ?? juego.id)}</span></h3>
+          ${suyas.map(filaDeMesa).join("")}
+        </div>`,
+    )
+    .join("");
+}
+
+$("listaPublicas").addEventListener("click", async (evento) => {
+  const boton = evento.target.closest("button");
   if (!boton) return;
-  $("codigoSala").value = boton.dataset.codigo;
-  $("btnUnirse").click();
+
+  if (boton.dataset.sentarse) {
+    await entrarConCodigo(boton.dataset.sentarse, { boton, avisar, limpiarAviso });
+  } else if (boton.dataset.volver) {
+    irALaSala(boton.dataset.volver);
+  } else if (boton.dataset.editar) {
+    empezarEdicion(boton.dataset.editar);
+  } else if (boton.dataset.borrar) {
+    await borrar(boton);
+  }
 });
 
-// Los listeners se cortan al irse: si no, quedan abiertos consumiendo lecturas.
-let dejarDeEscucharSaldo = null;
-window.addEventListener("pagehide", () => {
-  if (dejarDeEscucharSalas) dejarDeEscucharSalas();
-  if (dejarDeEscucharSaldo) dejarDeEscucharSaldo();
-});
+// -------------------------------------------- la administración de mesas
 
-// =====================================================================
-// Arranque
-// =====================================================================
-
-$("btnSalir").addEventListener("click", async () => {
-  await signOut(auth);
-  localStorage.removeItem("user");
-  localStorage.removeItem("roomCode");
-  window.location.href = "login.html";
-});
-
-// Si la mesa o la sala nos devolvieron acá, se explica por qué.
-const avisoPendiente = sessionStorage.getItem("avisoLobby");
-if (avisoPendiente) {
-  avisar(avisoPendiente, "error");
-  sessionStorage.removeItem("avisoLobby");
+function formularioAbrir() {
+  editando = null;
+  $("tituloAdminPublicas").textContent = "Abrir una mesa pública";
+  $("btnGuardarPublica").textContent = "Abrir mesa";
+  $("btnCancelarEdicion").hidden = true;
+  $("publicaNombre").value = "";
+  $("publicaEntrada").value = "10";
+  $("publicaDuracion").innerHTML = opcionesDeLaDuracion();
+  $("publicaCupo").value = String(MAX_JUGADORES);
 }
 
-const sesion = await exigirSesion();
-if (sesion) {
-  nombreJugador = sesion.perfil.nombre;
-  saldoActual = sesion.perfil.saldo;
-
-  $("saludo").textContent = `Hola, ${nombreJugador}`;
-  mostrarSaldo(saldoActual);
-
-  // El saldo se sigue en vivo: si el servidor lo mueve, se ve al instante.
-  dejarDeEscucharSaldo = onSnapshot(doc(db, "users", sesion.usuario.uid), (snap) => {
-    saldoActual = snap.exists() ? (snap.data().credits ?? 0) : 0;
-    mostrarSaldo(saldoActual);
-  });
-
-  escucharSalas();
+function empezarEdicion(codigo) {
+  const mesa = (mesas ?? []).find((m) => m.codigo === codigo);
+  if (!mesa) return;
+  editando = codigo;
+  $("tituloAdminPublicas").textContent = `Editar la mesa ${codigo}`;
+  $("btnGuardarPublica").textContent = "Guardar cambios";
+  $("btnCancelarEdicion").hidden = false;
+  $("publicaNombre").value = mesa.nombre ?? "";
+  $("publicaEntrada").value = String(mesa.entrada);
+  $("publicaDuracion").value = String(mesa.limitePuntos);
+  $("publicaCupo").value = String(mesa.maxJugadores ?? MAX_JUGADORES);
+  $("adminPublicas").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
+
+$("btnCancelarEdicion").addEventListener("click", formularioAbrir);
+
+$("adminPublicas").addEventListener("submit", async (evento) => {
+  evento.preventDefault();
+  const boton = $("btnGuardarPublica");
+  const datos = {
+    nombre: $("publicaNombre").value.trim() || undefined,
+    entrada: Number($("publicaEntrada").value),
+    limitePuntos: Number($("publicaDuracion").value),
+    maxJugadores: Number($("publicaCupo").value),
+  };
+
+  boton.disabled = true;
+  limpiarAviso();
+  try {
+    if (editando) {
+      await editarSalaPublica({ codigo: editando, ...datos });
+      avisar("Cambios guardados.");
+    } else {
+      await crearSalaPublica(datos);
+      avisar("Mesa abierta.");
+    }
+    formularioAbrir();
+  } catch (error) {
+    avisar(mensajeDe(error, "No pudimos guardar la mesa."), "error");
+  } finally {
+    boton.disabled = false;
+  }
+});
+
+/**
+ * Borrar pide dos toques: el primero pregunta, el segundo borra. Una mesa con
+ * gente sentada se cancela y se les devuelve la entrada; un solo toque de más
+ * no debería poder hacer eso.
+ */
+async function borrar(boton) {
+  if (boton.dataset.confirmar !== "1") {
+    boton.dataset.confirmar = "1";
+    boton.textContent = "¿Borrar? Tocá de nuevo";
+    setTimeout(() => {
+      if (boton.isConnected && boton.dataset.confirmar === "1") {
+        boton.dataset.confirmar = "";
+        boton.textContent = "Borrar";
+      }
+    }, 4000);
+    return;
+  }
+  boton.disabled = true;
+  limpiarAviso();
+  try {
+    await borrarSalaPublica(boton.dataset.borrar);
+    avisar("Mesa borrada. Si alguien había pagado la entrada, se le devolvió.");
+  } catch (error) {
+    avisar(mensajeDe(error, "No pudimos borrar la mesa."), "error");
+    boton.disabled = false;
+  }
+}
+
+// ------------------------------------------------------ salas privadas
+
+$("btnCrearSala").addEventListener("click", () =>
+  crearYMostrar({
+    boton: $("btnCrearSala"),
+    caja: $("codigoPrivado"),
+    entrada: Number($("entradaSala").value),
+    duracion: Number($("duracionSala").value),
+    nombre: `Sala de ${miNombre}`,
+    saldo,
+    avisar,
+    limpiarAviso,
+  }),
+);
+
+conectarCampoDeCodigo($("codigoSala"), $("btnUnirse"), { avisar, limpiarAviso });

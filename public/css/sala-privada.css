@@ -1,0 +1,188 @@
+/* ============================================================
+   EL CARTEL DEL CÓDIGO PRIVADO
+
+   Lo dibuja `js/sala-privada.js` y lo usan el tablero y el lobby: un solo
+   cartel y una sola hoja, para que no haya dos que se desacomoden.
+   ============================================================ */
+
+/* El código, la única vez que se ve. Grande y en monoespaciada: se lee para
+   dictarlo por teléfono, y un 8 y una B no se pueden confundir. */
+.codigo-privado {
+  margin-top: 14px;
+  padding: 16px 14px;
+  border: 1px solid var(--oro-hondo);
+  border-radius: 14px;
+  background: rgba(212, 168, 67, 0.06);
+  text-align: center;
+}
+
+.codigo-privado .titulo-codigo {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 1.6px;
+  color: var(--oro);
+}
+
+.codigo-grande {
+  margin: 8px 0;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 1.7rem;
+  letter-spacing: 6px;
+  color: var(--oro-claro);
+  /* En dos grupos, «ABCD EFGH»: si no entra en un renglón, se parte en el
+     espacio y no a la mitad de un grupo. */
+  word-break: normal;
+}
+
+.codigo-privado .vigencia-codigo {
+  margin-top: 4px;
+  font-size: 0.74rem;
+  color: var(--oro);
+}
+
+.codigo-privado .aviso-codigo {
+  font-size: 0.74rem;
+  color: var(--texto-tenue);
+  line-height: 1.6;
+}
+
+/* Arriba del botón de crear: qué se va a crear, sin casilla que elegir. */
+.ayuda-privada {
+  margin: 4px 0 12px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--texto-tenue);
+  text-align: center;
+}
+
+.botonera-codigo {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+/* `hidden` solo no alcanza: `button.accion` pone `display: inline-block` y le
+   gana. Sin esto, «Compartir…» se veía en navegadores que no saben compartir,
+   y tocarlo no hacía nada. */
+.botonera-codigo > [hidden] {
+  display: none;
+}
+
+/* ------------------------------------------------ los botones del cartel
+
+   Los cuatro miden lo mismo y tienen la misma forma: el mismo alto, las
+   mismas esquinas y el mismo halo. Cambia el metal.
+
+   Los selectores llevan `.botonera-codigo >` para ganarle a
+   `button.accion.sobria` y a `a.accion`, que ponen su propio fondo, su
+   `display` y sus mayúsculas. */
+
+.botonera-codigo > .accion {
+  min-height: 46px;
+  padding: 12px 22px;
+  border: none;
+  border-radius: 12px;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  transition: transform 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Copiar, Compartir… y Ya lo copié: dorados, como una pieza del juego.
+
+   El fondo es el degradado del botón de oro. El relieve son dos filos —uno
+   claro por dentro y uno hondo por fuera, más un segundo filo tenue— y el
+   halo, una luz dorada suave alrededor. La letra, en Playfair y mayúsculas:
+   Cinzel no, porque su archivo trae sólo las letras de MEMORIE LEGENDS, y en
+   COPIAR la C y la P saldrían con otra letra. */
+.botonera-codigo > .accion:not(.boton-whatsapp) {
+  color: #1a1206;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(255, 240, 200, 0.6);
+  background: linear-gradient(145deg, #b8892e 0%, var(--oro) 34%, var(--oro-claro) 62%, var(--oro) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 240, 200, 0.6),
+    inset 0 -3px 6px rgba(107, 83, 15, 0.35),
+    0 0 0 1px #6b530f,
+    0 0 0 3px rgba(212, 168, 67, 0.22),
+    0 0 18px rgba(212, 168, 67, 0.35),
+    0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+.botonera-codigo > .accion:not(.boton-whatsapp):hover:not(:disabled),
+.botonera-codigo > .accion:not(.boton-whatsapp):focus-visible {
+  transform: scale(1.02);
+  filter: brightness(1.08);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 240, 200, 0.75),
+    inset 0 -3px 6px rgba(107, 83, 15, 0.35),
+    0 0 0 1px #6b530f,
+    0 0 0 3px rgba(212, 168, 67, 0.32),
+    0 0 26px rgba(212, 168, 67, 0.55),
+    0 8px 18px rgba(0, 0, 0, 0.5);
+}
+
+/* Compartir por WhatsApp: la misma forma, en el verde oficial.
+
+   El logo es el archivo del kit, sin tocar, y verde: por eso el botón no es
+   verde por dentro —el logo se perdería— sino oscuro, con el filo, el halo y
+   la letra en #25d366. La palabra va como la escribe la marca, «WhatsApp»:
+   sin las mayúsculas de los otros botones. */
+.botonera-codigo > .accion.boton-whatsapp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #25d366;
+  letter-spacing: 0.3px;
+  text-transform: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  background: linear-gradient(180deg, #11231a 0%, #0a140f 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(37, 211, 102, 0.35),
+    0 0 0 1px #0e5c32,
+    0 0 0 3px rgba(37, 211, 102, 0.18),
+    0 0 18px rgba(37, 211, 102, 0.3),
+    0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+.botonera-codigo > .accion.boton-whatsapp:hover,
+.botonera-codigo > .accion.boton-whatsapp:focus-visible {
+  transform: scale(1.02);
+  filter: brightness(1.12);
+  box-shadow:
+    inset 0 0 0 1px rgba(37, 211, 102, 0.5),
+    0 0 0 1px #0e5c32,
+    0 0 0 3px rgba(37, 211, 102, 0.28),
+    0 0 26px rgba(37, 211, 102, 0.5),
+    0 8px 18px rgba(0, 0, 0, 0.5);
+}
+
+/* El mismo tamaño en los dos: 20 px, chico al lado de la palabra. */
+.boton-whatsapp img {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.botonera-codigo > .accion:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+.botonera-codigo > .accion:focus-visible {
+  outline: 2px solid var(--oro-claro);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .botonera-codigo > .accion,
+  .botonera-codigo > .accion:hover,
+  .botonera-codigo > .accion:active {
+    transition: none;
+    transform: none;
+  }
+}

@@ -211,9 +211,12 @@ console.log("\n=== La revancha no se le ofrece a quien no jugó ===");
   const cuerpo = cuerpoDe(lee("../functions/index.js"), "revanchaDeSala");
   ok(/listada: false/.test(cuerpo), "la sala de revancha nace fuera de la lista");
 
-  // El lobby pide las públicas —una revancha nunca lo es— y además descarta
-  // las no listadas.
-  ok(/s\.listada !== false/.test(lee("../public/js/lobby.js")), "lobby la saltea");
+  // El lobby tampoco la filtra en el navegador: desde el Bloque 4 pide sólo
+  // mesas PÚBLICAS, y una revancha nace privada. No llega nunca, y las reglas
+  // ni siquiera dejarían leerla.
+  const lobby = lee("../public/js/lobby.js");
+  ok(/where\("publica",\s*"==",\s*true\)/.test(lobby),
+     "lobby la saltea: sólo pide las mesas públicas");
 
   // El tablero ya no la filtra en el navegador: desde el Bloque 2 le pide a
   // Firestore SÓLO las salas en las que está sentado. Una revancha ajena no

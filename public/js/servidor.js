@@ -242,3 +242,25 @@ export const listarTorneos = () => llamar("listarTorneos");
  * @returns {Promise<{id: string, entrada: number, saldo: number, inscriptos: number}>}
  */
 export const inscribirseATorneo = (torneoId) => llamar("inscribirseATorneo", { torneoId });
+
+// ------------------------------------------------------ mesas públicas
+
+/**
+ * ¿Esta cuenta administra? Sólo para que el lobby muestre o no los controles
+ * de las mesas públicas: no protege nada. Las tres llamadas de abajo lo
+ * comprueban en el servidor por su cuenta, con el correo verificado.
+ *
+ * @returns {Promise<{admin: boolean}>}
+ */
+export const soyAdministrador = () => llamar("soyAdministrador");
+
+/** Abre una mesa pública, vacía. Sólo la administración. */
+export const crearSalaPublica = ({ nombre, entrada, limitePuntos, maxJugadores }) =>
+  llamar("crearSalaPublica", sinVacios({ nombre, entrada, limitePuntos, maxJugadores }));
+
+/** Retoca una mesa pública. La entrada y la duración, sólo con la mesa vacía. */
+export const editarSalaPublica = ({ codigo, nombre, entrada, limitePuntos, maxJugadores }) =>
+  llamar("editarSalaPublica", sinVacios({ codigo, nombre, entrada, limitePuntos, maxJugadores }));
+
+/** Borra una mesa pública que está esperando, y devuelve las entradas. */
+export const borrarSalaPublica = (codigo) => llamar("borrarSalaPublica", { codigo });

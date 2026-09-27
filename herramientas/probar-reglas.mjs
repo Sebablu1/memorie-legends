@@ -95,6 +95,12 @@ export const CASOS = [
   { nombre: "movimiento propio", esperado: "ALLOW", ...leer(BETO, "movimientos/m1", { uid: "beto", delta: 10 }) },
   { nombre: "movimiento ajeno", esperado: "DENY", ...leer(ANA, "movimientos/m1", { uid: "beto", delta: 10 }) },
   { nombre: "partida, aunque la juegue", esperado: "DENY", ...leer(BETO, "partidas/p1", { jugadores: ["beto"] }) },
+
+  // Los juegos: se leen sin sesión —el lobby los necesita para saber qué
+  // mostrar— y el navegador no los escribe, ni con sesión.
+  { nombre: "juego, leído sin sesión", esperado: "ALLOW", ...leer(SIN_SESION, "juegos/memorie", { nombre: "Memorie Legends", activo: true }) },
+  { nombre: "juego, escrito por alguien con sesión", esperado: "DENY",
+    auth: BETO, ruta: "juegos/memorie", metodo: "create", recurso: undefined, datosNuevos: { nombre: "Otro", activo: true } },
 ];
 
 /** El cuerpo que espera el servicio de pruebas. */
@@ -108,6 +114,7 @@ export function cuerpoDePrueba(reglas, casos = CASOS) {
           auth: c.auth,
           path: `/databases/(default)/documents/${c.ruta}`,
           method: c.metodo,
+          ...(c.datosNuevos ? { resource: { data: c.datosNuevos } } : {}),
         },
         ...(c.recurso ? { resource: c.recurso } : {}),
       })),
@@ -142,7 +149,8 @@ async function principal() {
     const r = resultados[i];
     const bien = r?.state === "SUCCESS";
     if (!bien) fallos++;
-    console.log(`  ${bien ? "✓" : "✗"} ${caso.nombre}: ${caso.esperado === "ALLOW" ? "se lee" : "no se lee"}`);
+    const verbo = caso.metodo === "get" ? "lee" : "escribe";
+    console.log(`  ${bien ? "✓" : "✗"} ${caso.nombre}: ${caso.esperado === "ALLOW" ? "se" : "no se"} ${verbo}`);
     if (!bien) console.log(`      ${JSON.stringify(r?.debugMessages ?? r).slice(0, 300)}`);
   });
   console.log(fallos ? `\n❌ ${fallos} caso(s) no dieron lo esperado` : `\n✅ los ${CASOS.length} casos dan lo esperado`);

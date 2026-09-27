@@ -5,6 +5,7 @@
  *   2. Toda consulta del navegador a `rooms` pide sólo lo que la regla deja
  *      ver: las públicas, o las mías.
  *   3. La lista de casos de `herramientas/probar-reglas.mjs` está completa.
+ *   4. Los juegos se leen sin sesión y no se escriben desde el navegador.
  *
  * Lo que la regla HACE lo prueba esa herramienta contra el motor de Google
  * (necesita red y credenciales, así que no corre acá). Esto prueba lo que se
@@ -120,11 +121,22 @@ console.log("\n=== 3. La lista de casos contra el motor de reglas ===");
   // Lo que ya estaba cerrado: cambiar una regla es la ocasión de abrir otra
   // sin querer.
   for (const n of ["perfil propio", "perfil ajeno", "código de sala privada", "movimiento propio",
-                   "movimiento ajeno", "partida, aunque la juegue"]) {
+                   "movimiento ajeno", "partida, aunque la juegue",
+                   "juego, leído sin sesión", "juego, escrito por alguien con sesión"]) {
     ok(nombres.has(n), `sigue el resguardo: ${n}`);
   }
   ok(CASOS.every((c) => c.esperado === "ALLOW" || c.esperado === "DENY"),
      "cada caso dice qué espera");
+}
+
+console.log("\n=== 4. Los juegos: se leen sin sesión, no se escriben ===");
+{
+  // El lobby lee `juegos/{id}` para saber qué mostrar. Son nombres y logos:
+  // nada que esconder. Escribirlos es de la administración.
+  const reglas = sinComentarios(leer("firestore.rules"));
+  const bloque = reglas.match(/match \/juegos\/\{juegoId\}\s*\{([^}]*)\}/)?.[1] ?? "";
+  ok(/allow read: if true;/.test(bloque), "se leen sin sesión");
+  ok(/allow write: if false;/.test(bloque), "y el navegador no los escribe");
 }
 
 console.log(fallos ? `\n❌ ${fallos} fallo(s)` : "\n✅ TODO OK");

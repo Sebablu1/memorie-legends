@@ -10,14 +10,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0a0a0a" />
     <meta name="robots" content="noindex, nofollow" />
-    <title>Jugar - Memorie Legends</title>
+    <title>Lobby - Memorie Legends</title>
     <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="img/apple-touch-icon.png" />
     <link rel="stylesheet" href="css/tema.css" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="css/lobby.css" />
+    <link rel="stylesheet" href="css/sala-privada.css" />
     <link rel="stylesheet" href="css/pie.css" />
-      <meta name="description" content="Elegí entre entrenamiento gratis contra la IA o una partida multijugador por Leyendas. Memoria, reflejos y estrategia con baraja española y cartas." />
+      <meta name="description" content="Lobby de Memorie Legends: mesas públicas que se pagan con Leyendas Ganadas, salas privadas con código para tus amigos y torneos en línea. Elegí dónde jugar." />
     <!-- La tarjeta que se ve al compartir el enlace.
 
          La imagen va con URL ABSOLUTA y en JPG a propósito. Una ruta relativa
@@ -34,16 +35,16 @@
     <meta property="og:site_name" content="Memorie Legends" />
     <meta property="og:locale" content="es_AR" />
     <meta property="og:url" content="https://memorielegends.com/lobby.html" />
-    <meta property="og:title" content="Jugar — Memorie Legends" />
-    <meta property="og:description" content="Elegí entre entrenamiento gratis contra la IA o una partida multijugador por Leyendas. Memoria, reflejos y estrategia con baraja española y cartas." />
+    <meta property="og:title" content="Lobby — Memorie Legends" />
+    <meta property="og:description" content="Lobby de Memorie Legends: mesas públicas que se pagan con Leyendas Ganadas, salas privadas con código para tus amigos y torneos en línea. Elegí dónde jugar." />
     <meta property="og:image" content="https://memorielegends.com/img/compartir-escudo.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Logo de Memorie Legends sobre fondo oscuro" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Jugar — Memorie Legends" />
-    <meta name="twitter:description" content="Elegí entre entrenamiento gratis contra la IA o una partida multijugador por Leyendas. Memoria, reflejos y estrategia con baraja española y cartas." />
+    <meta name="twitter:title" content="Lobby — Memorie Legends" />
+    <meta name="twitter:description" content="Lobby de Memorie Legends: mesas públicas que se pagan con Leyendas Ganadas, salas privadas con código para tus amigos y torneos en línea. Elegí dónde jugar." />
     <meta name="twitter:image" content="https://memorielegends.com/img/compartir-escudo.jpg" />
   </head>
   <body>
@@ -76,108 +77,126 @@
     </header>
 
     <main>
-      <h1 class="titulo-pagina" id="saludo">Elegí cómo jugar</h1>
-      <p class="subtitulo">
-        Entrená gratis contra la máquina, o competí con otras personas por Leyendas.
+      <h1 class="titulo-pagina">Lobby</h1>
+      <p class="subtitulo">Mesas públicas, salas privadas y torneos: todo lo que se juega con otros.</p>
+
+      <div class="aviso-salas" id="mensaje" role="status" aria-live="polite"></div>
+
+      <!-- Contra la máquina se juega desde el tablero: la configuración del
+           entrenamiento —cuántos rivales, de qué nivel, cuánto dura— vive en
+           un solo lugar, y el menú lleva al mismo. -->
+      <p class="lobby-ia">
+        <a class="accion sobria" id="enlaceJugarIA" href="dashboard.html#jugar">🤖 Jugar vs IA</a>
       </p>
 
-      <div class="mensaje-global" id="mensaje" role="status" aria-live="polite"></div>
+      <!-- Torneos en línea. Los crea la administración a mano. La lista la
+           dibuja `cartelera-torneos.js`, la misma de siempre; acá, sin torneos,
+           la sección se queda y lo dice, porque es una de las tres del lobby. -->
+      <section class="panel panel-lobby" id="carteleraTorneos">
+        <h2>🏆 Torneos en línea</h2>
+        <p class="nota-lobby">
+          Se paga la entrada al anotarse. Si no se llega a cuatro jugadores, el
+          torneo se cancela y se devuelve todo.
+        </p>
+        <p class="aviso-tienda" id="avisoTorneosJugador" role="status" aria-live="polite"></p>
+        <div id="listaTorneosJugador"></div>
+        <p class="vacio-simple" id="torneosVacios" hidden>No hay torneos abiertos por ahora.</p>
+      </section>
 
-      <div class="dos-ramas">
-        <!-- ============================ ENTRENAMIENTO ============================ -->
-        <section class="rama entrenamiento">
-          <header class="rama-cabecera">
-            <span class="rama-icono">🎯</span>
-            <div>
-              <h2>Entrenamiento — vs IA</h2>
-              <p class="rama-lema">Sin Leyendas · Sin premios · Practicá gratis</p>
-            </div>
-          </header>
+      <section class="panel panel-lobby" id="seccionPublicas">
+        <h2>🌐 Salas públicas</h2>
+        <p class="nota-lobby">
+          Las abre la administración y se pagan sólo con Leyendas Ganadas. Cuando
+          una empieza, se abre otra igual.
+        </p>
 
-          <fieldset class="campo">
-            <legend>¿Contra cuántas?</legend>
-            <div class="grupo-botones" id="cantidadIAs" role="radiogroup" aria-label="Cantidad de IAs">
-              <button type="button" class="opcion" data-ias="1" role="radio" aria-checked="false">1 IA</button>
-              <button type="button" class="opcion activa" data-ias="2" role="radio" aria-checked="true">2 IAs</button>
-              <button type="button" class="opcion" data-ias="3" role="radio" aria-checked="false">3 IAs</button>
-            </div>
-          </fieldset>
+        <!-- Los controles de la administración. Los muestra `lobby.js` si el
+             servidor dice que esta cuenta administra; no protegen nada: quien
+             decide es el servidor, en cada llamada. -->
+        <form class="admin-publicas" id="adminPublicas" hidden>
+          <h3 id="tituloAdminPublicas">Abrir una mesa pública</h3>
+          <div class="admin-campos">
+            <label class="campo-lobby" for="publicaNombre">
+              <span>Nombre</span>
+              <input id="publicaNombre" type="text" maxlength="40" placeholder="Mesa de 4" />
+            </label>
+            <label class="campo-lobby" for="publicaEntrada">
+              <span>Entrada</span>
+              <select id="publicaEntrada"></select>
+            </label>
+            <label class="campo-lobby" for="publicaDuracion">
+              <span>Duración</span>
+              <select id="publicaDuracion"></select>
+            </label>
+            <label class="campo-lobby" for="publicaCupo">
+              <span>Cupo</span>
+              <select id="publicaCupo">
+                <option value="2">2 jugadores</option>
+                <option value="3">3 jugadores</option>
+                <option value="4" selected>4 jugadores</option>
+              </select>
+            </label>
+          </div>
+          <div class="admin-botones">
+            <button class="accion" id="btnGuardarPublica" type="submit">Abrir mesa</button>
+            <button class="accion sobria" id="btnCancelarEdicion" type="button" hidden>Cancelar</button>
+          </div>
+        </form>
 
-          <div class="campo">
-            <label for="nivelIA">Nivel</label>
-            <select id="nivelIA">
-              <option value="facil">Fácil</option>
-              <option value="medio" selected>Medio</option>
-              <option value="dificil">Difícil</option>
-              <option value="experto">Experto</option>
-            </select>
+        <div id="listaPublicas">
+          <p class="vacio-simple">Buscando mesas…</p>
+        </div>
+      </section>
+
+      <section class="panel panel-lobby" id="seccionPrivadas">
+        <h2>🔒 Salas privadas</h2>
+        <p class="nota-lobby">
+          Para jugar con quien vos invites: creá una y compartí el código, o
+          entrá con el que te pasaron.
+        </p>
+
+        <div class="privadas">
+          <div class="privadas-crear">
+            <label class="campo-lobby" for="entradaSala">
+              <span>Entrada</span>
+              <select id="entradaSala"></select>
+            </label>
+            <label class="campo-lobby" for="duracionSala">
+              <span>Duración</span>
+              <select id="duracionSala"></select>
+            </label>
+            <p class="ayuda-privada">
+              Se creará una sala privada. Compartí el código con quien quieras invitar.
+            </p>
+            <button class="accion" id="btnCrearSala" type="button">Crear sala privada</button>
+            <!-- El cartel del código, el mismo del tablero: lo dibuja
+                 `js/sala-privada.js`. -->
+            <div class="codigo-privado" id="codigoPrivado" hidden></div>
           </div>
 
-          <button class="btn-oro ancho" id="btnEntrenar" type="button">
-            🎮 Jugar entrenamiento
-          </button>
-
-          <p class="rama-nota">
-            No se cobra entrada, no hay premio y podés abandonar cuando quieras sin
-            perder Leyendas.
-          </p>
-        </section>
-
-        <!-- ========================= PARTIDA POR LEYENDAS ========================= -->
-        <section class="rama leyendas">
-          <header class="rama-cabecera">
-            <span class="rama-icono">🏆</span>
-            <div>
-              <h2>Partida por Leyendas</h2>
-              <p class="rama-lema">Entrá con Leyendas y competí contra otros jugadores</p>
-            </div>
-          </header>
-
-          <div class="campo">
-            <label for="entradaSala">Seleccioná tu entrada en Leyendas</label>
-            <select id="entradaSala"></select>
-            <p class="ayuda" id="ayudaEntrada"></p>
+          <div class="privadas-entrar">
+            <!-- Ocho caracteres para una invitación privada, seis para una
+                 mesa pública: el largo decide por qué puerta entra. Es el campo
+                 al que manda el mensaje de WhatsApp. -->
+            <label class="campo-lobby" for="codigoSala">
+              <span>Entrar con un código</span>
+              <input
+                id="codigoSala"
+                type="text"
+                maxlength="8"
+                inputmode="latin"
+                autocomplete="off"
+                autocapitalize="characters"
+                spellcheck="false"
+                placeholder="ABCD1234"
+                aria-describedby="ayudaCodigo"
+              />
+            </label>
+            <p class="ayuda-lobby" id="ayudaCodigo">
+              Ocho caracteres si te invitaron a una sala privada; seis si es una mesa pública.
+            </p>
+            <button class="accion sobria" id="btnUnirse" type="button">Entrar</button>
           </div>
-
-          <!-- Con cuántos puntos se queda afuera: las partidas cortas también
-               se juegan por Leyendas. La lista la llena `lobby.js`. -->
-          <div class="campo">
-            <label for="duracionSala">Duración de la partida</label>
-            <select id="duracionSala"></select>
-          </div>
-
-          <button class="btn-oro ancho" id="btnCrearSala" type="button">Crear sala</button>
-
-          <div class="separador"><span>o</span></div>
-
-          <div class="campo">
-            <label for="codigoSala">Unirse con un código</label>
-            <input
-              id="codigoSala"
-              type="text"
-              inputmode="latin"
-              autocomplete="off"
-              spellcheck="false"
-              maxlength="6"
-              placeholder="ABCDEF"
-              aria-describedby="ayudaCodigo"
-            />
-            <p class="ayuda" id="ayudaCodigo">Seis caracteres, sin distinguir mayúsculas.</p>
-          </div>
-
-          <button class="btn-plata ancho" id="btnUnirse" type="button">Unirse a la sala</button>
-
-          <p class="rama-nota">
-            El pozo se reparte 75 % para el primero y 25 % para el segundo. Hasta
-            cuatro jugadores por sala.
-          </p>
-        </section>
-      </div>
-
-      <section class="panel" style="margin-top: 24px">
-        <h2>Salas esperando jugadores</h2>
-        <div id="listaSalas">
-          <p class="vacio-simple">Buscando salas…</p>
         </div>
       </section>
     </main>

@@ -90,11 +90,23 @@ function dibujar() {
   const caja = $("listaTorneosJugador");
   if (!seccion || !caja) return;
 
+  // Sin torneos, la sección se esconde: una que dice «no hay» ocupa el mismo
+  // lugar que uno de verdad y enseña a no mirarla. Salvo que la página tenga
+  // su propio texto de vacío —el lobby, donde los torneos son una de sus tres
+  // secciones—: ahí se queda y lo dice.
+  const vacio = $("torneosVacios");
   if (!abiertos.length) {
-    seccion.hidden = true;
+    caja.innerHTML = "";
+    if (vacio) {
+      vacio.hidden = false;
+      seccion.hidden = false;
+    } else {
+      seccion.hidden = true;
+    }
     return;
   }
 
+  if (vacio) vacio.hidden = true;
   caja.innerHTML = abiertos.map(dibujarTorneo).join("");
   seccion.hidden = false;
 }
@@ -153,10 +165,11 @@ async function cargar() {
 }
 
 /**
- * Arranca la cartelera. La llama `dashboard.js` cuando ya hay sesión.
+ * Arranca la cartelera. La llama el lobby cuando ya hay sesión.
  *
- * Si algo falla, la sección se queda oculta y el panel sigue funcionando. Una
- * cartelera rota no es motivo para que alguien no pueda entrar a jugar.
+ * Si algo falla, la página sigue funcionando: una cartelera rota no es motivo
+ * para que alguien no pueda entrar a jugar. Donde la sección no se esconde
+ * —el lobby— dice que no se pudo, en vez de quedar vacía sin explicación.
  */
 export async function montarCarteleraTorneos() {
   if (!$("carteleraTorneos")) return;
@@ -164,6 +177,11 @@ export async function montarCarteleraTorneos() {
   try {
     await cargar();
   } catch {
+    const vacio = $("torneosVacios");
+    if (vacio) {
+      vacio.textContent = "No pudimos cargar los torneos. Probá recargar la página.";
+      vacio.hidden = false;
+    }
     return;
   }
 

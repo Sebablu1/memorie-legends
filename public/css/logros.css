@@ -159,61 +159,12 @@
   }
 }
 
-/* ------------------------------------------------ cartelera de torneos
- *
- * Vive en esta hoja y no en una propia porque son quince reglas y las dos
- * secciones aparecen juntas en el mismo panel. Una hoja más sería un pedido
- * más en la carga de la página para eso.
- */
-
-.fila-torneo {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--borde-suave);
-}
-
-.fila-torneo + .fila-torneo {
-  margin-top: 8px;
-}
-
-.datos-torneo {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  /* `min-width: 0` para que un nombre largo se corte en vez de empujar al
-     botón fuera de la fila. Sin esto, en un teléfono el botón se sale. */
-  min-width: 0;
-  flex: 1 1 200px;
-}
-
-.datos-torneo b {
-  color: var(--texto);
-  font-size: 0.95rem;
-}
-
-.datos-torneo span {
-  font-size: 0.78rem;
-  color: var(--texto-tenue);
-}
-
-.fila-torneo .accion {
-  flex: 0 0 auto;
-  /* 44px de alto mínimo: es el objetivo táctil por debajo del cual el dedo
-     falla, y este botón cobra Leyendas. */
-  min-height: 44px;
-}
-
 /* ---------------------------------------------------------- mi inventario
  *
  * Vive en esta hoja y no en una propia porque comparte página con la vitrina
- * de logros y con la cartelera de torneos: una hoja más sería un pedido más en
- * la carga del panel para tres bloques que siempre aparecen juntos.
+ * de logros: una hoja más sería un pedido más en la carga del panel para dos
+ * bloques que siempre aparecen juntos. (La cartelera de torneos, que también
+ * vivía acá, se mudó con su sección al lobby.)
  */
 
 .grupo-inv + .grupo-inv {

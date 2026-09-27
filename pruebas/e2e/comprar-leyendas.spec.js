@@ -90,6 +90,10 @@ const servidorFalso = (respuesta) => `
   export async function abandonarPartida() { return {}; }
   export async function unirseASala() { return {}; }
   export async function crearSalaPrivada() { return {}; }
+  export async function soyAdministrador() { return { admin: false }; }
+  export async function crearSalaPublica() { return {}; }
+  export async function editarSalaPublica() { return {}; }
+  export async function borrarSalaPublica() { return {}; }
   export async function unirseConCodigo() { return {}; }
   export async function marcarListo() { return {}; }
   export async function iniciarPartida() { return {}; }

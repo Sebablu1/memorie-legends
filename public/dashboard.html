@@ -17,6 +17,7 @@
     <!-- Lo propio del tablero, en su hoja: app.css lo comparten varias
          páginas y crecía con cosas que sólo se usan acá. -->
     <link rel="stylesheet" href="css/tablero.css" />
+    <link rel="stylesheet" href="css/sala-privada.css" />
     <link rel="stylesheet" href="css/logros.css" />
     <link rel="stylesheet" href="css/pie.css" />
       <meta name="description" content="Elegí cómo jugar: entrenamiento gratis contra la IA, con uno a tres rivales y cuatro niveles, o una sala multijugador por Leyendas con tus amigos." />
@@ -280,44 +281,10 @@
             <button class="accion sobria" id="btnUnirse" type="button">Unirse</button>
           </div>
 
-          <!-- El código de una sala privada, la única vez que se puede ver.
-               Aparece recién cuando el servidor lo devuelve: no existe en el
-               HTML hasta entonces, y no vuelve a existir después. No va en
-               ninguna dirección del sitio ni se guarda en el navegador; la base
-               tiene sólo su resumen. -->
-          <div class="codigo-privado" id="codigoPrivado" hidden>
-            <p class="titulo-codigo">Tu sala privada está abierta</p>
-            <p class="codigo-grande" id="codigoPrivadoTexto">········</p>
-            <p class="aviso-codigo"><b>Copiá este código ahora. No se vuelve a mostrar.</b></p>
-            <p class="vigencia-codigo" id="vigenciaCodigo" hidden></p>
-            <div class="botonera-codigo">
-              <button class="accion sobria" id="btnCopiarCodigoPrivado" type="button">Copiar</button>
-              <!-- El logo es el archivo oficial del kit de marca de WhatsApp,
-                   sin tocar: verde, chico y al lado de la palabra, nunca en su
-                   lugar. `pruebas/sitio.mjs` compara su huella con la del
-                   archivo del kit. -->
-              <a
-                class="accion sobria boton-whatsapp"
-                id="enlaceWhatsApp"
-                href="https://wa.me/"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <img
-                  src="img/whatsapp/Digital_Glyph_Green_RGB_2026.svg"
-                  alt=""
-                  width="20"
-                  height="20"
-                />
-                <span>Compartir por WhatsApp</span>
-              </a>
-              <!-- Sólo donde el navegador sabe compartir: sobre todo, teléfonos. -->
-              <button class="accion sobria" id="btnCompartirCodigo" type="button" hidden>
-                Compartir…
-              </button>
-              <button class="accion" id="btnYaLoCopie" type="button">Ya lo copié</button>
-            </div>
-          </div>
+          <!-- El código de una sala privada, la única vez que se puede ver. Lo
+               dibuja `js/sala-privada.js` cuando el servidor lo devuelve: es el
+               mismo cartel del lobby, y vive en un solo lugar. -->
+          <div class="codigo-privado" id="codigoPrivado" hidden></div>
         </div>
       </section>
 
@@ -349,19 +316,6 @@
           </table>
         </div>
         <p class="vacio-simple" id="salasVacias">Buscando salas…</p>
-      </section>
-
-      <!-- Torneos abiertos. Sólo aparece si hay alguno: una sección que dice
-           "no hay torneos" ocupa el mismo lugar que uno de verdad y enseña a
-           no mirarla. Los crea el administrador a mano; no hay automáticos. -->
-      <section class="panel panel-torneos" id="carteleraTorneos" style="margin-top: 22px" hidden>
-        <h2>🏆 Torneos abiertos</h2>
-        <p class="nota-salas">
-          Se paga la entrada al anotarse. Si no se llega a cuatro jugadores, el
-          torneo se cancela y se devuelve todo.
-        </p>
-        <p class="aviso-tienda" id="avisoTorneosJugador" role="status" aria-live="polite"></p>
-        <div id="listaTorneosJugador"></div>
       </section>
 
       <section class="rejilla" style="margin-top: 22px">

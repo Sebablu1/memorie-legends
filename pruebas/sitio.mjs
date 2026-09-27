@@ -473,8 +473,16 @@ console.log("\n=== 13. El logo de WhatsApp, tal cual lo entrega su kit de marca 
 
   // Donde se use: chico, con `alt` vacío y con la palabra al lado. Las normas
   // piden no usar el logo en lugar de la palabra «WhatsApp».
+  // En las páginas y en los módulos que dibujan HTML: el cartel del código
+  // privado lo arma `js/sala-privada.js`.
+  const fuentes = [
+    ...Object.entries(html),
+    ...readdirSync(join(PUBLIC, "js"))
+      .filter((f) => f.endsWith(".js"))
+      .map((f) => [join(PUBLIC, "js", f), leer(join(PUBLIC, "js", f))]),
+  ];
   const usos = [];
-  for (const [pagina, texto] of Object.entries(html)) {
+  for (const [pagina, texto] of fuentes) {
     for (const m of texto.matchAll(/<a\b[^>]*>(?:(?!<\/a>)[\s\S])*?img\/whatsapp\/[\s\S]*?<\/a>/g)) {
       usos.push({ pagina: deRepo(pagina), bloque: m[0] });
     }

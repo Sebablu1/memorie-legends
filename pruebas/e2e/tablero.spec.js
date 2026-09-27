@@ -93,6 +93,10 @@ const SERVIDOR_FALSO = `
     window.__llamadas.push(["crearSala", entrada, limitePuntos]);
     return { codigo: "PUB123" };
   };
+  export const soyAdministrador = async () => ({ admin: false });
+  export const crearSalaPublica = async () => ({});
+  export const editarSalaPublica = async () => ({});
+  export const borrarSalaPublica = async () => ({});
   export const crearSalaPrivada = async (entrada, nombre, limitePuntos) => {
     window.__llamadas.push(["crearSalaPrivada", entrada, limitePuntos]);
     // Como el real: el vencimiento es una hora del reloj, no una duración.

@@ -535,97 +535,13 @@
   line-height: 1.5;
 }
 
-/* El código, la única vez que se ve. Grande y en monoespaciada: se lee para
-   dictarlo por teléfono, y un 8 y una B no se pueden confundir. */
-.codigo-privado {
-  margin-top: 14px;
-  padding: 14px;
-  border: 1px solid var(--oro-hondo);
-  border-radius: 14px;
-  background: rgba(212, 168, 67, 0.06);
-  text-align: center;
-}
-
-.codigo-privado .titulo-codigo {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 1.6px;
-  color: var(--oro);
-}
-
-.codigo-grande {
-  margin: 8px 0;
-  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-  font-size: 1.7rem;
-  letter-spacing: 6px;
-  color: var(--oro-claro);
-  /* En dos grupos, «ABCD EFGH»: si no entra en un renglón, se parte en el
-     espacio y no a la mitad de un grupo. */
-  word-break: normal;
-}
+/* El cartel del código privado vive en `sala-privada.css`, que comparten el
+   tablero y el lobby. Acá queda sólo lo que es de esta caja: */
 
 /* El cartel va centrado, como sus botones. La regla de los paneles alinea los
    párrafos a la izquierda y, con la misma fuerza, gana la que viene después:
    ésta. */
 .caja-jugar .codigo-privado p {
-  text-align: center;
-}
-
-.codigo-privado .vigencia-codigo {
-  margin-top: 4px;
-  font-size: 0.74rem;
-  color: var(--oro);
-}
-
-.codigo-privado .aviso-codigo {
-  font-size: 0.74rem;
-  color: var(--texto-tenue);
-  line-height: 1.6;
-}
-
-.botonera-codigo {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  margin-top: 12px;
-  flex-wrap: wrap;
-}
-
-/* `hidden` solo no alcanza: `button.accion` pone `display: inline-block` y le
-   gana. Sin esto, «Compartir…» se veía en navegadores que no saben compartir,
-   y tocarlo no hacía nada. */
-.botonera-codigo > [hidden] {
-  display: none;
-}
-
-/* El botón de WhatsApp: el mismo botón sobrio que los demás, con el logo
-   oficial chico al lado de la palabra. El logo no se tiñe, no se recorta y no
-   es lo más grande del cartel —lo es el código—, como pide el kit de marca. */
-/* Con las dos clases, para ganarle a `a.accion`, que pone su propio `display`
-   y sus mayúsculas. Sin las mayúsculas porque las normas de la marca piden
-   escribir siempre «WhatsApp», con la W y la segunda A en mayúscula y nada
-   más: en mayúsculas enteras sería otra palabra. */
-.accion.boton-whatsapp {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  text-transform: none;
-  letter-spacing: 0.3px;
-}
-
-.boton-whatsapp img {
-  width: 20px;
-  height: 20px;
-  flex: none;
-}
-
-/* Arriba del botón de crear: qué se va a crear, sin casilla que elegir. */
-.ayuda-privada {
-  margin: 4px 0 12px;
-  font-size: 0.8rem;
-  line-height: 1.5;
-  color: var(--texto-tenue);
   text-align: center;
 }
 

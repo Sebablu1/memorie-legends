@@ -108,6 +108,17 @@ service cloud.firestore {
       }
     }
 
+    // ------------------------------------------------------- juegos
+    // Qué juegos hay: nombre, si está activo, en qué orden va, su logo, sus
+    // colores y su configuración. El lobby los lee para saber qué mostrar, sin
+    // tener ningún juego escrito en el código. Se leen sin sesión —son nombres
+    // y logos, lo que ya se ve en la página— y los escribe sólo la
+    // administración, con `herramientas/sembrar-juegos.mjs` o desde la consola.
+    match /juegos/{juegoId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // ------------------------------------------------------- salas
     // Las salas las escribe ÚNICAMENTE el servidor: crear, unirse, iniciar
     // y salir pasan por Cloud Functions, que usan credenciales de admin y

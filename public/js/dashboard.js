@@ -23,10 +23,9 @@ import { db, collection, query, where, onSnapshot } from "./firebase.js";
 import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
 import { estadoMfa } from "./mfa.js";
 import { CORREO_ADMINISTRACION } from "./administracion.js";
-import {
-  crearSalaPrivada, unirseASala, unirseConCodigo, ErrorDeServidor,
-} from "./servidor.js";
-import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES, esCodigoValido } from "./reglas/salas.js";
+import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES } from "./reglas/salas.js";
+import { crearYMostrar } from "./sala-privada.js";
+import { conectarCampoDeCodigo, entrarConCodigo, irALaSala } from "./entrar-por-codigo.js";
 // Sólo nombres y etiquetas: el cerebro de la IA (`reglas/ia.js`, diez mil
 // caracteres) no hace falta acá y no se trae.
 import {
@@ -35,7 +34,6 @@ import {
 import { pintarAvatarCabecera, pintarInsignia } from "./equipado.js";
 import { montarLogros } from "./logros.js";
 import { montarInventario } from "./inventario.js";
-import { montarCarteleraTorneos } from "./cartelera-torneos.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -138,7 +136,6 @@ if (sesion) {
   // pone, y que la mesa abra ya vestida. Ver `modulos/vestuario.js`.
   montarInventario({ foto: usuario.photoURL, uid: usuario.uid });
   montarLogros();
-  montarCarteleraTorneos();
 
   arrancarSalas();
 }
@@ -279,171 +276,27 @@ actualizarAyudaEntrada();
 
 // --------------------------------------------------------- crear sala
 
-$("btnCrearSala").addEventListener("click", async () => {
-  const entrada = Number($("entradaSala").value);
-  const boton = $("btnCrearSala");
-
-  // Aviso temprano por cortesía. El servidor lo vuelve a comprobar igual.
-  if (saldoActual < entrada) {
-    avisar(`Te faltan Leyendas: la entrada es de ${entrada} y tenés ${saldoActual}.`, "error");
-    return;
-  }
-
-  boton.disabled = true;
-  boton.textContent = "Creando…";
-  limpiarAviso();
-
-  try {
-    const duracion = Number($("duracionSala").value);
-
-    // Desde el tablero, siempre privada: las públicas las abre la
-    // administración. Devuelve TRES cosas: el identificador de la sala, con el
-    // que se abre su pantalla; el código, que se muestra una vez y no vuelve a
-    // estar disponible en ninguna parte; y hasta cuándo vale.
-    const { sala, codigo, vence } = await crearSalaPrivada(
-      entrada, `Sala de ${nombreJugador}`, duracion,
-    );
-    mostrarCodigoPrivado(codigo, sala, vence);
-  } catch (error) {
-    avisar(error instanceof ErrorDeServidor ? error.message : "No pudimos crear la sala.", "error");
-    boton.disabled = false;
-    boton.textContent = "Crear sala";
-  }
-});
-
-/** Los caracteres de un código privado. Los de uno normal son seis. */
-const LARGO_CODIGO_PRIVADO = 8;
-
-/**
- * El mensaje para invitar. El código va SIN el espacio con que se lo muestra:
- * el campo donde se escribe acepta ocho caracteres, y pegado con el espacio
- * se perdería la última letra.
- */
-const mensajeDeInvitacion = (codigo) =>
-  "Te invito a jugar Memorie Legends conmigo. Entrá a https://memorielegends.com/lobby.html " +
-  `y usá el código ${codigo} para unirte a mi sala privada.`;
-
-/** «ABCD EFGH»: en dos grupos se lee y se dicta mejor. Sólo para mostrar. */
-const agrupado = (codigo) => codigo.replace(/^(.{4})(.+)$/, "$1 $2");
-
-/**
- * El código de una sala privada, mostrado la única vez que se puede.
- *
- * No está guardado en claro en ninguna parte: si se cierra esta ventana sin
- * copiarlo, la única salida es abrir otra sala. Por eso el aviso, y por eso
- * el botón para seguir —«Ya lo copié»— está DESPUÉS de los de copiar y
- * compartir. El código no va en ninguna dirección del sitio ni se guarda en el
- * navegador: viaja sólo dentro del mensaje que la persona decide mandar.
- */
-function mostrarCodigoPrivado(codigo, sala, vence) {
-  const caja = $("codigoPrivado");
-  if (!caja) {
-    // Sin la ventana —un HTML viejo en caché— igual no se pierde la sala.
-    irALaSala(sala);
-    return;
-  }
-
-  $("codigoPrivadoTexto").textContent = agrupado(codigo);
-
-  // Cuánto vale, según el servidor: el número no se escribe acá.
-  const minutos = Math.round((Number(vence) - Date.now()) / 60_000);
-  const vigencia = $("vigenciaCodigo");
-  if (Number.isFinite(minutos) && minutos > 0) {
-    vigencia.textContent = `Vale ${minutos} ${minutos === 1 ? "minuto" : "minutos"}.`;
-    vigencia.hidden = false;
-  }
-
-  const mensaje = mensajeDeInvitacion(codigo);
-  $("enlaceWhatsApp").href = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
-
-  if (typeof navigator.share === "function") {
-    const compartir = $("btnCompartirCodigo");
-    compartir.hidden = false;
-    compartir.onclick = () => navigator.share({ text: mensaje }).catch(() => {});
-  }
-
-  caja.hidden = false;
-
-  $("btnCopiarCodigoPrivado").onclick = async () => {
-    try {
-      await navigator.clipboard.writeText(codigo);
-      $("btnCopiarCodigoPrivado").textContent = "¡Copiado!";
-    } catch {
-      $("btnCopiarCodigoPrivado").textContent = "Copialo a mano";
-    }
-  };
-  $("btnYaLoCopie").onclick = () => irALaSala(sala);
-}
+// Desde el tablero, siempre privada: las públicas las abre la administración.
+// Crear la sala y dibujar el cartel del código es lo mismo acá y en el lobby,
+// y vive en `sala-privada.js`.
+$("btnCrearSala").addEventListener("click", () =>
+  crearYMostrar({
+    boton: $("btnCrearSala"),
+    caja: $("codigoPrivado"),
+    entrada: Number($("entradaSala").value),
+    duracion: Number($("duracionSala").value),
+    nombre: `Sala de ${nombreJugador}`,
+    saldo: saldoActual,
+    avisar,
+    limpiarAviso,
+  }),
+);
 
 // ------------------------------------------------------ entrar por código
 
-$("codigoSala").addEventListener("input", (evento) => {
-  // Sólo el alfabeto de los códigos, y en mayúsculas. Se limpia mientras se
-  // escribe para que nadie descubra al enviar que su "0" era una "O".
-  evento.target.value = evento.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-});
-
-$("codigoSala").addEventListener("keydown", (evento) => {
-  if (evento.key === "Enter") $("btnUnirse").click();
-});
-
-$("btnUnirse").addEventListener("click", () => entrarA($("codigoSala").value, $("btnUnirse")));
-
-/**
- * Pide entrar a una sala. Es el único camino: lo usan el botón de código y los
- * de la tabla, para que no haya dos formas de hacer lo mismo.
- */
-async function entrarA(codigoCrudo, boton) {
-  const codigo = String(codigoCrudo ?? "").trim().toUpperCase();
-
-  // Ocho caracteres es el código de una sala privada, y va por otra puerta:
-  // el servidor busca su hash y devuelve a qué sala pertenece.
-  const esPrivado = codigo.length === LARGO_CODIGO_PRIVADO;
-
-  if (!esPrivado && !esCodigoValido(codigo)) {
-    avisar("El código tiene que ser de seis caracteres, u ocho si es privado.", "error");
-    $("codigoSala").focus();
-    return;
-  }
-
-  const textoOriginal = boton?.textContent;
-  if (boton) {
-    boton.disabled = true;
-    boton.textContent = "Entrando…";
-  }
-  limpiarAviso();
-
-  try {
-    if (esPrivado) {
-      const { sala } = await unirseConCodigo(codigo);
-      irALaSala(sala);
-      return;
-    }
-    await unirseASala(codigo);
-    irALaSala(codigo);
-  } catch (error) {
-    avisar(
-      error instanceof ErrorDeServidor ? error.message : "No pudimos entrar a la sala.",
-      "error",
-    );
-    if (boton) {
-      boton.disabled = false;
-      boton.textContent = textoOriginal;
-    }
-  }
-}
-
-/**
- * Guarda el código y va a la sala.
- *
- * `roomCode` en localStorage es una comodidad para volver, NO una autoridad:
- * quien decide en qué sala está cada uno es el servidor. Editarlo a mano no
- * mete a nadie en ningún lado.
- */
-function irALaSala(codigo) {
-  localStorage.setItem("roomCode", codigo);
-  window.location.href = `room.html?code=${encodeURIComponent(codigo)}`;
-}
+// Seis caracteres para una sala pública, ocho para una invitación privada: la
+// lógica es la misma que en el lobby, en `entrar-por-codigo.js`.
+conectarCampoDeCodigo($("codigoSala"), $("btnUnirse"), { avisar, limpiarAviso });
 
 // -------------------------------------------------------- salas en vivo
 
@@ -513,7 +366,7 @@ function filaDeSala(sala) {
     boton.disabled = true;
   } else {
     boton.textContent = "Unirse";
-    boton.addEventListener("click", () => entrarA(sala.codigo, boton));
+    boton.addEventListener("click", () => entrarConCodigo(sala.codigo, { boton, avisar, limpiarAviso }));
   }
 
   accion.appendChild(boton);
