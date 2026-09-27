@@ -21,6 +21,7 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 const SESION_FALSA = `
   export const COLECCION="users"; export const CAMPO_SALDO="credits";
@@ -286,4 +287,98 @@ test("la portada también lo tiene, con sus dos botones adentro", async ({
 
   // Sin `<nav>` no hay lista de enlaces, así que los botones no se van al pie.
   await expect(cajon).toHaveClass(/sin-enlaces/);
+});
+
+// =====================================================================
+// Lo que el menú ofrece en todas las páginas
+// =====================================================================
+
+test("el cajón lleva al lobby", async ({ page }) => {
+  await abrirTablero(page);
+  await page.locator("#btnMenu").click();
+
+  const lobby = page.locator('#cajonMenu nav a[href="lobby.html"]');
+  await expect(lobby).toBeVisible();
+  await expect(lobby).toHaveText("Lobby");
+});
+
+test("y tiene el soporte por WhatsApp, con el número del sitio", async ({ page }) => {
+  await abrirTablero(page);
+  await page.locator("#btnMenu").click();
+
+  const soporte = page.locator("#cajonMenu nav a.enlace-soporte");
+  await expect(soporte).toBeVisible();
+  await expect(soporte).toHaveText("Soporte WhatsApp");
+  await expect(soporte).toHaveAttribute("href", "https://wa.me/59891900968");
+  // Sale del sitio: pestaña aparte, y `noopener` para que lo que se abra no
+  // pueda tocar esta página desde `window.opener`.
+  await expect(soporte).toHaveAttribute("target", "_blank");
+  await expect(soporte).toHaveAttribute("rel", /noopener/);
+
+  // El verde oficial de la marca, que es lo único que lo distingue del resto
+  // de la lista.
+  await expect(soporte).toHaveCSS("color", "rgb(37, 211, 102)");
+
+  // El glifo del kit: chico, con `alt` vacío —la palabra está al lado— y
+  // cargado de verdad, no un hueco.
+  const logo = soporte.locator("img");
+  await expect(logo).toHaveAttribute("src", /Digital_Glyph_Green_RGB_2026\.svg$/);
+  await expect(logo).toHaveJSProperty("alt", "");
+  expect(await logo.evaluate((i) => i.naturalWidth)).toBeGreaterThan(0);
+});
+
+test("la 404, servida desde una carpeta que no existe, se ve entera", async ({ page }) => {
+  // Firebase entrega esta página para CUALQUIER dirección que no existe, y la
+  // dirección puede tener carpetas inventadas. Si algo de la página fuera
+  // relativo, el navegador lo buscaría dentro de esa carpeta: la hoja no
+  // llegaría, el logo quedaría en un hueco y las salidas no llevarían a nada.
+  // Por eso se prueba servida desde el fondo, no desde `/404.html`.
+  const cuerpo = readFileSync("public/404.html", "utf8");
+  await page.route("**/carpeta/inventada/pagina", (r) =>
+    r.fulfill({ status: 404, contentType: "text/html; charset=utf-8", body: cuerpo }),
+  );
+
+  await page.setViewportSize(MOVIL);
+  await page.goto("/carpeta/inventada/pagina");
+
+  await expect(page.locator("h1")).toHaveText("Esta carta no está en el mazo");
+  // La moneda de la barra llegó: la hoja y las imágenes también salen de la raíz.
+  const moneda = page.locator(".marca-moneda");
+  expect(await moneda.evaluate((i) => i.naturalWidth)).toBeGreaterThan(0);
+
+  // Las dos salidas, y el soporte en el cajón.
+  await expect(page.locator('a.accion[href="/dashboard.html"]')).toBeVisible();
+  await expect(page.locator('a.accion[href="/lobby.html"]')).toBeVisible();
+  await page.locator("#btnMenu").click();
+  await expect(page.locator('#cajonMenu nav a.enlace-soporte')).toHaveAttribute(
+    "href",
+    "https://wa.me/59891900968",
+  );
+});
+
+test("una página legal lleva el mismo cajón, y el soporte NO se ve en la barra", async ({ page }) => {
+  // Las legales tenían su propia cabecera: una fila de enlaces siempre a la
+  // vista. Ahí el soporte por WhatsApp quedaba expuesto en todas las páginas
+  // del sitio que más se comparten. Ahora llevan la barra de siempre y el
+  // soporte vive dentro del cajón, como en el resto.
+  await page.setViewportSize(MOVIL);
+  await page.goto("/terminos.html");
+  await page.waitForSelector("#btnMenu");
+
+  // Cerrado: no hay ni un enlace del menú a la vista.
+  await expect(page.locator("header a.enlace-soporte")).toHaveCount(0);
+  await expect(page.locator(".barra-contenido nav")).toHaveCount(0);
+  await expect(page.locator("header")).not.toContainText("Soporte WhatsApp");
+
+  // Abierto: el soporte está adentro, en verde y con su número.
+  await page.locator("#btnMenu").click();
+  const soporte = page.locator("#cajonMenu nav a.enlace-soporte");
+  await expect(soporte).toBeVisible();
+  await expect(soporte).toHaveAttribute("href", "https://wa.me/59891900968");
+  await expect(soporte).toHaveCSS("color", "rgb(37, 211, 102)");
+
+  // Y el cuerpo sigue siendo el de la columna de lectura: 360 px en un
+  // teléfono de 390, que es lo que medía antes de tocarle la cabecera.
+  const columna = page.locator(".legal-container");
+  expect(Math.round((await columna.boundingBox()).width)).toBe(360);
 });

@@ -53,6 +53,7 @@ const DESTINO = "public/index.html";
 /** En el mismo orden en que estaban enlazadas: el orden decide quién gana. */
 const HOJAS = [
   "public/css/tema.css",
+  "public/css/barra.css",
   "public/css/app.css",
   "public/css/portada.css",
   "public/css/pie.css",

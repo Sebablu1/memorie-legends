@@ -400,3 +400,30 @@ input::placeholder {
 .sombra-oro {
   box-shadow: 0 8px 30px rgba(212, 168, 67, 0.2);
 }
+
+/* ══════════════════════════════════════ el soporte por WhatsApp
+
+   El único enlace del menú que sale del sitio, y el único que no es dorado:
+   en verde se lee como lo que es —un atajo a la conversación— y no como una
+   página más de la lista.
+
+   Vive en esta hoja, y no en `app.css`, porque lo llevan las dos cabeceras
+   del sitio: la de la app y la de las páginas legales, que cargan `legal.css`
+   y no la otra.
+
+   El glifo es el del kit de marca, sin tocar, chico y con la palabra al lado:
+   sus normas no dejan usarlo EN LUGAR de la palabra «WhatsApp». `sitio.mjs`
+   §13 lo vigila en todas las páginas. */
+
+.enlace-soporte {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #25d366;
+}
+
+.enlace-soporte img {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}

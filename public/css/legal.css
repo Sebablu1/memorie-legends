@@ -33,63 +33,12 @@ body {
   line-height: 1.6;
 }
 
-/* ------------------------------------------------------- cabecera */
-
-header {
-  border-bottom: 1px solid var(--borde);
-  background: rgba(12, 12, 18, 0.92);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  backdrop-filter: blur(8px);
-}
-
-.header-content {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 14px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.header-content .logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: var(--oro);
-  text-decoration: none;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-}
-
-.header-content nav {
-  display: flex;
-  gap: 22px;
-  flex-wrap: wrap;
-}
-
-.header-content nav a {
-  color: var(--texto-suave);
-  text-decoration: none;
-  font-size: 0.95rem;
-  padding: 4px 0;
-  border-bottom: 2px solid transparent;
-  transition: color 0.2s, border-color 0.2s;
-}
-
-.header-content nav a:hover,
-.header-content nav a[aria-current="page"] {
-  color: var(--oro);
-  border-bottom-color: var(--oro);
-}
+/* La cabecera ya no vive acá: estas páginas llevan la misma barra con cajón
+   que el resto del sitio, y sus estilos están en `app.css`. El soporte por
+   WhatsApp tiene que quedar DENTRO del cajón, nunca a la vista en la barra. */
 
 /* ------------------------------------------------------ contenido */
+
 
 main {
   flex: 1;
@@ -254,17 +203,6 @@ footer {
 
   .legal-container h2 {
     font-size: 1.25rem;
-  }
-
-  .header-content {
-    padding: 12px 15px;
-    justify-content: center;
-  }
-
-  .header-content nav {
-    gap: 16px;
-    justify-content: center;
-    width: 100%;
   }
 
   .footer-links {

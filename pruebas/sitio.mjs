@@ -14,6 +14,7 @@
  *  11. El sitemap tiene las páginas públicas y el robots no se las prohíbe.
  *  12. Cada página tiene título, descripción, canónica y Open Graph, sin repetir.
  *  13. El logo de WhatsApp es el del kit de marca, sin tocar, y se usa como pide.
+ *  14. El menú dice lo mismo, y en el mismo orden, en todas las páginas.
  *
  * Nada de esto rompe una prueba del navegador cuando falla. Un `src` mal
  * escrito no tira ningún error de JavaScript: deja un hueco donde iba la marca,
@@ -288,7 +289,8 @@ console.log("\n=== 7. La dirección canónica, sin www ===");
     const texto = html[pagina];
     ok(!/www\.memorielegends\.com|http:\/\/(www\.)?memorielegends\.com/.test(texto),
        `${nombre}: ningún enlace con www ni con http://`);
-    // La 404 es la de Firebase y el panel no se indexa: no llevan canónica.
+    // La 404 pide no ser indexada —lo dice su <meta robots>— y el panel
+    // tampoco se indexa: ninguna de las dos lleva canónica.
     if (nombre === "404.html" || nombre.startsWith("admin/")) continue;
 
     const esperada = `${SITIO}/${nombre === "index.html" ? "" : nombre}`;
@@ -436,7 +438,7 @@ console.log("\n=== 12. Cada página con sus metadatos ===");
   const descripciones = new Map();
   for (const pagina of PAGINAS) {
     const nombre = relative(PUBLIC, pagina).replaceAll("\\", "/");
-    // La 404 es la de Firebase (PENDIENTE §16) y el panel no se indexa.
+    // La 404 no se indexa, y el panel tampoco: no necesitan Open Graph.
     if (nombre === "404.html" || nombre.startsWith("admin/")) continue;
     const texto = html[pagina];
     const meta = etiquetas(texto, "meta");
@@ -495,6 +497,123 @@ console.log("\n=== 13. El logo de WhatsApp, tal cual lo entrega su kit de marca 
        `${pagina}: el logo va chico y con alt vacío`, img?.crudo);
     ok(/\bWhatsApp\b/.test(texto), `${pagina}: con la palabra «WhatsApp» al lado, bien escrita`);
   }
+}
+
+
+console.log("\n=== 14. El mismo menú, y en el mismo orden, en todas las páginas ===");
+{
+  // El orden canónico. Ninguna página los lleva todos —la sala de espera y las
+  // legales llevan menos—, pero la que lleva dos los lleva en este orden. Si
+  // una los ordena distinto, quien viaja entre páginas pierde el lugar donde
+  // estaba el enlace que busca, y eso se siente más que un color cambiado.
+  const ORDEN = ["Inicio", "Lobby", "Jugar", "Cómo se juega", "Ranking", "Tienda",
+                 "Tu cuenta", "Soporte WhatsApp", "Administración"];
+  // El número de soporte: UNO solo y el mismo en todas. Escrito catorce veces
+  // a mano, un dígito cambiado en una sola página manda a un desconocido.
+  const SOPORTE = "https://wa.me/59891900968";
+
+  // La portada no lleva menú: su cajón tiene los dos botones de entrar y de
+  // registrarse, y nada más. La mesa tampoco, porque adentro de una partida no
+  // hay a dónde ir. El panel de administración es otra cosa.
+  const conMenu = PAGINAS.filter((p) => /<nav\b/.test(html[p]) && !/admin/.test(p));
+  ok(conMenu.length === 14, "las páginas con menú son catorce", conMenu.map(deRepo));
+
+  for (const pagina of conMenu) {
+    const nombre = relative(PUBLIC, pagina).replaceAll("\\", "/");
+    const nav = html[pagina].match(/<nav\b[^>]*>[\s\S]*?<\/nav>/)[0];
+    const enlaces = [...nav.matchAll(/<a\b[^>]*>([\s\S]*?)<\/a>/g)].map((m) => ({
+      crudo: m[0],
+      href: m[0].match(/href="([^"]*)"/)?.[1],
+      texto: m[1].replace(/<[^>]*>/g, "").trim(),
+      actual: /aria-current="page"/.test(m[0]),
+    }));
+    const textos = enlaces.map((e) => e.texto);
+
+    // Subsecuencia del orden canónico: sin entradas desconocidas y sin vueltas
+    // hacia atrás.
+    const lugares = textos.map((x) => ORDEN.indexOf(x));
+    ok(lugares.every((i) => i >= 0) && lugares.every((v, i) => i === 0 || v > lugares[i - 1]),
+       `${nombre}: las entradas, en el orden de siempre`, textos);
+
+    const lobby = enlaces.find((e) => e.texto === "Lobby");
+    ok(/^\/?lobby\.html$/.test(lobby?.href ?? ""), `${nombre}: con «Lobby», y lleva al lobby`, lobby?.href);
+
+    // «Jugar» significa una sola cosa: el tablero. Nunca la pantalla de
+    // ingreso, que no es jugar sino entrar.
+    const jugar = enlaces.find((e) => e.texto === "Jugar");
+    ok(!jugar || /^(#jugar|\/?dashboard\.html#jugar)$/.test(jugar.href ?? ""),
+       `${nombre}: «Jugar» va al tablero`, jugar?.href);
+    ok(!/href="[^"]*login\.html"/.test(nav), `${nombre}: ninguna entrada manda a la pantalla de ingreso`);
+
+    // Y vive DENTRO del menú, que es lo que el cajón se lleva. Suelto en la
+    // barra quedaría a la vista en todas las páginas, que es justo lo que no
+    // se quiere: el número no es un botón de la cabecera.
+    const enLaPagina = (html[pagina].match(/class="enlace-soporte"/g) ?? []).length;
+    const enElMenu = (nav.match(/class="enlace-soporte"/g) ?? []).length;
+    ok(enLaPagina === 1 && enElMenu === 1,
+       `${nombre}: un solo soporte, y dentro del menú`, { enLaPagina, enElMenu });
+
+    const soporte = enlaces.find((e) => e.texto === "Soporte WhatsApp");
+    ok(soporte?.href === SOPORTE, `${nombre}: con «Soporte WhatsApp», al número del sitio`, soporte?.href);
+    // Sale del sitio: pestaña nueva, y `noopener` para que la página que se
+    // abre no pueda tocar la nuestra desde `window.opener`.
+    ok(/target="_blank"/.test(soporte?.crudo ?? "") && /rel="noopener/.test(soporte?.crudo ?? ""),
+       `${nombre}: el soporte abre aparte, con noopener`, soporte?.crudo);
+
+    // La página donde uno está se marca, y se marca una sola vez.
+    const propia = (href) => {
+      if (!href || /^https?:/.test(href)) return false;
+      const limpia = href.split("#")[0];
+      if (limpia === "") return true;
+      const destino = limpia === "/" ? join(PUBLIC, "index.html") : enDisco(limpia, pagina);
+      return resolve(destino) === resolve(pagina);
+    };
+    const propias = enlaces.filter((e) => propia(e.href));
+    const marcadas = enlaces.filter((e) => e.actual);
+    ok(marcadas.length === (propias.length ? 1 : 0) && marcadas.every((e) => propia(e.href)),
+       `${nombre}: la página donde uno está, marcada una sola vez`, marcadas.map((e) => e.texto));
+  }
+
+  // Las legales llevan el mismo menú que una página pública cualquiera: desde
+  // el Paso 1 tienen la misma barra con cajón que el resto del sitio, y el
+  // soporte por WhatsApp vive DENTRO del cajón, nunca a la vista en la barra.
+  const entradasDe = (pagina) => {
+    const nav = html[pagina].match(/<nav[^>]*>[\s\S]*?<\/nav>/)[0];
+    return [...nav.matchAll(/<a[^>]*>([\s\S]*?)<\/a>/g)].map((m) => m[1].replace(/<[^>]*>/g, "").trim());
+  };
+  const referencia = entradasDe(join(PUBLIC, "como-se-juega.html"));
+  for (const nombre of ["terminos.html", "privacidad.html", "seguridad.html",
+                        "quienes-somos.html", "reglamento-torneos.html"]) {
+    const pagina = join(PUBLIC, nombre);
+    ok(JSON.stringify(entradasDe(pagina)) === JSON.stringify(referencia),
+       `${nombre}: el mismo menú que el resto del sitio`, entradasDe(pagina));
+    // La barra con cajón: el mismo armado y el mismo módulo que las demás.
+    ok(/<header class="barra">/.test(html[pagina]) && /<div class="barra-contenido">/.test(html[pagina]),
+       `${nombre}: con la barra del sitio`);
+    ok(/<script type="module" src="\/js\/menu\.js"><\/script>/.test(html[pagina]),
+       `${nombre}: y con el cajón, que es donde va el soporte`);
+    ok(!/header-content/.test(html[pagina]), `${nombre}: sin rastros de la cabecera vieja`);
+  }
+  // La hoja de las legales ya no dibuja ninguna cabecera: si volviera a
+  // hacerlo, volvería la fila de enlaces a la vista.
+  const legal = leer(join(PUBLIC, "css", "legal.css"));
+  ok(!/header-content|^header\s*\{/m.test(legal.replace(/\/\*[\s\S]*?\*\//g, "")),
+     "legal.css no define ninguna cabecera");
+
+  // La 404 la sirve Firebase para CUALQUIER dirección que no existe, incluso
+  // una con carpetas inventadas. Una sola dirección relativa —una hoja, el
+  // logo, un enlace— se buscaría dentro de esa carpeta que no existe, y la
+  // página saldría desnuda o el enlace no llevaría a ninguna parte.
+  const cuatro = html[join(PUBLIC, "404.html")];
+  const relativas = [...cuatro.matchAll(/(?:href|src)="([^"]*)"/g)]
+    .map((m) => m[1])
+    .filter((d) => !/^(https?:|\/|#|data:|mailto:)/.test(d));
+  ok(relativas.length === 0, "404.html: todas sus direcciones salen de la raíz", relativas);
+  ok(/Esta carta no está en el mazo/.test(cuatro), "404.html: lo dice en criollo");
+  ok(/name="robots" content="noindex"/.test(cuatro), "404.html: y pide no ser indexada");
+  const salidas = [...cuatro.matchAll(/<a class="accion[^"]*" href="([^"]*)"/g)].map((m) => m[1]);
+  ok(salidas.includes("/dashboard.html") && salidas.includes("/lobby.html"),
+     "404.html: con sus dos salidas, al inicio y al lobby", salidas);
 }
 
 // ────────────────────────────────────────────────────────────────────

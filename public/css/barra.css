@@ -1,0 +1,665 @@
+/* ============================================================
+   LA BARRA DE ARRIBA Y SU MENÚ PLEGABLE
+   ============================================================
+
+   Hoja propia, y no parte de `app.css`, por una razón concreta: las páginas
+   legales —términos, privacidad, seguridad, quiénes somos y el reglamento de
+   torneos— llevan la misma barra que el resto del sitio, pero su cuerpo lo
+   arma `legal.css`, que es una columna de lectura. Cargarles `app.css` entero
+   les cambiaba el cuerpo: `main` pasaba a tener 1100 px de ancho máximo y
+   20 px de relleno a los costados, y en un teléfono el texto se reacomodaba
+   —medido: casi mil píxeles más de alto en Términos—.
+
+   Acá está sólo la barra: el logo, los enlaces, el saldo, la foto, el botón y
+   el cajón. Lo que hay dentro de la página no se toca desde esta hoja.
+
+   La portada no la enlaza: lleva su CSS incrustado, y `css-critico.mjs`
+   incluye esta hoja en el bloque que genera.
+*/
+
+/* ================================================== barra superior */
+
+.barra {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--borde);
+  background: rgba(10, 10, 10, 0.92);
+  backdrop-filter: blur(10px);
+}
+
+.barra-contenido {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.barra .marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* El logo de la barra.
+
+   Esta regla le gana a `.logo-img` por especificidad, así que es la que manda:
+   cambiar sólo aquélla no movía nada acá, que fue lo primero que probé.
+
+   Se le quitaron el borde dorado y las esquinas redondeadas. Eran un marco
+   para el logo cuadrado anterior; alrededor de uno transparente encierran aire
+   y le recortan las puntas del laurel. El logo nuevo ya trae su propio
+   contorno. */
+.barra .marca img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+@media (min-width: 768px) {
+  .barra .marca img {
+    width: 50px;
+    height: 50px;
+  }
+}
+
+/* El nombre: tipografía, dorado y relieve están en `.marca-texto`, en
+   `tema.css`, que comparten todas las páginas. Acá sólo se ajusta el tamaño a
+   lo que entra en cada ancho. */
+
+.barra nav {
+  display: flex;
+  gap: 18px;
+  margin-left: 8px;
+  flex-wrap: wrap;
+}
+
+.barra nav a {
+  color: var(--texto-tenue);
+  text-decoration: none;
+  font-size: 0.92rem;
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.barra nav a:hover,
+.barra nav a[aria-current="page"] {
+  color: var(--oro);
+  border-bottom-color: var(--oro);
+}
+
+.barra .derecha {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* El grupo de la derecha es uno solo: Leyendas, foto y menú, pegados.
+ *
+ * El hamburguesa traía su propio `margin-left: auto`, y con dos márgenes
+ * automáticos en la misma fila el hueco sobrante se reparte entre los dos: el
+ * saldo quedaba flotando en el medio y el botón contra el borde, como si no
+ * tuvieran nada que ver. Son la misma cosa —quién soy, cuánto tengo, qué puedo
+ * hacer— y se leen juntos. */
+.barra .derecha ~ .hamburguesa { margin-left: 0; }
+
+/* Saldo de Leyendas */
+.saldo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: rgba(212, 168, 67, 0.1);
+  border: 1px solid rgba(212, 168, 67, 0.35);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.saldo b {
+  color: var(--oro-claro);
+  font-size: 1.05rem;
+}
+
+.saldo small {
+  color: var(--texto-tenue);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.saldo.subiendo b {
+  animation: destelloSaldo 0.9s ease-out;
+}
+
+@keyframes destelloSaldo {
+  0% { transform: scale(1); color: var(--oro-claro); }
+  35% { transform: scale(1.35); color: #fff; text-shadow: 0 0 18px var(--oro); }
+  100% { transform: scale(1); color: var(--oro-claro); }
+}
+
+/* La foto de la cuenta. Con filo de oro, como todo lo que importa acá: es la
+   que dice de quién es la sesión, al lado de las Leyendas que se van a
+   gastar. */
+.avatar {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid rgba(212, 168, 67, 0.55);
+  object-fit: cover;
+  background: var(--panel-alto);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* El mismo círculo, cuando el avatar equipado es un glifo y no un archivo.
+   Un emoji no entra en un `<img>`, así que ahí el nodo pasa a ser un `<span>`
+   —lo cambia `avatar-cabecera.js`— y necesita centrar su contenido, que la
+   imagen resolvía sola con `object-fit`. */
+.avatar-glifo {
+  display: grid;
+  place-items: center;
+  font-size: 1.35rem;
+  line-height: 1;
+  background: radial-gradient(circle at 50% 40%, rgba(212, 168, 67, 0.22), var(--panel-alto));
+  user-select: none;
+}
+
+/* =====================================================================
+   EL MENÚ PLEGABLE
+   =====================================================================
+
+   Hasta 768px —una tableta en vertical— los enlaces y el bloque de la
+   derecha se mudan a un cajón que entra desde el costado. Por encima de
+   ese ancho vuelven a la barra y todo esto queda apagado.
+
+   Quien muda los nodos es `js/menu.js`, y son los MISMOS elementos: no se
+   copian. Ahí está explicado por qué importa.
+
+   Como el `<nav>` deja de estar dentro de `.barra` cuando está en el
+   cajón, las reglas `.barra nav a` dejan de alcanzarlo. Por eso acá se
+   escribe su aspecto entero en vez de retocar el de la barra. */
+
+/* --------------------------------------------------------- el botón */
+
+.hamburguesa {
+  /* En TODOS los tamaños. El menú plegable dejó de ser cosa del teléfono: la
+     barra queda con el logo, el saldo y el botón, y los enlaces viven en el
+     cajón. Una barra con siete enlaces y un saldo compite consigo misma; con
+     tres cosas se lee de un vistazo. */
+  display: inline-flex;
+  margin-left: auto;
+  padding: 10px;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  /* El objetivo táctil entero, no sólo las rayas: 44px es el mínimo que
+     se puede tocar sin apuntar. */
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.hamburguesa:hover {
+  border-color: var(--oro);
+  background: rgba(212, 168, 67, 0.08);
+}
+
+.hamburguesa .rayas {
+  position: relative;
+  display: block;
+  width: 22px;
+  height: 16px;
+}
+
+.hamburguesa i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--oro);
+  transition: transform 0.3s ease, opacity 0.2s ease, top 0.3s ease;
+}
+
+.hamburguesa i:nth-child(1) { top: 0; }
+.hamburguesa i:nth-child(2) { top: 7px; }
+.hamburguesa i:nth-child(3) { top: 14px; }
+
+/* Abierto: las tres rayas se vuelven una X.
+
+   Se cuelga de `aria-expanded` y no de una clase aparte. Así el dibujo no
+   puede decir una cosa mientras el atributo dice otra — que es lo que un
+   lector de pantalla anuncia—: son el mismo dato. */
+.hamburguesa[aria-expanded="true"] i:nth-child(1) {
+  top: 7px;
+  transform: rotate(45deg);
+}
+.hamburguesa[aria-expanded="true"] i:nth-child(2) {
+  opacity: 0;
+}
+.hamburguesa[aria-expanded="true"] i:nth-child(3) {
+  top: 7px;
+  transform: rotate(-45deg);
+}
+
+/* ---------------------------------------------------------- el velo */
+
+.fondo-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: var(--cajon-velo);
+  opacity: 0;
+  visibility: hidden;
+  /* La visibilidad cambia SIN transición, pero recién al final: si se
+     apagara de entrada, el desvanecido no se vería. */
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+
+.fondo-menu.visible {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.3s ease, visibility 0s;
+}
+
+/* --------------------------------------------------------- el cajón */
+
+.cajon-menu {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  width: var(--cajon-ancho);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+
+  /* Un fondo con algo adentro, no un rectángulo gris.
+     Dos luces tenues —oro arriba, bronce abajo— sobre el negro de la casa, y
+     un filo dorado en el canto: es la misma familia que el paño de la mesa y
+     que las tarjetas del tablero. Plano quedaba como una pieza de otro sitio. */
+  background:
+    radial-gradient(ellipse 120% 40% at 100% 0%, rgba(212, 168, 67, 0.10), transparent 70%),
+    radial-gradient(ellipse 100% 40% at 0% 100%, rgba(184, 115, 51, 0.08), transparent 70%),
+    var(--cajon-fondo);
+  border-left: 1px solid rgba(212, 168, 67, 0.28);
+  box-shadow: -18px 0 44px rgba(0, 0, 0, 0.6), inset 1px 0 0 rgba(255, 255, 255, 0.03);
+
+  /* Entra desde la derecha porque de ese lado está el botón: el panel sale
+     de donde se lo tocó, y en un teléfono ese lado es el que alcanza el
+     pulgar. */
+  transform: translateX(100%);
+  visibility: hidden;
+  transition: transform 0.3s ease, visibility 0s linear 0.3s;
+}
+
+.cajon-menu.abierto {
+  transform: none;
+  visibility: visible;
+  transition: transform 0.3s ease, visibility 0s;
+}
+
+.cabecera-cajon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--borde-suave);
+}
+
+.titulo-cajon {
+  margin: 0;
+  font-family: "Playfair Display", "Playfair respaldo", Georgia, "Times New Roman", serif;
+  font-size: 1.25rem;
+  color: var(--oro);
+  letter-spacing: 0.5px;
+}
+
+.cerrar-menu {
+  min-width: 40px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--oro);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.cerrar-menu:hover {
+  border-color: var(--oro);
+  background: rgba(212, 168, 67, 0.08);
+  color: var(--oro-claro);
+}
+
+/* ------------------------------------------- los enlaces, ya adentro */
+
+.cajon-menu nav {
+  display: flex;
+  flex-direction: column;
+
+  /* La lista toma el alto que sobra y se centra en él.
+     Pegada arriba dejaba media pantalla de negro debajo —siete enlaces en un
+     teléfono de 844 px— y el cajón parecía a medio hacer. Centrada, el hueco
+     se reparte y de paso los enlaces caen donde llega el pulgar. */
+  flex: 1 1 auto;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+}
+
+.cajon-menu nav a {
+  position: relative;
+  font-family: "Inter", "Inter respaldo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 1.02rem;
+  font-weight: 500;
+  color: var(--texto-tenue);
+  text-decoration: none;
+  /* Alto de dedo, y el área de toque ocupa todo el ancho del cajón: no hay
+     que apuntarle a la palabra. */
+  padding: 13px 14px;
+  border-radius: 10px;
+  border-bottom: none;
+  border: 1px solid transparent;
+  transition: color 0.2s, background 0.2s, border-color 0.2s, transform 0.2s;
+}
+
+.cajon-menu nav a:hover,
+.cajon-menu nav a:focus-visible {
+  color: var(--oro-claro);
+  background: rgba(212, 168, 67, 0.09);
+  border-color: rgba(212, 168, 67, 0.28);
+  /* Se corre dos píxeles hacia la lista: el enlace contesta al puntero antes
+     de que uno lo toque. */
+  transform: translateX(2px);
+}
+
+/* La página en la que uno está: fondo, filo y una barra de oro al costado.
+
+   El color solo no alcanza —hay quien no distingue el dorado del plata— y por
+   eso van las tres cosas juntas: tono, borde y una marca de posición. */
+.cajon-menu nav a[aria-current="page"] {
+  color: var(--oro-claro);
+  background: linear-gradient(90deg, rgba(212, 168, 67, 0.16), rgba(212, 168, 67, 0.04));
+  border-color: rgba(212, 168, 67, 0.4);
+  box-shadow: inset 3px 0 0 var(--oro);
+}
+
+/* ------------------------------------------- el soporte por WhatsApp
+
+   Lo que se ve —el verde, el glifo y el aire entre los dos— vive en
+   `tema.css`, que cargan las dos familias de cabecera: la de la app y la de
+   las páginas legales, que llevan otra hoja. Acá queda sólo lo del cajón.
+
+   En la lista, el enlace ocupa todo el ancho: el área de toque es la fila
+   entera y no la palabra. */
+.barra nav a.enlace-soporte,
+.cajon-menu nav a.enlace-soporte {
+  /* El verde otra vez: `.cajon-menu nav a` y `.barra nav a` pintan de gris
+     todo lo de la lista, y le ganan por especificidad al `.enlace-soporte`
+     de `tema.css`. */
+  color: #25d366;
+}
+
+.cajon-menu nav a.enlace-soporte {
+  /* En la lista ocupa todo el ancho: el área de toque es la fila entera y no
+     la palabra. */
+  display: flex;
+}
+
+.cajon-menu nav a.enlace-soporte:hover,
+.cajon-menu nav a.enlace-soporte:focus-visible {
+  /* El verde no cambia al pasar por encima: es el color de la marca, no un
+     estado. Lo que contesta es el fondo y el filo. */
+  color: #25d366;
+  border-color: rgba(37, 211, 102, 0.4);
+  background: rgba(37, 211, 102, 0.1);
+}
+
+
+/* ------------------------------------------------- el pie del cajón */
+
+/* "Salir" vive acá, separado de los enlaces por una línea y por el hueco que
+   deja `margin-top: auto`. Es la única acción del cajón que no lleva a una
+   página, y no tiene que poder tocarse por error al querer ir a la Tienda. */
+.pie-cajon {
+  margin: auto 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--borde-suave);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pie-cajon:empty { display: none; }
+
+.pie-cajon > button {
+  width: 100%;
+  justify-content: center;
+  text-align: center;
+}
+
+/* ------------------------------------- el saldo y el botón de salir */
+
+.cajon-menu .derecha {
+  /* `margin-top: auto` los manda al pie del cajón: son el cierre, no un
+     enlace más de la lista. */
+  margin: auto 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--borde-suave);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Saldo y avatar comparten renglón; los botones se llevan uno entero.
+   En la portada, donde `.derecha` son "Iniciar sesión" y "Crear cuenta",
+   esto los deja apilados y a todo el ancho, que es como se tocan bien. */
+.cajon-menu .derecha > .accion,
+.cajon-menu .derecha > button {
+  flex: 1 0 100%;
+  justify-content: center;
+  text-align: center;
+}
+
+/* Cajón sin lista de enlaces —la portada—: los botones suben al principio,
+   donde cae la vista, en vez de quedar al pie de una pantalla vacía. */
+.cajon-menu.sin-enlaces .derecha {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* Con el cajón abierto la página de atrás no se mueve. Sin esto, arrastrar
+   sobre el velo scrollea lo de abajo y al cerrar uno aparece en otro lado. */
+body.con-menu-abierto {
+  overflow: hidden;
+}
+
+/* La barra en un teléfono: logo, Leyendas, foto y menú en UN renglón.
+ *
+ * Los cuatro suman más de 320 px con el aire de una pantalla grande, y la fila
+ * se partía en dos: el logo arriba y todo lo demás abajo, con una cabecera de
+ * 90 px comiéndose la pantalla. Se aprieta el aire, se achica la ficha del
+ * saldo y, cuando ni así entra, cede primero la palabra "Leyendas" —el número
+ * es el dato, la etiqueta es el adorno— y después el nombre de la marca, que
+ * ya está dicho por el escudo que queda al lado. */
+@media (max-width: 560px) {
+  .barra-contenido { padding: 8px 12px; gap: 8px; }
+  .barra .marca { gap: 8px; }
+  .barra .marca-texto { font-size: 1rem; }
+  .saldo { padding: 5px 11px; gap: 6px; }
+  .saldo b { font-size: 0.98rem; }
+  .saldo small { font-size: 0.62rem; letter-spacing: 0.6px; }
+  .avatar { width: 34px; height: 34px; }
+  .hamburguesa { padding: 8px; }
+}
+
+@media (max-width: 430px) {
+  .saldo small { display: none; }
+}
+
+/* El nombre de la marca NO se esconde en pantallas angostas, y tampoco se corta.
+ *
+ * Estuvo escondido a 360px o menos, que es el ancho declarado de casi todos
+ * los Android: la mitad de los teléfonos veía el escudo sin el nombre al lado.
+ * Después, para que un saldo enorme no rompiera la barra, se recortaba con
+ * puntos suspensivos.
+ *
+ * En Cinzel y en mayúsculas el nombre ocupa más que en Playfair, y en la
+ * barra que lleva saldo, avatar y menú no entra en un renglón en un teléfono.
+ * Ahí las dos palabras se apilan —MEMORIE arriba, LEGENDS abajo— y cada una
+ * necesita la mitad del ancho. Es la forma de un logotipo, no un texto que se
+ * partió: por eso va decidido acá y no queda librado a `flex-wrap`.
+ *
+ * Sólo se apila la barra con saldo. La de la portada y la de las páginas sin
+ * sesión tienen lugar para el renglón entero hasta 320 px.
+ */
+@media (max-width: 360px) {
+  .barra .marca-texto { font-size: 0.92rem; }
+}
+
+@media (max-width: 480px) {
+  .barra-contenido:has(#saldo) .marca-texto {
+    display: inline-flex;
+    flex-direction: column;
+    font-size: 0.86rem;
+    line-height: 1.08;
+  }
+}
+
+.barra .marca {
+  min-width: 0;
+}
+
+/* El hamburguesa de una barra SIN menú —la portada— sólo aparece cuando el
+   contenido no entra. Lo marca `menu.js`, que es donde se sabe si hay enlaces
+   que plegar. Sin esto, en una pantalla ancha habría un botón que esconde las
+   dos llamadas principales y abre un cuarto vacío. */
+@media (min-width: 769px) {
+  .hamburguesa.solo-si-no-entra {
+    display: none;
+  }
+}
+
+/* Los enlaces viven en el cajón, en cualquier tamaño de pantalla.
+
+   Se esconden ANTES del primer dibujado, no cuando `menu.js` los muda: si no,
+   la barra se dibujaba con los siete adentro y se achicaba medio segundo
+   después, empujando la página entera. Ver la nota de `.con-js` más abajo.
+
+   `.barra-contenido > nav` y no `.barra nav`: cuando el menú está en el cajón
+   ya no es descendiente de la barra, y esta regla tiene que dejar de
+   alcanzarlo o se escondería también ahí. */
+.con-js .barra-contenido > nav {
+  display: none;
+}
+
+/* ------------------------------------------------- el punto de corte */
+
+@media (max-width: 768px) {
+  .hamburguesa {
+    display: inline-flex;
+  }
+
+  /* El menú ya nace escondido, antes de que corra el JavaScript.
+
+     Sin esto, la barra se dibujaba con los siete enlaces adentro —en dos
+     líneas— y `menu.js` los mudaba al cajón medio segundo después. La
+     cabecera se achicaba 42px de golpe y TODA la página saltaba hacia
+     arriba. Medido: 0,124 de "cambio de diseño", que era prácticamente todo
+     el que tenía la portada.
+
+     Cuelga de `.con-js` a propósito. Ese nombre lo pone un script de una
+     línea en el `<head>`, que corre antes de dibujar; si el JavaScript está
+     apagado, la clase no aparece, los enlaces se ven como siempre y la
+     página sigue siendo navegable. Esconderlos sin esa condición dejaría a
+     esa persona sin menú y sin hamburguesa —el botón tampoco andaría—. */
+  /* Se esconde sólo la `.derecha` que NO tiene sesión: la de la portada, que
+     son "Iniciar sesión" y "Crear cuenta" y sí se mudan al cajón en el
+     teléfono. Si se dibujaran y se fueran medio segundo después, la página
+     saltaría igual que con los enlaces.
+
+     La de una cuenta abierta —Leyendas y foto— se queda en la barra en todos
+     los tamaños, así que no se esconde: no se muda a ningún lado y no puede
+     mover nada. Antes se guardaba también, y eso era esconder justo lo que
+     uno mira entre partida y partida. */
+  .con-js .barra-contenido > .derecha:not(:has(#saldo)) {
+    display: none;
+  }
+
+  /* Y se le reserva al hamburguesa su alto, antes de que exista.
+
+     El botón lo crea `menu.js`, que corre después del primer dibujado. Mide
+     44px —el mínimo que se puede tocar sin apuntar— y el logo mide 40: al
+     aparecer, la barra crecía esos 4px y empujaba la página entera hacia
+     abajo. Cuatro píxeles parecen nada, pero mueven TODO lo que hay debajo, y
+     así se contaban 0,124 de "cambio de diseño".
+
+     Con el alto puesto de antemano, el botón aparece dentro de un lugar que ya
+     estaba guardado y no se mueve nada. Se comprobó bloqueando `menu.js`: sin
+     él el desplazamiento era 0,0008, o sea que todo venía de acá. */
+  /* El logo ocupa el alto del hamburguesa desde el principio.
+
+     `min-height` sobre `.barra-contenido` no alcanzaba: con `box-sizing:
+     border-box` ese mínimo incluye el relleno, así que la fila la seguía
+     midiendo el hijo más alto — el logo, de 40px. Cuando `menu.js` agregaba el
+     botón de 44, la barra crecía 4px y toda la página bajaba. Poniéndolo sobre
+     el propio logo, la fila mide 44 haya botón o no. */
+  .barra .marca {
+    min-height: 44px;
+  }
+
+  .barra-contenido {
+    min-height: 44px;
+
+    /* Y el logo se queda a la izquierda desde el principio.
+
+       Ésta era la causa de verdad, y no se veía a simple vista porque el
+       salto era HORIZONTAL. Una regla de `max-width: 700px` centra la barra
+       —tenía sentido cuando el menú ocupaba el ancho y se partía en dos
+       líneas—. Con el menú escondido queda un solo hijo, el logo, y centrado
+       se planta en el medio. Después aparece el hamburguesa, que se va a la
+       derecha con `margin-left: auto`, y empuja el logo 107px hacia la
+       izquierda: toda la página cuenta como desplazada.
+
+       `space-between` deja al logo donde va a terminar, esté o no el botón. */
+    justify-content: space-between;
+  }
+}
+
+/* Con movimiento reducido el cajón aparece y desaparece, sin deslizarse.
+   Sigue habiendo cajón: lo que se saca es el viaje, no la función. */
+@media (prefers-reduced-motion: reduce) {
+  .cajon-menu,
+  .cajon-menu.abierto,
+  .fondo-menu,
+  .fondo-menu.visible {
+    transition: none;
+  }
+  .hamburguesa i {
+    transition: none;
+  }
+}

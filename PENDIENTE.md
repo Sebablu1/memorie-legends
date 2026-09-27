@@ -627,9 +627,6 @@ ganadas, pero sigue siendo plata que no existía.
   partida en red existe hace rato. Sólo se le cambió la imagen —apuntaba al
   logo borrado—, para que ningún archivo del sitio pida algo que no está. Se
   puede borrar entera, en un cambio aparte.
-- **`public/404.html` es la página de ejemplo de Firebase**, en inglés
-  («Page Not Found», con el botón azul de la consola). Quien escriba mal una
-  dirección sale del juego a una pantalla que no es del juego.
 - **La cuenta de administración sigue siendo `soporte.memorie.legends@gmail.com`.**
   El correo de contacto pasó a `soporte@memorielegends.com`, pero la cuenta
   con la que se entra al panel es otra cosa: es el administrador raíz
