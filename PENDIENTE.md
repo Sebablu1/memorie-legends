@@ -726,6 +726,91 @@ recién con el segundo juego:**
 
 ---
 
+## 21. La caja de crear sala está escrita dos veces
+
+El tablero y el lobby tienen el MISMO formulario —crear una sala privada y
+entrar con un código— escrito dos veces en HTML y llenado dos veces en
+JavaScript. Los ids son idénticos (`entradaSala`, `duracionSala`,
+`btnCrearSala`, `codigoSala`, `btnUnirse`, `codigoPrivado`) y por dentro las
+dos llaman a lo mismo: `crearYMostrar` y `conectarCampoDeCodigo`. Lo que
+cambia es el diseño y las palabras.
+
+**Qué hacer:** un módulo compartido —`caja-sala-privada.js`— que dibuje el
+formulario, llene los selectores, conecte los dos botones y la ayuda, igual
+que `sala-privada.js` dibuja el cartel del código. Cada página queda con un
+`<div>` vacío.
+
+**La referencia visual es la caja del TABLERO.** El lobby adopta ese diseño;
+su versión en dos columnas no gustó.
+
+**Qué gana el lobby:** la ayuda viva del tablero, que hoy no tiene — «Con 4
+jugadores se juntan 40 Leyendas: 30 para el primero y 10 para el segundo», que
+se recalcula al cambiar la entrada.
+
+**Qué NO puede perderse:** la ayuda del código del lobby —«ocho caracteres si
+te invitaron a una sala privada; seis si es una mesa pública»—, que ahí tiene
+más sentido que en el tablero, porque en el lobby conviven las dos. Va como
+opción del módulo.
+
+**Decisión abierta:** si el lobby conserva las dos columnas en pantalla ancha.
+Es CSS, no estructura, y se ve con una captura al implementarlo.
+
+**Alcance:** `dashboard.html`, `lobby.html`, `dashboard.js`, `lobby.js`,
+`tablero.css`, `lobby.css`, y las pruebas `tablero.spec.js` y `lobby.spec.js`
+—que casi no se tocan, porque los ids no cambian—.
+
+**Cuidado:** `lobby.js` usa su `opcionesDeEntrada` TAMBIÉN para el formulario
+de mesas públicas (`publicaEntrada`, `publicaDuracion`). Eso se queda en el
+lobby o se exporta desde el módulo, pero no se borra.
+
+**Lo que el lobby tiene de más —torneos, mesas públicas— no se toca.**
+
+Es un bloque corto, y va DESPUÉS del despliegue: no conviene meter cambios
+visuales el mismo día que se toca producción.
+
+---
+
+## 22. Una sala en espera que nadie llena se queda con la entrada adentro
+
+El que crea una sala paga la entrada en el mismo momento de crearla
+(`index.js`, dentro de la transacción que la escribe) y el pozo arranca con
+esa entrada. Los que se unen pagan igual.
+
+Si la sala no se llena, la plata vuelve **cuando alguien lo pide**: el jugador
+que se va la recupera, el creador que se va de una privada dispara la
+devolución **a todos** y cancela la sala, y la administración puede cancelarlas
+en lote. Las tres devoluciones son irrepetibles —una por sala y jugador— y
+`pruebas/salida.mjs` las cubre.
+
+**Lo que no hay es un barrido automático.** `barrerPartidas` recorre partidas
+EMPEZADAS y vencidas, no salas esperando. Una sala privada que nadie llena se
+queda con la entrada del creador adentro hasta que él salga o la cancele la
+administración.
+
+Es como está hoy en producción, y con el tablero creando siempre salas
+privadas conviene decidir qué hacer: un barrido que las cancele y devuelva al
+vencer el código (30 minutos), o dejarlo en manos de quien la abrió.
+
+---
+
+## 23. `listarPoseedoresItemAdmin` valida el argumento antes de pedir sesión
+
+```js
+export const listarPoseedoresItemAdmin = functions.https.onCall((data, context) =>
+  tienda.listarPoseedores(context, validar(EsquemaItem, data, errorHttp).itemId));
+```
+
+`validar(...)` corre primero —es un argumento de la llamada—, así que sin
+sesión y con datos vacíos contesta `INVALID_ARGUMENT` en vez de
+`UNAUTHENTICATED`. Se vio en la llamada de humo del despliegue: las otras once
+funciones contestaron 401 y ésta, 400.
+
+No filtra nada —sólo dice que falta un campo— pero la convención del resto del
+archivo es al revés: primero `exigirSesion`, después validar. Es un detalle de
+estilo, y el arreglo es mover la validación adentro del cuerpo.
+
+---
+
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del
