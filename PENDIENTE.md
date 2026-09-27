@@ -667,6 +667,19 @@ dentro del cajón del menú, va en verde sobre fondo oscuro.
 
 ---
 
+## 18. Una prueba de la mesa en red es intermitente bajo carga
+
+`pruebas/e2e/fin-de-ronda-en-red.spec.js` → «al cortar, el resultado se
+muestra» falló UNA vez dentro de una corrida completa —428 pasadas, 17,5
+minutos, con la máquina ocupada— y pasa sola: 10 de 10 al correr su archivo.
+
+No la rompió ningún cambio del cartel ni de la portada: es una prueba de la
+partida en red y no toca nada de eso. Queda anotada por si vuelve: si aparece
+de nuevo, mirar si espera por un tiempo fijo en vez de esperar por lo que
+tiene que pasar.
+
+---
+
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del

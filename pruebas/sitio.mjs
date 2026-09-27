@@ -16,6 +16,7 @@
  *  13. El logo de WhatsApp es el del kit de marca, sin tocar, y se usa como pide.
  *  14. El menú dice lo mismo, y en el mismo orden, en todas las páginas.
  *  15. El botón flotante de soporte está en el tablero, y en ningún otro lado.
+ *  16. El botón de compartir el juego está en la portada, y con su mensaje.
  *
  * Nada de esto rompe una prueba del navegador cuando falla. Un `src` mal
  * escrito no tira ningún error de JavaScript: deja un hueco donde iba la marca,
@@ -682,6 +683,46 @@ console.log("\n=== 15. El soporte que flota: en el tablero, y en ningún otro la
   const aire = hoja.match(/@media \(max-width: 700px\) \{\s*([^{]*)\{[^}]*padding-bottom[^}]*\}/);
   ok(/body:has\(\.boton-soporte\)\s+footer/.test(aire?.[1] ?? ""),
      "tablero.css: el aire del pie, sólo en la página que tiene el botón", aire?.[1]?.trim());
+}
+
+
+console.log("\n=== 16. Compartir el juego, desde la portada y sólo desde ahí ===");
+{
+  // El tercero de los tres lugares de WhatsApp: el cartel del código, el
+  // soporte del tablero y éste. Va en la portada porque es la página que ve
+  // quien todavía no juega, y es la que se comparte.
+  const MENSAJE =
+    "Te paso Memorie Legends: memoria, habilidad y estrategia con baraja española legendaria. " +
+    "Jugá contra la IA o desafiá a tus amigos. https://memorielegends.com";
+
+  const conBoton = PAGINAS.filter((p) => /class="boton-compartir-juego"/.test(html[p])).map(deRepo);
+  ok(JSON.stringify(conBoton) === JSON.stringify(["public/index.html"]),
+     "el botón de compartir el juego existe, y sólo en la portada", conBoton);
+
+  const portada = html[join(PUBLIC, "index.html")];
+  const boton = portada.match(/<a\b[^>]*class="boton-compartir-juego"[\s\S]*?<\/a>/)?.[0] ?? "";
+
+  // El mensaje, tal cual. Se compara decodificado: escrito a mano en la
+  // dirección, un acento mal puesto no se ve hasta que alguien lo recibe.
+  const texto = decodeURIComponent((boton.match(/href="https:\/\/wa\.me\/\?text=([^"]*)"/)?.[1] ?? "").replace(/\+/g, " "));
+  ok(texto === MENSAJE, "con el mensaje acordado, palabra por palabra", texto);
+
+  // Sin número: WhatsApp abre su selector y elige quien comparte.
+  ok(/href="https:\/\/wa\.me\/\?text=/.test(boton), "sin destinatario: lo elige quien comparte");
+  ok(/target="_blank"/.test(boton) && /rel="noopener/.test(boton),
+     "abre aparte, con noopener");
+
+  // El glifo VERDE, que es el que corresponde sobre el fondo oscuro de la
+  // portada, y pedido tarde: está al final de la página y no tiene por qué
+  // competir con el escudo, que es lo que mide el LCP.
+  const glifo = etiquetas(boton, "img")[0];
+  ok(/img\/whatsapp\/Digital_Glyph_Green_RGB_2026\.svg$/.test(glifo?.src ?? ""),
+     "con el glifo verde del kit", glifo?.src);
+  ok(glifo?.loading === "lazy" && glifo?.fetchpriority === "low",
+     "el glifo se pide tarde y con prioridad baja", glifo?.crudo);
+
+  // Lo demás que piden sus normas —`alt` vacío, tamaño y la palabra al lado—
+  // lo comprueba §13, que recorre todos los usos del logo.
 }
 
 // ────────────────────────────────────────────────────────────────────

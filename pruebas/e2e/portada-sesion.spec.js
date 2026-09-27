@@ -131,3 +131,39 @@ test("si el navegador no deja leer el almacenamiento, hace lo de antes", async (
   await esperarLaCarga(page);
   expect(pedidos, "sin poder leer la marca, la portada no preguntó").toContain("portada.js");
 });
+
+// =====================================================================
+// Compartir el juego
+// =====================================================================
+
+test("el botón de compartir está al final, con su mensaje, y no pide Firebase", async ({ page }) => {
+  // Es un enlace y nada más: la portada sigue sin bajar Firebase a quien nunca
+  // entró, que es lo que defiende el resto de esta suite.
+  const pedidos = [];
+  page.on("request", (r) => pedidos.push(r.url()));
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/index.html");
+
+  const boton = page.locator("a.boton-compartir-juego");
+  await expect(boton).toHaveText("Compartir por WhatsApp");
+  await expect(boton).toHaveAttribute("target", "_blank");
+  await expect(boton).toHaveAttribute("rel", /noopener/);
+
+  const href = await boton.getAttribute("href");
+  expect(decodeURIComponent(href)).toBe(
+    "https://wa.me/?text=Te paso Memorie Legends: memoria, habilidad y estrategia con " +
+      "baraja española legendaria. Jugá contra la IA o desafiá a tus amigos. https://memorielegends.com",
+  );
+
+  // Va después de las tarjetas: quien comparte es quien ya leyó de qué se
+  // trata, y arriba están los dos botones que convierten.
+  const orden = await page.evaluate(() => {
+    const tarjetas = document.querySelector(".rejilla");
+    const compartir = document.querySelector(".compartir-juego");
+    return tarjetas.compareDocumentPosition(compartir) & Node.DOCUMENT_POSITION_FOLLOWING ? "después" : "antes";
+  });
+  expect(orden).toBe("después");
+
+  expect(pedidos.filter((u) => /firebase|googleapis/.test(u)), "la portada pidió Firebase").toEqual([]);
+});

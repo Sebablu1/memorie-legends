@@ -138,3 +138,63 @@
     font-size: 0.7rem;
   }
 }
+
+/* ═══════════════════════════════════ compartir el juego
+
+   Un renglón discreto al final de la portada. Discreto a propósito: arriba
+   están los dos botones que convierten —crear cuenta e iniciar sesión— y este
+   no les compite; es para quien ya bajó, leyó de qué se trata y se acordó de
+   alguien.
+
+   El verde es el oficial de WhatsApp y el glifo es el del kit, sin tocar. Acá
+   el fondo es oscuro, así que va el VERDE y no el blanco. */
+
+.compartir-juego {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 40px auto 8px;
+  text-align: center;
+}
+
+.compartir-juego p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--texto-tenue);
+}
+
+.boton-compartir-juego {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 1px solid rgba(37, 211, 102, 0.4);
+  border-radius: 999px;
+  background: rgba(37, 211, 102, 0.08);
+  color: #25d366;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.boton-compartir-juego:hover,
+.boton-compartir-juego:focus-visible {
+  /* El verde no cambia al pasar por encima: es el color de la marca, no un
+     estado. Lo que contesta es el fondo y el filo. */
+  background: rgba(37, 211, 102, 0.16);
+  border-color: rgba(37, 211, 102, 0.65);
+}
+
+.boton-compartir-juego img {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boton-compartir-juego {
+    transition: none;
+  }
+}
