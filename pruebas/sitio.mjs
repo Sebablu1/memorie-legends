@@ -525,9 +525,10 @@ console.log("\n=== 14. El mismo menú, y en el mismo orden, en todas las página
   // estaba el enlace que busca, y eso se siente más que un color cambiado.
   const ORDEN = ["Inicio", "Lobby", "Jugar", "Cómo se juega", "Ranking", "Tienda",
                  "Tu cuenta", "Soporte WhatsApp", "Administración"];
-  // El número de soporte: UNO solo y el mismo en todas. Escrito catorce veces
-  // a mano, un dígito cambiado en una sola página manda a un desconocido.
-  const SOPORTE = "https://wa.me/59891900968";
+  // El soporte: UN número y UN mensaje, los mismos en todas. Escrito catorce
+  // veces a mano, un dígito cambiado en una sola página manda a un desconocido,
+  // y un mensaje distinto es una grieta todavía más difícil de ver.
+  const SOPORTE = "https://wa.me/59891900968?text=Hola%2C%20necesito%20ayuda%20con%20Memorie%20Legends.%20Mi%20consulta%20es%3A";
 
   // La portada no lleva menú: su cajón tiene los dos botones de entrar y de
   // registrarse, y nada más. La mesa tampoco, porque adentro de una partida no
@@ -640,7 +641,7 @@ console.log("\n=== 15. El soporte que flota: en el tablero, y en ningún otro la
   // sitio el soporte vive dentro del cajón del menú (§14), que se abre cuando
   // uno quiere: un botón fijo en cada página sería el número a la vista en
   // todas, y tapando contenido en todas.
-  const SOPORTE = "https://wa.me/59891900968";
+  const SOPORTE = "https://wa.me/59891900968?text=Hola%2C%20necesito%20ayuda%20con%20Memorie%20Legends.%20Mi%20consulta%20es%3A";
   const conBoton = PAGINAS.filter((p) => /class="boton-soporte"/.test(html[p])).map(deRepo);
   ok(JSON.stringify(conBoton) === JSON.stringify(["public/dashboard.html"]),
      "el botón flotante existe, y sólo en el tablero", conBoton);
@@ -649,7 +650,7 @@ console.log("\n=== 15. El soporte que flota: en el tablero, y en ningún otro la
   const boton = tablero.match(/<a\b[^>]*class="boton-soporte"[\s\S]*?<\/a>/)?.[0] ?? "";
   ok((tablero.match(/class="boton-soporte"/g) ?? []).length === 1,
      "dashboard.html: uno solo");
-  ok(/href="https:\/\/wa\.me\/59891900968"/.test(boton),
+  ok(/href="https:\/\/wa\.me\/59891900968\?text=Hola%2C%20necesito%20ayuda%20con%20Memorie%20Legends\.%20Mi%20consulta%20es%3A"/.test(boton),
      "dashboard.html: al número del sitio", boton.match(/href="[^"]*"/)?.[0]);
   ok(/target="_blank"/.test(boton) && /rel="noopener/.test(boton),
      "dashboard.html: abre aparte, con noopener");

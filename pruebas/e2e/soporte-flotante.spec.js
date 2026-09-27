@@ -40,7 +40,7 @@ test("está abajo a la derecha, con su número y su glifo blanco", async ({ page
   const boton = page.locator("a.boton-soporte");
   await expect(boton).toBeVisible();
   await expect(boton).toHaveText(/Soporte WhatsApp/);
-  await expect(boton).toHaveAttribute("href", "https://wa.me/59891900968");
+  await expect(boton).toHaveAttribute("href", "https://wa.me/59891900968?text=Hola%2C%20necesito%20ayuda%20con%20Memorie%20Legends.%20Mi%20consulta%20es%3A");
   await expect(boton).toHaveAttribute("target", "_blank");
   await expect(boton).toHaveAttribute("rel", /noopener/);
 

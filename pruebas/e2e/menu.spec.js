@@ -309,7 +309,7 @@ test("y tiene el soporte por WhatsApp, con el número del sitio", async ({ page 
   const soporte = page.locator("#cajonMenu nav a.enlace-soporte");
   await expect(soporte).toBeVisible();
   await expect(soporte).toHaveText("Soporte WhatsApp");
-  await expect(soporte).toHaveAttribute("href", "https://wa.me/59891900968");
+  await expect(soporte).toHaveAttribute("href", "https://wa.me/59891900968?text=Hola%2C%20necesito%20ayuda%20con%20Memorie%20Legends.%20Mi%20consulta%20es%3A");
   // Sale del sitio: pestaña aparte, y `noopener` para que lo que se abra no
   // pueda tocar esta página desde `window.opener`.
   await expect(soporte).toHaveAttribute("target", "_blank");
@@ -352,7 +352,7 @@ test("la 404, servida desde una carpeta que no existe, se ve entera", async ({ p
   await page.locator("#btnMenu").click();
   await expect(page.locator('#cajonMenu nav a.enlace-soporte')).toHaveAttribute(
     "href",
-    "https://wa.me/59891900968",
+    "https://wa.me/59891900968?text=Hola%2C%20necesito%20ayuda%20con%20Memorie%20Legends.%20Mi%20consulta%20es%3A",
   );
 });
 
@@ -374,7 +374,7 @@ test("una página legal lleva el mismo cajón, y el soporte NO se ve en la barra
   await page.locator("#btnMenu").click();
   const soporte = page.locator("#cajonMenu nav a.enlace-soporte");
   await expect(soporte).toBeVisible();
-  await expect(soporte).toHaveAttribute("href", "https://wa.me/59891900968");
+  await expect(soporte).toHaveAttribute("href", "https://wa.me/59891900968?text=Hola%2C%20necesito%20ayuda%20con%20Memorie%20Legends.%20Mi%20consulta%20es%3A");
   await expect(soporte).toHaveCSS("color", "rgb(37, 211, 102)");
 
   // Y el cuerpo sigue siendo el de la columna de lectura: 360 px en un
