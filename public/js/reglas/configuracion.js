@@ -84,6 +84,29 @@ export const MINIMO_PARA_TORNEO = 4;
  * El panel puede cambiarlos —se guardan en `configuracion/ranking`— y esto es
  * lo que vale si nunca se tocaron.
  */
+/**
+ * ¿Se otorgan los premios físicos?
+ *
+ * NO, y no es un interruptor de desarrollo: es el estado real del trámite.
+ * Hoy está en `false` por dos cosas que todavía no pasaron:
+ *
+ *   1. Ningún abogado opinó sobre regalar objetos físicos por un ranking.
+ *   2. La base de datos sigue en revisión ante la URCDP, sin número.
+ *
+ * Mientras esté apagada, el cierre del mes NO deja constancia de ningún
+ * premio físico: no se promete lo que no está resuelto. Lo que sí sigue es la
+ * insignia Leyenda del top 5, que es digital y no promete nada material.
+ *
+ * NADA se borra. Los umbrales, `premioFisicoDe` y el otorgamiento siguen acá,
+ * probados con la bandera encendida, para el día que se resuelva.
+ *
+ * Es global y no por juego a propósito: no describe a un juego, describe el
+ * estado del trámite, que es del sitio entero. El día que la pregunta cambie
+ * —de «¿se pueden dar?» a «¿este juego da?»— pasa a ser un campo de
+ * `juegos/{id}`. Ver PENDIENTE §20.
+ */
+export const PREMIOS_FISICOS_ACTIVOS = false;
+
 export const PREMIOS_MENSUALES = Object.freeze([
   { puesto: 1, minimoPuntos: 20000, premio: "remera", etiqueta: "Remera de Memorie Legends" },
   { puesto: 2, minimoPuntos: 19000, premio: "llavero", etiqueta: "Llavero de Memorie Legends" },

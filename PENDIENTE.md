@@ -680,6 +680,52 @@ tiene que pasar.
 
 ---
 
+## 19. Cuando llegue el número de la URCDP
+
+`public/privacidad.html`, en la sección «1. Responsable del tratamiento», dice
+hoy **«Identificación en trámite»**: la Ley 18.331 exige identificar al
+responsable con su nombre y domicilio, y todavía no hay número de registro.
+
+Cuando la inscripción salga, ahí va el dato real. Hasta entonces se queda como
+está: ningún texto legal afirma una inscripción que no existe.
+
+La sección «3. Bases de datos» ya está escrita en futuro —«cuando corresponda,
+las bases serán inscritas»—, así que esa no hay que tocarla.
+
+---
+
+## 20. Cuando el abogado opine sobre los premios físicos
+
+`PREMIOS_FISICOS_ACTIVOS`, en `public/js/reglas/configuracion.js`, está en
+`false`. No es un interruptor de desarrollo: es el estado del trámite. Con la
+bandera apagada, el cierre del mes NO deja constancia de ninguna remera ni
+llavero; la insignia Leyenda del top 5 sigue igual, porque es digital.
+
+Nada se borró: los umbrales, `premioFisicoDe` y el otorgamiento siguen en su
+lugar y se prueban con la bandera encendida (`cierre-de-periodos.mjs` §5),
+para que el día que se encienda no haya que adivinar si todavía funciona.
+
+**Dos cosas hay que resolver ANTES de pasarla a `true`, y las dos aparecen
+recién con el segundo juego:**
+
+1. **¿Los premios son del sitio o de cada juego?** El cierre recorre todos los
+   juegos que tienen tabla. Con Truco sumado, el cierre de su mes también
+   otorgaría: saldrían dos remeras por mes, una por juego. No se pisan —las
+   constancias van con `arrayUnion` y cada una lleva su `juego` adentro, y el
+   `premioFisico` de la fila vive en `rankings/{juego}/…`—, pero son dos.
+   La forma correcta de resolverlo NO es un `if (juego === "memorie")`: eso es
+   el enum cerrado que este diseño evita. Es un campo en `juegos/{id}`
+   —`premiosFisicos: true`—, donde ya viven `activo`, `orden` y el logo. Así,
+   sumar un juego sin premios es escribir un documento.
+2. **Los umbrales son uno solo para todos.** `configuracion/ranking` guarda un
+   par —remera 20.000, llavero 19.000— compartido. Con dos juegos, «20.000
+   puntos» significa cosas distintas: dependen de cuánto se juega y de cuánto
+   paga cada motor. Si se encienden los premios con dos juegos, el umbral
+   también tiene que ser por juego, o el segundo regala o niega remeras según
+   cuánto se parezca al primero.
+
+---
+
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del

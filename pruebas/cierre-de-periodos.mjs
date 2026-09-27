@@ -28,6 +28,7 @@ import { crearCierreDePeriodos } from "../functions/cierre-de-periodos.js";
 import { crearMoverLeyendas } from "../functions/leyendas.js";
 import { clavePeriodo, ZONA_POR_DEFECTO } from "../public/js/reglas/ranking.js";
 import { MOTIVOS, premioPorPuesto } from "../public/js/reglas/economia.js";
+import { PREMIOS_FISICOS_ACTIVOS } from "../public/js/reglas/configuracion.js";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -151,7 +152,7 @@ const MES = clavePeriodo("mensual", FECHA, ZONA_POR_DEFECTO);
 
 const vacio = () => ({ credits: 0, creditosComprados: 0, creditosGanados: 0 });
 
-function montar(inicial) {
+function montar(inicial, { premiosFisicos } = {}) {
   const db = crearFirestore(inicial);
   const moverLeyendas = crearMoverLeyendas({
     db, usuarios: "users", campoSaldo: "credits", marcaDeTiempo: () => "T", error,
@@ -165,6 +166,8 @@ function montar(inicial) {
     marcaDeTiempo: () => "T",
     agregarAArray: (valor) => ({ __union: valor }),
     logger: null,
+    // Sin decir nada, vale lo que vale de verdad: la bandera apagada.
+    ...(premiosFisicos === undefined ? {} : { premiosFisicos }),
   });
   return { db, cierre, puestosMensuales };
 }
@@ -310,13 +313,17 @@ console.log("\n=== 4. Lo cerrado no se vuelve a cerrar ===");
 
 console.log("\n=== 5. El mes: la insignia y el premio físico, con su juego ===");
 {
+  // CON LA BANDERA ENCENDIDA. Hoy los premios físicos están apagados —ver la
+  // sección 5b—, pero el código que esconden tiene que seguir funcionando: si
+  // sólo se probara el camino apagado, el día que se encienda nadie sabría si
+  // todavía anda.
   const { db, cierre, puestosMensuales } = montar({
     "rankings/memorie": { juego: "memorie" },
     ...fila("memorie", MES, "ana", 25000),
     ...fila("memorie", MES, "beto", 500),
     "users/ana": vacio(),
     "users/beto": vacio(),
-  });
+  }, { premiosFisicos: true });
 
   await cierre.cerrarPeriodo("memorie", "mensual", FECHA);
   ok(puestosMensuales.some(([u, p]) => u === "ana" && p === 1),
@@ -327,6 +334,38 @@ console.log("\n=== 5. El mes: la insignia y el premio físico, con su juego ==="
      "la constancia del premio físico dice de qué juego y de qué mes", constancia);
   ok(db.leer(`rankings/memorie/periodos/${MES}/jugadores/ana`)?.premioFisico === "remera",
      "y la fila también");
+}
+
+console.log("\n=== 5b. Con la bandera apagada no se promete ningún premio físico ===");
+{
+  // LA BANDERA DE VERDAD: acá no se inyecta nada, así que vale
+  // `PREMIOS_FISICOS_ACTIVOS`, que hoy es `false`.
+  //
+  // No está apagado «para probar»: es el estado real. Ningún abogado opinó
+  // sobre regalar objetos físicos por un ranking, y la base de datos sigue en
+  // revisión ante la URCDP. Anotar que a alguien «le corresponde» una remera
+  // es prometerla, y no se promete lo que no está resuelto.
+  const { db, cierre, puestosMensuales } = montar({
+    "rankings/memorie": { juego: "memorie" },
+    ...fila("memorie", MES, "ana", 25000),
+    ...fila("memorie", MES, "beto", 500),
+    "users/ana": vacio(),
+    "users/beto": vacio(),
+  });
+
+  await cierre.cerrarPeriodo("memorie", "mensual", FECHA);
+
+  ok(PREMIOS_FISICOS_ACTIVOS === false,
+     "la bandera publicada está apagada", PREMIOS_FISICOS_ACTIVOS);
+  ok(db.leer("users/ana")?.premios === undefined,
+     "no queda ninguna constancia en el perfil del primero", db.leer("users/ana")?.premios);
+  ok(db.leer(`rankings/memorie/periodos/${MES}/jugadores/ana`)?.premioFisico === undefined,
+     "ni la fila del ranking queda marcada");
+
+  // Y lo que NO apaga: la insignia Leyenda es digital y no promete nada
+  // material, así que sigue otorgándose igual.
+  ok(puestosMensuales.some(([u, p]) => u === "ana" && p === 1),
+     "la insignia del top 5 se sigue otorgando", puestosMensuales);
 }
 
 // ==================================================================== 6

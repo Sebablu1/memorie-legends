@@ -42,7 +42,7 @@
 
 import { clavePeriodo, ZONA_POR_DEFECTO, RUTAS_RANKING } from "./reglas/ranking.js";
 import { premioPorPuesto, multiplicadorDePeriodo } from "./reglas/economia.js";
-import { premioFisicoDe, umbralesValidos } from "./reglas/configuracion.js";
+import { premioFisicoDe, umbralesValidos, PREMIOS_FISICOS_ACTIVOS } from "./reglas/configuracion.js";
 import { PUESTO_MENSUAL_CON_INSIGNIA } from "./reglas/insignias.js";
 
 /** Cuántas filas de cada tabla se miran para pagar. */
@@ -61,6 +61,13 @@ export function crearCierreDePeriodos({
   logger,
   usuarios = "users",
   configuracion = "configuracion",
+  /**
+   * Si se otorgan los premios físicos. Entra por parámetro para poder probar
+   * los DOS caminos: el de hoy —apagado— y el que queda detrás de la bandera,
+   * que tiene que seguir funcionando el día que se encienda. Una bandera
+   * leída adentro dejaría sin probar todo lo que esconde.
+   */
+  premiosFisicos = PREMIOS_FISICOS_ACTIVOS,
   zona = ZONA_POR_DEFECTO,
 }) {
   /** Una referencia a partir de una ruta entera: `a/b/c/d`. */
@@ -161,6 +168,11 @@ export function crearCierreDePeriodos({
         if (puesto <= PUESTO_MENSUAL_CON_INSIGNIA) {
           await insignias.registrarPuestoMensual(fila.id, puesto);
         }
+
+        // La insignia de arriba va siempre; lo físico, sólo si está
+        // resuelto. Con la bandera apagada no se escribe ninguna constancia:
+        // anotar que a alguien «le corresponde» una remera es prometerla.
+        if (!premiosFisicos) continue;
 
         const premio = premioFisicoDe(puesto, Number(fila.data()?.puntos ?? 0), umbrales);
         if (!premio) continue;

@@ -701,3 +701,12 @@ select {
   font-size: 0.75rem;
   color: var(--oro-claro, #fcf0c4);
 }
+
+/* El aviso de que algo está apagado: la nota de siempre, con el filo del
+   color de advertencia, para que no se lea como una explicación más. */
+.nota.aviso-apagado {
+  padding: 8px 12px;
+  border-left: 3px solid #f0d060;
+  background: rgba(240, 208, 96, 0.08);
+  color: #ffd79a;
+}
