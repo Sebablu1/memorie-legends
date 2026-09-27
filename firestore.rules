@@ -141,24 +141,6 @@ service cloud.firestore {
     // `||` tolera ese error si el otro lado es verdadero, así que se siguen
     // leyendo por el lado de "estoy sentado". Lo comprueba
     // `herramientas/probar-reglas.mjs` contra el motor de reglas de Google.
-    // ═════════════════════════════════════════════════════════════════
-    //  PASO 7 PENDIENTE — sin esto, rooms queda permisiva en producción
-    //  y cualquiera con sesión lee salas ajenas.
-    // ═════════════════════════════════════════════════════════════════
-    //
-    // El despliegue del lobby nuevo va en dos partes. La parte A afloja esta
-    // regla a `allow read: if autenticado()`, porque el cliente VIEJO que
-    // todavía está servido hace consultas que la regla de abajo rechazaría
-    // enteras. La parte B la vuelve a apretar, con el archivo tal como está
-    // acá. Entre una y otra, producción está abierta.
-    //
-    // Este cartel vive en el repositorio, no en lo desplegado: la parte A se
-    // escribe encima y no se commitea. Para saber con qué reglas corre
-    // producción, mirá el release de Firestore, no este archivo.
-    //
-    // Se borra cuando la parte B esté desplegada y los 22 casos de
-    // `herramientas/probar-reglas.mjs` den verde contra el ruleset VIVO.
-    // Ver PENDIENTE §24.
     match /rooms/{salaId} {
       allow read: if autenticado()
         && (resource.data.publica == true

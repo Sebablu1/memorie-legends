@@ -817,73 +817,45 @@ estilo, y el arreglo es mover la validación adentro del cuerpo.
 
 ---
 
-## 24. PASO 7 PENDIENTE — sin esto, `rooms` queda permisiva en producción
+## 24. Cómo volver atrás el despliegue del lobby nuevo
 
-**Esto es un agujero abierto, no una mejora.** Mientras esta sección esté acá,
-cualquiera con una cuenta puede leer una sala privada ajena, con los nombres de
-quienes la juegan adentro.
+El agujero que esta sección anunciaba está cerrado: la parte B se desplegó el
+**27/09 21:53 UTC** y los 22 casos de `herramientas/probar-reglas.mjs` dan verde
+contra el ruleset vivo. Lo que queda es el conocimiento de cómo volver atrás,
+que sigue sirviendo.
 
-El despliegue del lobby nuevo va en dos partes, y la de en medio deja la puerta
-abierta a propósito:
+### Volver atrás es una maniobra de dos pasos, y con orden
 
-- **Parte A** (desplegada): agrega `juegos` y la ruta nueva de rankings, y
-  **afloja** `rooms` a `allow read: if autenticado()`. Hace falta aflojarla
-  porque el cliente viejo que todavía está servido hace consultas que la regla
-  apretada rechazaría enteras, y el lobby se quedaría sin mesas.
-- **Parte B** (LO QUE FALTA): desplegar `firestore.rules` tal como está en el
-  repositorio, que vuelve a apretar `rooms` a «pública o estoy sentado».
+El cliente viejo consulta `rooms` con `where("estado", "==", "esperando")` y
+nada más, sin filtrar por `publica`. La regla apretada rechaza esa consulta
+ENTERA. Está comprobado contra producción, no deducido: esa consulta contesta
+**HTTP 403 PERMISSION_DENIED**, mientras las dos del cliente nuevo —`publica ==
+true` y `jugadores array-contains` mi uid— contestan 200.
 
-Cómo saber en qué estado está, sin confiar en la memoria:
+O sea que **volver sólo el hosting rompe el sitio**: cliente viejo más reglas
+apretadas es ninguna sala visible, ni en el lobby ni en el tablero.
 
-```
-node herramientas/probar-reglas.mjs
-```
+Si hay que volver atrás, se vuelven las dos cosas y en este orden:
 
-Contra el archivo del repositorio tiene que dar **22 de 22**. Con la parte A
-desplegada, cuatro de esos casos dan lo contrario **en producción**: sala
-privada, revancha y vieja leídas por alguien ajeno, y una sala que no existe
-leída por alguien con sesión. Los cuatro pasan de `DENY` a `ALLOW`.
-
-Y el archivo del repositorio **no dice** con qué reglas corre producción: la
-parte A se escribe encima y no se commitea. Lo que corre es el release
-`cloud.firestore` de la API de Firebase Rules.
-
-Cuando la parte B esté desplegada: borrar esta sección y el cartel que está
-arriba del bloque `match /rooms/{salaId}` en `firestore.rules`.
-
-### Rollback: después de la parte B es COMPUESTO
-
-**Volver sólo el hosting rompe el sitio.** El cliente viejo consulta `rooms` con
-`where("estado", "==", "esperando")` y nada más, sin filtrar por `publica`. La
-regla apretada de la parte B rechaza esa consulta ENTERA —podría traer una sala
-ajena—, así que cliente viejo + reglas apretadas = ninguna sala visible, ni en
-el lobby ni en el tablero.
-
-Por eso, si hay que volver atrás después de la parte B, se vuelven **las dos
-cosas, y en este orden**:
-
-1. **Primero las reglas.** Aflojarlas no rompe nada: el cliente nuevo sigue
-   funcionando con reglas permisivas, y el viejo también.
+1. **Primero las reglas.** Aflojarlas no rompe nada: los dos clientes andan.
 2. **Después el hosting.**
 
-**Nunca al revés.** Volver primero el hosting deja al cliente viejo corriendo
-contra reglas apretadas, que es exactamente el estado roto.
+**Nunca al revés.** Y si sólo hace falta aflojar las reglas, con eso alcanza.
 
-Y si sólo hace falta aflojar las reglas, con eso alcanza: el sitio queda
-funcionando y se vuelve a intentar la parte B cuando se entienda qué falló.
+### Las dos puertas
 
-#### Las dos puertas
-
-**Hosting** — 10 a 20 segundos; no sube nada, sólo mueve el puntero del release:
+**Hosting** — 10 a 20 segundos; no sube nada, sólo mueve el puntero:
 
 ```
 npx firebase hosting:rollback
 ```
 
-Vuelve a la versión anterior. La que estaba antes del lobby nuevo es
-`4dcb31df3b95a6f7`, del 21/09 21:30 UTC.
+| versión | qué es |
+|---|---|
+| `51d538bdfffda3cc` | el lobby nuevo, del 27/09 21:42 UTC |
+| `4dcb31df3b95a6f7` | lo anterior, del 21/09 21:30 UTC |
 
-**Reglas** — la vía probada, 20 segundos medidos:
+**Reglas** — la vía probada, 16 a 20 segundos medidos:
 
 ```
 cp ~/respaldos-memorie/firestore-vivo-a037a8ef-desplegado-2026-09-16.rules firestore.rules
@@ -898,21 +870,24 @@ servidor (segundos, NO probada todavía):
 curl -X PATCH -H "Authorization: Bearer $(gcloud auth print-access-token)" -H "x-goog-user-project: memorie-legends" -H "Content-Type: application/json" "https://firebaserules.googleapis.com/v1/projects/memorie-legends/releases/cloud.firestore" -d '{"name":"projects/memorie-legends/releases/cloud.firestore","rulesetName":"projects/memorie-legends/rulesets/RULESET"}'
 ```
 
-#### A qué ruleset volver
-
-| id | qué es | cuándo |
+| ruleset | qué es | cuándo |
 |---|---|---|
+| `77ee9876-8dde-42d8-8ef2-f11307f2068d` | **lo que corre hoy**: parte B, `rooms` apretada | — |
 | `8817ed97-8d38-4eb0-a693-7426727ad4d9` | parte A: `juegos` sí, `rooms` permisiva | **el destino seguro casi siempre** |
-| `a037a8ef-cca7-4a77-9ae8-09582d82e335` | lo de antes del despliegue (16/09 23:35 UTC) | sólo para volver del todo atrás |
+| `a037a8ef-cca7-4a77-9ae8-09582d82e335` | lo de antes de todo (16/09 23:35 UTC) | sólo para volver del todo atrás |
 
 La parte A sirve con cualquiera de los dos clientes: tiene `juegos` para el
 nuevo y `rooms` permisiva para el viejo. El del 16/09 **no tiene `juegos`**, así
 que sólo va si el hosting también vuelve atrás.
 
-El archivo de ese ruleset está en `~/respaldos-memorie/`, con
+El archivo de ese último está en `~/respaldos-memorie/`, con
 `sha256 72c70d1ae1070597dd9532e3ab87f56b4912c5cdc7acbf73d7b745c02e269068`.
 
----
+### Y una cosa que confunde
+
+El repositorio **no dice** con qué reglas corre producción. Lo que corre es el
+release `cloud.firestore` de la API de Firebase Rules. Hoy coinciden, pero
+durante un despliegue en dos partes no coinciden.
 
 ## Y algo que no está roto, pero falta
 
