@@ -80,6 +80,19 @@ const RELOJ = `<svg class="reloj" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M12 6.5V12l3.8 2.2" />
     </svg>`;
 
+/* Los íconos de los botones. Quietos los dos: una flecha acá diría «esto te
+   lleva afuera», y afuera lleva uno solo, el de WhatsApp. */
+const ICONO_COPIAR = `<svg class="icono" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="9" y="9" width="12" height="12" rx="2.5" />
+      <path d="M15 5.5A2.5 2.5 0 0 0 12.5 3h-7A2.5 2.5 0 0 0 3 5.5v7A2.5 2.5 0 0 0 5.5 15" />
+    </svg>`;
+
+const ICONO_ENTRAR = `<svg class="icono" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8" />
+      <path d="M18 12H10" />
+      <path d="M15 9l3 3-3 3" />
+    </svg>`;
+
 /** El cajón del menú, si estuviera abierto, se cierra antes de la ventana. */
 function cerrarElMenu() {
   const cajon = document.getElementById("cajonMenu");
@@ -89,9 +102,10 @@ function cerrarElMenu() {
 /**
  * El cartel, dentro de `caja`.
  *
- * El logo es el archivo oficial del kit de marca de WhatsApp, sin tocar:
- * verde, chico y al lado de la palabra, nunca en su lugar. `pruebas/sitio.mjs`
- * compara su huella con la del archivo del kit y mira cómo se usa acá.
+ * El logo es el archivo oficial del kit de marca de WhatsApp, sin tocar: el
+ * BLANCO, que es el que corresponde sobre el verde de la marca, al lado de la
+ * palabra y nunca en su lugar. `pruebas/sitio.mjs` compara su huella con la
+ * del archivo del kit y mira cómo se usa acá.
  */
 export function mostrarCodigoPrivado(caja, { codigo, sala, vence, alCerrar } = {}) {
   caja.innerHTML = `
@@ -108,9 +122,9 @@ export function mostrarCodigoPrivado(caja, { codigo, sala, vence, alCerrar } = {
       <p class="aviso-codigo"><b>Copiá este código ahora. No se vuelve a mostrar.</b></p>
       <p class="fila-reloj" id="filaReloj" hidden>${RELOJ}<span class="vigencia-codigo" id="vigenciaCodigo"></span></p>
       <div class="botonera-codigo">
-        <button class="accion sobria" id="btnCopiarCodigoPrivado" type="button">Copiar</button>
-        <a class="accion sobria boton-whatsapp" id="enlaceWhatsApp" href="https://wa.me/" target="_blank" rel="noopener noreferrer"><img src="img/whatsapp/Digital_Glyph_Green_RGB_2026.svg" alt="" width="20" height="20" /><span>Compartir por WhatsApp</span></a>
-        <button class="accion" id="btnEntrarSala" type="button">Entrar a la sala</button>
+        <button class="accion boton-copiar" id="btnCopiarCodigoPrivado" type="button">${ICONO_COPIAR}<span class="texto">Copiar</span></button>
+        <a class="accion boton-whatsapp" id="enlaceWhatsApp" href="https://wa.me/" target="_blank" rel="noopener noreferrer"><img src="img/whatsapp/Digital_Glyph_White_RGB_2026.svg" alt="" width="28" height="28" /><span class="texto"><span class="mayusculas">Compartir por</span> WhatsApp</span></a>
+        <button class="accion boton-entrar" id="btnEntrarSala" type="button">${ICONO_ENTRAR}<span class="texto">Entrar a la sala</span></button>
       </div>
     </div>`;
   const $ = (id) => caja.querySelector(`#${id}`);
@@ -131,12 +145,15 @@ export function mostrarCodigoPrivado(caja, { codigo, sala, vence, alCerrar } = {
   // copiar el código, compartirlo por WhatsApp, y entrar a la sala. Lo único
   // que cambia es el acuse de «Copiar», que vuelve solo a los dos segundos.
   const copiar = $("btnCopiarCodigoPrivado");
+  // Se escribe la ETIQUETA, no el botón: `textContent` sobre el botón entero
+  // borraría el ícono, que es un hijo más.
+  const etiquetaCopiar = copiar.querySelector(".texto");
   copiar.onclick = async () => {
     try {
       await navigator.clipboard.writeText(codigo);
-      copiar.textContent = "¡Copiado!";
+      etiquetaCopiar.textContent = "¡Copiado!";
       // Dos segundos con el acuse a la vista, y vuelve a decir lo que hace.
-      setTimeout(() => { copiar.textContent = "Copiar"; }, 2000);
+      setTimeout(() => { etiquetaCopiar.textContent = "Copiar"; }, 2000);
     } catch {
       // Si el navegador no deja copiar, el botón no miente ni cambia de
       // trabajo: el código está en pantalla, se puede copiar a mano, y entrar

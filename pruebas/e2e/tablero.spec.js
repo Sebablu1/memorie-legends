@@ -231,14 +231,17 @@ test("compartir por WhatsApp lleva el mensaje exacto, con el logo oficial", asyn
   await expect(enlace).toHaveAttribute("target", "_blank");
   await expect(enlace).toHaveAttribute("rel", /noopener/);
   await expect(enlace).toContainText("Compartir por WhatsApp");
-  // Como se VE, no como está escrito: los botones van en mayúsculas por CSS,
-  // y la marca pide «WhatsApp» exactamente así.
-  expect(await enlace.evaluate((a) => a.innerText.trim())).toBe("Compartir por WhatsApp");
+  // Como se VE, no como está escrito: «Compartir por» va en mayúsculas por
+  // CSS y «WhatsApp» NO, porque la marca se escribe así y en mayúsculas
+  // enteras sería otra palabra. La flecha del botón no aparece acá: la dibuja
+  // un pseudoelemento, que es justamente para que no entre en el texto.
+  expect(await enlace.evaluate((a) => a.innerText.trim())).toBe("COMPARTIR POR WhatsApp");
 
-  // El logo: el archivo del kit, cargado, chico, y sin tomar el lugar de la
-  // palabra —por eso el `alt` vacío—.
+  // El logo: el archivo BLANCO del kit, que es el que corresponde sobre el
+  // verde de la marca. Cargado, y sin tomar el lugar de la palabra —por eso
+  // el `alt` vacío—.
   const logo = enlace.locator("img");
-  await expect(logo).toHaveAttribute("src", "img/whatsapp/Digital_Glyph_Green_RGB_2026.svg");
+  await expect(logo).toHaveAttribute("src", "img/whatsapp/Digital_Glyph_White_RGB_2026.svg");
   await expect(logo).toHaveAttribute("alt", "");
   const m = await logo.evaluate((img) => ({
     cargo: img.complete && img.naturalWidth > 0,
@@ -246,8 +249,8 @@ test("compartir por WhatsApp lleva el mensaje exacto, con el logo oficial", asyn
     alto: img.getBoundingClientRect().height,
   }));
   expect(m.cargo, "el logo de WhatsApp no cargó").toBe(true);
-  expect(m.ancho).toBe(20);
-  expect(m.alto).toBe(20);
+  expect(m.ancho).toBe(28);
+  expect(m.alto).toBe(28);
 
   // El código sigue sin estar en ninguna dirección del sitio.
   expect(page.url()).not.toContain("K7M2PQRS");
@@ -273,6 +276,83 @@ test("el cartel tiene TRES botones, y ninguno se convierte en otro", async ({ pa
   await expect(copiar).toHaveText("¡Copiado!");
   await expect(copiar).toHaveText("Copiar", { timeout: 8000 });
   await expect(page.locator("#btnEntrarSala")).toBeVisible();
+});
+
+test("las tres placas: puntas, filo dorado, separador y el verde de la marca", async ({ page }) => {
+  // Hasta acá nada miraba la FORMA, y la forma es media obra: si un botón
+  // pierde las puntas o el filo, el cartel deja de ser una carta y ninguna
+  // prueba se entera.
+  await abrirElCartel(page);
+
+  const placas = await page.evaluate(() => {
+    const leer = (sel) => {
+      const e = document.querySelector(sel);
+      const est = getComputedStyle(e);
+      const cara = getComputedStyle(e, "::before");
+      const flecha = getComputedStyle(e, "::after");
+      const texto = getComputedStyle(e.querySelector(".texto"));
+      return {
+        recorte: est.clipPath,
+        filo: est.backgroundImage,
+        cara: cara.backgroundColor,
+        encimaDeLaCara: cara.backgroundImage,
+        flecha: flecha.content,
+        separador: parseFloat(texto.borderLeftWidth),
+        ancho: Math.round(e.getBoundingClientRect().width),
+      };
+    };
+    return {
+      copiar: leer("#btnCopiarCodigoPrivado"),
+      whatsapp: leer("#enlaceWhatsApp"),
+      entrar: leer("#btnEntrarSala"),
+    };
+  });
+  const todas = Object.values(placas);
+
+  // Las puntas: el mismo recorte en las tres, no uno por botón.
+  for (const p of todas) expect(p.recorte, "una placa se quedó sin puntas").toContain("polygon");
+  expect(new Set(todas.map((p) => p.recorte)).size, "cada placa con su propio ángulo").toBe(1);
+
+  // El filo dorado: la caja de atrás es el degradado que asoma alrededor.
+  for (const p of todas) expect(p.filo, "una placa perdió el filo dorado").toContain("gradient");
+
+  // El mismo ancho: son tres placas del mismo juego.
+  expect(new Set(todas.map((p) => p.ancho)).size, "las placas miden distinto").toBe(1);
+
+  // El separador entre el ícono y la palabra, en las tres.
+  for (const p of todas) expect(p.separador, "falta el separador").toBeGreaterThan(0);
+
+  // El verde OFICIAL, leído del navegador y no del archivo. Y PLANO: las
+  // normas del kit no dejan modificar el color de la marca, y un degradado
+  // encima —por suave que sea— lo modifica. El relieve de esa placa lo hace
+  // el filo dorado, que está afuera del verde.
+  expect(placas.whatsapp.cara).toBe("rgb(37, 211, 102)");
+  expect(placas.whatsapp.encimaDeLaCara, "le pusieron algo encima al verde").toBe("none");
+
+  // El espacio de respeto del glifo: la mitad de su alto a cada lado, que es
+  // lo que pide el kit. Se mide en la pantalla, no en la hoja.
+  const aire = await page.evaluate(() => {
+    const b = document.getElementById("enlaceWhatsApp");
+    const g = b.querySelector("img").getBoundingClientRect();
+    return {
+      izquierda: Math.round(g.left - b.getBoundingClientRect().left),
+      derecha: Math.round(b.querySelector(".texto").getBoundingClientRect().left - g.right),
+    };
+  });
+  expect(aire.izquierda, "el glifo, apretado contra el borde").toBeGreaterThanOrEqual(14);
+  expect(aire.derecha, "el glifo, apretado contra el separador").toBeGreaterThanOrEqual(14);
+
+  // La flecha, sólo en el que lleva afuera, y dibujada por el CSS: por eso no
+  // aparece en el texto del enlace, que sigue siendo exacto.
+  expect(placas.whatsapp.flecha).toContain("→");
+  expect(placas.copiar.flecha, "el botón de copiar tiene flecha").toBe("none");
+  expect(placas.entrar.flecha, "el botón de entrar tiene flecha").toBe("none");
+
+  // Y el glifo blanco del kit, a 28.
+  const glifo = page.locator("#enlaceWhatsApp img");
+  await expect(glifo).toHaveAttribute("src", /Digital_Glyph_White_RGB_2026\.svg$/);
+  const medida = await glifo.evaluate((i) => i.getBoundingClientRect().width);
+  expect(Math.round(medida)).toBe(28);
 });
 
 test("entrar a la sala es su propio botón", async ({ page }) => {

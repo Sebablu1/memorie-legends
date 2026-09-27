@@ -258,7 +258,7 @@ test("crear una sala privada muestra el mismo cartel que el tablero", async ({ p
   await page.locator("#btnCrearSala").click();
   await expect(page.locator("#codigoPrivado")).toBeVisible();
   await expect(page.locator("#codigoPrivadoTexto")).toHaveText("K7M2 PQRS");
-  await expect(page.locator("#enlaceWhatsApp img")).toHaveAttribute("src", "img/whatsapp/Digital_Glyph_Green_RGB_2026.svg");
+  await expect(page.locator("#enlaceWhatsApp img")).toHaveAttribute("src", "img/whatsapp/Digital_Glyph_White_RGB_2026.svg");
   expect((await llamadas(page)).map((l) => l[0])).toContain("crearSalaPrivada");
   expect((await llamadas(page)).map((l) => l[0])).not.toContain("crearSala");
 });

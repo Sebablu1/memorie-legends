@@ -352,111 +352,225 @@ body.con-cartel-abierto {
   text-align: center;
 }
 
+/* En columna y del mismo ancho: tres placas del mismo juego, una debajo de
+   la otra. Con el ancho de su contenido, cada una terminaba de un tamaño y
+   parecían de tres juegos distintos apilados. */
 .botonera-codigo {
   display: flex;
-  gap: 12px;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
-  margin-top: 14px;
-  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.botonera-codigo > .accion {
+  /* 356 y no 330: con 330, el contenido del botón de WhatsApp llegaba al
+     borde y al glifo le quedaban seis píxeles de aire a la izquierda, por
+     debajo del espacio de respeto que pide el kit. Medido hasta que los dos
+     lados pasaran los catorce. */
+  width: min(100%, 356px);
 }
 
 /* ------------------------------------------------ los botones del cartel
 
-   Los cuatro miden lo mismo y tienen la misma forma: el mismo alto, las
-   mismas esquinas y el mismo halo. Cambia el metal.
+   Tres placas con los extremos en punta, la misma forma y el mismo ángulo,
+   con tres pesos distintos: negra la de copiar —lo opcional—, verde la de
+   WhatsApp —la marca— y de oro lleno la de entrar, que es la acción que sigue
+   y va sola al final. Si copiar y entrar fueran las dos doradas, la carta
+   tendría dos botones gritando lo mismo.
+
+   EL FILO QUE SIGUE A LA PUNTA
+
+   `border` no sigue a un `clip-path`, y `outline` tampoco. Van dos cajas
+   apiladas con el mismo recorte: la de atrás con el degradado dorado y, dos
+   píxeles adentro, un `::before` con el color propio. Es la misma técnica de
+   la placa del código.
 
    Los selectores llevan `.botonera-codigo >` para ganarle a
    `button.accion.sobria` y a `a.accion`, que ponen su propio fondo, su
-   `display` y sus mayúsculas. */
+   `display`, su redondeo y sus mayúsculas. */
 
 .botonera-codigo > .accion {
-  min-height: 46px;
-  padding: 12px 22px;
+  /* Un solo ángulo para los tres: tres ángulos serían tres decisiones donde
+     alcanza con una. */
+  --punta: 16px;
+
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 12px 26px;
   border: none;
-  border-radius: 12px;
+  border-radius: 0;
   font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-weight: 700;
   font-size: 0.95rem;
-  transition: transform 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
+  /* El filo: la caja de atrás, dorada y entera. */
+  background: linear-gradient(155deg, #f6e3a1 0%, #dbbd6a 22%, #8a6d2a 48%, #f0d060 70%, #7c5a1e 100%);
+  box-shadow: none;
+  clip-path: polygon(
+    var(--punta) 0, calc(100% - var(--punta)) 0,
+    100% 50%,
+    calc(100% - var(--punta)) 100%, var(--punta) 100%,
+    0 50%
+  );
+  /* El halo va con `drop-shadow` y no con `box-shadow`: box-shadow dibujaría
+     la sombra del rectángulo entero y se verían las puntas recortadas contra
+     una sombra cuadrada. */
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+  transition: transform 0.2s ease, filter 0.2s ease;
 }
 
-/* Copiar, Compartir… y Ya lo copié: dorados, como una pieza del juego.
+/* La cara de adentro. `clip-path: inherit` repite el recorte sobre una caja
+   cuatro píxeles más chica, y lo que asoma alrededor es el filo. */
+.botonera-codigo > .accion::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  clip-path: inherit;
+  pointer-events: none;
+}
 
-   El fondo es el degradado del botón de oro. El relieve son dos filos —uno
-   claro por dentro y uno hondo por fuera, más un segundo filo tenue— y el
-   halo, una luz dorada suave alrededor. La letra, en Playfair y mayúsculas:
-   Cinzel no, porque su archivo trae sólo las letras de MEMORIE LEGENDS, y en
-   COPIAR la C y la P saldrían con otra letra. */
-.botonera-codigo > .accion:not(.boton-whatsapp) {
+/* El contenido va por encima de la cara. */
+.botonera-codigo > .accion > * {
+  position: relative;
+}
+
+/* El separador entre el ícono y la palabra: una línea fina del color del
+   botón. En el verde separa DOS marcas —el glifo de WhatsApp y nuestro
+   texto—, que es justo lo que las normas del kit piden no mezclar. */
+.botonera-codigo > .accion > .texto {
+  padding-left: 12px;
+  border-left: 1px solid;
+  /* En un renglón. Sin esto, la caja del texto se encoge antes que la letra y
+     «COMPARTIR POR WhatsApp» se parte en dos, con la placa creciendo a lo
+     alto. */
+  white-space: nowrap;
+}
+
+.botonera-codigo > .accion > .icono {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------------------------------------------------------- copiar */
+
+.botonera-codigo > .boton-copiar {
+  color: var(--oro-claro);
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.botonera-codigo > .boton-copiar::before {
+  background: linear-gradient(180deg, #16140f 0%, #0b0b09 60%, #080807 100%);
+}
+
+.botonera-codigo > .boton-copiar > .texto {
+  border-color: rgba(212, 168, 67, 0.4);
+}
+
+/* ------------------------------------------------- compartir por WhatsApp
+
+   Verde oficial por dentro y el glifo BLANCO del kit, que es el que
+   corresponde sobre ese verde. El logo no se toca: ni el dibujo ni el color.
+
+   «Compartir por» va en mayúsculas y «WhatsApp» con su grafía, que es como la
+   escribe la marca: en mayúsculas enteras sería otra palabra. */
+
+.botonera-codigo > .boton-whatsapp {
+  /* Catorce de aire a cada lado del glifo: 12 de hueco más 2 de margen a la
+     derecha, y 14 de relleno a la izquierda. */
+  gap: 12px;
+  padding-left: 14px;
+  color: #fff;
+  letter-spacing: 0.3px;
+  text-transform: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.botonera-codigo > .boton-whatsapp::before {
+  /* El verde, PLANO y sin nada encima: ni degradado, ni transparencia, ni
+     mezcla. Las normas del kit no dejan modificar el color de la marca, y un
+     degradado —por suave que sea— es una modificación: aclaraba arriba y
+     oscurecía abajo, y lo que se veía ya no era #25d366.
+
+     El relieve de esta placa lo hace el filo dorado que asoma alrededor, que
+     está AFUERA del verde y no encima. */
+  background-color: #25d366;
+}
+
+.botonera-codigo > .boton-whatsapp > .texto {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.boton-whatsapp .mayusculas {
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+}
+
+/* La flecha, que dice «esto te lleva afuera». Va en un pseudoelemento a
+   propósito: el `innerText` del enlace tiene que seguir diciendo exactamente
+   «Compartir por WhatsApp», y lo que pone el CSS no entra ahí. */
+.botonera-codigo > .boton-whatsapp::after {
+  content: "→";
+  position: relative;
+  font-size: 1.1rem;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+/* El glifo del kit, a 28, con su aire alrededor.
+
+   Las normas piden un espacio de respeto a su alrededor, y el que se toma es
+   la mitad de su alto: 14 px. A la izquierda lo da el relleno del botón; a la
+   derecha, el hueco hasta el separador. Con los 12 px de antes quedaba
+   apretado contra la línea, y con 8 en el teléfono, más. */
+.boton-whatsapp img {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  margin-right: 2px;
+}
+
+/* --------------------------------------------------------- entrar */
+
+.botonera-codigo > .boton-entrar {
   color: #1a1206;
   letter-spacing: 1.4px;
   text-transform: uppercase;
   text-shadow: 0 1px 0 rgba(255, 240, 200, 0.6);
+}
+
+.botonera-codigo > .boton-entrar::before {
   background: linear-gradient(145deg, #b8892e 0%, var(--oro) 34%, var(--oro-claro) 62%, var(--oro) 100%);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 240, 200, 0.6),
-    inset 0 -3px 6px rgba(107, 83, 15, 0.35),
-    0 0 0 1px #6b530f,
-    0 0 0 3px rgba(212, 168, 67, 0.22),
-    0 0 18px rgba(212, 168, 67, 0.35),
-    0 6px 14px rgba(0, 0, 0, 0.45);
 }
 
-.botonera-codigo > .accion:not(.boton-whatsapp):hover:not(:disabled),
-.botonera-codigo > .accion:not(.boton-whatsapp):focus-visible {
+.botonera-codigo > .boton-entrar > .texto {
+  border-color: rgba(26, 18, 6, 0.35);
+}
+
+/* ------------------------------------------------------- los tres */
+
+.botonera-codigo > .accion:hover:not(:disabled),
+.botonera-codigo > .accion:focus-visible {
   transform: scale(1.02);
-  filter: brightness(1.08);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 240, 200, 0.75),
-    inset 0 -3px 6px rgba(107, 83, 15, 0.35),
-    0 0 0 1px #6b530f,
-    0 0 0 3px rgba(212, 168, 67, 0.32),
-    0 0 26px rgba(212, 168, 67, 0.55),
-    0 8px 18px rgba(0, 0, 0, 0.5);
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.5)) brightness(1.08);
 }
 
-/* Compartir por WhatsApp: la misma forma, en el verde oficial.
-
-   El logo es el archivo del kit, sin tocar, y verde: por eso el botón no es
-   verde por dentro —el logo se perdería— sino oscuro, con el filo, el halo y
-   la letra en #25d366. La palabra va como la escribe la marca, «WhatsApp»:
-   sin las mayúsculas de los otros botones. */
-.botonera-codigo > .accion.boton-whatsapp {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  color: #25d366;
-  letter-spacing: 0.3px;
-  text-transform: none;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
-  background: linear-gradient(180deg, #11231a 0%, #0a140f 100%);
-  box-shadow:
-    inset 0 0 0 1px rgba(37, 211, 102, 0.35),
-    0 0 0 1px #0e5c32,
-    0 0 0 3px rgba(37, 211, 102, 0.18),
-    0 0 18px rgba(37, 211, 102, 0.3),
-    0 6px 14px rgba(0, 0, 0, 0.45);
-}
-
-.botonera-codigo > .accion.boton-whatsapp:hover,
-.botonera-codigo > .accion.boton-whatsapp:focus-visible {
-  transform: scale(1.02);
-  filter: brightness(1.12);
-  box-shadow:
-    inset 0 0 0 1px rgba(37, 211, 102, 0.5),
-    0 0 0 1px #0e5c32,
-    0 0 0 3px rgba(37, 211, 102, 0.28),
-    0 0 26px rgba(37, 211, 102, 0.5),
-    0 8px 18px rgba(0, 0, 0, 0.5);
-}
-
-/* El mismo tamaño en los dos: 20 px, chico al lado de la palabra. */
-.boton-whatsapp img {
-  width: 20px;
-  height: 20px;
-  flex: none;
+/* Menos el verde: `brightness` le subiría el tono al color de la marca, que no
+   es un estado. Acá lo que contesta es la sombra y la escala. */
+.botonera-codigo > .boton-whatsapp:hover:not(:disabled),
+.botonera-codigo > .boton-whatsapp:focus-visible {
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.5));
 }
 
 .botonera-codigo > .accion:active:not(:disabled) {
@@ -464,8 +578,27 @@ body.con-cartel-abierto {
 }
 
 .botonera-codigo > .accion:focus-visible {
-  outline: 2px solid var(--oro-claro);
-  outline-offset: 3px;
+  /* Sin `outline`: sobre una forma recortada se dibuja el rectángulo entero y
+     se ven las esquinas que el recorte sacó. El foco se marca con la misma
+     luz del halo, más fuerte. */
+  outline: none;
+  filter: drop-shadow(0 0 0 2px var(--oro-claro)) drop-shadow(0 8px 18px rgba(0, 0, 0, 0.5));
+}
+
+/* En un teléfono angosto, «COMPARTIR POR WhatsApp» no entra en un renglón con
+   el cuerpo de los otros dos: es la etiqueta más larga de las tres. Se achica
+   sólo ésa, lo justo para que no se parta en dos. */
+@media (max-width: 480px) {
+  .botonera-codigo > .boton-whatsapp {
+    /* Se achica la letra, no el aire del glifo: el espacio de respeto es del
+       kit y no se negocia con el ancho de la pantalla. */
+    padding-right: 14px;
+    font-size: 0.76rem;
+  }
+
+  .botonera-codigo > .boton-whatsapp > .texto {
+    padding-left: 10px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

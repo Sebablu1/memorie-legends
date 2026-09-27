@@ -486,6 +486,10 @@ console.log("\n=== 13. El logo de WhatsApp, tal cual lo entrega su kit de marca 
 
   // Donde se use: chico, con `alt` vacío y con la palabra al lado. Las normas
   // piden no usar el logo en lugar de la palabra «WhatsApp».
+  //
+  // El tope son 28 px, que es lo que mide el glifo blanco dentro de la placa
+  // verde del cartel: ahí el botón es grande y un logo de 20 se perdía. En el
+  // menú y en el botón flotante sigue midiendo 20 y 22.
   // En las páginas y en los módulos que dibujan HTML: el cartel del código
   // privado lo arma `js/sala-privada.js`.
   const fuentes = [
@@ -504,7 +508,7 @@ console.log("\n=== 13. El logo de WhatsApp, tal cual lo entrega su kit de marca 
   for (const { pagina, bloque } of usos) {
     const img = etiquetas(bloque, "img").find((i) => /img\/whatsapp\//.test(i.src ?? ""));
     const texto = bloque.replace(/<[^>]+>/g, " ");
-    ok(img?.alt === "" && Number(img?.width) <= 24 && Number(img?.height) <= 24,
+    ok(img?.alt === "" && Number(img?.width) <= 28 && Number(img?.height) <= 28,
        `${pagina}: el logo va chico y con alt vacío`, img?.crudo);
     ok(/\bWhatsApp\b/.test(texto), `${pagina}: con la palabra «WhatsApp» al lado, bien escrita`);
   }
