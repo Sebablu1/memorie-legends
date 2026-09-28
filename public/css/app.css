@@ -314,6 +314,11 @@ main {
 button.accion,
 a.accion {
   display: inline-block;
+  /* Cuarenta y cuatro es el alto mínimo que pide Apple para algo que se toca
+     con el dedo. Con este relleno el botón ya da 44 justos, así que esto no
+     cambia nada hoy: lo que hace es que siga dando 44 el día que alguien
+     toque el relleno o la letra sin pensar en el teléfono. */
+  min-height: 44px;
   padding: 13px 24px;
   border: none;
   border-radius: 11px;

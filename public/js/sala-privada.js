@@ -146,7 +146,7 @@ export function mostrarCodigoPrivado(caja, { codigo, sala, vence, alCerrar } = {
       </div>
       <p class="aviso-codigo"><b>Copiá este código ahora. No se vuelve a mostrar.</b></p>
       <div class="fila-link">
-        <span class="link-invitacion" id="linkInvitacion"></span>
+        <span class="link-invitacion" id="linkInvitacion"><span id="linkBase"></span><span class="link-codigo" id="linkCodigo"></span></span>
         <button class="copiar-link" id="btnCopiarLink" type="button" aria-label="Copiar el link">${ICONO_COPIAR}</button>
       </div>
       <p class="fila-reloj" id="filaReloj" hidden>${RELOJ}<span class="vigencia-codigo" id="vigenciaCodigo"></span></p>
@@ -181,8 +181,20 @@ export function mostrarCodigoPrivado(caja, { codigo, sala, vence, alCerrar } = {
    * servidor, pero esta caja se arma con una plantilla y meter texto de
    * afuera como HTML es exactamente la costumbre que no queremos tomar.
    */
+  /*
+   * El link se escribe en DOS pedazos: la dirección y el código.
+   *
+   * No es un capricho de marcado. En un teléfono angosto el link no entra en
+   * una línea, y partiéndolo donde sea cortaba el código a la mitad —`…/s/DZ2TP`
+   * arriba y `UDH` abajo—. Un código partido se lee mal, se dicta peor, y
+   * alguien lo va a copiar a mano sin la segunda mitad.
+   *
+   * Con el código en su propio elemento, el CSS le pone `white-space: nowrap`
+   * y sólo a él: la dirección se parte si hace falta y el código no.
+   */
   const link = linkDeInvitacion(codigo);
-  $("linkInvitacion").textContent = link;
+  $("linkBase").textContent = link.slice(0, link.length - codigo.length);
+  $("linkCodigo").textContent = codigo;
 
   const copiarLink = $("btnCopiarLink");
   copiarLink.onclick = async () => {

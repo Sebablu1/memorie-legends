@@ -247,6 +247,10 @@ input:focus {
 }
 
 button {
+  /* Medían 42 con este relleno: dos píxeles por debajo del mínimo que pide
+     Apple para un blanco táctil. Se sube el piso y no el relleno, para que el
+     botón no cambie de aspecto donde ya entraba bien. */
+  min-height: 44px;
   padding: 12px 24px;
   border: none;
   border-radius: 8px;

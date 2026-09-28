@@ -130,9 +130,11 @@ body.con-cartel-abierto {
   top: 24px;
   right: 16px;
   z-index: 1;
-  /* Área de toque de dedo, aunque el aspa se vea chica. */
-  min-width: 40px;
-  min-height: 40px;
+  /* Área de toque de dedo, aunque el aspa se vea chica. Cuarenta y cuatro es
+     el mínimo que pide Apple; estaba en cuarenta, que se queda corto en un
+     teléfono y encima es el botón que cierra algo. */
+  min-width: 44px;
+  min-height: 44px;
   display: grid;
   place-items: center;
   border: none;
@@ -319,19 +321,35 @@ body.con-cartel-abierto {
 
 .link-invitacion {
   color: var(--oro-suave, #e3c77a);
-  font-size: 0.8rem;
-  /* `anywhere` y no `break-all`: parte sólo si hace falta, y no corta una
-     palabra corta que entraba bien. */
+  /* 0.8rem eran 12,8px y costaba leerlo en un teléfono. Este link existe para
+     que alguien lo mire y compruebe que dice lo que dice antes de mandarlo. */
+  font-size: 0.875rem;
+  /* Parte donde haga falta... */
   overflow-wrap: anywhere;
   opacity: 0.92;
+}
+
+/* ...MENOS en el código, que va entero o no va.
+
+   Con `anywhere` a secas, en un teléfono angosto el link se cortaba a mitad
+   del código: `…/s/DZ2TP` en una línea y `UDH` en la otra. Un código partido
+   en dos se lee mal, se dicta peor, y alguien lo va a copiar a mano sin la
+   segunda mitad.
+
+   Por eso el código viaja en su propio elemento: el resto de la dirección se
+   parte si no entra, y él no. */
+.link-codigo {
+  white-space: nowrap;
 }
 
 .copiar-link {
   flex: none;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  /* Treinta era cómodo de dibujar y incómodo de tocar. Cuarenta y cuatro es el
+     mínimo para un dedo; el ícono adentro sigue midiendo quince. */
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 1px solid rgba(212, 168, 67, 0.45);
   border-radius: 6px;

@@ -167,7 +167,10 @@
 .boton-compartir-juego {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  /* Medía 42. Ver el comentario de `style.css`: el piso, no el relleno. */
+  min-height: 44px;
   padding: 10px 18px;
   border: 1px solid rgba(37, 211, 102, 0.4);
   border-radius: 999px;
