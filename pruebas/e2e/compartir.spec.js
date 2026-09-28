@@ -36,7 +36,7 @@ import { readFileSync } from "node:fs";
  * si alguien cambia los metadatos de una página y se olvida de las otras.
  */
 const SITIO = "https://memorielegends.com";
-const TARJETA = `${SITIO}/img/compartir-escudo.jpg`;
+const TARJETA = `${SITIO}/img/compartir-escudo-2.jpg`;
 
 /** Las páginas que alguien podría llegar a compartir. */
 const PAGINAS = [
@@ -154,7 +154,7 @@ test("los títulos y las descripciones son distintos entre páginas", async ({
 });
 
 test("la miniatura existe, es JPG, mide 1200x630 y pesa poco", async ({ page }) => {
-  const r = await page.request.get("/img/compartir-escudo.jpg");
+  const r = await page.request.get("/img/compartir-escudo-2.jpg");
   expect(r.status(), "la miniatura no está servida").toBe(200);
 
   // JPG y no WebP: WhatsApp no muestra WebP, y el resto del sitio es WebP.
@@ -176,7 +176,7 @@ test("la miniatura existe, es JPG, mide 1200x630 y pesa poco", async ({ page }) 
         const img = new Image();
         img.onload = () => listo({ ancho: img.naturalWidth, alto: img.naturalHeight });
         img.onerror = () => listo(null);
-        img.src = "/img/compartir-escudo.jpg";
+        img.src = "/img/compartir-escudo-2.jpg";
       }),
   );
   expect(medida, "la miniatura no se pudo cargar").not.toBeNull();
@@ -215,6 +215,6 @@ test("la miniatura sale del escudo, desde el original sin pérdida", async () =>
   expect(receta).toContain("export const ALTO = 630");
 
   // Y que siga escribiendo un JPG donde las etiquetas dicen que está.
-  expect(receta).toContain("public/img/compartir-escudo.jpg");
+  expect(receta).toContain("public/img/compartir-escudo-2.jpg");
   expect(receta).toContain('type: "jpeg"');
 });

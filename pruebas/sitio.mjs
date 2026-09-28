@@ -293,8 +293,10 @@ console.log("\n=== 7. La dirección canónica, sin www ===");
     ok(!/www\.memorielegends\.com|http:\/\/(www\.)?memorielegends\.com/.test(texto),
        `${nombre}: ningún enlace con www ni con http://`);
     // La 404 pide no ser indexada —lo dice su <meta robots>— y el panel
-    // tampoco se indexa: ninguna de las dos lleva canónica.
-    if (nombre === "404.html" || nombre.startsWith("admin/")) continue;
+    // tampoco se indexa: ninguna de las dos lleva canónica. `s.html` es el
+    // redirector de los links cortos: cada dirección suya lleva el código de
+    // una sala privada adentro, así que indexarla sería publicar invitaciones.
+    if (nombre === "404.html" || nombre === "s.html" || nombre.startsWith("admin/")) continue;
 
     const esperada = `${SITIO}/${nombre === "index.html" ? "" : nombre}`;
     const canonicas = etiquetas(texto, "link").filter((l) => l.rel === "canonical");
@@ -399,7 +401,11 @@ console.log("\n=== 11. El sitemap y el robots ===");
   // Las que piden sesión: un buscador que llega termina en la pantalla de
   // ingreso. La 404 y el panel, tampoco.
   const PRIVADAS = ["dashboard.html", "cuenta.html", "room.html", "lobby.html", "mesa.html",
-                    "ranking.html", "tienda.html", "404.html", "admin/index.html"];
+                    "ranking.html", "tienda.html", "404.html", "admin/index.html",
+                    // El redirector de los links cortos. No es una página que
+                    // alguien busque: se entra por una invitación y se sale
+                    // sola al lobby.
+                    "s.html"];
   const canonicaDe = (p) => etiquetas(html[p], "link").find((l) => l.rel === "canonical")?.href;
   const publicas = PAGINAS.filter((p) => !PRIVADAS.includes(relative(PUBLIC, p).replaceAll("\\", "/")));
 
@@ -441,8 +447,10 @@ console.log("\n=== 12. Cada página con sus metadatos ===");
   const descripciones = new Map();
   for (const pagina of PAGINAS) {
     const nombre = relative(PUBLIC, pagina).replaceAll("\\", "/");
-    // La 404 no se indexa, y el panel tampoco: no necesitan Open Graph.
-    if (nombre === "404.html" || nombre.startsWith("admin/")) continue;
+    // La 404 no se indexa, el panel tampoco, y `s.html` menos todavía: es una
+    // pantalla de paso que dura menos de un segundo y su dirección lleva un
+    // código de sala. Ninguna necesita Open Graph.
+    if (nombre === "404.html" || nombre === "s.html" || nombre.startsWith("admin/")) continue;
     const texto = html[pagina];
     const meta = etiquetas(texto, "meta");
     const titulo = texto.match(/<title>([^<]*)<\/title>/)?.[1];

@@ -12,6 +12,8 @@ import {
   SUPPORT_EMAIL,
 } from "./firebase.js";
 
+import { hay as hayCodigoPendiente } from "./codigo-pendiente.js";
+
 import {
   necesitaSegundoPaso,
   opcionesDeSegundoPaso,
@@ -170,7 +172,22 @@ onAuthStateChanged(auth, async (usuario) => {
       // esto se ve el formulario de login durante el viaje al panel, que es
       // exactamente el parpadeo que vinimos a sacar.
       mostrarVelo("Iniciando sesión…");
-      window.location.replace("dashboard.html");
+
+      /*
+       * Quien vino por un link corto va al LOBBY, no al tablero.
+       *
+       * El camino es: `/s/ABCD1234` → lobby → sin sesión, al login → y acá.
+       * Mandarlo al tablero lo dejaría con el código guardado y sin ver dónde
+       * usarlo, y el código vence en media hora.
+       *
+       * Se pregunta SIN consumir: el que lo consume es el lobby, y tiene que
+       * encontrarlo entero cuando llegue.
+       *
+       * (Existe `?volver` en la dirección, que manda `guardia-sesion.js`, pero
+       * nadie lo lee: está anotado en PENDIENTE. Cuando se arregle, esto
+       * podría salir de acá.)
+       */
+      window.location.replace(hayCodigoPendiente() ? "lobby.html" : "dashboard.html");
       return;
     }
 

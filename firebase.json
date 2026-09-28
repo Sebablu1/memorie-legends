@@ -9,6 +9,10 @@
       "img/avatar/*.png",
       "img/insignias/*.png"
     ],
+    "// rewrites": "El link corto de una sala privada: memorielegends.com/s/ABCD1234. Lo sirve s.html, que guarda el codigo y manda al lobby. NO apunta a lobby.html: el lobby tiene catorce rutas relativas -css/, img/, js/- y servido bajo /s/ todas resolverian a /s/css/... y la pagina saldria rota. Es el mismo motivo por el que 404.html quedo con rutas absolutas.",
+    "rewrites": [
+      { "source": "/s/**", "destination": "/s.html" }
+    ],
     "headers": [
       {
         "//": "El HTML NUNCA se cachea. Es el que nombra a todo lo demás: si se guarda, un despliegue no llega hasta que venza, y quien tenga la copia vieja pide archivos que ya no existen.",

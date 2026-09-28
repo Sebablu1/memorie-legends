@@ -867,6 +867,28 @@ en `npm test` es una suite que no existe.
 
 ---
 
+---
+
+## 26. Borrar `compartir-escudo.jpg`, la tarjeta vieja
+
+Desde el 27/09 el sitio usa `compartir-escudo-2.jpg`, la versión centrada que
+sobrevive al recorte cuadrado. **Ninguna página apunta ya a la vieja**, pero el
+archivo se dejó en su lugar a propósito.
+
+El motivo: los mensajes de WhatsApp ya enviados llevan adentro la dirección de
+la imagen vieja. Si alguien abre una conversación de hace un mes y el cliente
+vuelve a pedirla, un 404 le dejaría la tarjeta en blanco. Y las imágenes se
+guardan un mes en caché (`firebase.json`).
+
+**Cuándo borrarla:** pasado un mes desde el 27/09, o sea a partir del
+**27 de octubre de 2026**. Son 99 KB.
+
+Antes de borrarla, comprobar que sigue sin referencias:
+
+```
+grep -rn "compartir-escudo.jpg" public/ pruebas/ herramientas/
+```
+
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del

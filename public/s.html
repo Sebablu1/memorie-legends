@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Entrando a la sala — Memorie Legends</title>
+
+    <!--
+      No se indexa. Cada dirección de éstas lleva el código de una sala privada
+      adentro: que un buscador las guarde sería publicar invitaciones.
+    -->
+    <meta name="robots" content="noindex, nofollow" />
+
+    <link rel="icon" href="/img/favicon-32.png" sizes="32x32" />
+
+    <!--
+      RUTAS ABSOLUTAS, TODAS.
+
+      Esta página se sirve bajo `/s/ABCD1234`, así que una ruta relativa como
+      `css/tema.css` resolvería a `/s/css/tema.css` y no existiría. Es el mismo
+      motivo por el que `404.html` quedó con rutas absolutas, y la razón por la
+      que esto NO es `lobby.html` con lógica nueva: el lobby tiene catorce
+      rutas relativas y todas se romperían.
+    -->
+    <link rel="stylesheet" href="/css/tema.css" />
+
+    <style>
+      /* Lo mínimo para que el instante que dura esto no sea una pantalla
+         blanca. No se carga `app.css` ni `barra.css`: son 50 KB para una
+         página que se va sola en menos de un segundo. */
+      body {
+        margin: 0;
+        min-height: 100svh;
+        display: grid;
+        place-items: center;
+        gap: 18px;
+        background: var(--fondo, #0b0b0d);
+        color: var(--oro, #d4a843);
+        font-family: var(--tipografia-texto, system-ui, sans-serif);
+        text-align: center;
+        padding: 24px;
+      }
+      img {
+        width: 96px;
+        height: 96px;
+      }
+      p {
+        margin: 0;
+        font-size: 0.95rem;
+      }
+      a {
+        color: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <img src="/img/moneda-80.webp" alt="" width="96" height="96" />
+      <p id="aviso">Entrando a la sala…</p>
+      <noscript>
+        <p>Necesitás JavaScript. <a href="/lobby.html">Ir al lobby</a></p>
+      </noscript>
+    </div>
+
+    <script type="module">
+      import { guardar } from "/js/codigo-pendiente.js";
+
+      /*
+       * El código va en el último tramo de la dirección: `/s/ABCD1234`.
+       *
+       * De acá en adelante NO viaja por la URL. Se guarda y el lobby lo saca
+       * del almacenamiento, porque `lobby.spec.js` comprueba que un código
+       * privado no termine en la dirección: ahí quedaría en el historial del
+       * navegador y en los registros de cualquier intermediario.
+       */
+      const tramo = decodeURIComponent(location.pathname.split("/").filter(Boolean).pop() ?? "");
+
+      guardar(tramo);
+
+      /*
+       * Se va al lobby pase lo que pase. Si el código venía mal, o si el
+       * almacenamiento no se puede escribir —ventana privada, extensiones—, el
+       * lobby abre con el campo vacío y la persona pega el código a mano. Es
+       * lo que hacía antes de que existiera este link, así que el peor caso
+       * de esta página es no mejorar nada.
+       *
+       * `replace` y no `href`: el botón de atrás tiene que llevar a donde
+       * estaba la persona, no a esta pantalla de paso que la traería de nuevo
+       * acá.
+       */
+      location.replace("/lobby.html");
+    </script>
+  </body>
+</html>

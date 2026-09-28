@@ -51,10 +51,13 @@ import path from "node:path";
 export const LOGO = "../diseno/escudo.png";
 
 /** Dónde queda la miniatura, y con qué medidas. */
-// El nombre cambió con el escudo: las imágenes quedan un mes en caché
-// (`firebase.json`), y con el mismo nombre los que ya tenían la vieja la
-// seguirían mostrando.
-export const SALIDA = "public/img/compartir-escudo.jpg";
+// El nombre cambia CADA VEZ que cambia el dibujo. Las imágenes quedan un mes
+// en caché (`firebase.json`) y WhatsApp guarda además su propia vista previa
+// por dirección: con el mismo nombre, quien ya vio la vieja la seguiría
+// viendo, y no habría forma de saberlo desde acá.
+//
+// `-2` es la versión centrada, la que sobrevive al recorte cuadrado.
+export const SALIDA = "public/img/compartir-escudo-2.jpg";
 export const ANCHO = 1200;
 export const ALTO = 630;
 
@@ -74,8 +77,8 @@ const PLANTILLA = `<!doctype html>
   body { width: ${ANCHO}px; height: ${ALTO}px; overflow: hidden; }
   .tarjeta {
     width: ${ANCHO}px; height: ${ALTO}px; position: relative;
-    display: flex; flex-direction: row; align-items: center; justify-content: center;
-    gap: 54px; padding: 50px 90px 96px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 24px; padding: 40px 90px 118px;
     background:
       radial-gradient(circle at 50% 34%, rgba(212,168,67,0.24) 0%, rgba(212,168,67,0) 56%),
       linear-gradient(160deg, #0d0d10 0%, #05070b 55%, #0a0a0a 100%);
@@ -90,18 +93,46 @@ const PLANTILLA = `<!doctype html>
   .e3 { bottom: 22px; left: 22px; border-right: 0; border-top: 0; border-radius: 0 0 0 18px; }
   .e4 { bottom: 22px; right: 22px; border-left: 0; border-top: 0; border-radius: 0 0 18px 0; }
 
-  /* El escudo manda: es lo único que se reconoce a tamaño de miniatura,
-     cuando la tarjeta entra en un chat con 300px de ancho y el texto ya no se
-     lee. Es casi cuadrado, así que va a la izquierda y el texto al lado: uno
-     arriba del otro, el escudo habría tenido que achicarse a la mitad. */
-  .logo { height: 440px; width: auto; flex: none; filter: drop-shadow(0 0 50px rgba(212,168,67,0.55)); }
-  .textos { display: flex; flex-direction: column; gap: 22px; max-width: 520px; }
+  /* ─────────────────────────────────────────────────────────────────────
+     TODO EN COLUMNA Y CENTRADO, Y POR QUÉ SE CAMBIÓ
+
+     La versión anterior ponía el escudo a la izquierda y el texto al lado,
+     con este argumento: el escudo es casi cuadrado, y apilándolo sobre el
+     texto habría que achicarlo. El argumento era cierto y la conclusión,
+     equivocada.
+
+     Lo que no contemplaba es que WhatsApp tiene DOS vistas previas. Cuando el
+     enlace va solo en el mensaje muestra la tarjeta entera, de 1200x630; pero
+     si el enlace va adentro de una frase muestra una versión compacta, que
+     recorta un CUADRADO DEL CENTRO. Sobre un diseño de logo-izquierda /
+     texto-derecha, ese cuadrado —630x630 desde x=285— parte el escudo por la
+     mitad y corta el título a mitad de palabra.
+
+     Se vio en dos mensajes reales, uno al lado del otro: el que era sólo un
+     enlace salió grande y bien, y el que lo llevaba adentro de una oración,
+     en miniatura y cortado.
+
+     Así que ahora todo vive dentro de la franja central de 630px: el escudo
+     centrado arriba y el texto centrado abajo. El escudo baja de 440 a 330px
+     de alto, que es el precio, y es el correcto: 330px centrados se ven
+     ENTEROS en las dos vistas, y 440px a la izquierda se ven enteros sólo en
+     una.
+
+     La regla para quien toque esto: si algo importante queda fuera del
+     rectángulo x∈[285, 915], se va a perder en la mitad de los chats. */
+  .logo { height: 330px; width: auto; flex: none; filter: drop-shadow(0 0 44px rgba(212,168,67,0.55)); }
+  .textos {
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    /* 560 y no más: centrado, ocupa de 320 a 880, adentro de la franja que
+       sobrevive al recorte cuadrado. */
+    max-width: 560px; text-align: center;
+  }
 
   .lema {
     font-family: "Playfair Display", Georgia, serif;
-    font-size: 48px; color: #f0d060; line-height: 1.12;
+    font-size: 44px; color: #f0d060; line-height: 1.12;
   }
-  .bajada { font-size: 24px; color: #b9c0cc; line-height: 1.45; }
+  .bajada { font-size: 21px; color: #b9c0cc; line-height: 1.45; }
   .sello {
     position: absolute; bottom: 52px; left: 50%; transform: translateX(-50%);
     display: flex; align-items: center; gap: 14px;

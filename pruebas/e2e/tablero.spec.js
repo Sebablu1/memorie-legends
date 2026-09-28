@@ -198,9 +198,10 @@ async function abrirElCartel(page) {
   await expect(page.locator("#codigoPrivado")).toBeVisible();
 }
 
-const MENSAJE =
-  "Te invito a jugar Memorie Legends conmigo. Entrá a https://memorielegends.com/lobby.html " +
-  "y usá el código K7M2PQRS para unirte a mi sala privada.";
+// El link va SOLO, en su propia línea y al final. Es lo que hace que WhatsApp
+// muestre la vista previa grande en vez de la compacta, que recorta la tarjeta
+// a un cuadrado. Ver el comentario de `mensajeDeInvitacion`.
+const MENSAJE = `Te invito a jugar Memorie Legends conmigo:\n\nhttps://memorielegends.com/s/K7M2PQRS`;
 
 test("el cartel dice cuánto vale el código, y se copia sin el espacio", async ({ page }) => {
   await abrirElCartel(page);

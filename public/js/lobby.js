@@ -36,6 +36,7 @@ import {
 } from "./servidor.js";
 import { crearYMostrar } from "./sala-privada.js";
 import { conectarCampoDeCodigo, entrarConCodigo, irALaSala } from "./entrar-por-codigo.js";
+import { consumir as consumirCodigoPendiente } from "./codigo-pendiente.js";
 import { montarCarteleraTorneos } from "./cartelera-torneos.js";
 import { escapar } from "./modulos/texto.js";
 
@@ -334,3 +335,23 @@ $("btnCrearSala").addEventListener("click", () =>
 );
 
 conectarCampoDeCodigo($("codigoSala"), $("btnUnirse"), { avisar, limpiarAviso });
+
+/*
+ * El código que llegó por un link corto, si llegó.
+ *
+ * Se CONSUME —se lee y se borra de una— así que una segunda visita al lobby
+ * abre con el campo vacío y no pisa lo que la persona esté escribiendo.
+ *
+ * Y NO se une solo, a propósito: se llena el campo y se enfoca el botón, pero
+ * el último paso lo da quien recibió la invitación. Entrar a una sala cuesta
+ * Leyendas, y gastar la plata de alguien por haber tocado un link es
+ * exactamente lo que no se hace.
+ */
+{
+  const pendiente = consumirCodigoPendiente();
+  if (pendiente) {
+    $("codigoSala").value = pendiente;
+    $("btnUnirse").focus();
+    avisar("Te invitaron a una sala. Tocá «Entrar» para unirte.");
+  }
+}

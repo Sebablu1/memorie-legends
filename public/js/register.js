@@ -13,6 +13,11 @@ import {
 // de Firestore. Antes cada archivo tenía el suyo escrito a mano.
 import { LEYENDAS_REGISTRO, saldoDeRegistro } from "./reglas/economia.js";
 
+// Quien llegó por un link corto vuelve al LOBBY, no al tablero: es el caso
+// más común de una invitación, porque a quien te invita un amigo suele no
+// tener cuenta todavía.
+import { hay as hayCodigoPendiente } from "./codigo-pendiente.js";
+
 const form = document.getElementById("registerForm");
 const mensaje = document.getElementById("mensaje");
 const boton = form.querySelector('button[type="submit"]');
@@ -94,9 +99,9 @@ form.addEventListener("submit", async (e) => {
     mensaje.className = "mensaje success";
     boton.textContent = "Entrando...";
 
-    // 5. Redirigir al lobby
+    // 5. Redirigir: al lobby si vino por una invitación, al tablero si no.
     setTimeout(() => {
-      window.location.href = "dashboard.html";
+      window.location.href = hayCodigoPendiente() ? "lobby.html" : "dashboard.html";
     }, 1500);
   } catch (error) {
     console.error("❌ Error de registro:", error);
@@ -203,7 +208,7 @@ botonGoogle?.addEventListener("click", async () => {
         : "Ya tenías cuenta. Entrando…",
       "success",
     );
-    window.location.replace("dashboard.html");
+    window.location.replace(hayCodigoPendiente() ? "lobby.html" : "dashboard.html");
   } catch (error) {
     botonGoogle.disabled = false;
     avisar(explicar(error), "error");

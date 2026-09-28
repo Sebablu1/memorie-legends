@@ -300,6 +300,63 @@ body.con-cartel-abierto {
 /* La vigencia, entre dos líneas que se desvanecen, como la corona. El reloj
    va AL LADO del texto y no adentro: `#vigenciaCodigo` dice exactamente
    «Vale 30 minutos.», y una prueba lo compara tal cual. */
+/* ───────────────────────────────── el link de invitación
+
+   Va debajo del código y arriba del reloj. Es la forma CÓMODA de pasar la
+   sala —quien lo toca llega al lobby con el código puesto— y el código de
+   arriba es la forma que se puede dictar.
+
+   Se muestra entero y no acortado: alguien lo va a querer leer para
+   comprobar que dice lo que dice antes de mandarlo. Si no entra, se parte. */
+.fila-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 0 4px;
+}
+
+.link-invitacion {
+  color: var(--oro-suave, #e3c77a);
+  font-size: 0.8rem;
+  /* `anywhere` y no `break-all`: parte sólo si hace falta, y no corta una
+     palabra corta que entraba bien. */
+  overflow-wrap: anywhere;
+  opacity: 0.92;
+}
+
+.copiar-link {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid rgba(212, 168, 67, 0.45);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--oro, #d4a843);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.copiar-link:hover {
+  border-color: var(--oro, #d4a843);
+}
+
+.copiar-link svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* El acuse: el botón es sólo un ícono, así que la confirmación tiene que ser
+   visual. El rótulo para lectores de pantalla lo cambia el JavaScript. */
+.copiar-link.copiado {
+  border-color: #25d366;
+  color: #25d366;
+}
+
 .fila-reloj {
   display: flex;
   align-items: center;

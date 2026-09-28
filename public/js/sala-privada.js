@@ -42,14 +42,39 @@
 import { crearSalaPrivada, ErrorDeServidor } from "./servidor.js";
 import { irALaSala } from "./entrar-por-codigo.js";
 
+/** El link corto que lleva al lobby con el código ya puesto. */
+export const linkDeInvitacion = (codigo) => `https://memorielegends.com/s/${codigo}`;
+
 /**
- * El mensaje para invitar. El código va SIN el espacio con que se lo muestra:
- * el campo donde se escribe acepta ocho caracteres, y pegado con el espacio
- * se perdería la última letra.
+ * El mensaje para invitar.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ EL LINK VA SOLO, EN SU PROPIA LÍNEA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque WhatsApp decide el TAMAÑO de la vista previa según cuánto texto
+ * rodea al enlace. Con el link enterrado en una frase —como estaba— muestra la
+ * versión compacta, que recorta la tarjeta a un cuadrado y parte el logo por
+ * la mitad. Con el link separado y al final, muestra la grande, que es la que
+ * se ve entera.
+ *
+ * Se comprobó con dos mensajes reales puestos uno al lado del otro: el que era
+ * sólo un enlace salió grande y el que lo llevaba adentro de una oración, en
+ * miniatura y cortado.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ UN LINK Y NO EL CÓDIGO SUELTO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque en WhatsApp no se puede copiar un pedazo de un mensaje: al tocarlo se
+ * copia entero. Quien recibía «…usá el código ABCD1234 para unirte…» tenía que
+ * transcribirlo a mano. Tocando el link, el código llega solo al campo.
+ *
+ * El cartel sigue mostrando el código además del link, para quien prefiera
+ * dictarlo o pegarlo por otro lado.
  */
 export const mensajeDeInvitacion = (codigo) =>
-  "Te invito a jugar Memorie Legends conmigo. Entrá a https://memorielegends.com/lobby.html " +
-  `y usá el código ${codigo} para unirte a mi sala privada.`;
+  `Te invito a jugar Memorie Legends conmigo:\n\n${linkDeInvitacion(codigo)}`;
 
 /** «ABCD EFGH»: en dos grupos se lee y se dicta mejor. Sólo para mostrar. */
 export const agrupado = (codigo) => codigo.replace(/^(.{4})(.+)$/, "$1 $2");
@@ -120,6 +145,10 @@ export function mostrarCodigoPrivado(caja, { codigo, sala, vence, alCerrar } = {
         <span class="diamante" aria-hidden="true"></span>
       </div>
       <p class="aviso-codigo"><b>Copiá este código ahora. No se vuelve a mostrar.</b></p>
+      <div class="fila-link">
+        <span class="link-invitacion" id="linkInvitacion"></span>
+        <button class="copiar-link" id="btnCopiarLink" type="button" aria-label="Copiar el link">${ICONO_COPIAR}</button>
+      </div>
       <p class="fila-reloj" id="filaReloj" hidden>${RELOJ}<span class="vigencia-codigo" id="vigenciaCodigo"></span></p>
       <div class="botonera-codigo">
         <button class="accion boton-copiar" id="btnCopiarCodigoPrivado" type="button">${ICONO_COPIAR}<span class="texto">Copiar</span></button>
@@ -140,6 +169,37 @@ export function mostrarCodigoPrivado(caja, { codigo, sala, vence, alCerrar } = {
 
   const mensaje = mensajeDeInvitacion(codigo);
   $("enlaceWhatsApp").href = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+
+  /*
+   * El link, a la vista y con su propio botón de copiar.
+   *
+   * Va además del código, no en su lugar: el link sirve para mandarlo por
+   * cualquier lado, y el código para dictarlo por teléfono o escribirlo a
+   * mano. Sacar uno de los dos deja sin salida a la mitad de los casos.
+   *
+   * Se escribe con `textContent` y no con `innerHTML`: el código viene del
+   * servidor, pero esta caja se arma con una plantilla y meter texto de
+   * afuera como HTML es exactamente la costumbre que no queremos tomar.
+   */
+  const link = linkDeInvitacion(codigo);
+  $("linkInvitacion").textContent = link;
+
+  const copiarLink = $("btnCopiarLink");
+  copiarLink.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      // El acuse va en el rótulo para lectores de pantalla y en una clase
+      // para el ojo: el botón es sólo un ícono y no tiene dónde poner texto.
+      copiarLink.classList.add("copiado");
+      copiarLink.setAttribute("aria-label", "Link copiado");
+      setTimeout(() => {
+        copiarLink.classList.remove("copiado");
+        copiarLink.setAttribute("aria-label", "Copiar el link");
+      }, 2000);
+    } catch {
+      // Igual que el otro: el link está en pantalla y se puede copiar a mano.
+    }
+  };
 
   // Tres botones, los tres siempre a la vista y ninguno se convierte en otro:
   // copiar el código, compartirlo por WhatsApp, y entrar a la sala. Lo único
