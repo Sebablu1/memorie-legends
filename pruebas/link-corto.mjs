@@ -174,6 +174,21 @@ console.log("\n=== 9. Quien llega por un link cae en el LOBBY ===");
   ok(/consumirCodigoPendiente\(\)/.test(lobby), "el lobby lo consume");
   ok(!/unirseConCodigo\(pendiente\)|entrarConCodigo\(pendiente\)/.test(lobby),
      "y NO une solo: el último paso lo da la persona");
+
+  /*
+   * Y lo consume SÓLO con sesión. Esta comprobación existe por un bug que
+   * llegó a producción: `exigirSesion()` manda al login pero no corta el
+   * módulo, así que el lobby consumía el código —lo leía y lo borraba— en el
+   * instante muerto antes de que el navegador se fuera. Quien tocaba el link
+   * sin sesión terminaba de entrar y el código ya no estaba.
+   *
+   * Mira el texto y no el comportamiento, que es lo que se puede desde acá.
+   * Es débil, pero caza el regreso exacto del error.
+   */
+  const bloque = lobby.slice(lobby.indexOf("consumirCodigoPendiente()") - 400,
+                             lobby.indexOf("consumirCodigoPendiente()"));
+  ok(/if \(sesion\) \{[^}]*$/.test(bloque.replace(/\/\*[\s\S]*?\*\//g, "")),
+     "y sólo con sesión: sin la guarda, el código se pierde camino al login");
 }
 
 console.log(fallos ? `\n❌ ${fallos} fallo(s)` : "\n✅ TODO OK");

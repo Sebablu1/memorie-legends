@@ -346,8 +346,21 @@ conectarCampoDeCodigo($("codigoSala"), $("btnUnirse"), { avisar, limpiarAviso })
  * el último paso lo da quien recibió la invitación. Entrar a una sala cuesta
  * Leyendas, y gastar la plata de alguien por haber tocado un link es
  * exactamente lo que no se hace.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * SÓLO SI HAY SESIÓN, Y ESTO NO ES UN DETALLE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `exigirSesion()` manda al login cuando no hay sesión, pero NO corta este
+ * archivo: asignar `location.href` pide una navegación y el resto del módulo
+ * sigue corriendo igual hasta que el navegador se va.
+ *
+ * Sin esta guarda, quien tocaba el link sin sesión perdía el código: el lobby
+ * lo consumía —lo leía y lo borraba— en ese instante muerto, y cuando la
+ * persona terminaba de entrar ya no quedaba nada. Se descubrió probándolo
+ * contra producción, no leyéndolo.
  */
-{
+if (sesion) {
   const pendiente = consumirCodigoPendiente();
   if (pendiente) {
     $("codigoSala").value = pendiente;
