@@ -956,6 +956,119 @@ dato sobre ella: ni scroll horizontal, ni tamaños de campo, ni blancos
 táctiles.
 
 
+## 28. La banda muerta de 74 píxeles: la lección, y el reclamo que no tuvo dónde ir
+
+Cerrado el 28 de septiembre de 2026 en `a59c3ed`. Queda anotado porque lo que
+importa no es el arreglo —son dos palabras de CSS— sino lo que costó llegar a
+él y por qué.
+
+### a. El defecto, en una línea
+
+La tabla de «Mis salas» mide unos 490 px por sus cinco cabeceras con `nowrap` y
+mayúsculas espaciadas. Su caja la scrollea con `overflow-x: auto`, pero ese
+desborde igual se propagaba al `scrollWidth` de los ancestros: a 360 de
+pantalla, `section.panel-salas` daba 419 en una caja de 330 y `main` 434 en 360.
+En el teléfono se veía como una banda muerta al costado, con el botón de soporte
+corrido y la caja de la sala privada cortada.
+
+Lo ataja `contain: paint` en `.tabla-salas-caja`. El porqué, y las cuatro
+alternativas que se midieron antes de elegirlo, están escritos en
+`css/tablero.css` al lado de la regla.
+
+### b. Lo que costó
+
+Diez horas. Nueve hipótesis descartadas: la dirección del link del cartel, los
+`select` del panel, el cajón del menú, el botón flotante de soporte, la tabla de
+salas —descartada por el motivo equivocado: se comprobó que su caja la contiene
+visualmente y se dio por cerrado—, el cartel del código entero, el cajón por
+`visibility: hidden`, la tipografía del sistema, y el ajuste de texto del
+aparato.
+
+Tres arreglos desplegados que no arreglaron nada: uno al panel (`1f6b581`,
+revertido en `90af920`), uno al cartel (`c7cda5a`) y un recorte general con
+`overflow-x: clip` sobre `html`, `body`, `main` y `.panel` (`5d6aeb3`, quitado
+en `a59c3ed`).
+
+Y cuatro rondas de mediciones que tuvo que hacer el humano en su teléfono,
+anotadas a mano porque en ese aparato no se podían capturar.
+
+### c. Las tres razones por las que no se encontró antes
+
+Esta es la parte que sirve.
+
+**1. La causa estaba en el primer mensaje.** El reporte inicial decía, con
+capturas, que el defecto aparecía al pasar a «Por Leyendas». Y «Por Leyendas» es
+exactamente el modo que muestra la tabla de salas: lo afirma una prueba que ya
+existía, «las salas abiertas sólo se muestran en el modo por Leyendas». El
+disparador señalaba a la tabla desde el principio y se leyó como si señalara al
+panel.
+
+**2. En el escritorio la tabla estaba vacía.** Sin salas listadas el defecto no
+existe. Se midió durante horas una página que no tenía el problema, mientras el
+teléfono del humano lo tenía porque él sí estaba en salas. **Nunca hizo falta el
+aparato: hacía falta el contenido.** Cada ronda de mediciones que se le pidió
+era evitable.
+
+**3. El recorrido preguntaba lo que no era.** Se buscó `scrollWidth >
+clientWidth` entre los descendientes. Eso encuentra al que NO PUEDE CONTENER, no
+al que empuja: el que empuja nunca se desborda a sí mismo, porque nadie lo
+apretó. En una cadena de cajas flexibles todas se estiran y encajan perfecto con
+su contenido; el desborde aparece recién en la primera con techo duro, que era
+justo lo único que el recorrido encontraba.
+
+### d. Cómo medir esto la próxima vez
+
+1. **Poblar el contenido primero.** Si la pantalla tiene listas, tablas o
+   secciones que sólo aparecen con datos, llenarlas ANTES de medir. Una página
+   vacía no tiene el defecto de una página usada.
+2. **Medir holgura, no desborde.** Para cada elemento: su ancho mínimo (un clon
+   en el mismo padre con `width: min-content`) contra el espacio que le queda
+   hasta el techo duro de su cadena. Ordenar por holgura ascendente. Menos del
+   15 % es un desborde en algún teléfono.
+3. **Mirar lo que `querySelectorAll('*')` no ve:** nodos de texto (con `Range`)
+   y pseudoelementos (con `getComputedStyle(el, '::before')`). Si una caja mide
+   más que la unión de sus hijos elemento, lo que sobra es uno de esos dos.
+4. **Estresar la tipografía, no emular el aparato.** `setViewportSize` cambia el
+   ancho y nada más: los archivos de fuente siguen siendo los de la máquina, así
+   que un desborde de métrica tipográfica no se reproduce nunca. Forzar una letra
+   más ancha (Verdana sirve, es un 10 % más) y bloquear las tipografías web para
+   ejercitar la cadena de respaldo.
+5. **No tapar.** `overflow-x: clip` corta el síntoma y deja ciega a la medición:
+   con el recorte puesto, `scrollWidth` da limpio siempre. Lo vigila el canario
+   de `pruebas/e2e/tablero.spec.js`, que afirma que `html`, `body` y `main`
+   siguen con `overflow-x: visible`.
+
+### e. El reclamo por el tiempo perdido no tuvo dónde ir
+
+El humano presentó un reclamo formal por calidad de servicio al soporte de
+Anthropic —chat con el agente Fin— documentando las diez horas, las nueve
+hipótesis erradas, las cuatro rondas de mediciones y el hecho de que la causa
+estaba en el primer mensaje.
+
+La respuesta, según la transcripción que trajo:
+
+> No tengo información sobre un proceso formal de compensación por tiempo
+> perdido en casos de diagnóstico erróneo, ni sobre cómo se registran este tipo
+> de incidencias de calidad internamente. Lo que sí puedo confirmar es que tu
+> reclamo queda registrado en esta conversación tal como lo describiste. No
+> puedo ofrecerte crédito, extensión de suscripción ni ningún otro tipo de
+> compensación.
+
+Y después: «Entiendo tu frustración. Tu reclamo queda registrado aquí y lo
+tomaré en cuenta».
+
+En claro: **el sistema de soporte no tiene vía para procesar un reclamo de
+calidad.** No hay expediente, no hay escalamiento, no hay compensación, y no hay
+forma de saber si queda registrado en algún lado que no sea esa conversación. El
+humano calificó la atención de «Horrible».
+
+Lo que esto significa para el proyecto, que es lo único que este archivo puede
+dejar dicho: si vuelve a pasar, **no hay canal**. El único registro que queda es
+el que se escriba acá y en los mensajes de los commits. Por eso esta sección
+tiene la sección (c) y la (d): no para tener la queja anotada, sino para que el
+costo se pague una sola vez.
+
+
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del
