@@ -461,6 +461,50 @@
           "white-space:pre-wrap;word-break:break-word;box-shadow:0 2px 10px rgba(0,0,0,.5)";
         document.body.appendChild(caja);
 
+        /*
+         * Quién se pasa del borde, con nombre y apellido.
+         *
+         * Descarta a los que un ancestro recorta —si alguien arriba tiene
+         * `overflow` distinto de `visible`, lo que sobra no llega a la
+         * página— y a los `fixed` escondidos. Lo que queda es lo que de
+         * verdad ensancha el documento.
+         *
+         * Se queda con los de MÁS afuera, que son los que mandan.
+         */
+        const culpables = (limite) => {
+          const lista = [];
+          for (const el of document.querySelectorAll("body *")) {
+            const r = el.getBoundingClientRect();
+            if (!r.width && !r.height) continue;
+            if (r.right <= limite + 1) continue;
+
+            let recortado = false;
+            for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+              const o = getComputedStyle(p);
+              if (o.overflowX !== "visible") { recortado = true; break; }
+            }
+            if (recortado) continue;
+
+            const cs = getComputedStyle(el);
+            if (cs.visibility === "hidden" || cs.display === "none") continue;
+
+            lista.push({
+              nombre: el.tagName.toLowerCase() +
+                (el.id ? "#" + el.id : "") +
+                (typeof el.className === "string" && el.className
+                  ? "." + el.className.trim().split(/\s+/)[0] : ""),
+              der: Math.round(r.right),
+              ancho: Math.round(r.width),
+              letra: cs.fontSize,
+            });
+          }
+          lista.sort((a, b) => b.der - a.der);
+          if (!lista.length) return ["  (ninguno sin recortar)"];
+          return lista.slice(0, 5).map(
+            (x) => "  " + x.der + "  w" + x.ancho + "  " + x.letra + "  " + x.nombre.slice(0, 30),
+          );
+        };
+
         const pintar = () => {
           const vv = window.visualViewport;
           const d = document.documentElement;
@@ -474,6 +518,10 @@
             "dpr          " + window.devicePixelRatio,
             "¿comprime?   " + (vv && vv.scale < 1 ? "SÍ, a " + Math.round(vv.scale * 100) + "%" : "no"),
             "¿más ancha?  " + (d.scrollWidth > d.clientWidth ? "SÍ, sobran " + (d.scrollWidth - d.clientWidth) : "no"),
+            "raiz/body    " + getComputedStyle(d).fontSize + " / " + getComputedStyle(document.body).fontSize,
+            "",
+            "QUIEN SE PASA DE " + d.clientWidth + ":",
+            ...culpables(d.clientWidth),
             "",
             navigator.userAgent,
           ].join("\n");
