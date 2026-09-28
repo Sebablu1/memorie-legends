@@ -454,6 +454,11 @@
     <script>
       if (new URLSearchParams(location.search).get("diag") === "1") {
         const caja = document.createElement("div");
+        // Con id, para poder excluirla de su propia medición. Sin esto la
+        // franja salía primera en la lista de culpables: es `fixed` con
+        // `left:0;right:0`, así que mide todo el ancho, y no tenía nombre
+        // con el que distinguirla. El instrumento se medía a sí mismo.
+        caja.id = "__diag";
         caja.style.cssText =
           "position:fixed;top:0;left:0;right:0;z-index:2147483647;" +
           "pointer-events:none;background:#fff;color:#000;" +
@@ -471,38 +476,67 @@
          *
          * Se queda con los de MÁS afuera, que son los que mandan.
          */
-        const culpables = (limite) => {
+        /*
+         * Quién tiene CONTENIDO que no entra en su propia caja.
+         *
+         * El criterio anterior —borde derecho más allá del viewport— no
+         * servía: una vez que el documento se ensanchó, cualquier bloque al
+         * 100% lo cumple, y la lista se llenaba de consecuencias. Lo que
+         * señala el origen es `scrollWidth > clientWidth`: el contenido no
+         * entra, y por eso empuja.
+         *
+         * Se descartan los recortados —si un ancestro tiene `overflow`
+         * distinto de `visible`, lo que sobra no llega a la página—, los
+         * escondidos, los `fixed` (no generan scroll del documento) y esta
+         * misma franja.
+         */
+        const culpables = () => {
           const lista = [];
           for (const el of document.querySelectorAll("body *")) {
-            const r = el.getBoundingClientRect();
-            if (!r.width && !r.height) continue;
-            if (r.right <= limite + 1) continue;
-
-            let recortado = false;
-            for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
-              const o = getComputedStyle(p);
-              if (o.overflowX !== "visible") { recortado = true; break; }
-            }
-            if (recortado) continue;
+            if (el.id === "__diag" || el.closest("#__diag")) continue;
+            const sobra = el.scrollWidth - el.clientWidth;
+            if (sobra <= 1 || el.clientWidth === 0) continue;
 
             const cs = getComputedStyle(el);
             if (cs.visibility === "hidden" || cs.display === "none") continue;
+            if (cs.overflowX !== "visible") continue;
+            if (cs.position === "fixed") continue;
+
+            let recortado = false;
+            for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+              if (getComputedStyle(p).overflowX !== "visible") { recortado = true; break; }
+            }
+            if (recortado) continue;
 
             lista.push({
               nombre: el.tagName.toLowerCase() +
                 (el.id ? "#" + el.id : "") +
                 (typeof el.className === "string" && el.className
                   ? "." + el.className.trim().split(/\s+/)[0] : ""),
-              der: Math.round(r.right),
-              ancho: Math.round(r.width),
-              letra: cs.fontSize,
+              sobra, contenido: el.scrollWidth, caja: el.clientWidth, letra: cs.fontSize,
             });
           }
-          lista.sort((a, b) => b.der - a.der);
-          if (!lista.length) return ["  (ninguno sin recortar)"];
+          lista.sort((a, b) => b.sobra - a.sobra);
+          if (!lista.length) return ["  NINGUNO — el desborde no sale de acá"];
           return lista.slice(0, 5).map(
-            (x) => "  " + x.der + "  w" + x.ancho + "  " + x.letra + "  " + x.nombre.slice(0, 30),
+            (x) => "  +" + x.sobra + " (" + x.contenido + " en " + x.caja + ") " +
+                   x.letra + " " + x.nombre.slice(0, 26),
           );
+        };
+
+        /*
+         * ¿Y si la franja fuera parte del problema?
+         *
+         * Se esconde un instante, se mide, y se vuelve a mostrar. Si el
+         * documento sigue midiendo lo mismo sin ella, queda probado que el
+         * diagnóstico no altera lo que diagnostica.
+         */
+        const sinLaFranja = () => {
+          const antes = caja.style.display;
+          caja.style.display = "none";
+          const medida = document.documentElement.scrollWidth;
+          caja.style.display = antes;
+          return medida;
         };
 
         const pintar = () => {
@@ -520,8 +554,10 @@
             "¿más ancha?  " + (d.scrollWidth > d.clientWidth ? "SÍ, sobran " + (d.scrollWidth - d.clientWidth) : "no"),
             "raiz/body    " + getComputedStyle(d).fontSize + " / " + getComputedStyle(document.body).fontSize,
             "",
-            "QUIEN SE PASA DE " + d.clientWidth + ":",
-            ...culpables(d.clientWidth),
+            "sin la franja " + sinLaFranja(),
+            "",
+            "CONTENIDO QUE NO ENTRA:",
+            ...culpables(),
             "",
             navigator.userAgent,
           ].join("\n");
