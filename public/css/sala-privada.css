@@ -50,9 +50,61 @@ body.con-cartel-abierto {
    acompaña sin que nadie se acuerde.
 
    Lo que esto NO arregla: que en algunos teléfonos la página se vea más
-   angosta de lo que mide. Eso es otra cosa. */
+   angosta de lo que mide. Eso es lo que persigue el bloque que sigue. */
 body.con-cartel-abierto .boton-soporte {
   display: none;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   QUE NADA DEL CARTEL PUEDA ESTIRAR LA PÁGINA
+
+   Medido en dos teléfonos Android distintos, con el mismo resultado: al
+   entrar al tablero el documento medía 360, y al crear la sala privada
+   pasaba a 419. Cincuenta y nueve píxeles de más, que se ven como una banda
+   muerta al costado y que cortan el botón de copiar contra el borde: se veía
+   negro porque la mitad dorada quedaba afuera de la pantalla.
+
+   En el emulador de escritorio, cero. La diferencia es la tipografía del
+   aparato, que dibuja más anchos los mismos textos.
+
+   Ya se descartaron, midiendo en el aparato: la dirección del link (se parte
+   sola), los `select` del panel, el cajón del menú (`visibility: hidden`, no
+   llega a pintar) y la tabla de «Mis salas» (la contiene su propio
+   `overflow-x`). Queda el cartel, que es lo único que aparece justo cuando
+   el número cambia.
+
+   No se llegó a saber CUÁL de sus partes lo estira, y no valía seguir
+   pidiendo mediciones a alguien con el teléfono en la mano: estas cuatro
+   reglas tapan a todas las partes a la vez.
+
+   ── Por qué `min-width: 0` ──
+
+   Un hijo de flex nace con `min-width: auto`: no baja del ancho mínimo de su
+   contenido por más que `width` diga otra cosa. Acá todo son flex anidados
+   —el velo, la placa, la fila del link, la botonera—, así que un texto que
+   no puede partirse empuja a su caja, y su caja a la de arriba.
+
+   ── Por qué `max-width: 100%` ──
+
+   Es el cinturón: aunque algo calcule un ancho mayor, no se pasa de su
+   contenedor.
+
+   ── Por qué se permite partir palabras ──
+
+   Porque las cadenas largas de acá son códigos y direcciones, que no traen
+   espacios donde cortar. Entre una palabra partida y la página corrida, se
+   elige la palabra partida. Las dos excepciones —el código de la placa y el
+   del link— se defienden más abajo, cada una con su motivo.
+
+   Es de riesgo cero donde ya entraba: nada de esto cambia un ancho que no
+   estuviera desbordándose. */
+.codigo-privado,
+.codigo-privado * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* ------------------------------------------------------- la carta
@@ -328,6 +380,30 @@ body.con-cartel-abierto .boton-soporte {
   word-break: normal;
 }
 
+/* En un teléfono, el código más chico y con las letras más juntas.
+   ─────────────────────────────────────────────────────────────────────────
+   La placa es la caja más ancha del cartel: nueve caracteres en serif con
+   dos píxeles de aire entre cada uno, más los dos rombos y sus huecos. A 420
+   de pantalla se le baja el cuerpo y el aire, y se le permite partirse.
+
+   `min(1.35rem, 6vw)` y no `1.35rem` a secas: un tamaño fijo en `rem` es
+   exactamente lo que se sacó de este archivo en «El cartel aguanta la letra
+   grande del sistema». Al 200% valdría 43px, y volveríamos al principio. El
+   tope en `vw` lo ata a la pantalla, que es la que no cambia.
+
+   `white-space: normal` acompaña al `overflow-wrap`: sin él gana el `nowrap`
+   de arriba y permitir el corte no significa nada. A este cuerpo los nueve
+   caracteres entran de sobra, así que en la práctica no se parte: es un
+   seguro, no un cambio de diseño. */
+@media (max-width: 420px) {
+  .codigo-grande {
+    font-size: min(1.35rem, 6vw);
+    letter-spacing: 1px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
 /* ------------------------------------------------- el aviso y el reloj */
 
 /* El aviso va en dorado, como el resto de la carta. Medido contra el negro
@@ -580,6 +656,21 @@ body.con-cartel-abierto .boton-soporte {
      «COMPARTIR POR WhatsApp» se parte en dos, con la placa creciendo a lo
      alto. */
   white-space: nowrap;
+}
+
+/* Y si aun así no entra, en dos renglones antes que de largo.
+   ─────────────────────────────────────────────────────────────────────────
+   Contradice al comentario de arriba a propósito, y el de arriba se queda
+   porque explica qué se pierde: la etiqueta se parte, la placa crece a lo
+   alto y las tres dejan de medir lo mismo.
+
+   Es el precio, y es más barato que el otro. Con `nowrap` a secas, una
+   etiqueta que no entra no se parte NI se encoge: EMPUJA. Y lo que empuja
+   acá corre la página entera, que es el defecto que se está persiguiendo. */
+.botonera-codigo > .accion,
+.botonera-codigo > .accion > .texto {
+  max-width: 100%;
+  white-space: normal;
 }
 
 .botonera-codigo > .accion > .icono {
