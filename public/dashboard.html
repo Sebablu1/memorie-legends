@@ -531,6 +531,55 @@
          * documento sigue midiendo lo mismo sin ella, queda probado que el
          * diagnóstico no altera lo que diagnostica.
          */
+        /*
+         * Lo que hay DENTRO del panel que desborda, ordenado por ancho.
+         *
+         * Se busca por ancho y no sólo por `scrollWidth > clientWidth`,
+         * porque el que empuja no siempre se desborda a sí mismo: un
+         * `<select>` recorta su texto —su `scrollWidth` es igual a su
+         * `clientWidth`— pero su ANCHO MÍNIMO DE CONTENIDO, que es la opción
+         * más larga, estira a su contenedor igual. Lo mismo un elemento con
+         * `nowrap`.
+         *
+         * Por eso además se mide `min-content` a mano: se le fuerza ese
+         * ancho un instante, se lee, y se deja como estaba. Ese número es el
+         * que de verdad manda sobre el contenedor.
+         */
+        const dentroDelPanel = () => {
+          const panel = [...document.querySelectorAll("section.panel")]
+            .find((s) => s.scrollWidth > s.clientWidth + 1);
+          if (!panel) return ["  (ningún section.panel desborda ahora)"];
+
+          const filas = [];
+          for (const el of panel.querySelectorAll("*")) {
+            if (el.closest("#__diag")) continue;
+            const cs = getComputedStyle(el);
+            if (cs.display === "none" || cs.visibility === "hidden") continue;
+            const r = el.getBoundingClientRect();
+            if (r.width < 1) continue;
+
+            const antes = el.style.width;
+            el.style.width = "min-content";
+            const min = Math.round(el.getBoundingClientRect().width);
+            el.style.width = antes;
+
+            filas.push({
+              w: Math.round(r.width),
+              min,
+              sobra: el.scrollWidth - el.clientWidth,
+              tag: el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") +
+                (typeof el.className === "string" && el.className
+                  ? "." + el.className.trim().split(/\s+/)[0] : ""),
+            });
+          }
+          // Manda el ancho mínimo: es el que no se puede achicar.
+          filas.sort((a, b) => b.min - a.min);
+          return ["  caja=" + panel.clientWidth + " contenido=" + panel.scrollWidth]
+            .concat(filas.slice(0, 5).map(
+              (x) => "  w" + x.w + " min" + x.min + " " + x.tag.slice(0, 24),
+            ));
+        };
+
         const sinLaFranja = () => {
           const antes = caja.style.display;
           caja.style.display = "none";
@@ -558,6 +607,9 @@
             "",
             "CONTENIDO QUE NO ENTRA:",
             ...culpables(),
+            "",
+            "DENTRO DEL PANEL, POR ANCHO:",
+            ...dentroDelPanel(),
             "",
             navigator.userAgent,
           ].join("\n");
