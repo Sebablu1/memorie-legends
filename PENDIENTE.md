@@ -907,6 +907,55 @@ Antes de borrarla, comprobar que sigue sin referencias:
 grep -rn "compartir-escudo.jpg" public/ pruebas/ herramientas/
 ```
 
+---
+
+## 27. Lo que quedó fuera del barrido responsive del 28 de septiembre
+
+El barrido cubrió las páginas públicas y las que piden sesión, a 320, 360,
+414, 768 y 1440, y con la letra del sistema al 100, 125, 150 y 200 %. Estas
+tres cosas quedaron identificadas y sin tocar.
+
+### a. Los campos del panel de administración miden 14,4 px
+
+El panel **sí** recibe `tema.css`: lo importa desde su propia hoja
+(`admin.css:14`), no con un `<link>`. Así que el arreglo que llevó los campos
+del sitio a 16 px también cubre los suyos... salvo éstos:
+
+```css
+.campos-item input[type="text"],
+.campos-item input[type="number"],
+.campos-item select {
+  font-size: 0.9rem;   /* 14,4 px */
+  min-height: 42px;
+}
+```
+
+Con la raíz en 16, `0.9rem` son 14,4: por debajo del umbral de 16 con el que
+Safari en iOS hace zoom al tocar un campo. Son treinta campos.
+
+Y en la misma regla, `min-height: 42px` con el comentario «Alto de dedo: el
+panel también se abre desde el teléfono». Le faltan los dos píxeles para
+llegar a los 44 que pide Apple, que es justo lo que se corrigió en el resto
+del sitio.
+
+### b. Los enlaces del pie miden 16 a 18 px de alto
+
+En las diecinueve páginas, entre seis y nueve por página. Están por debajo de
+los 44 px, medido en el navegador.
+
+Se dejaron afuera a propósito: son enlaces de texto en línea, que es el caso
+donde la regla de los 44 px se discute más, y agrandarlos cambia el aspecto
+del pie en todas las páginas a la vez. Es una decisión de diseño, no un
+arreglo mecánico.
+
+### c. `mesa.html` no se auditó
+
+Es la pantalla más compleja del sitio —2.900 líneas de CSS propio— y para
+verla hace falta una partida en curso. No entró en el barrido y no hay ningún
+dato sobre ella: ni scroll horizontal, ni tamaños de campo, ni blancos
+táctiles.
+
+
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del

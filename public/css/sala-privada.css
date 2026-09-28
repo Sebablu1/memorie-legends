@@ -39,6 +39,22 @@ body.con-cartel-abierto {
   overflow: hidden;
 }
 
+/* Con el cartel abierto, el botón de soporte se va.
+   ─────────────────────────────────────────────────────────────────────────
+   El cartel deja `inert` a todo lo demás del cuerpo, así que esa píldora
+   verde flotando sobre la carta no se puede tocar: es un adorno que estorba,
+   y en un teléfono queda justo encima de los tres botones.
+
+   Va acá y no en `tablero.css` porque la condición es del CARTEL, no del
+   tablero: el día que el cartel se abra desde otra pantalla, esto lo
+   acompaña sin que nadie se acuerde.
+
+   Lo que esto NO arregla: que en algunos teléfonos la página se vea más
+   angosta de lo que mide. Eso es otra cosa. */
+body.con-cartel-abierto .boton-soporte {
+  display: none;
+}
+
 /* ------------------------------------------------------- la carta
 
    Marco doble —un filo grueso de oro por fuera y uno fino por dentro—, fondo
