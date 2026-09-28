@@ -46,6 +46,18 @@ body.con-cartel-abierto {
    despegarla del velo. */
 .cartel-tarot {
   position: relative;
+  /* ───────────────────────────────────────────────────────────────────
+     SIN ESTO, EL CARTEL SE SALE DE LA PANTALLA
+
+     Es hijo de un flex, y un hijo de flex nace con `min-width: auto`: no baja
+     del ancho mínimo de su contenido, por más que `width` diga otra cosa. Con
+     la letra del sistema agrandada —Android lo permite— el código crecía, no
+     podía partirse, y empujaba el cartel más allá del `min(520px, 100%)`
+     hasta sacarlo de la pantalla.
+
+     Se vio en un teléfono de verdad: el aspa de cerrar y el botón de copiar
+     quedaban cortados contra el borde derecho. */
+  min-width: 0;
   /* 520 y no 440: con 440 el título se partía en dos también en pantalla
      grande, y en la referencia va en un renglón. */
   width: min(520px, 100%);
@@ -264,7 +276,23 @@ body.con-cartel-abierto {
   margin: 0;
   font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-weight: 700;
-  font-size: clamp(1.45rem, 7vw, 2.6rem);
+  /* ───────────────────────────────────────────────────────────────────
+     POR QUÉ NO HAY PISO EN `rem`
+
+     Antes decía `clamp(1.45rem, 7vw, 2.6rem)`. El piso en `rem` era el
+     problema: con la letra del sistema al 125% valía 29px y le ganaba al
+     `7vw`, así que el código crecía aunque la pantalla fuera la misma. Con
+     `white-space: nowrap` no podía partirse, y arrastraba el cartel afuera.
+
+     Ahora escala con la PANTALLA y se topa en 2.6rem para que no se vuelva
+     gigante en un monitor. El techo sigue en `rem` a propósito: ahí agrandar
+     la letra del sistema sí lo agranda, porque sobra lugar.
+
+     El costo, dicho de frente: en un teléfono con la letra agrandada, el
+     código NO crece. Es el precio de que la placa siga siendo una placa de un
+     solo renglón. Todo lo demás del cartel —el título, el aviso, el link—
+     sigue escalando. */
+  font-size: min(7vw, 2.6rem);
   line-height: 1.1;
   letter-spacing: 2px;
   /* Los números, a la altura de las mayúsculas. Playfair los dibuja por
@@ -481,7 +509,20 @@ body.con-cartel-abierto {
   border-radius: 0;
   font-family: "Playfair Display", "Playfair respaldo", Georgia, serif;
   font-weight: 700;
-  font-size: 0.95rem;
+  /* Se topa con la PANTALLA, por lo mismo que el código de arriba: la placa
+     mide `min(100%, 356px)` y la etiqueta lleva `nowrap`, así que una letra
+     que crece con el sistema se sale del botón. Pasaba de verdad: al 150%,
+     «COMPARTIR POR WhatsApp» desbordaba el verde y «ENTRAR A LA SALA» quedaba
+     cortado a «ENTRAR A LA SAL».
+
+     En pantalla ancha gana `0.95rem` y todo queda como estaba. */
+  /* Tres topes, y cada uno ataja una cosa:
+       0.95rem  el tamaño de diseño, el que manda cuando todo es normal;
+       4.2vw    para que se achique en pantallas angostas;
+       15px     para que la letra del sistema no lo infle en ESCRITORIO, donde
+                `4.2vw` vale sesenta píxeles y no topa nada, pero la placa
+                sigue midiendo 356 fijos. */
+  font-size: min(0.95rem, 4.2vw, 15px);
   /* El filo: la caja de atrás, dorada y entera. */
   background: linear-gradient(155deg, #f6e3a1 0%, #dbbd6a 22%, #8a6d2a 48%, #f0d060 70%, #7c5a1e 100%);
   box-shadow: none;
@@ -598,7 +639,18 @@ body.con-cartel-abierto {
 .botonera-codigo > .boton-whatsapp::after {
   content: "→";
   position: relative;
-  font-size: 1.1rem;
+  /* En `em`, o sea atada a la letra DEL BOTÓN, y no a la raíz ni a la
+     pantalla.
+
+     Era el último tamaño suelto del botón. En `rem` crecía con la letra del
+     sistema —al 200% medía 35px y empujaba ocho píxeles fuera del verde—, y
+     topada en `vw` quedaba desproporcionada: a 320px de ancho la flecha medía
+     14,7 al lado de una etiqueta de 10.
+
+     Con `em` acompaña a su etiqueta en cualquier ancho y a cualquier escala,
+     sin un número por caso. En pantalla grande da 17px, que es lo que daba el
+     `1.1rem` original. */
+  font-size: 1.15em;
   line-height: 1;
   opacity: 0.9;
 }
@@ -666,9 +718,16 @@ body.con-cartel-abierto {
 @media (max-width: 480px) {
   .botonera-codigo > .boton-whatsapp {
     /* Se achica la letra, no el aire del glifo: el espacio de respeto es del
-       kit y no se negocia con el ancho de la pantalla. */
+       kit y no se negocia con el ancho de la pantalla.
+
+       Con el tope en `vw` por el mismo motivo que el resto de la botonera: es
+       la etiqueta más larga de las tres y la primera en desbordarse. */
     padding-right: 14px;
-    font-size: 0.76rem;
+    /* 3 y no 3.4: a 320px de ancho —el teléfono más angosto que soportamos—
+       con 3.4 la etiqueta desbordaba el verde por nueve píxeles, y con 3.15
+       todavía por dos. Los números salieron de medir cada vez, no de tantear.
+       El aire del glifo no se toca: eso lo pide el kit de la marca. */
+    font-size: min(0.76rem, 3vw);
   }
 
   .botonera-codigo > .boton-whatsapp > .texto {

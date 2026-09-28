@@ -78,7 +78,11 @@ const PLANTILLA = `<!doctype html>
   .tarjeta {
     width: ${ANCHO}px; height: ${ALTO}px; position: relative;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 24px; padding: 40px 90px 118px;
+    gap: 22px; padding: 46px 90px 96px;
+    /* La columna tiene que ENTRAR en la caja con relleno. Si no entra, al
+       centrarla se desborda por arriba y por abajo en partes iguales, y lo que
+       asoma arriba es la corona del escudo: en la primera versión llegó a
+       tocar el filo dorado del marco, que está a 22px del borde. */
     background:
       radial-gradient(circle at 50% 34%, rgba(212,168,67,0.24) 0%, rgba(212,168,67,0) 56%),
       linear-gradient(160deg, #0d0d10 0%, #05070b 55%, #0a0a0a 100%);
@@ -120,7 +124,10 @@ const PLANTILLA = `<!doctype html>
 
      La regla para quien toque esto: si algo importante queda fuera del
      rectángulo x∈[285, 915], se va a perder en la mitad de los chats. */
-  .logo { height: 330px; width: auto; flex: none; filter: drop-shadow(0 0 44px rgba(212,168,67,0.55)); }
+  /* 290 y no 330: con 330 la columna medía más que la caja y la corona se
+     subía encima del marco. Sigue entrando entero en el cuadrado central, que
+     es lo que importa para la vista compacta. */
+  .logo { height: 290px; width: auto; flex: none; filter: drop-shadow(0 0 40px rgba(212,168,67,0.55)); }
   .textos {
     display: flex; flex-direction: column; align-items: center; gap: 14px;
     /* 560 y no más: centrado, ocupa de 320 a 880, adentro de la franja que
