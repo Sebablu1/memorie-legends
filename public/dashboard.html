@@ -434,5 +434,60 @@
 
     <script type="module" src="js/dashboard.js"></script>
     <script type="module" src="js/menu.js"></script>
+
+    <!-- ╔══════════════════════════════════════════════════════════════╗
+         ║  DIAGNÓSTICO TEMPORAL — BORRAR CUANDO ESTÉ LEÍDO             ║
+         ╚══════════════════════════════════════════════════════════════╝
+
+         Existe para medir UNA cosa en un teléfono de verdad: si el
+         navegador está comprimiendo la página. En el emulador de escritorio
+         ese cálculo no ocurre, así que el número sólo se puede sacar acá.
+
+         Se muestra SÓLO con `?diag=1` en la dirección. Sin ese parámetro no
+         corre ni una línea, así que en producción no lo ve nadie por accidente.
+
+         Es `position: fixed` y `pointer-events: none`: no ocupa lugar en el
+         flujo ni se puede tocar, para no cambiar justamente lo que mide.
+
+         Se borra en cuanto el número esté leído. Si estás leyendo esto y
+         nadie se acuerda de por qué está, bórralo. -->
+    <script>
+      if (new URLSearchParams(location.search).get("diag") === "1") {
+        const caja = document.createElement("div");
+        caja.style.cssText =
+          "position:fixed;top:0;left:0;right:0;z-index:2147483647;" +
+          "pointer-events:none;background:#fff;color:#000;" +
+          "font:13px/1.45 ui-monospace,Consolas,monospace;padding:10px 12px;" +
+          "white-space:pre-wrap;word-break:break-word;box-shadow:0 2px 10px rgba(0,0,0,.5)";
+        document.body.appendChild(caja);
+
+        const pintar = () => {
+          const vv = window.visualViewport;
+          const d = document.documentElement;
+          caja.textContent = [
+            "scale        " + (vv ? vv.scale : "SIN visualViewport"),
+            "vv.width     " + (vv ? Math.round(vv.width) : "-"),
+            "innerWidth   " + window.innerWidth,
+            "clientWidth  " + d.clientWidth,
+            "scrollWidth  " + d.scrollWidth,
+            "screen.width " + screen.width,
+            "dpr          " + window.devicePixelRatio,
+            "¿comprime?   " + (vv && vv.scale < 1 ? "SÍ, a " + Math.round(vv.scale * 100) + "%" : "no"),
+            "¿más ancha?  " + (d.scrollWidth > d.clientWidth ? "SÍ, sobran " + (d.scrollWidth - d.clientWidth) : "no"),
+            "",
+            navigator.userAgent,
+          ].join("\n");
+        };
+
+        pintar();
+        // Se repinta cuando cambia algo: así se ve el número EN EL MOMENTO
+        // en que la página se ve apretada, y no sólo al cargar.
+        addEventListener("resize", pintar);
+        addEventListener("orientationchange", pintar);
+        window.visualViewport?.addEventListener("resize", pintar);
+        window.visualViewport?.addEventListener("scroll", pintar);
+        setInterval(pintar, 1000);
+      }
+    </script>
   </body>
 </html>
