@@ -577,9 +577,41 @@
 }
 
 /* La tabla scrollea DENTRO de su caja: sin esto, en un teléfono estrecho
-   empuja la página entera de costado. */
+   empuja la página entera de costado.
+   ─────────────────────────────────────────────────────────────────────────
+   Y `overflow-x: auto` NO ALCANZABA. Recortaba bien lo que se ve, pero el
+   desborde igual se propagaba al `scrollWidth` de los ancestros: medido a 360
+   de ancho y con dos salas en la tabla, `section.panel-salas` daba 419 en una
+   caja de 330, `main` 434 en 360, y el documento entero 434. Son los 74
+   píxeles de más que en un teléfono se ven como una banda muerta al costado y
+   que corren el botón de soporte.
+
+   Que un contenedor de scroll no contenga eso es una rareza del motor —por
+   especificación, su desborde es suyo—, pero pasa, y `contain: paint` la
+   ataja: marca un límite del que no sale ni la tinta ni el área de scroll de
+   lo que tiene adentro.
+
+   No cambia NADA de lo que se ve. La caja ya era contenedor de scroll por el
+   `overflow-x: auto`, así que ya recortaba en el mismo borde; lo único que
+   agrega `contain` es que los ancestros dejen de enterarse. La tabla sigue
+   midiendo sus 489 y sigue scrolleando adentro, que es para lo que está esta
+   caja.
+
+   Medido, con la tabla llena y sin ningún recorte de emergencia puesto:
+     sin nada                        el documento sobra 74
+     th y td sin nowrap              sobra 30  (la tabla baja a 446: no alcanza)
+     table-layout: fixed             sobra  0  (pero la tabla pasa a 290 y las
+                                                cabeceras con nowrap se salen
+                                                de sus celdas: cambia el diseño)
+     contain: paint en la caja       sobra  0  (y no cambia un píxel)
+   El instrumento que lo midió está descrito en `pruebas/e2e/tablero.spec.js`,
+   en la prueba del ancho a 360.
+
+   Si algún navegador viejo no soporta `contain`, se comporta como antes: la
+   página vuelve a ensancharse, y nada más. */
 .tabla-salas-caja {
   overflow-x: auto;
+  contain: paint;
 }
 
 .tabla-salas {

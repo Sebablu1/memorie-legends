@@ -998,3 +998,120 @@ test("la ayuda repite la duración elegida", async ({ page }) => {
   await page.selectOption("#tipoPartida", "extendida");
   await expect(page.locator("#ayudaEntrenamiento")).toContainText(/150 puntos/);
 });
+
+/**
+ * Dos salas en la tabla, como las tiene cualquiera que esté jugando.
+ *
+ * Se inyectan a mano porque Firestore no existe en esta suite y la tabla queda
+ * vacía. Y con la tabla vacía, la prueba de abajo no prueba NADA: el defecto
+ * que persigue sólo aparece cuando la tabla tiene filas. Fue exactamente el
+ * motivo por el que no se lo encontró durante días midiendo en el escritorio.
+ *
+ * Las columnas son las de `filaDeSala()` en `js/dashboard.js`. Si esa función
+ * cambia de columnas, esto queda viejo y mide de menos: la prueba se defiende
+ * comprobando que la tabla resultante sea ancha de verdad.
+ */
+async function ponerDosSalasEnLaTabla(page) {
+  await page.evaluate(() => {
+    const celda = (texto, clase) => {
+      const td = document.createElement("td");
+      td.textContent = texto;
+      if (clase) td.className = clase;
+      return td;
+    };
+    const fila = (rotulo, gente, entrada, estado, boton) => {
+      const tr = document.createElement("tr");
+      tr.className = "sala-mia";
+      tr.append(celda(rotulo, "celda-codigo privada"), celda(gente), celda(entrada), celda(estado));
+      const td = document.createElement("td");
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "accion chica";
+      b.textContent = boton;
+      td.appendChild(b);
+      tr.appendChild(td);
+      return tr;
+    };
+    const cuerpo = document.getElementById("filasSalas");
+    cuerpo.replaceChildren(
+      fila("🔒 Privada", "1/2", "100", "Ya estás", "Volver"),
+      fila("K7M2PQRS", "2/2", "500", "Esperando", "Llena"),
+    );
+    cuerpo.closest(".tabla-salas-caja").hidden = false;
+    document.getElementById("salasVacias").hidden = true;
+  });
+}
+
+/**
+ * EL CANARIO DEL ANCHO: el documento no puede medir más que la pantalla.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * QUÉ DEFECTO VIGILA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * En un teléfono, con salas listadas, el documento medía 419 donde la pantalla
+ * mide 360. Se veía como una banda muerta al costado, el botón de soporte
+ * corrido a la derecha y la caja de la sala privada cortada.
+ *
+ * La causa era la tabla de salas: mide ~490 por sus cabeceras con `nowrap`, su
+ * caja la scrollea con `overflow-x: auto`, y aun así el desborde se propagaba
+ * al `scrollWidth` de los ancestros. Lo ataja `contain: paint` en
+ * `.tabla-salas-caja`; el porqué está escrito ahí, en `css/tablero.css`.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ ESTA PRUEBA COMPRUEBA ADEMÁS QUE NADIE LO TAPE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque este defecto ya se tapó una vez, con `overflow-x: clip` en `html`,
+ * `body`, `main` y `.panel`. Tapado funciona: el usuario deja de ver la banda.
+ * Pero recorta en silencio —lo que caiga afuera desaparece sin barra de scroll
+ * y sin forma de llegar— y, peor, deja ciega a esta misma medición: con el
+ * recorte puesto, `scrollWidth` da siempre limpio.
+ *
+ * Así que acá se afirman las dos cosas: que el documento no se ensancha, Y que
+ * `html`, `body` y `main` siguen con `overflow-x: visible`. Si algún día
+ * alguien vuelve a tapar en vez de arreglar, esta prueba lo dice.
+ */
+test("el tablero no mide más que la pantalla, ni con salas en la tabla", async ({ page }) => {
+  const medir = () => {
+    const doc = document.documentElement;
+    const panel = document.querySelector("section.panel-salas");
+    const tabla = document.querySelector("table.tabla-salas");
+    const cartel = document.querySelector(".cartel-tarot");
+    const ox = (sel) => getComputedStyle(document.querySelector(sel)).overflowX;
+    return {
+      sobra: doc.scrollWidth - window.innerWidth,
+      panel: panel.scrollWidth - panel.clientWidth,
+      tabla: tabla ? Math.round(tabla.offsetWidth) : 0,
+      recortes: { html: ox("html"), body: ox("body"), main: ox("main") },
+      cartel: cartel ? Math.round(cartel.getBoundingClientRect().right - window.innerWidth) : null,
+    };
+  };
+
+  for (const ancho of [320, 360]) {
+    await page.setViewportSize({ width: ancho, height: 800 });
+    await tableroConServidorFalso(page);
+    await ponerDosSalasEnLaTabla(page);
+
+    const m = await page.evaluate(medir);
+
+    // Primero: que la medición esté cargada. Una tabla angosta no prueba nada,
+    // y es la forma más fácil de que este canario se vuelva un adorno.
+    expect(m.tabla, `la tabla quedó en ${m.tabla}px: sin filas anchas esto no mide nada`)
+      .toBeGreaterThan(380);
+
+    expect(m.sobra, `a ${ancho}px el documento sobra ${m.sobra}px de ancho`).toBeLessThanOrEqual(0);
+    expect(m.panel, `la tabla vuelve a empujar a su panel (${m.panel}px de más)`).toBe(0);
+
+    // Y que el arreglo sea un arreglo, no una tapa.
+    expect(m.recortes, "alguien tapó el desborde con un recorte en lugar de arreglarlo")
+      .toEqual({ html: "visible", body: "visible", main: "visible" });
+
+    // Con el cartel del código en pantalla, tampoco.
+    await page.locator("#btnCrearSala").click();
+    await expect(page.locator("#codigoPrivado")).toBeVisible();
+    const c = await page.evaluate(medir);
+    expect(c.cartel, `a ${ancho}px el cartel se sale ${c.cartel}px de la pantalla`)
+      .toBeLessThanOrEqual(0);
+  }
+});
