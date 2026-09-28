@@ -486,6 +486,12 @@ body.con-cartel-abierto .boton-soporte {
 .copiar-link svg {
   width: 15px;
   height: 15px;
+  /* Más gordo que el 1.8 de arriba porque éste es el ícono más chico del
+     cartel: el trazo se dibuja en el sistema del `viewBox`, que mide 24, y al
+     bajar la caja a 15 queda en 1,1 px reales. A 2,6 termina en 1,6, que es lo
+     que mide el del botón grande y lo que se llega a ver en dorado sobre
+     negro. */
+  stroke-width: 2.6;
 }
 
 /* El acuse: el botón es sólo un ícono, así que la confirmación tiene que ser
@@ -673,15 +679,37 @@ body.con-cartel-abierto .boton-soporte {
   white-space: normal;
 }
 
-.botonera-codigo > .accion > .icono {
-  width: 22px;
-  height: 22px;
-  flex: none;
+/* Cómo se dibujan los íconos del cartel, en UN solo lugar.
+   ─────────────────────────────────────────────────────────────────────────
+   Estas cuatro líneas vivían adentro de `.botonera-codigo > .accion > .icono`,
+   y el botón chico de copiar —el que va al lado del link— no es hijo de ningún
+   `.accion`. Se quedaba sin ellas.
+
+   Un `<svg>` sin `fill` se pinta en NEGRO MACIZO por omisión. El dibujo de
+   copiar es un `<rect>` y un `<path>`, así que sin esto era un cuadrado negro
+   sobre una carta casi negra: el botón se veía VACÍO, con su borde dorado y
+   nada adentro. No faltaba el ícono ni dejaba de cargar. Estaba, y era
+   invisible.
+
+   Va por cartel y no por botón porque es la misma decisión de dibujo para
+   todos: contorno del color de la letra, sin relleno. El tamaño sí es de cada
+   uno y sigue donde estaba.
+
+   No se puede ver en una captura —negro sobre negro es negro— ni leyendo el
+   HTML, donde el `<svg>` está y es correcto. Se ve leyendo `fill`, y eso es lo
+   que hace la prueba «los íconos del cartel se dibujan con trazo». */
+.codigo-privado .icono {
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.botonera-codigo > .accion > .icono {
+  width: 22px;
+  height: 22px;
+  flex: none;
 }
 
 /* ---------------------------------------------------------- copiar */

@@ -1000,6 +1000,55 @@ test("la ayuda repite la duración elegida", async ({ page }) => {
 });
 
 /**
+ * LOS ÍCONOS DEL CARTEL SE DIBUJAN CON TRAZO, NO EN NEGRO MACIZO.
+ *
+ * El botón chico de copiar, al lado del link, se veía VACÍO: el borde dorado
+ * estaba y adentro no había nada. No era que faltara el ícono ni que no
+ * cargara: un `<svg>` sin `fill` se pinta en NEGRO MACIZO por omisión, así que
+ * el `<rect>` del dibujo era un cuadrado negro sobre una carta casi negra.
+ *
+ * Las cuatro líneas que lo dibujan bien —`fill: none` y el trazo— vivían
+ * dentro de `.botonera-codigo > .accion > .icono`, y este botón no es hijo de
+ * ningún `.accion`. El ícono grande, que sí lo es, se veía perfecto. De ahí que
+ * nadie lo notara mirando el código: la regla existía, no lo alcanzaba.
+ *
+ * Esto no se puede ver en una captura —negro sobre negro es negro— ni en el
+ * HTML, donde el `<svg>` está y es correcto. Se ve leyendo `fill`.
+ */
+test("los íconos del cartel se dibujan con trazo, no en negro macizo", async ({ page }) => {
+  await abrirElCartel(page);
+
+  const iconos = await page.evaluate(() => {
+    const leer = (sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return { falta: true };
+      const e = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      return {
+        fill: e.fill,
+        stroke: e.stroke,
+        ancho: Math.round(r.width),
+        alto: Math.round(r.height),
+      };
+    };
+    return {
+      "chico (al lado del link)": leer(".copiar-link .icono"),
+      "grande (botón Copiar)": leer(".boton-copiar .icono"),
+      "el de entrar": leer(".boton-entrar .icono"),
+      reloj: leer(".fila-reloj .reloj"),
+    };
+  });
+
+  for (const [donde, i] of Object.entries(iconos)) {
+    expect(i.falta, `no está el ícono ${donde}`).toBeFalsy();
+    expect(i.fill, `el ícono ${donde} se pinta macizo (fill: ${i.fill}) y desaparece`).toBe("none");
+    expect(i.stroke, `el ícono ${donde} no tiene trazo, así que no se dibuja nada`).not.toBe("none");
+    expect(i.ancho, `el ícono ${donde} mide ${i.ancho}px de ancho`).toBeGreaterThan(10);
+    expect(i.alto, `el ícono ${donde} mide ${i.alto}px de alto`).toBeGreaterThan(10);
+  }
+});
+
+/**
  * Dos salas en la tabla, como las tiene cualquiera que esté jugando.
  *
  * Se inyectan a mano porque Firestore no existe en esta suite y la tabla queda
