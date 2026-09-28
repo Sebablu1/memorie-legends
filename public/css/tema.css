@@ -244,7 +244,26 @@ textarea {
   border: 1px solid var(--borde);
   border-radius: 10px;
   font-family: inherit;
-  font-size: 0.95rem;
+  /* ───────────────────────────────────────────────────────────────────
+     16px EXACTOS, Y NO ES UNA CUESTIÓN DE GUSTO
+
+     Safari en iOS hace ZOOM sobre cualquier campo cuya letra mida menos de
+     16px al tocarlo. No es configurable ni se puede desactivar desde la
+     página: la única salida que no rompe el pellizco para agrandar es que el
+     campo mida 16 o más.
+
+     Acá decía `0.95rem`, que con la raíz en 16px son 15,2. Ochenta centésimas
+     de píxel por debajo del umbral, y alcanzaban: en un iPhone, tocar el campo
+     del código de una sala privada saltaba la página entera y había que
+     volver a achicarla a mano.
+
+     Eran dieciocho campos en cuatro pantallas —tablero, lobby, sala y
+     cuenta—, todos por esta línea. `login` y `register` se salvaban de
+     casualidad, porque `style.css` los pisa con `1rem`.
+
+     Si algún día hace falta letra más chica en un campo, que sea en ESE campo
+     y con el motivo escrito al lado. Acá no. */
+  font-size: 1rem;
   padding: 11px 13px;
   box-shadow: var(--relieve-hueco);
 }
