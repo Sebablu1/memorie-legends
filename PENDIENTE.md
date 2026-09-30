@@ -1078,7 +1078,7 @@ fue nunca qué arreglar sino cuántas cosas tener abiertas a la vez.
 **La regla, que es lo único que no se negocia: un bloque por vez. Cerrar,
 desplegar, verificar. Recién ahí se abre el siguiente.**
 
-### Bloque 1 — el del poder 7 y el cuadro de cartas (en curso)
+### Bloque 1 — el del poder 7 y el cuadro de cartas (CERRADO y desplegado al 30/9/2026)
 
 1. Verde de navegador para el arreglo del 7.
 2. El cuadro de objetivos del poder: «Tus cartas» arriba, a pantalla completa
@@ -1090,13 +1090,16 @@ desplegar, verificar. Recién ahí se abre el siguiente.**
    pruebas.
 4. Commit, push, despliegue y verificación en producción.
 
-### Bloque 2 — el siguiente, y no antes de cerrar el 1
+### Bloque 2 — el siguiente (el Bloque 1 ya está cerrado). NO ARRANCAR hasta que el usuario diga OK
 
-- La precarga de cartas y el fondo que no sea blanco (el parpadeo).
+- Precarga de las 48 cartas al iniciar partida (mata el parpadeo).
+- Fondo del contenedor de carta que no sea blanco (defensa extra).
 - §13b: `cerrarMirada` puede cortar la mirada antes de tiempo.
 - Paso 9: borrar `crearSala`, que quedó sin uso.
-- **Una sola pasada de suite para los tres.** Son veinte minutos cada vez y
-  tres pasadas para tres cambios que no se tocan entre sí es tiempo tirado.
+- §18: el test intermitente `fin-de-ronda-en-red`.
+- **Una sola pasada de suite. Un commit. Un deploy.** Son veinte minutos cada
+  vez y una pasada por cambio, para cambios que no se tocan entre sí, es
+  tiempo tirado.
 
 ### Después del 2 — lo que se decide con datos, no antes
 
@@ -1115,6 +1118,37 @@ No abrir el rediseño de la mesa ni la Fase 3 hasta que el Bloque 2 esté
 cerrado y desplegado. Si en el medio aparece un defecto que duele —como el
 del ancho, que se comió diez horas—, se atiende y se vuelve acá; lo que no se
 hace es empezar un tercer frente porque el segundo se puso aburrido.
+
+
+## 30. Cierre del 30 de septiembre de 2026: Search Console y el formato de `index.html`
+
+### a. Google Search Console — cerrado
+
+- Etiqueta `google-site-verification` en `public/index.html` (línea 9, después
+  del script con-js).
+- Dominio verificado por DNS en Cloudflare desde la cuenta de la empresa.
+  Propiedad dueña: soporte.memorie.legends@gmail.com. La cuenta personal
+  queda también como Propietario (Google no deja bajarla a delegada cuando
+  viene de verificación DNS).
+- Sitemap enviado: https://memorielegends.com/sitemap.xml → «Correcto», 10
+  páginas descubiertas. Home ya indexada. `robots.txt` sirve bien y el sitemap
+  sale como `application/xml`.
+
+### b. Format On Save de VS Code rompe `public/index.html`
+
+1. **Si hay que reescribir `public/index.html`, NO usar Format On Save de VS
+   Code**: borra las comas del `srcset` y lo deja como `srcset=",,"`. Usar el
+   Bloc de notas o editar desde Claude.
+2. `css-critico.mjs` anda bien y respeta el `srcset` y la etiqueta de Google
+   (probado el 30/9).
+3. Historia del archivo: el ruido de formato (19653d6, cf25f7f) quedó limpio;
+   8f540f4 es el commit extra que agrega la etiqueta.
+
+### c. Estado de producción al cierre
+
+Hosting 8f540f4 (etiqueta de Google + arreglo del 7 + modal) · reglas 77ee9876
+(parte B) · 81 funciones, todas al día · sitemap leído por Google · home
+indexada.
 
 
 ## Y algo que no está roto, pero falta

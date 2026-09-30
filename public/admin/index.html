@@ -6,18 +6,37 @@
     <meta name="robots" content="noindex, nofollow" />
     <meta name="theme-color" content="#0a0a0a" />
     <title>Memorie Legends — Administración</title>
-    <link rel="icon" href="../img/favicon-32.png" type="image/png" sizes="32x32" />
+    <link
+      rel="icon"
+      href="../img/favicon-32.png"
+      type="image/png"
+      sizes="32x32"
+    />
     <link rel="apple-touch-icon" href="../img/apple-touch-icon.png" />
     <link rel="stylesheet" href="admin.css" />
   </head>
   <body>
     <header class="barra">
-      <img class="marca" src="../img/moneda-80.webp" srcset="../img/moneda-40.webp 40w, ../img/moneda-80.webp 80w, ../img/moneda-120.webp 120w" sizes="38px" width="38" height="38" alt="" />
+      <img
+        class="marca"
+        src="../img/moneda-80.webp"
+        srcset="
+          ../img/moneda-40.webp   40w,
+          ../img/moneda-80.webp   80w,
+          ../img/moneda-120.webp 120w
+        "
+        sizes="38px"
+        width="38"
+        height="38"
+        alt=""
+      />
       <div>
         <h1>Administración</h1>
         <p class="lema" id="quien">Sin sesión</p>
       </div>
-      <button id="btnSalir" class="btn sobrio" type="button" hidden>Salir</button>
+      <button id="btnSalir" class="btn sobrio" type="button" hidden>
+        Salir
+      </button>
     </header>
 
     <!-- Entrar. El correo se comprueba de verdad en el servidor; esto sólo
@@ -33,7 +52,9 @@
 
            El formulario se deja igual: si algún día se le agrega contraseña a
            la cuenta, sirve. Lo que cambió es cuál se ofrece primero. -->
-      <button class="btn" id="btnGoogle" type="button">Entrar con Google</button>
+      <button class="btn" id="btnGoogle" type="button">
+        Entrar con Google
+      </button>
 
       <div class="separador"><span>o con correo y contraseña</span></div>
 
@@ -44,7 +65,12 @@
         </label>
         <label>
           Contraseña
-          <input id="clave" type="password" required autocomplete="current-password" />
+          <input
+            id="clave"
+            type="password"
+            required
+            autocomplete="current-password"
+          />
         </label>
         <button class="btn" type="submit">Entrar</button>
       </form>
@@ -84,7 +110,9 @@
         <button class="btn" type="submit">Entrar</button>
       </form>
       <div class="acciones">
-        <button class="btn sobrio" id="btnVolverAdmin" type="button">Volver</button>
+        <button class="btn sobrio" id="btnVolverAdmin" type="button">
+          Volver
+        </button>
       </div>
       <p class="aviso" id="avisoSegundoPaso" role="status"></p>
     </main>
@@ -92,13 +120,21 @@
     <main id="panel" hidden>
       <section class="totales">
         <div class="dato"><b id="totalSalas">—</b><span>salas vivas</span></div>
-        <div class="dato"><b id="totalPartidas">—</b><span>partidas en curso</span></div>
-        <div class="dato acento"><b id="totalRetenido">—</b><span>Leyendas retenidas</span></div>
-        <div class="dato"><b id="totalMuertas">—</b><span>salas cerradas sin borrar</span></div>
+        <div class="dato">
+          <b id="totalPartidas">—</b><span>partidas en curso</span>
+        </div>
+        <div class="dato acento">
+          <b id="totalRetenido">—</b><span>Leyendas retenidas</span>
+        </div>
+        <div class="dato">
+          <b id="totalMuertas">—</b><span>salas cerradas sin borrar</span>
+        </div>
       </section>
 
       <div class="acciones">
-        <button id="btnRefrescar" class="btn sobrio" type="button">Refrescar</button>
+        <button id="btnRefrescar" class="btn sobrio" type="button">
+          Refrescar
+        </button>
         <button id="btnCancelarTodas" class="btn peligro" type="button">
           Cancelar todas las que esperan
         </button>
@@ -118,9 +154,10 @@
       <section>
         <h2>Tienda</h2>
         <p class="nota">
-          Llena el catálogo con los artículos de arranque. <b>No pisa lo que ya
-          está</b>: los precios que hayas cambiado se respetan, y sembrar dos
-          veces no revierte nada. Sólo agrega los que falten.
+          Llena el catálogo con los artículos de arranque.
+          <b>No pisa lo que ya está</b>: los precios que hayas cambiado se
+          respetan, y sembrar dos veces no revierte nada. Sólo agrega los que
+          falten.
         </p>
         <div class="acciones">
           <button class="btn sobrio" id="btnSembrarCatalogo" type="button">
@@ -129,7 +166,9 @@
           <button class="btn sobrio" id="btnRefrescarCatalogo" type="button">
             Ver catálogo
           </button>
-          <button class="btn sobrio" id="btnNuevoItem" type="button">Artículo nuevo</button>
+          <button class="btn sobrio" id="btnNuevoItem" type="button">
+            Artículo nuevo
+          </button>
           <!-- Dos pasos a propósito: el primero MUESTRA cuáles, el segundo
                apaga. Un botón que apaga diez artículos sin decir cuáles es un
                botón que nadie se anima a tocar. -->
@@ -151,7 +190,12 @@
         <div class="campos-item">
           <label>
             <span>Id</span>
-            <input id="itemId" type="text" placeholder="avatar-lobo" autocomplete="off" />
+            <input
+              id="itemId"
+              type="text"
+              placeholder="avatar-lobo"
+              autocomplete="off"
+            />
           </label>
           <label>
             <span>Tipo</span>
@@ -159,7 +203,12 @@
           </label>
           <label>
             <span>Nombre</span>
-            <input id="itemNombre" type="text" placeholder="El Lobo" autocomplete="off" />
+            <input
+              id="itemNombre"
+              type="text"
+              placeholder="El Lobo"
+              autocomplete="off"
+            />
           </label>
           <label id="campoPrecio">
             <span>Precio en Leyendas</span>
@@ -173,13 +222,23 @@
           </label>
           <label class="ancho">
             <span>Descripción</span>
-            <input id="itemDescripcion" type="text" placeholder="Caza solo." autocomplete="off" />
+            <input
+              id="itemDescripcion"
+              type="text"
+              placeholder="Caza solo."
+              autocomplete="off"
+            />
           </label>
           <label class="ancho">
             <!-- Dos formas válidas, y conviene decirlo: el catálogo de arranque
                  usa emojis para no depender de arte que todavía no existe. -->
             <span>Imagen — una ruta (<code>/img/…</code>) o un emoji</span>
-            <input id="itemImagen" type="text" placeholder="🐺" autocomplete="off" />
+            <input
+              id="itemImagen"
+              type="text"
+              placeholder="🐺"
+              autocomplete="off"
+            />
           </label>
           <label>
             <span>Orden</span>
@@ -208,7 +267,9 @@
         </div>
 
         <div class="acciones">
-          <button class="btn" id="btnGuardarItem" type="button">Guardar artículo</button>
+          <button class="btn" id="btnGuardarItem" type="button">
+            Guardar artículo
+          </button>
         </div>
         <div class="aviso" id="avisoItem"></div>
 
@@ -222,10 +283,10 @@
         <h2>Paquetes de Leyendas</h2>
         <p class="nota">
           Lo que se compra con <b>dinero de verdad</b>. El precio que se cobra
-          sale de acá: un cero de más o de menos se cobra igual, así que
-          revisá antes de guardar. Editar un pack <b>no cambia ninguna compra
-          ya hecha</b> — cada orden se queda con el precio y las Leyendas que
-          tenía cuando se hizo.
+          sale de acá: un cero de más o de menos se cobra igual, así que revisá
+          antes de guardar. Editar un pack
+          <b>no cambia ninguna compra ya hecha</b> — cada orden se queda con el
+          precio y las Leyendas que tenía cuando se hizo.
         </p>
         <div class="acciones">
           <button class="btn sobrio" id="btnSembrarPacks" type="button">
@@ -234,7 +295,9 @@
           <button class="btn sobrio" id="btnRefrescarPacks" type="button">
             Ver paquetes
           </button>
-          <button class="btn sobrio" id="btnNuevoPack" type="button">Paquete nuevo</button>
+          <button class="btn sobrio" id="btnNuevoPack" type="button">
+            Paquete nuevo
+          </button>
         </div>
         <p class="aviso" id="avisoPacks"></p>
 
@@ -244,12 +307,25 @@
           <div class="campos">
             <label>
               <span>Id</span>
-              <input id="packId" type="text" placeholder="premium" autocomplete="off" />
-              <small class="nota-campo">Minúsculas, números, guiones. No se puede cambiar después.</small>
+              <input
+                id="packId"
+                type="text"
+                placeholder="premium"
+                autocomplete="off"
+              />
+              <small class="nota-campo"
+                >Minúsculas, números, guiones. No se puede cambiar
+                después.</small
+              >
             </label>
             <label>
               <span>Nombre</span>
-              <input id="packNombre" type="text" placeholder="Pack Premium" autocomplete="off" />
+              <input
+                id="packNombre"
+                type="text"
+                placeholder="Pack Premium"
+                autocomplete="off"
+              />
             </label>
             <label>
               <span>Precio en pesos</span>
@@ -287,8 +363,12 @@
                mismo terminan discrepando, y el que discrepa se acredita. -->
           <p class="nota" id="packResumen"></p>
           <div class="acciones">
-            <button class="btn" id="btnGuardarPack" type="button">Guardar</button>
-            <button class="btn sobrio" id="btnCancelarPack" type="button">Cancelar</button>
+            <button class="btn" id="btnGuardarPack" type="button">
+              Guardar
+            </button>
+            <button class="btn sobrio" id="btnCancelarPack" type="button">
+              Cancelar
+            </button>
           </div>
         </div>
 
@@ -303,7 +383,9 @@
           tuya, no de un listado.
         </p>
         <div class="acciones">
-          <button class="btn sobrio" id="btnRevisarNombres" type="button">Revisar nombres</button>
+          <button class="btn sobrio" id="btnRevisarNombres" type="button">
+            Revisar nombres
+          </button>
         </div>
         <div class="aviso" id="avisoNombres"></div>
         <div class="lista" id="listaNombres"></div>
@@ -321,7 +403,9 @@
           ranking de los demás.
         </p>
         <div class="acciones">
-          <button class="btn sobrio" id="btnListarUsuarios" type="button">Ver cuentas</button>
+          <button class="btn sobrio" id="btnListarUsuarios" type="button">
+            Ver cuentas
+          </button>
         </div>
         <div class="aviso" id="avisoUsuarios"></div>
         <div class="lista" id="listaUsuarios"></div>
@@ -337,7 +421,9 @@
           miraste. Para actuar sobre una cuenta está la sección de arriba.
         </p>
         <div class="acciones">
-          <button class="btn sobrio" id="btnVerReportes" type="button">Ver reportes</button>
+          <button class="btn sobrio" id="btnVerReportes" type="button">
+            Ver reportes
+          </button>
           <label class="filtro-reportes" for="filtroReportes">
             <span class="oculto-visual">Filtrar por estado</span>
             <select id="filtroReportes">
@@ -358,8 +444,8 @@
         <h2>Administradores</h2>
         <p class="nota">
           Quién puede entrar acá. Se identifica por el <b>correo</b>, así que
-          tiene que ser el mismo con el que esa persona inicia sesión. Cada
-          alta y cada baja queda registrada con quién la hizo.
+          tiene que ser el mismo con el que esa persona inicia sesión. Cada alta
+          y cada baja queda registrada con quién la hizo.
         </p>
         <p class="nota">
           La cuenta principal <b>no se puede quitar</b> —es el seguro contra
@@ -370,11 +456,20 @@
         <div class="acciones">
           <label class="campo-admin" for="correoAdmin">
             <span class="oculto-visual">Correo del nuevo administrador</span>
-            <input id="correoAdmin" type="email" placeholder="correo@ejemplo.com"
-                   autocomplete="off" spellcheck="false" />
+            <input
+              id="correoAdmin"
+              type="email"
+              placeholder="correo@ejemplo.com"
+              autocomplete="off"
+              spellcheck="false"
+            />
           </label>
-          <button class="btn" id="btnAgregarAdmin" type="button">Agregar</button>
-          <button class="btn sobrio" id="btnVerAdmins" type="button">Refrescar</button>
+          <button class="btn" id="btnAgregarAdmin" type="button">
+            Agregar
+          </button>
+          <button class="btn sobrio" id="btnVerAdmins" type="button">
+            Refrescar
+          </button>
         </div>
         <div class="aviso" id="avisoAdmins"></div>
         <div class="lista" id="listaAdmins"></div>
@@ -413,30 +508,58 @@
       <section>
         <h2>Torneos</h2>
         <p class="nota">
-          Un torneo va para adelante y no vuelve: <b>borrador → inscripciones →
-          completo → en curso → finalizado</b>. Se puede cancelar mientras nadie
-          esté jugando, y entonces se devuelven todas las entradas.
-          La entrada va de 5 a 20.000 Leyendas, de a 5.
+          Un torneo va para adelante y no vuelve:
+          <b>borrador → inscripciones → completo → en curso → finalizado</b>. Se
+          puede cancelar mientras nadie esté jugando, y entonces se devuelven
+          todas las entradas. La entrada va de 5 a 20.000 Leyendas, de a 5.
         </p>
 
         <div class="campos-item">
-          <label class="ancho"><span>Nombre</span>
-            <input id="torneoNombre" type="text" maxlength="80" placeholder="Copa de Primavera" />
+          <label class="ancho"
+            ><span>Nombre</span>
+            <input
+              id="torneoNombre"
+              type="text"
+              maxlength="80"
+              placeholder="Copa de Primavera"
+            />
           </label>
-          <label class="ancho"><span>De qué va (lo lee el jugador antes de pagar)</span>
-            <input id="torneoDescripcion" type="text" maxlength="300"
-                   placeholder="Cuatro mesas, se juega por Discord. Paso el enlace a los anotados." />
+          <label class="ancho"
+            ><span>De qué va (lo lee el jugador antes de pagar)</span>
+            <input
+              id="torneoDescripcion"
+              type="text"
+              maxlength="300"
+              placeholder="Cuatro mesas, se juega por Discord. Paso el enlace a los anotados."
+            />
           </label>
-          <label><span>Cuándo empieza</span>
+          <label
+            ><span>Cuándo empieza</span>
             <input id="torneoComienza" type="datetime-local" />
           </label>
-          <label><span>Entrada (Leyendas)</span>
-            <input id="torneoEntrada" type="number" min="5" max="20000" step="5" value="100" />
+          <label
+            ><span>Entrada (Leyendas)</span>
+            <input
+              id="torneoEntrada"
+              type="number"
+              min="5"
+              max="20000"
+              step="5"
+              value="100"
+            />
           </label>
-          <label><span>Máximo de jugadores</span>
-            <input id="torneoMaximo" type="number" min="4" step="1" value="10000" />
+          <label
+            ><span>Máximo de jugadores</span>
+            <input
+              id="torneoMaximo"
+              type="number"
+              min="4"
+              step="1"
+              value="10000"
+            />
           </label>
-          <label><span>Tipo</span>
+          <label
+            ><span>Tipo</span>
             <select id="torneoTipo">
               <option value="especial">Especial</option>
               <option value="semanal">Semanal</option>
@@ -444,8 +567,12 @@
           </label>
         </div>
         <div class="acciones">
-          <button class="btn sobrio" id="btnCrearTorneo" type="button">Crear torneo</button>
-          <button class="btn sobrio" id="btnRefrescarTorneos" type="button">Ver torneos</button>
+          <button class="btn sobrio" id="btnCrearTorneo" type="button">
+            Crear torneo
+          </button>
+          <button class="btn sobrio" id="btnRefrescarTorneos" type="button">
+            Ver torneos
+          </button>
         </div>
         <div class="aviso" id="avisoTorneos"></div>
         <div id="listaTorneos" class="lista"></div>
@@ -470,15 +597,31 @@
           aplican hoy.
         </p>
         <div class="campos-item">
-          <label><span>Remera (puesto 1)</span>
-            <input id="umbralRemera" type="number" min="1" step="1000" value="20000" />
+          <label
+            ><span>Remera (puesto 1)</span>
+            <input
+              id="umbralRemera"
+              type="number"
+              min="1"
+              step="1000"
+              value="20000"
+            />
           </label>
-          <label><span>Llavero (puesto 2)</span>
-            <input id="umbralLlavero" type="number" min="1" step="1000" value="19000" />
+          <label
+            ><span>Llavero (puesto 2)</span>
+            <input
+              id="umbralLlavero"
+              type="number"
+              min="1"
+              step="1000"
+              value="19000"
+            />
           </label>
         </div>
         <div class="acciones">
-          <button class="btn sobrio" id="btnGuardarUmbrales" type="button">Guardar umbrales</button>
+          <button class="btn sobrio" id="btnGuardarUmbrales" type="button">
+            Guardar umbrales
+          </button>
         </div>
         <div class="aviso" id="avisoUmbrales"></div>
       </section>
