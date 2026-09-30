@@ -1120,15 +1120,14 @@ export function crearMotorEnRed({
        * ronda esperando jugadores —que es fase `mirar` sin ventana— o durante
        * la cuenta regresiva, cualquiera podía llamarla y saltarles la mirada a
        * todos, dejando además la partida en `descarte` sin ventana.
-       *
-       * Queda un hueco que viene de antes y NO se tapa acá: una vez abierta la
-       * ventana, esto sigue pudiendo cortar los dos segundos de mirada antes
-       * de tiempo. Está anotado en PENDIENTE.md.
        */
-      if (partida.esperandoLlegadas || !partida.ventana || ahora() < partida.ventana.abiertaEn) {
+      const t = ahora();
+      if (partida.esperandoLlegadas || !partida.ventana || t < partida.ventana.abiertaEn) {
         throw error("failed-precondition", "La mirada todavía no empezó.");
       }
-
+      if (t < partida.ventana.abiertaEn + MS_MIRADA_TOTAL) {
+        throw error("failed-precondition", "La mirada todavía no venció.");
+      }
       const siguiente = {
         ...partida,
         estado: motor.terminarMirada(partida.estado),
