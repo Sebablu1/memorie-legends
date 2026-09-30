@@ -676,8 +676,8 @@ export const CATALOGO_INICIAL = [
   { id: "leyenda", tipo: TIPOS.INSIGNIA, nombre: "Leyenda", descripcion: "La que le da el nombre al juego.", precio: 0, imagen: "/img/insignias/leyenda.webp", activo: true, orden: 60, metadata: { rareza: "legendario" } },
 
   // -------------------------------------------------------------- dorsos
-  { id: "dorso_azul", tipo: TIPOS.DORSO, nombre: "Dorso Azul", descripcion: "El de siempre.", precio: 0, imagen: "/img/dorsos/dorso-azul.png", activo: true, orden: 10, metadata: { rareza: "inicial" } },
-  { id: "dorso_rojo", tipo: TIPOS.DORSO, nombre: "Dorso Rojo", descripcion: "El otro de siempre.", precio: 100, imagen: "/img/dorsos/dorso-rojo.png", activo: true, orden: 20, metadata: { rareza: "comun" } },
+  { id: "dorso_azul", tipo: TIPOS.DORSO, nombre: "Dorso Azul", descripcion: "El de siempre.", precio: 0, imagen: "/img/dorsos/dorso-azul.webp", activo: true, orden: 10, metadata: { rareza: "inicial" } },
+  { id: "dorso_rojo", tipo: TIPOS.DORSO, nombre: "Dorso Rojo", descripcion: "El otro de siempre.", precio: 100, imagen: "/img/dorsos/dorso-rojo.webp", activo: true, orden: 20, metadata: { rareza: "comun" } },
 
   // ------------------------------------------------------ paños de mesa
   //
@@ -702,7 +702,7 @@ export const CATALOGO_INICIAL = [
   // pueda volver. Los tres pagos son SVG con la misma rosa de los vientos
   // que lleva grabada el paño, para que el mazo se lea como parte del
   // mueble y no como un naipe apoyado encima.
-  { id: "mazo_azul", tipo: TIPOS.MAZO, nombre: "Mazo Azul", descripcion: "El del medio de siempre.", precio: 0, imagen: "/img/dorsos/dorso-azul.png", activo: true, orden: 10, metadata: { rareza: "inicial" } },
+  { id: "mazo_azul", tipo: TIPOS.MAZO, nombre: "Mazo Azul", descripcion: "El del medio de siempre.", precio: 0, imagen: "/img/dorsos/dorso-azul.webp", activo: true, orden: 10, metadata: { rareza: "inicial" } },
   { id: "mazo_real", tipo: TIPOS.MAZO, nombre: "Mazo Real", descripcion: "Azul de medianoche, brújula en oro.", precio: 150, imagen: "/img/mazos/real.svg", activo: true, orden: 20, metadata: { rareza: "poco_comun" } },
   { id: "mazo_esmeralda", tipo: TIPOS.MAZO, nombre: "Mazo Esmeralda", descripcion: "Verde profundo y plata verdosa.", precio: 300, imagen: "/img/mazos/esmeralda.svg", activo: true, orden: 30, metadata: { rareza: "raro" } },
   { id: "mazo_carmesi", tipo: TIPOS.MAZO, nombre: "Mazo Carmesí", descripcion: "El de las mesas donde se juega en serio.", precio: 450, imagen: "/img/mazos/carmesi.svg", activo: true, orden: 40, metadata: { rareza: "epico" } },

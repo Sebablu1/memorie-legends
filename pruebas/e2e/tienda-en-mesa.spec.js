@@ -69,6 +69,18 @@ async function abrirVestida(page, equipo = COMPRADO) {
   await page.waitForSelector(".jugador.propio .carta");
 }
 
+/**
+ * El dorso de un asiento en la misma forma que devuelve `dorsosDe`: sin la
+ * versión.
+ *
+ * `dorsoDeAsiento` entrega la dirección completa —`…webp?v=1`, para que un
+ * dibujo nuevo con el mismo nombre no se quede tapado por la caché de un mes—
+ * y `dorsosDe` devuelve `pathname`, que no la lleva. Comparar la función
+ * contra lo que dibuja la mesa sigue siendo lo correcto; lo que hay que
+ * emparejar es la forma.
+ */
+const rutaDelDorso = (asiento) => dorsoDeAsiento(asiento).split("?")[0];
+
 /** Los `src` de los reversos de una mano, sin repetidos y ya resueltos. */
 const dorsosDe = (page, sel) =>
   page.$$eval(`${sel} .carta .dorso img`, (imgs) => [
@@ -108,14 +120,14 @@ test("el dorso comprado cambia mi asiento y ningún otro", async ({ page }) => {
 
   for (const i of [1, 2, 3]) {
     const suyo = await dorsosDe(page, `.jugador[data-jugador="${i}"]`);
-    expect(suyo, `el rival ${i} no lleva el dorso de su asiento`).toEqual([dorsoDeAsiento(i)]);
+    expect(suyo, `el rival ${i} no lleva el dorso de su asiento`).toEqual([rutaDelDorso(i)]);
   }
 
   // Y el mío NO es el que me tocaría por asiento: si lo fuera, esta prueba
   // pasaría con la compra desconectada.
   const mios = await dorsosDe(page, ".jugador.propio");
   expect(mios).toEqual([COMPRADO.dorso]);
-  expect(mios[0], "el dorso comprado coincide con el del asiento").not.toBe(dorsoDeAsiento(0));
+  expect(mios[0], "el dorso comprado coincide con el del asiento").not.toBe(rutaDelDorso(0));
 });
 
 test("el paño comprado se enciende sin repintar la mesa", async ({ page }) => {
@@ -132,8 +144,10 @@ test("sin nada comprado, la mesa se ve exactamente como siempre", async ({ page 
   await abrirVestida(page, {});
 
   const mazo = await page.getAttribute("#mazoCarta .carta .dorso img", "src");
-  expect(mazo, "sin mazo comprado la pila del centro cambió de dorso").toBe(
-    "/img/dorsos/dorso-azul.png",
+  // Con la versión suelta, como el resto: el número sube cada vez que se
+  // reemplaza el dibujo, y esta prueba no es sobre eso.
+  expect(mazo, "sin mazo comprado la pila del centro cambió de dorso").toMatch(
+    /^\/img\/dorsos\/dorso-azul\.webp\?v=\d+$/,
   );
 
   const pano = await page.evaluate(() =>
@@ -318,7 +332,7 @@ test("en red, cada mano se dibuja con el dorso que compró su dueño", async ({ 
     if (suyo.dorso) continue;
     const usados = await dorsosDe(page, `.jugador[data-jugador="${i}"]`);
     expect(usados, `el jugador ${i} sin compra se dibuja con ${usados.join(", ")}`).toEqual([
-      dorsoDeAsiento(i),
+      rutaDelDorso(i),
     ]);
   }
 });
@@ -352,7 +366,7 @@ test("en red, el mazo del centro no toma el dorso de nadie", async ({ page }) =>
   await abrirEnRed(page);
 
   const mazo = await page.getAttribute("#mazoCarta .carta .dorso img", "src");
-  expect(mazo).toBe("/img/dorsos/dorso-azul.png");
+  expect(mazo).toMatch(/^\/img\/dorsos\/dorso-azul\.webp\?v=\d+$/);
   for (const suyo of LUCE) {
     if (suyo.dorso) expect(mazo).not.toBe(suyo.dorso);
   }

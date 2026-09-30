@@ -14,7 +14,7 @@
  * 2. EL PESO. Las cartas rediseñadas entraron en 1023×1537 y 2,7 MB CADA UNA
  *    —137 MB entre las 48— y así se desplegaron. Una mesa muestra veinte
  *    cartas: eran decenas de megas por partida, y en un teléfono con datos,
- *    impagable. Ahora son WebP de 512×768, que cubren un celular 3x.
+ *    impagable. Ahora son WebP de 448×672, que cubren un celular 3x.
  *
  * 3. LA CACHÉ. Las imágenes se guardan un mes en el navegador. Reemplazar un
  *    archivo con el mismo nombre deja a quien ya lo tenía con la copia vieja,
@@ -87,7 +87,7 @@ console.log("\n=== 1. Las 48 cartas están, y nada más ===");
 
 console.log("\n=== 2. Livianas y del tamaño que se sirve ===");
 {
-  const TOPE_KB = 300;
+  const TOPE_KB = 150;
   const pesadas = [];
   const raras = [];
   let total = 0;
@@ -100,13 +100,13 @@ console.log("\n=== 2. Livianas y del tamaño que se sirve ===");
       if (kb > TOPE_KB) pesadas.push(`${palo}/${numero}: ${kb} KB`);
 
       const m = medidaWebp(ruta);
-      if (!m || m.ancho !== 512 || m.alto !== 768) raras.push(`${palo}/${numero}: ${JSON.stringify(m)}`);
+      if (!m || m.ancho !== 448 || m.alto !== 672) raras.push(`${palo}/${numero}: ${JSON.stringify(m)}`);
     }
   }
 
   ok(pesadas.length === 0, `ninguna pasa de ${TOPE_KB} KB`, pesadas.slice(0, 5));
-  ok(raras.length === 0, "todas miden 512×768, que es 2:3 como el dibujo", raras.slice(0, 5));
-  ok(total < 9 * 1024, "y las 48 juntas no llegan a 9 MB", `${Math.round(total / 1024)} MB`);
+  ok(raras.length === 0, "todas miden 448×672, que es 2:3 como el dibujo", raras.slice(0, 5));
+  ok(total < 4 * 1024, "y las 48 juntas no llegan a 4 MB", `${Math.round(total / 1024)} MB`);
 }
 
 // ===================================================== 3. la dirección

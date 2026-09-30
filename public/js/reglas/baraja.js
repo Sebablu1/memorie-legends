@@ -5,11 +5,31 @@ export const NUMEROS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 export const TAM_MANO = 4;
 
+/**
+ * La versión de los dorsos. La misma idea que `VERSION_CARTAS`, más abajo, y
+ * por el mismo motivo: las imágenes se guardan un mes en cada navegador, así
+ * que un dibujo nuevo con el mismo nombre no llega hasta que venza.
+ *
+ * Hoy no hacía falta —los dorsos pasaron de `.png` a `.webp`, y un nombre
+ * distinto ya es una dirección distinta—. Está para la PRÓXIMA vez, que es
+ * cuando muerde: cuando se reemplace el dibujo dejando el nombre.
+ *
+ * Ojo con el alcance: esto cubre los dos dorsos de la casa, que son los que
+ * vive acá. El dorso que alguien COMPRÓ sale de su artículo en el catálogo de
+ * Firestore, y su dirección es la que diga ese documento.
+ *
+ * 1 — los dorsos en WebP.
+ */
+export const VERSION_DORSOS = 1;
+
+/** La dirección de un dorso, con su versión. */
+export const dorsoUrl = (ruta) => `${ruta}?v=${VERSION_DORSOS}`;
+
 // Sólo existen dos dorsos. Con 3 o 4 jugadores se repiten alternando, y los
 // asientos se distinguen por el color del aro (ver --color-asiento en el CSS).
-export const DORSOS = ["/img/dorsos/dorso-azul.png", "/img/dorsos/dorso-rojo.png"];
+export const DORSOS = ["/img/dorsos/dorso-azul.webp", "/img/dorsos/dorso-rojo.webp"];
 
-export const dorsoDeAsiento = (indice) => DORSOS[indice % DORSOS.length];
+export const dorsoDeAsiento = (indice) => dorsoUrl(DORSOS[indice % DORSOS.length]);
 
 /** Reglamento: 1-10 valor nominal, 11 (Caballo) = 0, 12 (Rey) = 12. */
 export function puntosCarta(numero) {
@@ -33,8 +53,11 @@ export function puntosCarta(numero) {
  * dirección nueva y el navegador la pide de nuevo.
  *
  * 2 — las cartas rediseñadas, en WebP de 512×768.
+ * 3 — las cartas nuevas, en WebP de 448×672. Siguen cubriendo un teléfono de
+ *     3x: la carta más grande de la mesa es la del centro, que llega a 146×219
+ *     de CSS, o sea 438×657 reales. Y pesan la mitad: 3,3 MB las 48 contra 6,6.
  */
-export const VERSION_CARTAS = 2;
+export const VERSION_CARTAS = 3;
 
 export function imagenCarta(palo, numero) {
   return `/assets/${palo}/${numero}.webp?v=${VERSION_CARTAS}`;

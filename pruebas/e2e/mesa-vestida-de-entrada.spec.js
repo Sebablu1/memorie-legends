@@ -117,7 +117,7 @@ test("sin caché, la mesa abre con lo de la casa y no se rompe", async ({ page }
 
   const mazo = await rutaDe(page, "#mazoCarta .carta .dorso img");
   expect(mazo, "sin caché la pila tiene que salir con el dorso de siempre")
-    .toBe("/img/dorsos/dorso-azul.png");
+    .toBe("/img/dorsos/dorso-azul.webp");
 });
 
 test("el caché de OTRA cuenta no se usa", async ({ page }) => {
@@ -146,7 +146,7 @@ test("el caché de OTRA cuenta no se usa", async ({ page }) => {
   await page.waitForSelector(".jugador.propio .carta");
 
   const mazo = await rutaDe(page, "#mazoCarta .carta .dorso img");
-  expect(mazo, "se usó el vestuario de otra cuenta").toBe("/img/dorsos/dorso-azul.png");
+  expect(mazo, "se usó el vestuario de otra cuenta").toBe("/img/dorsos/dorso-azul.webp");
 });
 
 test("una ruta de otro dominio en el caché no llega a la mesa", async ({ page }) => {
@@ -167,7 +167,7 @@ test("una ruta de otro dominio en el caché no llega a la mesa", async ({ page }
   expect(mias, "entró una URL de otro dominio").not.toContain("ejemplo.test");
 
   const mazo = await rutaDe(page, "#mazoCarta .carta .dorso img");
-  expect(mazo, "entró una URL de protocolo relativo").toBe("/img/dorsos/dorso-azul.png");
+  expect(mazo, "entró una URL de protocolo relativo").toBe("/img/dorsos/dorso-azul.webp");
 
   // Y lo que sí era del sitio se aplicó igual: una ruta mala no arrastra a las
   // demás.

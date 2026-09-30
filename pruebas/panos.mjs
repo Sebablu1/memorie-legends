@@ -268,7 +268,7 @@ console.log("\n=== El mazo del centro es su propio artículo ===");
   const gratis = MAZOS.filter((m) => m.precio === 0);
   ok(gratis.length === 1, "uno solo gratis", gratis.map((m) => m.id));
   ok(
-    gratis[0]?.imagen === "/img/dorsos/dorso-azul.png",
+    gratis[0]?.imagen === "/img/dorsos/dorso-azul.webp",
     "y es el que la pila del centro ya usaba: equiparlo no cambia nada",
     gratis[0]?.imagen,
   );
