@@ -665,10 +665,6 @@ export function crearMotorEnRed({
   };
 
   /**
-   * Reparte en el servidor. El mazo se baraja acá y su orden no sale nunca:
-   * es la diferencia entre un juego de memoria y una lista pública de cartas.
-   */
-  /**
    * Reparto DENTRO de una transacción que ya está abierta.
    *
    * Existe separado de `repartir` porque `iniciarPartida` tiene que cobrar la
