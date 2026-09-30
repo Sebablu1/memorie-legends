@@ -221,7 +221,11 @@ console.log("\n=== Una partida real llega al corte automático ===");
     estado = {
       ...estado,
       fase: "descarte",
-      descarte: [{ ...suya, id: "muestra", visible: true }, ...estado.descarte],
+      // Un id distinto por vuelta. El tiro propio se gasta por MUESTRA —ver
+      // `yaIntentoLoSuyo`— así que con el mismo id las cuatro muestras serían
+      // la misma y sólo entraría el primer descarte. En una partida de verdad
+      // cada carta tiene el suyo; esto es el fixture poniéndose al día.
+      descarte: [{ ...suya, id: `muestra-${pos}`, visible: true }, ...estado.descarte],
       ventanaDescarte: { volverA: "turno", huboPrimero: false, intentos: [] },
     };
     estado = motor.intentarDescarte(estado, 1, pos);

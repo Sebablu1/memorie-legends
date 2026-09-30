@@ -393,7 +393,9 @@ export const RECHAZO_INTENTO = {
  *
  * @returns {{ok: true, ventana, duplicado: boolean} | {ok: false, motivo: string}}
  */
-export function registrarIntento(ventana, intento, { ahora, cantidadDeCartas }) {
+export function registrarIntento(
+  ventana, intento, { ahora, cantidadDeCartas, tiroGastado = false },
+) {
   const { windowId, clientActionId, uid, posicion } = intento;
 
   if (!clientActionId || !uid) return { ok: false, motivo: RECHAZO_INTENTO.FALTA_IDENTIFICADOR };
@@ -430,7 +432,16 @@ export function registrarIntento(ventana, intento, { ahora, cantidadDeCartas }) 
   const yaJugoLoSuyo = Object.values(ventana.intentos)
     .some((x) => x.uid === uid && (x.objetivo ?? x.uid) === x.uid);
 
-  if (contraSuPropiaMano && yaJugoLoSuyo) {
+  /**
+   * `tiroGastado` lo trae quien llama, leyéndolo del estado del motor.
+   *
+   * El límite es de UNA por muestra, y sobre una misma muestra puede haber dos
+   * ventanas: la de reflejos de todos y la corta que se abre tras un poder.
+   * Esta función ve una sola —la que recibe— así que la otra mitad del dato
+   * tiene que venir de afuera. Sin esto, quien gastó su tiro en la primera lo
+   * recuperaba en la segunda, que es justo lo que la regla nueva no quiere.
+   */
+  if (contraSuPropiaMano && (yaJugoLoSuyo || tiroGastado)) {
     return { ok: false, motivo: RECHAZO_INTENTO.YA_INTENTO };
   }
 

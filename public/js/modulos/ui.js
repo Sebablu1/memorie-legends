@@ -92,13 +92,30 @@ export function crearInterfaz({ dom, sonidos, titulos, esperar, msAnuncio, msMar
     "</span>",
   ].join("");
 
-  const abrirModal = (html) => {
+  /**
+   * `completo` es para las ventanas que no entran en una tarjeta centrada.
+   *
+   * La de elegir objetivo de un poder muestra una mano POR JUGADOR: con cuatro
+   * son cuatro grupos de cuatro cartas, y medido en un teléfono de 360 pedía
+   * hasta 298 px de scroll adentro de la ventana. Lo que quedaba abajo del
+   * corte era la mano propia, que en el 9 y el 10 es la primera que hay que
+   * elegir, y sin barra de scroll a la vista nada avisaba que había más.
+   *
+   * La marca va en los dos —el velo y la ventana— porque el aire que hay que
+   * sacar es el relleno del velo, y el alto que hay que dar es el de la
+   * ventana. El CSS decide qué hacer con ella, y sólo en pantalla angosta.
+   */
+  const abrirModal = (html, { completo = false } = {}) => {
     dom.modal.innerHTML = RELOJ_DEL_MODAL + html;
+    dom.modal.classList.toggle("completo", completo);
+    dom.velo.classList.toggle("completo", completo);
     dom.velo.classList.add("abierto");
   };
 
   const cerrarModal = () => {
     dom.velo.classList.remove("abierto");
+    dom.velo.classList.remove("completo");
+    dom.modal.classList.remove("completo");
     dom.modal.innerHTML = "";
   };
 

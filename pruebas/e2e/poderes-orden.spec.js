@@ -1,9 +1,25 @@
 /**
- * En la ventana del 9 y del 10, los rivales arriba y tus cartas abajo.
+ * En la ventana del 9 y del 10, TUS CARTAS ARRIBA y los rivales abajo.
  *
  * Son las dos únicas ventanas que muestran las dos cosas: el 7 muestra sólo
- * tus cartas y el 8 sólo las de los rivales. Antes seguían el orden de los
- * asientos y tus cartas —asiento 0 en el entrenamiento— quedaban arriba.
+ * tus cartas y el 8 sólo las de los rivales.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ESTO ESTABA AL REVÉS, Y ESTA PRUEBA LO SOSTENÍA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Primero fue el orden de los asientos, que dejaba tus cartas arriba por
+ * casualidad —sos el asiento 0 en el entrenamiento—. Se cambió a propósito
+ * para que no dependiera del asiento, y se eligió rivales arriba.
+ *
+ * En un teléfono con cuatro jugadores, «abajo» resultó ser «fuera de la
+ * pantalla»: la ventana pedía hasta 298 px de scroll interno y lo que quedaba
+ * abajo del corte era justamente tu mano. Y el 9 y el 10 piden elegir PRIMERO
+ * una carta tuya —«Elegí una carta tuya y una de un rival»—, así que lo
+ * primero que nombra la instrucción era lo único que no se veía.
+ *
+ * El orden sigue sin depender del asiento, que era lo que importaba de la
+ * decisión anterior. Lo que cambió es cuál va primero.
  *
  * Esta ventana es sólo del entrenamiento: en red, el objetivo del poder se
  * elige tocando las cartas sobre la mesa, sin ventana.
@@ -19,7 +35,7 @@ import { test, expect } from "@playwright/test";
 import { abrirMesa, elegirCartaParaMirar, esperarMiTurno, SEL } from "./mesa.js";
 
 for (const [numero, semilla] of [[9, 4], [10, 23]]) {
-  test(`el ${numero}: los rivales arriba y tus cartas abajo`, async ({ page }) => {
+  test(`el ${numero}: tus cartas arriba y los rivales abajo`, async ({ page }) => {
     const errores = await abrirMesa(page, { semilla });
     await elegirCartaParaMirar(page);
     await esperarMiTurno(page);
@@ -37,8 +53,8 @@ for (const [numero, semilla] of [[9, 4], [10, 23]]) {
     await expect(grupos.first()).toBeVisible({ timeout: 20_000 });
     const titulos = await grupos.allTextContents();
 
-    expect(titulos.at(-1), "tus cartas no quedaron abajo").toBe("Tus cartas");
-    expect(titulos.slice(0, -1), "arriba tiene que haber sólo rivales").not.toContain("Tus cartas");
+    expect(titulos.at(0), "tus cartas no quedaron arriba de todo").toBe("Tus cartas");
+    expect(titulos.slice(1), "abajo tiene que haber sólo rivales").not.toContain("Tus cartas");
     expect(titulos.length, "faltan rivales en la ventana").toBeGreaterThan(1);
     expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
   });

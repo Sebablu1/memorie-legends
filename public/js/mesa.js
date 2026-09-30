@@ -36,6 +36,8 @@ import {
   evaluarAtaque,
   posicionesAtacablesDe,
   ventanaTrasPoder,
+  motivoDeRechazoDescarte,
+  dondeEntraLoQueSabe,
 } from "./reglas/motor.js";
 
 
@@ -2182,10 +2184,26 @@ async function trasResolverElPoder(pistaFinal = "CORTAR O PASAR") {
 
   estado = conVentana;
   dibujar();
+
+  /**
+   * Qué decir depende de dónde está lo que sabe.
+   *
+   * Decía siempre «BUSCÁ LA CARTA DEL RIVAL», y desde que un 7 también abre
+   * esta ventana eso puede ser mentira: lo que se descubrió puede estar en la
+   * mano propia. Mandar a alguien a buscar en la mano de otro lo que tiene
+   * adelante es peor que no decir nada.
+   */
+  const donde = dondeEntraLoQueSabe(estado, YO);
+  const rotulo = donde.propia && donde.ajena
+    ? "TENÉS UN PAR: TUYO O DEL RIVAL"
+    : donde.propia
+      ? "ESA CARTA TUYA ENTRA: DESCARTALA"
+      : "BUSCÁ LA CARTA DEL RIVAL";
+
   // Tres segundos, los mismos que una reapertura: ya se sabe qué se busca y
   // en qué mano. El servidor llega al mismo número por su cuenta, leyendo
   // `volverA` en `duracionDeVentana`.
-  await faseDescarte(null, MS_REAPERTURA, "BUSCÁ LA CARTA DEL RIVAL");
+  await faseDescarte(null, MS_REAPERTURA, rotulo);
   if (estado.fase === "postLevantada") pista("CORTAR O PASAR");
 }
 
@@ -2256,6 +2274,20 @@ function faseDescarte(alCerrar, duracion = MS_DESCARTE, rotulo = "DESCARTE") {
     });
 
     manejadorDescarte = (pos) => {
+      /**
+       * Si el motor no deja, se DICE por qué.
+       *
+       * Antes esto era mudo: `intentarDescarte` devuelve el estado tal cual
+       * cuando rechaza, así que tocar la carta no hacía absolutamente nada y no
+       * había forma de distinguir una regla de algo roto. Lo reportaron como un
+       * bug, y tenían razón en que parecía uno.
+       */
+      const motivo = motivoDeRechazoDescarte(estado, YO, pos);
+      if (motivo) {
+        pista(motivo.toUpperCase());
+        sonidos.error();
+        return;
+      }
       estado = intentarDescarte(estado, YO, pos);
       resolverUltimoDescarte();
       dibujar();
@@ -3013,13 +3045,25 @@ function abrirModalPoder() {
   const descripciones = INSTRUCCIONES_PODER;
 
   const soloPropias = tipo === "mirarPropia";
-  // Los rivales arriba y tus cartas abajo. En el orden de los asientos tus
-  // cartas quedaban arriba, porque en el entrenamiento sos siempre el 0; así
-  // no depende del asiento. Sólo se nota en el 9 y el 10, los que muestran
-  // las dos cosas. Esta ventana es sólo del entrenamiento: en red el objetivo
-  // se elige sobre la mesa. La carta elegida se identifica por el índice del
-  // jugador, no por su lugar en la ventana.
-  const orden = [...estado.jugadores.keys()].sort((a, b) => (a === YO) - (b === YO));
+  /**
+   * TUS CARTAS PRIMERO, y antes iban últimas.
+   *
+   * El orden no sale de los asientos —en entrenamiento uno es siempre el 0, y
+   * atarlo al asiento haría que la ventana cambiara de forma según dónde te
+   * sentaras—, así que era una decisión libre y estaba tomada al revés: los
+   * rivales arriba, lo tuyo abajo.
+   *
+   * En un teléfono con cuatro jugadores, «abajo» es «fuera de la pantalla».
+   * Y el 9 y el 10 —los únicos que muestran las dos cosas— piden elegir
+   * PRIMERO una carta tuya: la instrucción dice «Elegí una carta tuya y una de
+   * un rival» y lo primero que nombra era lo único que no se veía.
+   *
+   * Sólo se nota en esos dos: el 7 muestra nada más lo tuyo y el 8 nada más lo
+   * ajeno. En red el objetivo se elige sobre la mesa y esta ventana no existe.
+   * La carta elegida se identifica por el índice del jugador, no por su lugar
+   * en la ventana, así que mover el orden no mueve ninguna jugada.
+   */
+  const orden = [...estado.jugadores.keys()].sort((a, b) => (b === YO) - (a === YO));
   const grupos = orden
     .map((i) => {
       const jugador = estado.jugadores[i];
@@ -3035,12 +3079,17 @@ function abrirModalPoder() {
     })
     .join("");
 
-  abrirModal(`
+  abrirModal(
+    `
     <h2>⚡ Poder ${numero} — ${titulos[tipo]}</h2>
     <p>${descripciones[tipo]}</p>
     <div class="objetivos">${grupos}</div>
     <button class="accion sobria" data-accion="saltar" type="button">Cancelar y descartar</button>
-  `);
+  `,
+    // A pantalla completa en el teléfono: con cuatro jugadores son cuatro manos
+    // y en una tarjeta centrada no entran. Ver `abrirModal`.
+    { completo: true },
+  );
 }
 
 dom.btnAbandonar.addEventListener("click", () => {

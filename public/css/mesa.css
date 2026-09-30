@@ -2094,6 +2094,167 @@ button.accion.sobria:hover:not(:disabled) {
   --carta-alto: 81px;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   LA VENTANA DE ELEGIR OBJETIVO, EN UN TELÉFONO, OCUPA TODO
+
+   Muestra una mano POR JUGADOR. Con cuatro son cuatro grupos de cuatro
+   cartas, y medido a 360×640 la ventana pedía 298 px de scroll adentro suyo;
+   a 390×700, 220. Lo que quedaba abajo del corte era la mano propia —que
+   ahora va primera, ver `abrirModalPoder`— y no había barra de scroll a la
+   vista que avisara que había más.
+
+   Tres cosas, y ninguna toca la ventana en pantalla grande:
+
+   1. Se le saca el aire al velo y el redondeo a la tarjeta: los 22 px de
+      relleno y los 30 de la ventana eran 104 px de los 640 que hay.
+   2. `100dvh` y no `88vh`: `dvh` es la altura que HAY, con la barra del
+      navegador puesta. El resto de esta hoja ya usa `dvh` por lo mismo; esta
+      ventana se había quedado con `vh`, que es la altura que habría si la
+      barra no estuviera.
+   3. Las cartas del cuadro bajan de 54×81 a 42×63. Es el cuadro, no la mesa:
+      acá se toca para elegir y no hay que leer ningún número.
+
+   ── EL CORTE ES POR ALTO, NO POR ANCHO ──
+
+   Empezó siendo `max-width: 560px` y estaba mal: lo que no entra es el ALTO.
+   Un teléfono acostado —844×390, 780×360— es ANCHO y bajísimo, así que se
+   quedaba afuera del arreglo justo en el caso peor. Va por `max-height`, que
+   es la medida que manda.
+
+   Van las dos condiciones con coma, que en CSS es un O: corto de alto —un
+   teléfono acostado— o angosto de ancho —uno parado—. Una tablet de 768×1024
+   no es ninguna de las dos y se queda con la tarjeta centrada de siempre.
+
+   Con las tres, las cuatro manos entran sin scroll en un teléfono normal. */
+@media (max-height: 700px), (max-width: 480px) {
+  .velo.completo {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .modal.completo {
+    max-width: none;
+    max-height: 100dvh;
+    min-height: 100dvh;
+    border-radius: 0;
+    /* El relleno de abajo respeta la barra de gestos del teléfono: sin esto,
+       el botón de cancelar queda debajo de la raya de inicio. */
+    padding: 16px 12px calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .modal.completo .objetivos {
+    gap: 12px;
+  }
+
+  .modal.completo .grupo-objetivo {
+    padding: 8px;
+  }
+
+  .modal.completo .grupo-objetivo .mano {
+    --carta-ancho: 42px;
+    --carta-alto: 63px;
+  }
+
+  .modal.completo h2 {
+    font-size: 1.15rem;
+  }
+
+  .modal.completo p {
+    margin-bottom: 12px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Y DEBAJO DE ESO, LA CARTA DEL CUADRO SIGUE BAJANDO
+
+   Con cuatro jugadores son cuatro manos, y apiladas no entran en un teléfono
+   acostado por más grande que sea la pantalla: 390 px de alto son 390.
+
+   La salida no es un carrusel. `.objetivos` ya es `flex-wrap`, así que
+   achicando la carta los grupos se acomodan SOLOS en menos filas: a 844 de
+   ancho, con cartas de 42 cada grupo mide unos 200 y los cuatro entran en una
+   fila. Lo que se gana es que no hace falta ningún gesto nuevo para ver que
+   hay más — y esta ventana dura tres segundos, así que descubrir que había
+   algo más al costado no es una opción.
+
+   El piso es 40 px de ancho y no baja de ahí. El blanco táctil del resto del
+   sitio se llevó a 44 a propósito; acá la carta mide 60 de alto, así que el
+   área alcanza, pero más angosto que 40 se vuelve difícil de acertar con el
+   pulgar en tres segundos. Si algún día un aparato no entra ni con esto, la
+   respuesta es mostrar un grupo por vez, no cartas más chicas. */
+@media (max-height: 560px) {
+  .modal.completo .grupo-objetivo .mano {
+    --carta-ancho: 40px;
+    --carta-alto: 60px;
+  }
+
+  .modal.completo .objetivos {
+    gap: 8px;
+  }
+
+  .modal.completo .grupo-objetivo {
+    padding: 6px;
+  }
+
+  .modal.completo h2 {
+    font-size: 1rem;
+    margin-bottom: 2px;
+  }
+
+  .modal.completo p {
+    font-size: 0.82rem;
+    margin-bottom: 8px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   EN UN TELÉFONO PARADO, CADA MANO SE DOBLA EN DOS POR DOS
+
+   El corte por alto arregló el acostado y dejó afuera el caso más común: un
+   teléfono parado de 390×844 tiene alto de sobra —844— y ancho de menos. Con
+   la mano en una fila, un grupo mide unos 250 px, así que entra UNO por fila,
+   las cuatro manos se apilan y piden 836 px de contenido contra los 742 que
+   deja el `max-height`. Medido: 93 px de scroll, los mismos que antes del
+   arreglo.
+
+   Achicar más la carta no es la salida —a 390 de ancho harían falta 36 px
+   para que entren dos grupos por fila, y el piso táctil es 40—. La salida es
+   usar el ancho que hay: la mano se dobla en 2×2, el grupo baja de 250 a 126
+   de ancho, y entran dos o tres grupos por fila. Con eso el contenido queda
+   en unos 540 px y sobra pantalla, SIN tocar el tamaño de la carta.
+
+   Es al revés que la mesa, donde una mano en dos filas sería un disparate:
+   ahí las cartas están en la mesa y su posición significa algo. Acá es una
+   grilla para elegir. */
+@media (max-width: 480px) {
+  .modal.completo .grupo-objetivo .mano {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .modal.completo .objetivos {
+    gap: 10px;
+  }
+}
+
+/* Acostado de verdad: la descripción del poder se va. El título ya dice cuál
+   es, y con 390 px de alto cada renglón cuesta una fila de cartas. */
+@media (max-height: 430px) {
+  .modal.completo p {
+    display: none;
+  }
+
+  .modal.completo {
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .modal.completo .grupo-objetivo .titulo {
+    font-size: 0.64rem;
+  }
+}
+
 /* ====================================== efectos de los poderes */
 
 .anuncio-poder {

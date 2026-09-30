@@ -157,16 +157,29 @@ const resultados = t.ventanaDescarte.intentos.map((i) => i.resultado);
 ok(resultados.filter((r) => r === "primero").length === 1, "un solo 'primero'", resultados);
 ok(t.ventanaDescarte.huboPrimero === true, "queda marcado que ya hubo primero");
 
-console.log("\n=== Un intento por ventana sobre la mano propia ===");
+console.log("\n=== Un intento por MUESTRA sobre la mano propia ===");
 {
   /**
-   * Sobre lo propio hay UN tiro por ventana, y se vive con él.
+   * Sobre lo propio hay UN tiro, y se vive con él.
    *
    * Sin esto, tocar tres cartas costaba tres castigos: cuatro cartas antes,
    * siete después. En red ya era así —`registrarIntento` rechaza el segundo
    * antes de anotarlo— y en entrenamiento no, así que la misma jugada costaba
    * distinto según dónde se jugara. Ahora el límite está en el motor, que es
    * lo único que corren los dos modos.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * ERA POR VENTANA Y AHORA ES POR MUESTRA
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Porque sobre una misma muestra puede haber dos ventanas: la de reflejos
+   * de todos y la corta que se abre después de un poder. Contando por ventana
+   * el contador se reiniciaba, y ése era el motivo por el que esa segunda
+   * ventana prohibía el descarte propio — una prohibición que dejaba sin
+   * jugar al que usaba un 7 y descubría que su carta hacía par.
+   *
+   * Contando por muestra, el tiro es uno solo se use donde se use, y la
+   * prohibición se pudo levantar. Ver `motor.js: yaIntentoLoSuyo`.
    */
   let w = mesaDePrueba();
 
@@ -183,15 +196,29 @@ console.log("\n=== Un intento por ventana sobre la mano propia ===");
      "y no queda anotado como intento", segundo.ventanaDescarte.intentos.length);
   ok(M.yaIntentoLoSuyo(w, 0) === true, "el motor sabe que ya jugó lo suyo");
 
-  // Pero es SÓLO del que tiró, y SÓLO en esta ventana.
+  // Pero es SÓLO del que tiró.
   ok(M.yaIntentoLoSuyo(w, 1) === false, "a los demás no les gasta el tiro");
   const otroJugador = M.intentarDescarte(w, 1, 0);
   ok(cuenta(otroJugador, 1) === 3, "B acierta primero en la misma ventana", cuenta(otroJugador, 1));
 
-  const ventanaNueva = { ...w, ventanaDescarte: { huboPrimero: false, intentos: [] } };
-  ok(M.yaIntentoLoSuyo(ventanaNueva, 0) === false, "la ventana siguiente empieza limpia");
-  ok(cuenta(M.intentarDescarte(ventanaNueva, 0, 0), 0) === 4,
-     "y ahí sí puede volver a tirar: acierta y se saca una de encima");
+  // Una ventana nueva sobre la MISMA muestra NO devuelve el tiro. Es el caso
+  // de la ventana corta que sigue a un poder, y es lo que hace que levantar la
+  // prohibición de descartar ahí no regale una segunda oportunidad.
+  const otraVentana = { ...w, ventanaDescarte: { huboPrimero: false, intentos: [] } };
+  ok(M.yaIntentoLoSuyo(otraVentana, 0) === true,
+     "otra ventana sobre la misma muestra sigue gastada");
+  ok(M.intentarDescarte(otraVentana, 0, 0) === otraVentana,
+     "y no se puede volver a tirar");
+
+  // Con OTRA muestra, en cambio, el tiro se renueva solo: el permiso está
+  // atado al id de la carta de arriba, no a un contador que alguien limpie.
+  const otraMuestra = {
+    ...otraVentana,
+    descarte: [{ ...otraVentana.jugadores[0].mano[0], visible: true }],
+  };
+  ok(M.yaIntentoLoSuyo(otraMuestra, 0) === false, "con otra muestra empieza limpio");
+  ok(cuenta(M.intentarDescarte(otraMuestra, 0, 0), 0) === trasUno.cartas - 1,
+     "y ahí sí puede tirar: acierta y se saca una de encima");
 }
 
 console.log("\n=== Acertar tarde deja la carta a la vista, como el error ===");

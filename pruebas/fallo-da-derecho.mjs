@@ -231,6 +231,11 @@ console.log("\n=== 4. Un fallo nuevo en la misma posición da un derecho nuevo =
   const conOtra = {
     ...uno,
     ventanaDescarte: { huboPrimero: false, intentos: [] },
+    // El tiro propio se gasta por MUESTRA y no por ventana, así que una
+    // ventana nueva sobre la misma muestra sigue gastada. Acá se limpia a
+    // mano: lo que esta prueba mira es el CONOCIMIENTO, y el límite tiene la
+    // suya en `descarte.mjs`.
+    tiroDeMuestra: {},
     jugadores: uno.jugadores.map((j, i) =>
       i === 0 ? { ...j, mano: j.mano.map((c, p) => (p === 1 ? carta("a9", 2) : c)) } : j,
     ),

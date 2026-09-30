@@ -472,21 +472,49 @@ export function intentarDescarte(estado, indiceJugador, posicion) {
   if (estado.fase !== "descarte" || !estado.ventanaDescarte) return estado;
 
   /**
-   * La ventana que sigue a un poder es sólo para atacar.
+   * La ventana corta que sigue a un poder es de quien lo usó, y de nadie más.
    *
-   * Quien la abrió ya tuvo su turno de descartar en la ventana de reflejos,
-   * con esta misma muestra. Si pudiera descartar acá también, tendría dos
-   * oportunidades sobre la misma carta y los otros tres una — y encima en
-   * privado, porque esta ventana no es de ellos.
-   *
-   * Se rechaza para TODOS y no sólo para el dueño: los demás caen igual en
-   * `soloPara`, dos líneas más abajo en `intentarDescarteRival`, y acá no
-   * tienen nada que hacer de ninguna manera.
+   * Antes esto lo tapaba `soloAtaques`, que rechazaba a los cuatro. Ahora que
+   * el dueño SÍ puede descartar algo suyo ahí, la puerta de los otros tres hay
+   * que cerrarla explícitamente: sin esta línea, cualquiera podría descartar
+   * en una ventana privada que no es suya.
    */
-  if (estado.ventanaDescarte.soloAtaques) return estado;
+  const { soloPara, soloAtaques } = estado.ventanaDescarte;
+  if (soloPara != null && soloPara !== indiceJugador) return estado;
+
+  const jugador = estado.jugadores[indiceJugador];
+  const carta = jugador.mano[posicion];
+  if (!carta) return estado;
 
   /**
-   * Un intento por ventana sobre la mano PROPIA.
+   * En la ventana de un poder sólo se juega lo que se CONOCE.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * ESTO ERA UN «NO» A SECAS, Y ERA DEMASIADO
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * El argumento escrito era: quien la abrió ya tuvo su turno de descartar en
+   * la ventana de reflejos, con esta misma muestra, así que descartar acá le
+   * daría dos oportunidades y a los otros tres una.
+   *
+   * El argumento era correcto y el remedio, más grande que la herida. Las dos
+   * oportunidades venían de que el contador de tiros propios se reiniciaba con
+   * cada ventana; ahora viaja con la muestra —ver `yaIntentoLoSuyo`— así que
+   * el tiro es uno solo, se use en la ventana que se use.
+   *
+   * Lo reportó un jugador: tiró un 7, usó el poder, vio que su propia carta
+   * era un 7 — y no pudo descartarla. Es el mismo caso que le dio origen a
+   * esta ventana, pero con la mano propia en vez de la del rival: el
+   * conocimiento llegaba un paso después de la única ventana donde servía.
+   *
+   * A ciegas sigue prohibido, y eso es a propósito: la ventana del poder es
+   * privada, los otros tres no están mirando, y un tiro al azar ahí sería
+   * gratis. Lo que se permite es usar lo que se sabe.
+   */
+  if (soloAtaques && !conoceCarta(estado, indiceJugador, carta.id)) return estado;
+
+  /**
+   * Un intento por muestra sobre la mano PROPIA.
    *
    * Sobre lo tuyo el descarte es una carrera de reflejos: hay un tiro y se
    * vive con él. Sin este límite, tocar tres cartas costaba tres castigos
@@ -504,10 +532,6 @@ export function intentarDescarte(estado, indiceJugador, posicion) {
    * cada error. Es la regla.
    */
   if (yaIntentoLoSuyo(estado, indiceJugador)) return estado;
-
-  const jugador = estado.jugadores[indiceJugador];
-  const carta = jugador.mano[posicion];
-  if (!carta) return estado;
 
   const muestra = cima(estado.descarte);
   const correcto = esDescarteValido(carta, muestra);
@@ -591,6 +615,10 @@ export function intentarDescarte(estado, indiceJugador, posicion) {
       mazo,
       descarte,
       conocimientos,
+      // El tiro propio queda anotado CONTRA ESTA MUESTRA, no contra esta
+      // ventana: si después se abre la corta del poder, sigue gastado. Se
+      // guarda la muestra de ANTES del descarte, que es contra la que se jugó.
+      tiroDeMuestra: { ...(estado.tiroDeMuestra ?? {}), [indiceJugador]: muestra?.id ?? null },
       jugadores: estado.jugadores.map((j, i) => (i === indiceJugador ? { ...j, mano } : j)),
       ventanaDescarte: {
         // El spread NO es decorativo: la ventana lleva `volverA`, que dice
@@ -620,15 +648,110 @@ export function intentarDescarte(estado, indiceJugador, posicion) {
 }
 
 /**
- * ¿Este jugador ya tiró sobre su propia mano en esta ventana?
+ * ¿Este jugador ya tiró sobre su propia mano CONTRA ESTA MUESTRA?
  *
  * Los intentos contra un rival llevan `actor` —quien atacó— y su
  * `indiceJugador` es el atacado. Los propios no llevan `actor`: por ahí se
  * distinguen, y por eso un ataque recibido no gasta el tiro de la víctima.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ SE CUENTA POR MUESTRA Y NO POR VENTANA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque sobre la misma muestra puede haber DOS ventanas: la de reflejos de
+ * todos, y la corta que se abre después de un poder para el que lo tiró. La
+ * segunda nace con `intentos: []`, así que contando por ventana el contador
+ * se reiniciaba y quien usó el poder tenía dos tiros sobre la misma carta.
+ *
+ * Ése era justamente el argumento por el que la ventana del poder prohibía el
+ * descarte propio, y era un argumento contra el CONTADOR, no contra la
+ * jugada. Arreglado el contador, la prohibición dejó de hacer falta: ver
+ * `ventanaTrasPoder`.
+ *
+ * Se guarda el id de la muestra y no un booleano porque la muestra cambia
+ * sola —cada acierto pone otra carta arriba— y con el id el permiso se
+ * renueva sin que nadie tenga que acordarse de limpiar nada.
  */
 export function yaIntentoLoSuyo(estado, indiceJugador) {
   const intentos = estado?.ventanaDescarte?.intentos ?? [];
-  return intentos.some((i) => i.actor == null && i.indiceJugador === indiceJugador);
+  if (intentos.some((i) => i.actor == null && i.indiceJugador === indiceJugador)) return true;
+  return gastoElTiroDeLaMuestra(estado, indiceJugador);
+}
+
+/**
+ * La mitad de arriba que NO mira la ventana actual: sólo si el tiro ya se gastó
+ * contra la muestra que hay ahora.
+ *
+ * Va suelta porque el servidor la necesita sin la otra mitad: allá los intentos
+ * de la ventana viva se anotan en un objeto propio —`partida.ventana`, con sus
+ * identificadores de red— y ésos los cuenta `registrarIntento` por su cuenta.
+ * Preguntarle a esta función por la ventana sería contar dos veces una y
+ * ninguna la otra.
+ */
+export function gastoElTiroDeLaMuestra(estado, indiceJugador) {
+  const muestra = cima(estado?.descarte ?? []);
+  return Boolean(muestra) && estado?.tiroDeMuestra?.[indiceJugador] === muestra.id;
+}
+
+/**
+ * ¿Conoce el actor alguna carta —suya o de un rival— que entre en la muestra?
+ *
+ * Es lo que decide si la ventana corta de después de un poder tiene sentido.
+ * No pregunta de qué poder viene el conocimiento ni de quién es la carta: un 7
+ * puede descubrir que la carta propia hace par con la muestra que uno mismo
+ * acaba de poner, y un 8 de dos jugadas atrás puede seguir sirviendo ahora.
+ */
+export function dondeEntraLoQueSabe(estado, actor) {
+  const muestra = cima(estado.descarte ?? []);
+  if (!muestra) return { propia: false, ajena: false };
+
+  const entra = (carta) =>
+    Boolean(carta) && conoceCarta(estado, actor, carta.id) && esDescarteValido(carta, muestra);
+
+  return {
+    propia: (estado.jugadores[actor]?.mano ?? []).some(entra),
+    ajena: posicionesAtacablesDe(estado, actor).some(({ objetivo, posicion }) =>
+      entra(estado.jugadores[objetivo]?.mano?.[posicion]),
+    ),
+  };
+}
+
+/**
+ * Lo mismo, en una sola respuesta: ¿hay algo que jugar contra esta muestra?
+ *
+ * Separadas porque la mesa necesita saber DÓNDE para decirlo —mandar a alguien
+ * a buscar en la mano del rival lo que tiene adelante es peor que no decir
+ * nada— y `ventanaTrasPoder` sólo necesita saber si hay algo.
+ */
+export const conoceUnaQueEntra = (estado, actor) => {
+  const donde = dondeEntraLoQueSabe(estado, actor);
+  return donde.propia || donde.ajena;
+};
+
+/**
+ * Por qué NO se pudo descartar, en palabras. `null` si sí se puede.
+ *
+ * Va aparte de `intentarDescarte` y no adentro porque esa función devuelve el
+ * estado TAL CUAL cuando rechaza —hay pruebas que lo afirman con `===`— y
+ * meterle un campo de aviso rompería esa propiedad, que es la que hace barato
+ * razonar sobre ella. Esto lo llama la mesa para decir algo en vez de quedarse
+ * muda, que era el defecto que hacía parecer un bug a lo que era una regla.
+ */
+export function motivoDeRechazoDescarte(estado, indiceJugador, posicion) {
+  if (estado.fase !== "descarte" || !estado.ventanaDescarte) return "La ventana ya cerró.";
+
+  const { soloPara, soloAtaques } = estado.ventanaDescarte;
+  if (soloPara != null && soloPara !== indiceJugador) return "Esta ventana no es tuya.";
+
+  const carta = estado.jugadores[indiceJugador]?.mano?.[posicion];
+  if (!carta) return "Ahí no hay carta.";
+
+  if (soloAtaques && !conoceCarta(estado, indiceJugador, carta.id)) {
+    return "En esta ventana sólo podés jugar una carta que conozcas.";
+  }
+  if (yaIntentoLoSuyo(estado, indiceJugador)) return "Ya tiraste contra esta muestra.";
+
+  return null;
 }
 
 /**
@@ -1037,8 +1160,12 @@ export const cerrarVentanaDescarte = (estado) => {
  * `soloPara` — los otros tres ya tuvieron su ventana en el paso 2, con esta
  * misma muestra. Ésta existe por algo que le pasó a uno solo.
  *
- * `soloAtaques` — si además pudiera descartar una carta propia, tendría DOS
- * oportunidades sobre la misma muestra y los demás una.
+ * `soloAtaques` — acá sólo se juega lo que se CONOCE. El nombre quedó de
+ * cuando era literal: prohibía todo descarte propio, con el argumento de que
+ * si no tendría dos oportunidades sobre la misma muestra y los demás una. El
+ * argumento era del CONTADOR, que se reiniciaba con cada ventana; ahora el
+ * tiro propio viaja con la muestra —`yaIntentoLoSuyo`— así que es uno solo, y
+ * lo que queda prohibido es sólo el tiro a ciegas. Ver `intentarDescarte`.
  *
  * Van separadas y no en un solo campo «es una ventana de poder» porque son
  * dos restricciones distintas: una dice QUIÉN y la otra QUÉ. Las comprueban
@@ -1055,17 +1182,48 @@ export function ventanaTrasPoder(estado, actor) {
   // ventana abierta, reemplazarla les quitaría a los otros tres los reflejos
   // que están corriendo y borraría los intentos ya anotados.
   if (estado.fase !== "postLevantada" || estado.ventanaDescarte) return estado;
-  if (!objetivosDe(estado, actor).length) return estado;
+
+  /**
+   * Se abre si hay algo que hacer: alguien a quien atacar, O una carta propia
+   * conocida que entre en la muestra.
+   *
+   * La segunda mitad es la que faltaba. `objetivosDe` sólo mira las manos
+   * AJENAS —`puedeAtacarEn` empieza pidiendo `actor !== objetivo`— así que un
+   * 7, que mira una carta propia, nunca abría nada. Y un 7 puede descubrir
+   * justo lo que esta ventana existe para permitir: que la carta propia hace
+   * par con la muestra que uno mismo acaba de poner.
+   *
+   * Es una unión y no un reemplazo, a propósito: el 8, el 9 y el 10 abren
+   * exactamente cuando abrían. Lo que se agrega es un caso, no se quita
+   * ninguno.
+   */
+  if (!objetivosDe(estado, actor).length && !conoceUnaQueEntra(estado, actor)) return estado;
 
   return {
     ...estado,
     fase: "descarte",
     ventanaDescarte: {
-      // `huboPrimero` en `true`: nadie puede "llegar primero" acá. No es lo
-      // que impide el descarte propio —de eso se ocupa `soloAtaques`— pero
-      // deja el dato coherente para quien lo lea, porque el primero de esta
-      // muestra ya se definió en la ventana del paso 2.
-      huboPrimero: true,
+      /**
+       * `huboPrimero` en `false`, y es un cambio.
+       *
+       * Estaba en `true` con este argumento: el primero de esta muestra ya se
+       * definió en la ventana del paso 2. Pero ser primero CAMBIA la muestra
+       * —la carta acertada pasa a ser la de arriba—, así que si alguien fue
+       * primero allá, la muestra de acá ya es otra y nadie fue primero contra
+       * ella. Y si nadie fue primero, sigue abierto.
+       *
+       * En los dos casos, contra la muestra que hay AHORA no hubo primero.
+       *
+       * Con el descarte propio prohibido daba igual y el comentario lo decía
+       * ("deja el dato coherente"). Ahora no da igual: con `true`, quien
+       * descarta acá su carta conocida acierta TARDE, o sea que la carta se le
+       * queda Y encima recibe una de castigo. Abrirle la puerta para eso sería
+       * peor que dejarla cerrada.
+       *
+       * El ataque al rival no lee este campo, así que el 8, el 9 y el 10 se
+       * comportan exactamente igual que antes.
+       */
+      huboPrimero: false,
       intentos: [],
       volverA: "postLevantada",
       soloPara: actor,

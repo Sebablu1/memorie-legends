@@ -122,14 +122,37 @@ console.log("\n=== 1. Se abre sólo si el que usó el poder puede atacar ===");
   ok(sinSaber.ventanaDescarte === null, "y no queda ninguna ventana");
 
   /**
-   * Un 7 mira una carta PROPIA, así que no deja derecho sobre nadie: nadie se
-   * ataca a sí mismo. Que acá no abra no es una regla nueva, es aquélla.
+   * UN 7 QUE DESCUBRE UN PAR CON LA MUESTRA TAMBIÉN ABRE.
+   *
+   * Acá decía lo contrario, y era el bug. El argumento escrito era que un 7
+   * mira una carta PROPIA y no deja derecho sobre nadie —cierto— así que
+   * abriría tres segundos muertos. Lo que no contemplaba es que puede
+   * descubrir que la carta propia hace par con la muestra que uno mismo acaba
+   * de poner, que es exactamente la jugada que esta ventana vino a permitir.
+   *
+   * Lo reportó un jugador: tiró un 7, vio su 7, y no pudo descartarlo. Es el
+   * mismo reporte que creó esta función, con la mano propia en vez de la del
+   * rival.
+   *
+   * `Oro-5` es la carta 0 de X y la muestra es un 5.
    */
   const solo7 = M.ventanaTrasPoder(
     trasElPoder({ sabe: [{ actor: 0, idCarta: "Oro-5", origen: "poder7" }] }),
     0,
   );
-  ok(solo7.fase === "postLevantada", "un 7 sobre carta propia tampoco abre", solo7.fase);
+  ok(solo7.fase === "descarte", "un 7 que descubre un par con la muestra abre", solo7.fase);
+
+  /**
+   * Y un 7 que NO descubre nada sigue sin abrir, que era el argumento bueno
+   * del comentario viejo: `Oro-2` no hace par con un 5 y X no sabe nada de
+   * nadie, así que serían tres segundos muertos.
+   */
+  const siete7Inutil = M.ventanaTrasPoder(
+    trasElPoder({ sabe: [{ actor: 0, idCarta: "Oro-2", origen: "poder7" }] }),
+    0,
+  );
+  ok(siete7Inutil.fase === "postLevantada",
+     "y un 7 que no descubre ningún par, no", siete7Inutil.fase);
 
   /**
    * Lo que dejó un FALLO ajeno también cuenta, y abre.
@@ -248,6 +271,94 @@ console.log("\n=== 5. No pisa una ventana que ya está abierta ===");
    */
   const enTurno = { ...trasElPoder({ sabe: SABE }), fase: "turno" };
   ok(M.ventanaTrasPoder(enTurno, 0) === enTurno, "ni desde otra fase");
+}
+
+// =====================================================================
+console.log("\n=== 6. En esta ventana se juega lo que se SABE, sea de quien sea ===");
+// =====================================================================
+{
+  /**
+   * La jugada del reporte, entera: X tira un 7, usa el poder, ve que su propia
+   * carta es un 5 —la muestra es un 5— y la descarta.
+   *
+   * Antes esto era imposible: la ventana no abría, y si abría por otro motivo
+   * `soloAtaques` rechazaba el descarte propio sin decir nada.
+   */
+  const sabeLoSuyo = [{ actor: 0, idCarta: "Oro-5", origen: "poder7" }];
+  const abierta = M.ventanaTrasPoder(trasElPoder({ sabe: sabeLoSuyo }), 0);
+  ok(abierta.fase === "descarte", "abre", abierta.fase);
+
+  const descartada = M.intentarDescarte(abierta, 0, 0);
+  ok(cuenta(descartada, 0) === cuenta(abierta, 0) - 1,
+     "X se saca su 5 de encima", cuenta(descartada, 0));
+  ok(descartada.descarte[0].id === "Oro-5", "y queda de muestra", descartada.descarte[0].id);
+
+  /**
+   * Pero a ciegas no. Lo que se permite es usar lo que se sabe: un tiro al
+   * azar en una ventana privada, que los otros tres no están mirando, sería
+   * gratis.
+   */
+  const aCiegas = M.intentarDescarte(abierta, 0, 3);
+  ok(aCiegas === abierta, "una carta que NO conoce no se puede tirar acá");
+
+  /**
+   * Y si ya gastó su tiro en la ventana de reflejos, tampoco. Una oportunidad
+   * por muestra, total: es lo que hace que esto no sea una segunda chance.
+   */
+  const gastado = { ...abierta, tiroDeMuestra: { 0: abierta.descarte[0].id } };
+  ok(M.intentarDescarte(gastado, 0, 0) === gastado,
+     "con el tiro ya gastado contra esta muestra, no");
+
+  /**
+   * El conocimiento no tiene que venir del poder que abrió la ventana. X tira
+   * un 7, mira una carta suya que no sirve —`Oro-2` contra una muestra de 5—
+   * pero de un 8 anterior sabe que Y tiene un 5: la ventana corresponde igual,
+   * y lo que puede hacer es atacar.
+   */
+  const deAntes = M.ventanaTrasPoder(
+    trasElPoder({ sabe: [...SABE, { actor: 0, idCarta: "Oro-2", origen: "poder7" }] }),
+    0,
+  );
+  ok(deAntes.fase === "descarte", "con un saber viejo también abre", deAntes.fase);
+  // Y acierta igual que siempre: a Y le sacan su 5 y recibe una de X, así que
+  // queda con las mismas; el que baja una es X, que entrega.
+  const alRival = M.intentarDescarteRival(deAntes, 0, 1, 1, 2);
+  ok(cuenta(alRival, 0) === cuenta(deAntes, 0) - 1,
+     "y el ataque al rival sigue andando", { X: cuenta(alRival, 0), Y: cuenta(alRival, 1) });
+
+  /**
+   * Los otros tres siguen sin poder jugar acá, y ahora hace falta decirlo: la
+   * puerta que los frenaba era `soloAtaques`, que dejó de ser un «no» a secas.
+   */
+  ok(M.intentarDescarte(abierta, 1, 1) === abierta, "Y no descarta en la ventana de X");
+}
+
+// =====================================================================
+console.log("\n=== 7. Y cuando rechaza, dice por qué ===");
+// =====================================================================
+{
+  /**
+   * El rechazo mudo era la mitad del defecto: quien tocaba su carta y no veía
+   * pasar nada no tenía forma de saber si era una regla o algo roto.
+   */
+  const abierta = M.ventanaTrasPoder(
+    trasElPoder({ sabe: [{ actor: 0, idCarta: "Oro-5", origen: "poder7" }] }),
+    0,
+  );
+
+  ok(M.motivoDeRechazoDescarte(abierta, 0, 0) === null, "lo que se puede jugar no tiene motivo");
+  ok(/conozcas/i.test(M.motivoDeRechazoDescarte(abierta, 0, 3) ?? ""),
+     "una carta desconocida dice que hay que conocerla", M.motivoDeRechazoDescarte(abierta, 0, 3));
+  ok(/no es tuya/i.test(M.motivoDeRechazoDescarte(abierta, 1, 0) ?? ""),
+     "y a otro le dice que la ventana no es suya", M.motivoDeRechazoDescarte(abierta, 1, 0));
+
+  const gastado = { ...abierta, tiroDeMuestra: { 0: abierta.descarte[0].id } };
+  ok(/ya tiraste/i.test(M.motivoDeRechazoDescarte(gastado, 0, 0) ?? ""),
+     "con el tiro gastado lo dice", M.motivoDeRechazoDescarte(gastado, 0, 0));
+
+  const cerrada = { ...abierta, fase: "postLevantada", ventanaDescarte: null };
+  ok(/cerr/i.test(M.motivoDeRechazoDescarte(cerrada, 0, 0) ?? ""),
+     "y sin ventana, que ya cerró", M.motivoDeRechazoDescarte(cerrada, 0, 0));
 }
 
 console.log(fallos ? `\n❌ ${fallos} FALLOS` : "\n✅ TODO OK");

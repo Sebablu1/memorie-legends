@@ -116,9 +116,21 @@ function atacarEnLaVentana(page, rival, posicion) {
           .map((c) => Number(c.dataset.posicion));
       const otroRival = rival === 1 ? 2 : 1;
 
-      // La ventana que abre el 8, después de los dos segundos de mirar.
+      /**
+       * La ventana que abre el 8, después de los dos segundos de mirar.
+       *
+       * Se espera a que aparezca una carta ATACABLE, no a que la pista diga
+       * una palabra. Esperaba `/busc/i` —por «BUSCÁ LA CARTA DEL RIVAL»— y eso
+       * se rompió el día que la pista aprendió a decir otra cosa: ahora,
+       * cuando además conocés una carta propia que entra en la muestra, dice
+       * «TENÉS UN PAR: TUYO O DEL RIVAL». La ventana abría igual; lo que
+       * fallaba era la prueba, que afirmaba una redacción en vez de un hecho.
+       *
+       * La marca de atacable es el hecho: la pone el motor sobre la carta que
+       * se conoce, y es lo que esta prueba va a mirar en la línea siguiente.
+       */
       const limite = Date.now() + 15_000;
-      while (!/busc/i.test(texto(sel.pista))) {
+      while (!document.querySelector(".carta.atacable")) {
         if (Date.now() > limite) {
           return { fallo: `no se abrió la ventana tras el 8; la pista dice "${texto(sel.pista)}"` };
         }

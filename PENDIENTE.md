@@ -1069,6 +1069,54 @@ tiene la sección (c) y la (d): no para tener la queja anotada, sino para que el
 costo se pague una sola vez.
 
 
+## 29. El orden de trabajo — acordado el 30 de septiembre de 2026
+
+No es una lista de defectos: es en qué ORDEN se atacan los que ya están
+anotados más arriba. Está acá porque la decisión más cara de este proyecto no
+fue nunca qué arreglar sino cuántas cosas tener abiertas a la vez.
+
+**La regla, que es lo único que no se negocia: un bloque por vez. Cerrar,
+desplegar, verificar. Recién ahí se abre el siguiente.**
+
+### Bloque 1 — el del poder 7 y el cuadro de cartas (en curso)
+
+1. Verde de navegador para el arreglo del 7.
+2. El cuadro de objetivos del poder: «Tus cartas» arriba, a pantalla completa
+   en el teléfono, y las cartas de ese cuadro pueden achicarse un poco. Sale
+   de la auditoría de scroll: con cuatro jugadores el modal pide hasta 298 px
+   de scroll interno y lo que queda abajo del corte es justamente la mano
+   propia, que en el 9 y el 10 es la primera que hay que elegir.
+3. Borrar los `pruebas/e2e/_auditoria-*.spec.js`, que son instrumentos y no
+   pruebas.
+4. Commit, push, despliegue y verificación en producción.
+
+### Bloque 2 — el siguiente, y no antes de cerrar el 1
+
+- La precarga de cartas y el fondo que no sea blanco (el parpadeo).
+- §13b: `cerrarMirada` puede cortar la mirada antes de tiempo.
+- Paso 9: borrar `crearSala`, que quedó sin uso.
+- **Una sola pasada de suite para los tres.** Son veinte minutos cada vez y
+  tres pasadas para tres cambios que no se tocan entre sí es tiempo tirado.
+
+### Después del 2 — lo que se decide con datos, no antes
+
+- Auditoría visual de la mesa: cuánto del viewport es carta y cuánto es
+  adorno, con capturas anotadas, en móvil, tablet y escritorio. **Sólo mirar
+  los números.** El rediseño de la mesa no se abre hasta tenerlos, y puede no
+  abrirse nunca si los números no lo justifican.
+- §21: unificar la caja de crear sala, que hoy está escrita dos veces.
+- PageSpeed.
+- §10 → Fase 3 (latencia), y con medición previa: es el único de la lista que
+  puede empeorar lo que toca si se entra a ciegas.
+
+### Lo que esto deja dicho
+
+No abrir el rediseño de la mesa ni la Fase 3 hasta que el Bloque 2 esté
+cerrado y desplegado. Si en el medio aparece un defecto que duele —como el
+del ancho, que se comió diez horas—, se atiende y se vuelve acá; lo que no se
+hace es empezar un tercer frente porque el segundo se puso aburrido.
+
+
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del

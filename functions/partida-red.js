@@ -946,6 +946,11 @@ export function crearMotorEnRed({
           entregaHasta,
         },
         {
+          // El tiro propio se gasta por MUESTRA, y esta ventana puede ser la
+          // segunda sobre la misma: la corta que abre un poder. `registrarIntento`
+          // sólo ve la ventana que recibe, así que la otra mitad del dato se la
+          // pasa el estado del motor.
+          tiroGastado: motor.gastoElTiroDeLaMuestra(partida.estado, indice),
           // La sellada al entrar, no la de ahora: ver arriba. Es la misma en
           // cada reintento de esta transacción.
           ahora: llegada,
