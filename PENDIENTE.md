@@ -409,8 +409,10 @@ Encontrado mientras se trabajaba en otra cosa. Ninguno rompe nada hoy.
   binario, y alguna herramienta podría truncarlo. Escribirlo como `"\u0000"`
   dejaría el mismo valor sin el byte crudo en el fuente.
 
-- **Dos comentarios de documentación seguidos sobre `repartirEn`**, en
-  `functions/partida-red.js`. El primero —«Reparte en el servidor…»— es el de
+- ~~**Dos comentarios de documentación seguidos sobre `repartirEn`**~~ ✅
+  **HECHO el 30/9/2026** (`73c0972`, sólo comentario, sin despliegue): borrado
+  el comentario huérfano. Texto original, en
+  `functions/partida-red.js`: el primero —«Reparte en el servidor…»— es el de
   `repartir`, que quedó separado de su función. Un editor muestra el de abajo
   y el de arriba no se lee en ningún lado.
 
@@ -482,9 +484,13 @@ propósito, porque no eran ese arreglo. La primera ya está hecha; quedan dos.
   400. Eso sigue relacionado con el punto 10 (arranques en frío): ahora hay
   cinco segundos más de margen, pero el arranque en frío no desapareció.
 
-- **`cerrarMirada` puede cortar la mirada antes de tiempo.** Ya no antes de que
-  abra —eso se tapó—, pero una vez abierta cualquiera de los cuatro puede
-  llamarla y terminarla para todos. **Y ahora el hueco es más grande**: la
+- ~~**`cerrarMirada` puede cortar la mirada antes de tiempo.**~~ **RESUELTO el
+  30 de septiembre de 2026** (`8b1d80c`, hecho a mano): `cerrarMirada` en
+  `functions/partida-red.js` ahora exige que la ventana haya vencido antes de
+  aceptar la llamada. Desplegada sólo esa función; suite `mirar-descarte.mjs`
+  verde. Texto original: «Ya no antes de que abra —eso se tapó—, pero una vez
+  abierta cualquiera de los cuatro puede llamarla y terminarla para todos.
+  **Y ahora el hueco es más grande**: la
   mirada dura siete segundos en vez de dos, así que hay siete segundos en los
   que un cliente modificado se la puede cortar a los otros tres. El plazo del
   servidor la cierra solo, así que el cliente no necesita llamarla: se podría
@@ -1094,7 +1100,9 @@ desplegar, verificar. Recién ahí se abre el siguiente.**
 
 - Precarga de las 48 cartas al iniciar partida (mata el parpadeo).
 - Fondo del contenedor de carta que no sea blanco (defensa extra).
-- §13b: `cerrarMirada` puede cortar la mirada antes de tiempo.
+- ~~§13b: `cerrarMirada` puede cortar la mirada antes de tiempo.~~ ✅ HECHO
+  a mano el 30/9 (`8b1d80c`, desplegada sólo esa función). Ya no va en la
+  pasada única del Bloque 2.
 - Paso 9: borrar `crearSala`, que quedó sin uso.
 - §18: el test intermitente `fin-de-ronda-en-red`.
 - **Una sola pasada de suite. Un commit. Un deploy.** Son veinte minutos cada
