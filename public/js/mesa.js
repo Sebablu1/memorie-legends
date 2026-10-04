@@ -1454,6 +1454,39 @@ async function resolverDecisionPorTiempo() {
   const que = decisionQueVence(estado.fase);
   if (!que || estado.indiceTurno !== YO) return;
 
+  /**
+   * Cerrar el modal que la decisión hubiera abierto, y limpiar lo que dejó
+   * a medio elegir.
+   *
+   * ─────────────────────────────────────────────────────────────────
+   * POR QUÉ HACÍA FALTA
+   * ─────────────────────────────────────────────────────────────────
+   *
+   * El camino manual —el clic en «🔮 Usar poder», en una carta objetivo, en
+   * «⇄ Cambiar»— cierra el modal en cada rama. Este camino no lo hacía: al
+   * vencer los diez segundos, el turno avanzaba por debajo (`pasarTurno`,
+   * `dibujar`, `cicloTurnos`) y el modal se quedaba arriba, tapando una
+   * partida que ya había seguido sin el jugador.
+   *
+   * `cerrarModal` es idempotente —lo llama `arrancarRonda` sin preguntar—
+   * así que en las fases sin modal no hace nada.
+   *
+   * ─────────────────────────────────────────────────────────────────
+   * Y LAS DOS VARIABLES QUE VIVEN FUERA DEL DOM
+   * ─────────────────────────────────────────────────────────────────
+   *
+   * `seleccionPropia` la setea el 9 y el 10 al tocar la carta propia, y la
+   * limpia el camino manual en `resolverElDiez`. Acá hay que hacer lo mismo:
+   * si no, el próximo 9 o 10 arrastraría una selección que ya no existe.
+   *
+   * `revelaciones` la destapa el 10 en `preguntarSiCambia` y la limpia
+   * `resolverElDiez`. Si el tiempo vence en su lugar, las dos cartas se
+   * quedarían boca arriba después de que el turno ya pasó.
+   */
+  cerrarModal();
+  seleccionPropia = null;
+  revelaciones.clear();
+
   if (que === "descartarPorTiempo") {
     sonidos.whoosh();
     estado = tirarCarta(estado, { porTiempo: true });
