@@ -228,7 +228,7 @@ test("compartir por WhatsApp lleva el mensaje exacto, con el logo oficial", asyn
   await abrirElCartel(page);
 
   const enlace = page.locator("#enlaceWhatsApp");
-  await expect(enlace).toHaveAttribute("href", `https://wa.me/?text=${encodeURIComponent(MENSAJE)}`);
+  await expect(enlace).toHaveAttribute("href", `https://api.whatsapp.com/send?text=${encodeURIComponent(MENSAJE)}`);
   await expect(enlace).toHaveAttribute("target", "_blank");
   await expect(enlace).toHaveAttribute("rel", /noopener/);
   await expect(enlace).toContainText("Compartir por WhatsApp");

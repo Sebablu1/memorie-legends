@@ -168,7 +168,7 @@ export function mostrarCodigoPrivado(caja, { codigo, sala, vence, alCerrar } = {
   }
 
   const mensaje = mensajeDeInvitacion(codigo);
-  $("enlaceWhatsApp").href = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+  $("enlaceWhatsApp").href = `https://api.whatsapp.com/send?text=${encodeURIComponent(mensaje)}`;
 
   /*
    * El link, a la vista y con su propio botón de copiar.

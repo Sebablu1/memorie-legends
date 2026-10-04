@@ -152,7 +152,7 @@ test("el botón de compartir está al final, con su mensaje, y no pide Firebase"
 
   const href = await boton.getAttribute("href");
   expect(decodeURIComponent(href)).toBe(
-    "https://wa.me/?text=Te paso Memorie Legends: memoria, habilidad y estrategia con " +
+    "https://api.whatsapp.com/send?text=Te paso Memorie Legends: memoria, habilidad y estrategia con " +
       "baraja española legendaria. Jugá contra la IA o desafiá a tus amigos. https://memorielegends.com",
   );
 
