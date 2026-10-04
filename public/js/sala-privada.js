@@ -168,7 +168,26 @@ export function mostrarCodigoPrivado(caja, { codigo, sala, vence, alCerrar } = {
   }
 
   const mensaje = mensajeDeInvitacion(codigo);
-  $("enlaceWhatsApp").href = `https://api.whatsapp.com/send?text=${encodeURIComponent(mensaje)}`;
+  /**
+   * `type` va PRIMERO, y no es decorativo.
+   *
+   * La lista «Redes sociales» de AdGuard trae seis reglas que esconden los
+   * botones de compartir por WhatsApp, y las seis son por PREFIJO. La que
+   * pegaba acá es su línea 15048:
+   *
+   *   ~whatsapp.com##a[href^="https://api.whatsapp.com/send?text="]
+   *
+   * Con otro parámetro delante, el `href` deja de empezar con esa cadena y
+   * ninguna de las seis matchea. WhatsApp ignora lo que no conoce: comprobado
+   * contra el servidor, las dos formas devuelven la misma página con el
+   * mensaje ya escrito.
+   *
+   * Lo que esto NO resuelve: una regla por SUBCADENA —`a[href*="whatsapp"]`—
+   * contra la que no hay dirección que sirva, porque el enlace tiene que
+   * apuntar a WhatsApp. Hoy ninguna lista la tiene.
+   */
+  $("enlaceWhatsApp").href =
+    `https://api.whatsapp.com/send?type=text&text=${encodeURIComponent(mensaje)}`;
 
   /*
    * El link, a la vista y con su propio botón de copiar.
