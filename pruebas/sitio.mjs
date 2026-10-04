@@ -714,11 +714,15 @@ console.log("\n=== 16. Compartir el juego, desde la portada y sólo desde ahí =
 
   // El mensaje, tal cual. Se compara decodificado: escrito a mano en la
   // dirección, un acento mal puesto no se ve hasta que alguien lo recibe.
-  const texto = decodeURIComponent((boton.match(/href="https:\/\/wa\.me\/\?text=([^"]*)"/)?.[1] ?? "").replace(/\+/g, " "));
+  // `send?type=text&amp;text=` y no `wa.me/?text=`: el `href` cambió para
+  // esquivar las seis reglas de prefijo de AdGuard —ver `4181850`— y el `&`
+  // viaja como entidad porque esto está escrito en un HTML.
+  const texto = decodeURIComponent((boton.match(/href="https:\/\/api\.whatsapp\.com\/send\?type=text&amp;text=([^"]*)"/)?.[1] ?? "").replace(/\+/g, " "));
   ok(texto === MENSAJE, "con el mensaje acordado, palabra por palabra", texto);
 
   // Sin número: WhatsApp abre su selector y elige quien comparte.
-  ok(/href="https:\/\/wa\.me\/\?text=/.test(boton), "sin destinatario: lo elige quien comparte");
+  ok(/href="https:\/\/api\.whatsapp\.com\/send\?type=text&amp;text=/.test(boton),
+     "sin destinatario: lo elige quien comparte");
   ok(/target="_blank"/.test(boton) && /rel="noopener/.test(boton),
      "abre aparte, con noopener");
 
