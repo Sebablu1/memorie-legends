@@ -1159,6 +1159,81 @@ Hosting 8f540f4 (etiqueta de Google + arreglo del 7 + modal) · reglas 77ee9876
 indexada.
 
 
+## 31. Un bloqueador de contenido esconde el botón de WhatsApp en escritorio
+
+Para el Bloque 2C. Confirmado el 4 de octubre de 2026, no es una hipótesis.
+
+### Qué pasa
+
+En el cartel de la sala privada, «COMPARTIR POR WHATSAPP» no se ve en
+escritorio. En el teléfono sí. Se comprobó desde la consola:
+`document.getElementById("enlaceWhatsApp")` **devuelve el `<a>` entero**, con
+su `href` y su `<img>`. O sea: el elemento está en el DOM y el navegador no lo
+dibuja. Eso es una regla COSMÉTICA de un bloqueador de contenido, no un
+defecto del sitio.
+
+Se descartó el código primero: no hay una sola regla de `display`, `hidden`,
+`none` ni `visibility` que toque `.boton-whatsapp` ni `#enlaceWhatsApp` en
+ninguna hoja, y `sala-privada.js` lo dibuja siempre, sin detección de
+dispositivo ni rama condicional.
+
+### Los dos anzuelos, y por qué importa cuál es
+
+El botón del cartel tiene TRES cosas que una lista social puede reconocer:
+
+```
+class="accion boton-whatsapp"
+id="enlaceWhatsApp"
+src="img/whatsapp/Digital_Glyph_White_RGB_2026.svg"
+```
+
+El botón de **soporte** —el flotante verde, y el del pie— tiene sólo la
+tercera: sus clases son `boton-soporte` y `enlace-soporte`, sin la subcadena.
+
+Eso convierte una sola observación en el dato que decide el alcance:
+
+- **Si el de soporte SE VE y el del cartel no** → la regla activa es la de la
+  CLASE. Alcanza con renombrar la clase y el id. Es un archivo de CSS y uno de
+  JS.
+- **Si los DOS desaparecen** → la regla activa es la de la RUTA de la imagen, y
+  entonces hay que renombrar la carpeta, que toca **dieciséis páginas**.
+
+**Falta hacer esa observación.** Es mirar una pantalla de escritorio con el
+bloqueador puesto y decir si el botón verde de soporte está o no.
+
+### El inventario, para que el arreglo sea mecánico
+
+La clase `boton-whatsapp`: 10 veces en `public/css/sala-privada.css`, 1 en
+`public/js/sala-privada.js`. El id `enlaceWhatsApp`: `sala-privada.js` y dos
+pruebas, `pruebas/e2e/lobby.spec.js` y `pruebas/e2e/tablero.spec.js`.
+
+La ruta `img/whatsapp/`: dieciséis HTML —404, como-se-juega, cuenta,
+dashboard, index, lobby, privacidad, quienes-somos, ranking,
+reglamento-partidas, reglamento-torneos, room, seguridad, terminos, tienda— más
+`sala-privada.js` y las mismas dos pruebas. La carpeta tiene dos archivos:
+`Digital_Glyph_Green_RGB_2026.svg` y `Digital_Glyph_White_RGB_2026.svg`.
+
+Ojo con dos cosas al renombrar la ruta: `index.html` lleva su CSS incrustado y
+hay que regenerarlo (`herramientas/css-critico.mjs`), y las dos pruebas de
+navegador afirman la ruta vieja y se ponen en rojo.
+
+### Lo que NO hay que perder de vista
+
+El glifo es el oficial del kit de marca y el nombre del archivo lo dice
+—`Digital_Glyph_White_RGB_2026`—. Si la carpeta pasa a llamarse `compartir/`,
+el nombre del archivo es lo único que queda diciendo de dónde salió: no se
+toca. Y el verde tampoco, que es requisito del kit.
+
+### Y una advertencia sobre el arreglo
+
+Renombrar esquiva las listas de HOY. Las listas se actualizan, y un botón que
+comparte por WhatsApp va a seguir pareciéndose a un botón que comparte por
+WhatsApp. Esto compra tiempo, no inmunidad: si vuelve a pasar con otro nombre,
+la respuesta no es renombrar de nuevo sino aceptar que a una parte de los
+visitantes el botón no les va a aparecer, y que el link del cartel —que se
+copia con el botón de al lado— es el camino que nadie bloquea.
+
+
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del
