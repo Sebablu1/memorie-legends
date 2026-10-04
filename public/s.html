@@ -11,6 +11,50 @@
     -->
     <meta name="robots" content="noindex, nofollow" />
 
+    <!--
+      LA VISTA PREVIA DEL MENSAJE.
+
+      Sin esto, una invitación compartida por WhatsApp se mostraba con el
+      FAVICON: esta página no tenía ninguna etiqueta `og:`, y el cliente cae a
+      lo único que encuentra. Medido en producción antes de arreglarlo —`curl`
+      a una de estas direcciones devolvía cero coincidencias de `og:`— mientras
+      la portada sí las tenía y se veía bien.
+
+      Hay que ponerlas ACÁ y no alcanza con las de `index.html`: `/s/**` se
+      reescribe a este archivo (ver `firebase.json`), así que lo que lee
+      WhatsApp es este `<head>` y ningún otro.
+
+      EL TEXTO NO ES EL DE LA PORTADA, A PROPÓSITO
+
+      Quien recibe esto recibe una invitación a una mesa, no un anuncio del
+      juego. La vista previa es lo único que va a leer antes de decidir si
+      toca, así que dice lo que está pasando.
+
+      `noindex` y estas etiquetas no se pisan: el primero habla con los
+      buscadores y las segundas con el que recibe el mensaje.
+
+      NO VA `og:url`. Firebase Hosting sirve estático: sería la misma dirección
+      para todas las salas, que es peor que no decir ninguna.
+
+      La imagen es la misma de la portada —1200x630, JPG— y es a propósito: es
+      la única del sitio que sobrevive al recorte cuadrado de la vista previa
+      compacta de WhatsApp. El porqué está en `herramientas/tarjeta.mjs`.
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Memorie Legends" />
+    <meta property="og:locale" content="es_AR" />
+    <meta property="og:title" content="Te invitan a una sala privada — Memorie Legends" />
+    <meta property="og:description" content="Te invito a jugar Memorie Legends conmigo. Entrá con el código y jugamos." />
+    <meta property="og:image" content="https://memorielegends.com/img/compartir-escudo-2.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Logo de Memorie Legends sobre fondo oscuro" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Te invitan a una sala privada — Memorie Legends" />
+    <meta name="twitter:description" content="Te invito a jugar Memorie Legends conmigo. Entrá con el código y jugamos." />
+    <meta name="twitter:image" content="https://memorielegends.com/img/compartir-escudo-2.jpg" />
+
     <link rel="icon" href="/img/favicon-32.png" sizes="32x32" />
 
     <!--
