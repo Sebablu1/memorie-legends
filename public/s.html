@@ -84,10 +84,6 @@
         text-align: center;
         padding: 24px;
       }
-      img {
-        width: 96px;
-        height: 96px;
-      }
       p {
         margin: 0;
         font-size: 0.95rem;
@@ -95,12 +91,91 @@
       a {
         color: inherit;
       }
+
+      /* ───────────────────────────────────────────────────────────────────
+         EL MISMO VELO QUE EL DE ENTRENAMIENTO
+
+         Copiado de `css/mesa.css` —`.velo-carga` y sus tres piezas— en vez de
+         compartido, y es a propósito: una hoja compartida sería UN ARCHIVO MÁS
+         que bajar antes de mostrar algo, que es justo lo que esta página
+         evita. `mesa.css` entero son 3.900 líneas para usar cincuenta.
+
+         Lo que se duplica es el aro y el texto. Si algún día el velo de la
+         mesa cambia de aspecto, esto queda viejo: es cosmético y se nota a
+         simple vista.
+
+         NO se copia la red de seguridad de los diez segundos
+         (`animation: velo-rendirse`). Allá el velo tapa la mesa y hay que
+         destaparla si el JavaScript no llega; acá no tapa nada, y si el
+         JavaScript no corre el `<noscript>` ya ofrece el camino al lobby.
+
+         Tampoco se copia `position: fixed`: el `<body>` ya centra con grid y
+         esta página no tiene nada debajo que haya que cubrir. */
+      .velo-carga {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+      }
+
+      .velo-carga-logo {
+        width: clamp(160px, 46vw, 260px);
+        height: auto;
+        filter: drop-shadow(0 0 26px rgba(212, 168, 67, 0.45));
+      }
+
+      .velo-carga-aro {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 3px solid rgba(212, 168, 67, 0.25);
+        border-top-color: var(--oro, #d4a843);
+        animation: velo-girar 0.9s linear infinite;
+      }
+
+      @keyframes velo-girar {
+        to { transform: rotate(360deg); }
+      }
+
+      /* Quien pidió no ver movimiento no lo ve. La misma regla que el resto
+         del sitio: el aro se queda quieto y sigue diciendo lo mismo. */
+      @media (prefers-reduced-motion: reduce) {
+        .velo-carga-aro { animation: none; }
+      }
+
+      .velo-carga-texto {
+        margin: 0;
+        color: var(--texto-tenue, #9aa3b2);
+        letter-spacing: 1.6px;
+        text-transform: uppercase;
+        font-size: 0.78rem;
+      }
     </style>
   </head>
   <body>
-    <div>
-      <img src="/img/moneda-80.webp" alt="" width="96" height="96" />
-      <p id="aviso">Entrando a la sala…</p>
+    <div class="velo-carga">
+      <!--
+        El escudo y no la moneda, con los cuatro tamaños que usa el velo de la
+        mesa. Los cuatro y no uno: el logo mide hasta 260 px, así que en un
+        teléfono de 3x el navegador pide el de 640 — con un solo archivo, o se
+        ve pixelado o se baja de más en la única pantalla donde los milisegundos
+        se notan.
+
+        Rutas absolutas, como todo acá: esto se sirve bajo `/s/ABCD1234`.
+      -->
+      <img
+        class="velo-carga-logo"
+        src="/img/escudo-320.webp"
+        srcset="/img/escudo-160.webp 160w, /img/escudo-320.webp 320w, /img/escudo-480.webp 480w, /img/escudo-640.webp 640w"
+        sizes="(max-width: 347px) 160px, (max-width: 565px) 46vw, 260px"
+        alt="Memorie Legends"
+        width="640"
+        height="598"
+      />
+      <span class="velo-carga-aro" aria-hidden="true"></span>
+      <!-- «Entrando a la sala» y no «Cargando entrenamiento»: acá es verdad. -->
+      <p class="velo-carga-texto" id="aviso" role="status">Entrando a la sala…</p>
       <noscript>
         <p>Necesitás JavaScript. <a href="/lobby.html">Ir al lobby</a></p>
       </noscript>
