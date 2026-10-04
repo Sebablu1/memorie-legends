@@ -2208,32 +2208,40 @@ button.accion.sobria:hover:not(:disabled) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   EN UN TELÉFONO PARADO, CADA MANO SE DOBLA EN DOS POR DOS
+   LA MANO DEL CUADRO VA EN UNA FILA, COMO EN LA MESA. SIEMPRE.
 
-   El corte por alto arregló el acostado y dejó afuera el caso más común: un
-   teléfono parado de 390×844 tiene alto de sobra —844— y ancho de menos. Con
-   la mano en una fila, un grupo mide unos 250 px, así que entra UNO por fila,
-   las cuatro manos se apilan y piden 836 px de contenido contra los 742 que
-   deja el `max-height`. Medido: 93 px de scroll, los mismos que antes del
-   arreglo.
+   Acá hubo una grilla de 2×2 para pantallas angostas, y estuvo mal.
 
-   Achicar más la carta no es la salida —a 390 de ancho harían falta 36 px
-   para que entren dos grupos por fila, y el piso táctil es 40—. La salida es
-   usar el ancho que hay: la mano se dobla en 2×2, el grupo baja de 250 a 126
-   de ancho, y entran dos o tres grupos por fila. Con eso el contenido queda
-   en unos 540 px y sobra pantalla, SIN tocar el tamaño de la carta.
+   La escribí para que las cuatro manos entraran sin scroll en un teléfono: en
+   una fila un grupo mide unos 250 px, así que entra uno por fila, las cuatro
+   se apilan y pedían 93 px de scroll a 390×844 y 298 a 360×640. Doblada en
+   2×2 el grupo baja a 126 de ancho, entran tres por fila y no sobra nada.
 
-   Es al revés que la mesa, donde una mano en dos filas sería un disparate:
-   ahí las cartas están en la mesa y su posición significa algo. Acá es una
-   grilla para elegir. */
+   Resolvió el scroll y rompió algo más importante.
+
+   ─────────────────────────────────────────────────────────────────────────
+   POR QUÉ UNA FILA NO ES UNA DECISIÓN DE DISEÑO
+   ─────────────────────────────────────────────────────────────────────────
+
+   Esto es un juego de MEMORIA, y lo que se memoriza es la POSICIÓN. En la
+   mesa la mano es una fila de cuatro —`.mano`, con `flex-wrap: nowrap`— y el
+   jugador recuerda «la tercera empezando por la izquierda».
+
+   Cuando el cuadro del poder le pide elegir una carta y se la muestra en un
+   cuadrado de 2×2, esa memoria deja de servir: la tercera ya no está tercera,
+   está abajo a la izquierda. El jugador tiene que traducir, y traducir bajo un
+   reloj de tres segundos es, en la práctica, elegir a ciegas.
+
+   El comentario que estaba acá decía que en el cuadro «es una grilla para
+   elegir» y que la posición no significaba nada. Es exactamente al revés: en
+   el único momento en que la posición tiene que significar algo es cuando hay
+   que usarla.
+
+   El scroll vuelve, y se acepta: es un gesto de más contra una jugada que no
+   se puede hacer. Lo que lo resuelve de verdad —mostrar un grupo por vez en
+   el 9 y el 10, que además permite cartas del doble de grandes— es otro
+   cambio y va aparte. */
 @media (max-width: 480px) {
-  .modal.completo .grupo-objetivo .mano {
-    display: grid;
-    grid-template-columns: repeat(2, auto);
-    justify-content: center;
-    gap: 6px;
-  }
-
   .modal.completo .objetivos {
     gap: 10px;
   }

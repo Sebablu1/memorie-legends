@@ -3006,11 +3006,42 @@ document.addEventListener("click", async (evento) => {
 
 // --------------------------------------------------------- modal poderes
 
-function manoParaElegir(i, { soloVacias = false } = {}) {
+/**
+ * La mano de alguien, para elegir una carta en el cuadro de un poder.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LOS HUECOS NO SE DIBUJAN, Y ESO ES LO QUE HACE QUE SIRVA LA MEMORIA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Acá se dibujaba un `<div class="hueco vacio">` por cada lugar sin carta, y
+ * la mesa hace lo contrario: `dibujarJugador` filtra los nulos y pinta las
+ * cartas pegadas, con el argumento —que está escrito allá— de que un agujero
+ * en el medio se lee como una mano «repartida como si todavía fueran cuatro».
+ *
+ * Que una pantalla compacte y la otra no rompe lo único que este juego pide
+ * recordar: DÓNDE está cada carta. Con un hueco en la posición 1, la mesa
+ * muestra [0][2][3] pegadas y el cuadro mostraba [0][·][2][3]: la carta 2 era
+ * la segunda en la mesa y la tercera acá. Medido —el hueco ocupaba 42x63, o
+ * sea una carta entera, y corría todo lo que seguía—.
+ *
+ * Y muerde justo cuando la memoria más importa: a mitad de ronda, con las
+ * manos ya descompletadas. Con la mano entera —el primer turno— coincidía, que
+ * es por lo que no se veía.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * EL `pos` SIGUE SIENDO EL DE SIEMPRE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `data-pos` es la DIRECCIÓN de la carta para el motor, no su lugar en la
+ * fila. Devolver vacío no lo corre: el `.map` recorre el arreglo completo, así
+ * que `pos` es el índice original aunque esa vuelta no dibuje nada. Es la
+ * misma precaución que toma la mesa, que captura el `pos` antes de filtrar y
+ * usa el lugar en el abanico sólo para la geometría.
+ */
+function manoParaElegir(i) {
   return estado.jugadores[i].mano
     .map((carta, pos) => {
-      if (!carta) return `<div class="hueco vacio"></div>`;
-      if (soloVacias) return "";
+      if (!carta) return "";
       return `
         <button class="carta jugable ${claseAsiento(i)}" data-objetivo="${i}" data-pos="${pos}" type="button">
           <span class="posicion">${pos}</span>
