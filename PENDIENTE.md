@@ -1159,79 +1159,127 @@ Hosting 8f540f4 (etiqueta de Google + arreglo del 7 + modal) · reglas 77ee9876
 indexada.
 
 
-## 31. Un bloqueador de contenido esconde el botón de WhatsApp en escritorio
+## 31. Un bloqueador escondía el botón de WhatsApp en escritorio — RESUELTO el 4 de octubre de 2026
 
-Para el Bloque 2C. Confirmado el 4 de octubre de 2026, no es una hipótesis.
+Tres commits para una línea. Lo que sigue es el camino entero, porque lo caro
+no fue el arreglo sino descartar seis diagnósticos equivocados.
 
-### Qué pasa
+### El síntoma
 
-En el cartel de la sala privada, «COMPARTIR POR WHATSAPP» no se ve en
-escritorio. En el teléfono sí. Se comprobó desde la consola:
-`document.getElementById("enlaceWhatsApp")` **devuelve el `<a>` entero**, con
-su `href` y su `<img>`. O sea: el elemento está en el DOM y el navegador no lo
-dibuja. Eso es una regla COSMÉTICA de un bloqueador de contenido, no un
-defecto del sitio.
+En escritorio, el botón verde «COMPARTIR POR WHATSAPP» del cartel de sala
+privada no se veía. En el teléfono sí. El elemento estaba en el DOM, con su
+`href` y su `<img>`, y el navegador le ponía `display: none`: ancho 0.
 
-Se descartó el código primero: no hay una sola regla de `display`, `hidden`,
-`none` ni `visibility` que toque `.boton-whatsapp` ni `#enlaceWhatsApp` en
-ninguna hoja, y `sala-privada.js` lo dibuja siempre, sin detección de
-dispositivo ni rama condicional.
+### La causa, con nombre y número de línea
 
-### Los dos anzuelos, y por qué importa cuál es
-
-El botón del cartel tiene TRES cosas que una lista social puede reconocer:
+**AdGuard AdBlocker**, extensión de Edge, con su lista «Redes sociales»
+(`filters.adtidy.org/extension/chromium/filters/4.txt`). Trae SEIS reglas que
+esconden enlaces de compartir por WhatsApp, y las seis son por PREFIJO:
 
 ```
-class="accion boton-whatsapp"
-id="enlaceWhatsApp"
-src="img/whatsapp/Digital_Glyph_White_RGB_2026.svg"
+##a[href^="https://wa.me/?text="]                                (14959)
+~whatsapp.com##a[href^="//api.whatsapp.com/send?text="]          (15046)
+~whatsapp.com##a[href^="https://api.whatsapp.com/send/"]         (15047)
+~whatsapp.com##a[href^="https://api.whatsapp.com/send?text="]    (15048)
+~whatsapp.com##a[href^="https://web.whatsapp.com/send?text="]    (15049)
+##a[href^="whatsapp://send"]                                     (14657)
 ```
 
-El botón de **soporte** —el flotante verde, y el del pie— tiene sólo la
-tercera: sus clases son `boton-soporte` y `enlace-soporte`, sin la subcadena.
+La que pegaba al final fue la **15048**.
 
-Eso convierte una sola observación en el dato que decide el alcance:
+### El camino: dos commits que no arreglaron nada
 
-- **Si el de soporte SE VE y el del cartel no** → la regla activa es la de la
-  CLASE. Alcanza con renombrar la clase y el id. Es un archivo de CSS y uno de
-  JS.
-- **Si los DOS desaparecen** → la regla activa es la de la RUTA de la imagen, y
-  entonces hay que renombrar la carpeta, que toca **dieciséis páginas**.
+**`8d8c7ea`** cambió `wa.me/?text=` por `api.whatsapp.com/send?text=`. Se había
+verificado contra la lista social de Fanboy, que tiene la 14959 y ninguna más.
+AdGuard tiene las dos: el cambio saltó de una regla a otra de la misma familia y
+el botón siguió sin verse.
 
-**Falta hacer esa observación.** Es mirar una pantalla de escritorio con el
-bloqueador puesto y decir si el botón verde de soporte está o no.
+Fue un error de método, y conviene que quede dicho: se verificó que la regla
+EXISTÍA y que MATCHEABA, y se dio por probado que era la causa. Faltaba el paso
+barato —cambiar el `href` y mirar si el botón reaparecía—, que es lo que después
+la refutó en diez segundos.
 
-### El inventario, para que el arreglo sea mecánico
+**`4181850`** cambió `?text=` por `?type=text&text=`. Con otro parámetro
+delante, el `href` deja de empezar con ninguna de las seis cadenas. Es el que
+funcionó.
 
-La clase `boton-whatsapp`: 10 veces en `public/css/sala-privada.css`, 1 en
-`public/js/sala-privada.js`. El id `enlaceWhatsApp`: `sala-privada.js` y dos
-pruebas, `pruebas/e2e/lobby.spec.js` y `pruebas/e2e/tablero.spec.js`.
+### Qué se descartó, y con qué prueba
 
-La ruta `img/whatsapp/`: dieciséis HTML —404, como-se-juega, cuenta,
-dashboard, index, lobby, privacidad, quienes-somos, ranking,
-reglamento-partidas, reglamento-torneos, room, seguridad, terminos, tienda— más
-`sala-privada.js` y las mismas dos pruebas. La carpeta tiene dos archivos:
-`Digital_Glyph_Green_RGB_2026.svg` y `Digital_Glyph_White_RGB_2026.svg`.
+Para que nadie vuelva a recorrerlos:
 
-Ojo con dos cosas al renombrar la ruta: `index.html` lleva su CSS incrustado y
-hay que regenerarlo (`herramientas/css-critico.mjs`), y las dos pruebas de
-navegador afirman la ruta vieja y se ponen en rojo.
+| descartado | la prueba que lo descartó |
+|---|---|
+| Bloqueo de RED por la ruta de la imagen | `glifoCargo: true`. El SVG se descargaba: si la URL estuviera bloqueada, el pedido no habría llegado. |
+| Una regla por el `src` de la imagen | Ninguna lista mira `src*=whatsapp`. Buscado en Fanboy social, EasyList, AdGuard social y AdGuard base. |
+| El `href` de `wa.me` | Se cambió a `api.whatsapp.com` y el botón siguió oculto. |
+| CSS del propio sitio | Las dos únicas reglas con `con-cartel-abierto` son `overflow: hidden` en el `body` y `display: none` en `.boton-soporte`. Ninguna alcanza al botón. Se parsearon las ocho hojas buscando toda regla con `display: none` que pudiera matchearlo: cero. |
+| La Prevención de Rastreo de Edge | En InPrivate sin extensiones el botón se veía. |
+| Fanboy social | Tiene sólo la 14959. Las otras cinco son de AdGuard. |
 
-### Lo que NO hay que perder de vista
+Y un dato que estuvo envenenando el diagnóstico durante varios pasos: se midió
+`soporteDisplay: "none"` y de ahí salió la idea de que había «un anzuelo
+compartido entre los dos botones». **Ese `none` era nuestro**, de la regla de
+`.boton-soporte`, porque se midió con el cartel abierto. Nunca hubo dos
+elementos ocultos: hubo uno.
 
-El glifo es el oficial del kit de marca y el nombre del archivo lo dice
-—`Digital_Glyph_White_RGB_2026`—. Si la carpeta pasa a llamarse `compartir/`,
-el nombre del archivo es lo único que queda diciendo de dónde salió: no se
-toca. Y el verde tampoco, que es requisito del kit.
+### El arreglo
 
-### Y una advertencia sobre el arreglo
+`https://api.whatsapp.com/send?text=…` pasa a
+`https://api.whatsapp.com/send?type=text&text=…`, en los DOS botones que lo
+tenían: el del cartel (`js/sala-privada.js`) y el de compartir de la portada
+(`index.html`). En el HTML el separador va como `&amp;`.
 
-Renombrar esquiva las listas de HOY. Las listas se actualizan, y un botón que
-comparte por WhatsApp va a seguir pareciéndose a un botón que comparte por
-WhatsApp. Esto compra tiempo, no inmunidad: si vuelve a pasar con otro nombre,
-la respuesta no es renombrar de nuevo sino aceptar que a una parte de los
-visitantes el botón no les va a aparecer, y que el link del cartel —que se
-copia con el botón de al lado— es el camino que nadie bloquea.
+WhatsApp ignora el parámetro que no conoce. Comprobado contra el servidor antes
+de tocar nada: las tres formas —sin parámetro extra, con `type` y con `phone`—
+devuelven 200 y renderizan el mensaje en el mismo bloque de vista previa, y el
+`<noscript>` de cada una reenvía conservando lo que se le pasó.
+
+42 pruebas de navegador en verde entre `tablero.spec.js` y
+`portada-sesion.spec.js`.
+
+El botón de SOPORTE no se tocó. Su `href` es `wa.me/<número>?text=`, que no
+empieza con ninguna de las seis cadenas: nunca estuvo oculto.
+
+### El límite, dicho de frente
+
+Esto esquiva reglas de PREFIJO, que son las que hay hoy. El día que una lista
+escriba una por SUBCADENA —`a[href*="whatsapp"]`— no hay dirección que sirva,
+porque el enlace tiene que apuntar a WhatsApp para funcionar.
+
+Ahí quedarían dos salidas y ninguna es gratis: dejar de usar un `<a>` —y perder
+Ctrl+clic, rueda del medio y «abrir en pestaña nueva»— o aceptar que a quien
+tenga esa lista no le aparezca.
+
+### La decisión de producto, que sigue vigente
+
+En escritorio, compartir por WhatsApp sirve poco: `api.whatsapp.com` abre
+WhatsApp Web, que exige tener la sesión puesta en ese navegador. **El botón es
+un atajo, no la función.** COPIAR está al lado, no tiene anzuelo que una lista
+pueda reconocer, y hace lo mismo.
+
+Si esto vuelve a romperse, la respuesta por defecto es aceptarlo, no perseguir
+la lista. Se arregló esta vez porque costaba una línea.
+
+### Verificación pendiente
+
+El despliegue está hecho y producción sirve las dos URLs nuevas. Falta mirarlo
+con **AdGuard activado**, que es lo único que no se puede comprobar desde acá:
+
+1. Cartel: crear una sala privada y ver el botón verde entre COPIAR y ENTRAR.
+2. Portada: bajar hasta «¿Conocés a alguien que juega a las cartas?».
+3. En la consola, con el cartel abierto:
+   `getComputedStyle(document.getElementById("enlaceWhatsApp")).display`
+   tiene que decir `flex`.
+4. Tocar el botón una vez y ver que WhatsApp abre con el mensaje escrito. Las
+   tres URLs se comprobaron con `curl`, no con WhatsApp Web abriéndose de
+   verdad.
+
+**Si el `display` sigue en `none`**, la regla que pega es otra y no hay que
+adivinarla: el **registro de filtrado de AdGuard** —ícono → Registro de
+filtrado, recargar con el cartel abierto, filtrar por `enlaceWhatsApp`— la
+nombra textualmente. Es el paso que faltó al principio y el que habría ahorrado
+los dos commits fallidos.
+
 
 
 ## Y algo que no está roto, pero falta
