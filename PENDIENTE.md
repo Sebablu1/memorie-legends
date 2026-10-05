@@ -4,7 +4,7 @@ Lo que está esperando algo — a Meta, a un banco, a una decisión, o a una
 próxima sesión. Cada punto dice **qué falta**, **de quién depende** y **cómo se
 sabe que se resolvió**.
 
-Última revisión: 27 de septiembre de 2026.
+Última revisión: 4 de octubre de 2026.
 
 ---
 
@@ -1097,18 +1097,30 @@ desplegar, verificar. Recién ahí se abre el siguiente.**
    pruebas.
 4. Commit, push, despliegue y verificación en producción.
 
-### Bloque 2 — el siguiente (el Bloque 1 ya está cerrado). NO ARRANCAR hasta que el usuario diga OK
+### Bloque 2 — el siguiente (el Bloque 1 ya está cerrado)
 
 - Precarga de las 48 cartas al iniciar partida (mata el parpadeo).
-- Fondo del contenedor de carta que no sea blanco (defensa extra).
+  **Diseño acordado con Sebastian el 4/10:** dorsos al entrar, caras
+  cuando se van a mostrar (mirada inicial, levantar carta, abrir poder).
+  Medido en el diagnóstico: al dibujar la mesa se piden ~25 imágenes,
+  16 son caras de la mesa; las ~32 del mazo no se piden hasta que salen
+  — esas son las que parpadean. Toca `public/js/mesa.js`.
+
+- ~~Fondo del contenedor de carta que no sea blanco.~~ ✅ HECHO el 4/10
+  (commit `10acdfa`, desplegado y verificado visualmente). Fondo de
+  `.carta .cara` pasó de `#f6f1e4` a `var(--noche-3)`. Tapa el síntoma,
+  no la causa. La causa la ataca la precarga de arriba.
+
 - ~~§13b: `cerrarMirada` puede cortar la mirada antes de tiempo.~~ ✅ HECHO
-  a mano el 30/9 (`8b1d80c`, desplegada sólo esa función). Ya no va en la
-  pasada única del Bloque 2.
-- Paso 9: borrar `crearSala`, que quedó sin uso.
+  a mano el 30/9 (`8b1d80c`, desplegada sólo esa función).
+
+- Paso 9: borrar `crearSala`. Antes verificar: **§32** ya tiene el
+  inventario hecho (nadie la llama, tres tests dependen de ella). No urgente.
+
 - §18: el test intermitente `fin-de-ronda-en-red`.
-- **Una sola pasada de suite. Un commit. Un deploy.** Son veinte minutos cada
-  vez y una pasada por cambio, para cambios que no se tocan entre sí, es
-  tiempo tirado.
+- `ojo-del-poder.spec.js` también es intermitente (anotado el 4/10).
+
+- **Una sola pasada de suite. Un commit. Un deploy.**
 
 ### Después del 2 — lo que se decide con datos, no antes
 
@@ -1329,3 +1341,22 @@ No se rompen si se borra, pero conviene actualizarlos.
    lobby.
 
 **No es urgente.** No rompe nada hoy. Va después del Bloque 2.
+
+## 33. Deploy con muchas functions
+
+Anotado el 4 de octubre de 2026, después de dos deploys fallidos.
+
+Con ~90 functions, `npm run deploy` falla con `Quota Exceeded` en la API
+de Cloud Functions. No es un cupo diario: es un límite de **escritura
+por minuto** (80 cada 100 segundos por proyecto). No se puede aumentar
+desde la consola — la columna "Ajustable" dice "No".
+
+**Qué hacer:** deployar en lotes de 10 o menos con
+`firebase deploy --only functions:X,Y,Z`, esperando ~2 minutos entre
+lotes si hace falta.
+
+**Verificado el 4/10:** dos `npm run deploy` completos fallaron; con 12
+functions en un `--only` selectivo, pasó. Las 78 restantes salieron como
+"Skipped (No changes detected)".
+
+Anotado para no volver a pisar el mismo rato.
