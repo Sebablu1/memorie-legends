@@ -1752,3 +1752,36 @@ correrla siempre con la variable:
 que baja es el import — de 1526 a 752 ms — y eso sí se va a ver en
 los 2049. La concurrencia se nota en la mesa de cuatro tocando a la
 vez: antes eran hasta cuatro instancias y cuatro arranques, ahora una.
+
+## 40. Corte automático: el fix
+
+Arreglado en `49ae144`, el 5/10/2026.
+
+Cuando un jugador se queda sin cartas durante una ventana de descarte
+que NO es la del principio de la ronda (una reapertura, la ventana tras
+un poder, o el camino del jugador eliminado), el corte automático
+cambiaba la fase a `finRonda`, pero el código que cerró la ventana no
+lo verificaba. La mesa quedaba congelada, con las manos destapadas y
+sin error de consola.
+
+El fix: la guarda va adentro de `faseDescarte`, no en cada llamador.
+Un solo lugar, ocho caminos cubiertos.
+
+Verificado a mano en local el 5/10: entrenamiento, descartar la última
+carta durante una reapertura, el modal aparece con la fila en -10 y el
+botón "Siguiente ronda".
+
+### Pendientes anotados, sin decidir
+
+1. No hay prueba de navegador que ejercite el corte automático de
+   punta a punta. La que se agregó comprueba el cableado, no que la
+   mesa se destrabe. Para lo segundo haría falta llevar la partida a
+   un estado específico (1 carta + muestra coincidente + reapertura),
+   y `mesa.js` no expone el estado ni acepta una mano por parámetro.
+   Opciones: un `?debug-mano=` sólo para pruebas, o aceptar que esta
+   regla se verifica a mano.
+
+2. El `pista("CORTAR O PASAR")` incondicional de `mesa.js:3041` queda
+   correcto por los 1,6 s de `RITMO.trasCorte`. Es una dependencia de
+   tiempos, no de lógica. Si algún día se acorta `RITMO.trasCorte`,
+   el orden se invierte y el cartel queda mal.
