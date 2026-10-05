@@ -14,10 +14,10 @@ sabe que se resolvió**.
 > porque explica por qué los packs están como están, pero tres de sus
 > afirmaciones dejaron de ser ciertas. Verificado el 27 de septiembre:
 >
-> | Decía | Hoy |
-> |---|---|
-> | «Nada desplegado» | Se desplegó todo el 27/09: hosting, las 81 funciones y las reglas |
-> | «La suite quedó cortada en 77 de 253» | Corrió entera: **429 pasadas** |
+> | Decía                                       | Hoy                                                                |
+> | ------------------------------------------- | ------------------------------------------------------------------ |
+> | «Nada desplegado»                           | Se desplegó todo el 27/09: hosting, las 81 funciones y las reglas  |
+> | «La suite quedó cortada en 77 de 253»       | Corrió entera: **429 pasadas**                                     |
 > | «Élite y ML hay que sembrarlos y apagarlos» | Hecho: los 5 packs están sembrados y esos dos, retirados (ver §3b) |
 >
 > Lo de abajo queda tal como se escribió aquel día.
@@ -48,8 +48,7 @@ sabe que se resolvió**.
 
 ### Lo que faltaba aquel día, y ya está
 
-Marco y título en la sala de espera y en el ranking. Se hizo: ver §3d.
----
+## Marco y título en la sala de espera y en el ranking. Se hizo: ver §3d.
 
 ## 1. WhatsApp Business — en revisión por Meta
 
@@ -65,13 +64,13 @@ aprobada en el panel de WhatsApp Business.
 **Estado, verificado el 27 de septiembre:** el servidor puede cobrar. Lo que
 falta no es técnico.
 
-| Qué | Estado |
-|---|---|
-| `MP_ACCESS_TOKEN` | existe desde el 14/09 (versión 3) |
-| `MP_WEBHOOK_SECRET` | existe desde el 14/09 |
-| `MP_PUBLIC_KEY` | existe desde el 14/09 |
+| Qué                  | Estado                                       |
+| -------------------- | -------------------------------------------- |
+| `MP_ACCESS_TOKEN`    | existe desde el 14/09 (versión 3)            |
+| `MP_WEBHOOK_SECRET`  | existe desde el 14/09                        |
+| `MP_PUBLIC_KEY`      | existe desde el 14/09                        |
 | `crearOrdenDeCompra` | desplegada el 27/09, recibe los dos secretos |
-| `webhookPago` | desplegada el 27/09, recibe los dos secretos |
+| `webhookPago`        | desplegada el 27/09, recibe los dos secretos |
 
 La prueba que esta misma sección proponía ya da el resultado de «resuelto»:
 
@@ -111,6 +110,7 @@ riesgo.
 
 **Lo que falta para cobrar de verdad:** §3, la cuenta bancaria, que bloquea
 retirar el dinero, no cobrarlo.
+
 ---
 
 ## 3. Cuenta bancaria de Mercado Pago — pendiente
@@ -122,7 +122,7 @@ Mercado Pago y admite transferencias.
 
 ---
 
-## ~~3b. Sembrar los paquetes en producción~~  ✅ HECHO
+## ~~3b. Sembrar los paquetes en producción~~ ✅ HECHO
 
 Verificado en producción el 27 de septiembre:
 
@@ -135,8 +135,7 @@ Verificado en producción el 27 de septiembre:
 El panel ya manda: los packs se pueden editar porque existen en la base, y no
 se cae a la semilla del código.
 
-Queda abierto lo visual de esos 12 artículos, que es §3c.
----
+## Queda abierto lo visual de esos 12 artículos, que es §3c.
 
 ## 3c. Arte de los 12 artículos exclusivos
 
@@ -154,7 +153,7 @@ Los doce: `avatar_iniciado`, `dorso_viajero`, `avatar_erudito`,
 
 ---
 
-## ~~3d. Dibujar marco y título en la sala de espera y en el ranking~~  ✅ HECHO
+## ~~3d. Dibujar marco y título en la sala de espera y en el ranking~~ ✅ HECHO
 
 Las cuatro pantallas: perfil, mesa, sala de espera y ranking.
 
@@ -179,7 +178,6 @@ ranking hasta jugar otra partida. Es lo correcto para un registro histórico —
 la fila dice cómo lucía cuando ganó ese puesto— pero conviene saberlo si
 alguien pregunta.
 
-
 ---
 
 ## 4. Los 48 frentes de cartas — próxima sesión
@@ -195,7 +193,7 @@ dos o tres diseños más.
 
 ---
 
-## ~~5. Limpiar datos viejos en los perfiles~~  ✅ SIN NADA QUE HACER
+## ~~5. Limpiar datos viejos en los perfiles~~ ✅ SIN NADA QUE HACER
 
 Contado en producción el 27 de septiembre: **0 de 24 perfiles** tienen el
 array `users/{uid}.insignias`. No hay nada que limpiar.
@@ -207,6 +205,7 @@ se hizo el 27/09, así que la fuente está cortada y el recuento es cero.
 
 Si alguna vez vuelve a aparecer el campo, querría decir que algo lo escribe de
 nuevo, y eso sí sería un hallazgo.
+
 ---
 
 ## 6. Imágenes de build en GCR
@@ -225,7 +224,7 @@ la facturación de Artifact Registry deja de crecer.
 
 ---
 
-## ~~7. El guardián de dobles no mira `firebase.js`~~  ✅ HECHO
+## ~~7. El guardián de dobles no mira `firebase.js`~~ ✅ HECHO
 
 **Resuelto.** No con la regla que se propuso —exigirle los 32 exports a cada
 doble— sino con la correcta: cada doble tiene que exportar lo que la PÁGINA
@@ -257,7 +256,7 @@ correcta es otra: qué importa, en cadena, la página que la prueba abre.
 
 ---
 
-## ~~8. El marco de la MESA tiene el mismo `width: auto`~~  ✅ HECHO
+## ~~8. El marco de la MESA tiene el mismo `width: auto`~~ ✅ HECHO
 
 **Resuelto.** `mesa.css` lleva alto y ancho escritos en función de `--aro`, más
 `object-fit: contain`. La prueba nueva de `marco-y-titulo.spec.js` mide el marco
@@ -327,15 +326,15 @@ instancias mínimas.
 Desde la laptop de desarrollo, contra producción, con llamadas rechazadas sin
 sesión —no tocan datos—, y en los registros de una partida real:
 
-| Qué | Medido |
-|---|---|
-| Función en frío (contenedor) | **3,6 – 4,5 s** |
-| La misma, tibia | 0,29 s |
-| Primera llamada de cada instancia, *dentro* del handler | **~2 s** (primera conexión con Firestore + claves de tokens) |
-| Las siguientes, dentro del handler | 200 – 290 ms |
-| Cargar `firebase-functions/v1` | 1,3 s de los ~1,5 s del módulo |
-| Una jugada que publica | 1 lectura · 5 escrituras · 13 KB |
-| CPU del servidor por jugada | < 1 ms |
+| Qué                                                     | Medido                                                       |
+| ------------------------------------------------------- | ------------------------------------------------------------ |
+| Función en frío (contenedor)                            | **3,6 – 4,5 s**                                              |
+| La misma, tibia                                         | 0,29 s                                                       |
+| Primera llamada de cada instancia, _dentro_ del handler | **~2 s** (primera conexión con Firestore + claves de tokens) |
+| Las siguientes, dentro del handler                      | 200 – 290 ms                                                 |
+| Cargar `firebase-functions/v1`                          | 1,3 s de los ~1,5 s del módulo                               |
+| Una jugada que publica                                  | 1 lectura · 5 escrituras · 13 KB                             |
+| CPU del servidor por jugada                             | < 1 ms                                                       |
 
 **La causa principal es el arranque en frío.** Las funciones son de primera
 generación: una instancia atiende un pedido a la vez, con poca CPU, y sin
@@ -480,8 +479,7 @@ propósito, porque no eran ese arreglo. La primera ya está hecha; quedan dos.
   Era una diferencia entre modos contra la regla de «entrenamiento = red», y
   **ya había pasado en producción**: partida del 17 de septiembre, 07:19:47
   UTC, una mirada llegó al final de los dos segundos a una instancia recién
-  arrancada —1679 ms dentro de la función— y `accionDePartida` la rechazó con
-  400. Eso sigue relacionado con el punto 10 (arranques en frío): ahora hay
+  arrancada —1679 ms dentro de la función— y `accionDePartida` la rechazó con 400. Eso sigue relacionado con el punto 10 (arranques en frío): ahora hay
   cinco segundos más de margen, pero el arranque en frío no desapareció.
 
 - ~~**`cerrarMirada` puede cortar la mirada antes de tiempo.**~~ **RESUELTO el
@@ -622,11 +620,11 @@ dentro del cajón del menú, va en verde sobre fondo oscuro.
 `pruebas/e2e/fin-de-ronda-en-red.spec.js` falla dentro de una corrida completa
 y pasa sola. Pasó dos veces, y la segunda fue peor que la primera.
 
-| | 27/09 | 28/09 |
-|---|---|---|
-| Fallaron | 1: «al cortar, el resultado se muestra» | **2**: esa misma y «el 10 a medio decidir se cierra si el servidor lo resuelve por tiempo» |
-| La corrida | 428 pasadas, 17,5 min | 427 pasadas, **26,4 min** |
-| Sola | 10 de 10 | **10 de 10, en 17,7 segundos** |
+|            | 27/09                                   | 28/09                                                                                      |
+| ---------- | --------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Fallaron   | 1: «al cortar, el resultado se muestra» | **2**: esa misma y «el 10 a medio decidir se cierra si el servidor lo resuelve por tiempo» |
+| La corrida | 428 pasadas, 17,5 min                   | 427 pasadas, **26,4 min**                                                                  |
+| Sola       | 10 de 10                                | **10 de 10, en 17,7 segundos**                                                             |
 
 **La corrida del 28 tardó un 50% más que la del 27.** Es el mismo síntoma con
 más carga encima: cuanto más ocupada la máquina, más pruebas de ese archivo se
@@ -770,8 +768,13 @@ se acumulan, y el mismo barrido que resuelva lo de arriba tendría que barrerlos
 ## 23. `listarPoseedoresItemAdmin` valida el argumento antes de pedir sesión
 
 ```js
-export const listarPoseedoresItemAdmin = functions.https.onCall((data, context) =>
-  tienda.listarPoseedores(context, validar(EsquemaItem, data, errorHttp).itemId));
+export const listarPoseedoresItemAdmin = functions.https.onCall(
+  (data, context) =>
+    tienda.listarPoseedores(
+      context,
+      validar(EsquemaItem, data, errorHttp).itemId,
+    ),
+);
 ```
 
 `validar(...)` corre primero —es un argumento de la llamada—, así que sin
@@ -818,10 +821,10 @@ Si hay que volver atrás, se vuelven las dos cosas y en este orden:
 npx firebase hosting:rollback
 ```
 
-| versión | qué es |
-|---|---|
+| versión            | qué es                              |
+| ------------------ | ----------------------------------- |
 | `51d538bdfffda3cc` | el lobby nuevo, del 27/09 21:42 UTC |
-| `4dcb31df3b95a6f7` | lo anterior, del 21/09 21:30 UTC |
+| `4dcb31df3b95a6f7` | lo anterior, del 21/09 21:30 UTC    |
 
 **Reglas** — la vía probada, 16 a 20 segundos medidos:
 
@@ -838,11 +841,11 @@ servidor (segundos, NO probada todavía):
 curl -X PATCH -H "Authorization: Bearer $(gcloud auth print-access-token)" -H "x-goog-user-project: memorie-legends" -H "Content-Type: application/json" "https://firebaserules.googleapis.com/v1/projects/memorie-legends/releases/cloud.firestore" -d '{"name":"projects/memorie-legends/releases/cloud.firestore","rulesetName":"projects/memorie-legends/rulesets/RULESET"}'
 ```
 
-| ruleset | qué es | cuándo |
-|---|---|---|
-| `77ee9876-8dde-42d8-8ef2-f11307f2068d` | **lo que corre hoy**: parte B, `rooms` apretada | — |
-| `8817ed97-8d38-4eb0-a693-7426727ad4d9` | parte A: `juegos` sí, `rooms` permisiva | **el destino seguro casi siempre** |
-| `a037a8ef-cca7-4a77-9ae8-09582d82e335` | lo de antes de todo (16/09 23:35 UTC) | sólo para volver del todo atrás |
+| ruleset                                | qué es                                          | cuándo                             |
+| -------------------------------------- | ----------------------------------------------- | ---------------------------------- |
+| `77ee9876-8dde-42d8-8ef2-f11307f2068d` | **lo que corre hoy**: parte B, `rooms` apretada | —                                  |
+| `8817ed97-8d38-4eb0-a693-7426727ad4d9` | parte A: `juegos` sí, `rooms` permisiva         | **el destino seguro casi siempre** |
+| `a037a8ef-cca7-4a77-9ae8-09582d82e335` | lo de antes de todo (16/09 23:35 UTC)           | sólo para volver del todo atrás    |
 
 La parte A sirve con cualquiera de los dos clientes: tiene `juegos` para el
 nuevo y `rooms` permisiva para el viejo. El del 16/09 **no tiene `juegos`**, así
@@ -931,7 +934,7 @@ del sitio a 16 px también cubre los suyos... salvo éstos:
 .campos-item input[type="text"],
 .campos-item input[type="number"],
 .campos-item select {
-  font-size: 0.9rem;   /* 14,4 px */
+  font-size: 0.9rem; /* 14,4 px */
   min-height: 42px;
 }
 ```
@@ -960,7 +963,6 @@ Es la pantalla más compleja del sitio —2.900 líneas de CSS propio— y para
 verla hace falta una partida en curso. No entró en el barrido y no hay ningún
 dato sobre ella: ni scroll horizontal, ni tamaños de campo, ni blancos
 táctiles.
-
 
 ## 28. La banda muerta de 74 píxeles: la lección, y el reclamo que no tuvo dónde ir
 
@@ -1074,7 +1076,6 @@ el que se escriba acá y en los mensajes de los commits. Por eso esta sección
 tiene la sección (c) y la (d): no para tener la queja anotada, sino para que el
 costo se pague una sola vez.
 
-
 ## 29. El orden de trabajo — acordado el 30 de septiembre de 2026
 
 No es una lista de defectos: es en qué ORDEN se atacan los que ya están
@@ -1127,7 +1128,6 @@ cerrado y desplegado. Si en el medio aparece un defecto que duele —como el
 del ancho, que se comió diez horas—, se atiende y se vuelve acá; lo que no se
 hace es empezar un tercer frente porque el segundo se puso aburrido.
 
-
 ## 30. Cierre del 30 de septiembre de 2026: Search Console y el formato de `index.html`
 
 ### a. Google Search Console — cerrado
@@ -1157,7 +1157,6 @@ hace es empezar un tercer frente porque el segundo se puso aburrido.
 Hosting 8f540f4 (etiqueta de Google + arreglo del 7 + modal) · reglas 77ee9876
 (parte B) · 81 funciones, todas al día · sitemap leído por Google · home
 indexada.
-
 
 ## 31. Un bloqueador escondía el botón de WhatsApp en escritorio — RESUELTO el 4 de octubre de 2026
 
@@ -1207,14 +1206,14 @@ funcionó.
 
 Para que nadie vuelva a recorrerlos:
 
-| descartado | la prueba que lo descartó |
-|---|---|
-| Bloqueo de RED por la ruta de la imagen | `glifoCargo: true`. El SVG se descargaba: si la URL estuviera bloqueada, el pedido no habría llegado. |
-| Una regla por el `src` de la imagen | Ninguna lista mira `src*=whatsapp`. Buscado en Fanboy social, EasyList, AdGuard social y AdGuard base. |
-| El `href` de `wa.me` | Se cambió a `api.whatsapp.com` y el botón siguió oculto. |
-| CSS del propio sitio | Las dos únicas reglas con `con-cartel-abierto` son `overflow: hidden` en el `body` y `display: none` en `.boton-soporte`. Ninguna alcanza al botón. Se parsearon las ocho hojas buscando toda regla con `display: none` que pudiera matchearlo: cero. |
-| La Prevención de Rastreo de Edge | En InPrivate sin extensiones el botón se veía. |
-| Fanboy social | Tiene sólo la 14959. Las otras cinco son de AdGuard. |
+| descartado                              | la prueba que lo descartó                                                                                                                                                                                                                             |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bloqueo de RED por la ruta de la imagen | `glifoCargo: true`. El SVG se descargaba: si la URL estuviera bloqueada, el pedido no habría llegado.                                                                                                                                                 |
+| Una regla por el `src` de la imagen     | Ninguna lista mira `src*=whatsapp`. Buscado en Fanboy social, EasyList, AdGuard social y AdGuard base.                                                                                                                                                |
+| El `href` de `wa.me`                    | Se cambió a `api.whatsapp.com` y el botón siguió oculto.                                                                                                                                                                                              |
+| CSS del propio sitio                    | Las dos únicas reglas con `con-cartel-abierto` son `overflow: hidden` en el `body` y `display: none` en `.boton-soporte`. Ninguna alcanza al botón. Se parsearon las ocho hojas buscando toda regla con `display: none` que pudiera matchearlo: cero. |
+| La Prevención de Rastreo de Edge        | En InPrivate sin extensiones el botón se veía.                                                                                                                                                                                                        |
+| Fanboy social                           | Tiene sólo la 14959. Las otras cinco son de AdGuard.                                                                                                                                                                                                  |
 
 Y un dato que estuvo envenenando el diagnóstico durante varios pasos: se midió
 `soporteDisplay: "none"` y de ahí salió la idea de que había «un anzuelo
@@ -1280,11 +1279,53 @@ filtrado, recargar con el cartel abierto, filtrar por `enlaceWhatsApp`— la
 nombra textualmente. Es el paso que faltó al principio y el que habría ahorrado
 los dos commits fallidos.
 
-
-
 ## Y algo que no está roto, pero falta
 
 **No existe el otorgamiento manual de insignias.** `tienda.otorgar` está del
 lado del servidor y sólo lo llama `insignias.js` al cerrar una partida o un
 período de ranking: no hay callable ni botón en el panel. Se dio por existente
 en un pedido anterior. Se construye rápido cuando haga falta.
+
+## 32. crearSala — verificar antes de borrar
+
+Bloque 2 dice "borrar crearSala, que quedó sin uso". Verificado el
+4 de octubre de 2026:
+
+**Ningún cliente la llama:**
+
+- `dashboard.js:282` → `crearYMostrar` → `crearSalaPrivada`
+- `lobby.js:324` → `crearYMostrar` → `crearSalaPrivada`
+- `servidor.js:71` (la función del cliente) → nadie la importa
+
+**Tres tests dependen de ella:**
+
+- `ritmo.mjs:178-180` → prueba el límite de ritmo con `LIMITES.crearSala`
+- `revancha.mjs:164,237-238` → compara el límite de `revanchaDeSala` con
+  el de `crearSala`
+- `salas-publicas.mjs:519-522` → verifica que `crearSala` exige admin
+  antes de abrir nada
+
+Y hay menciones en comentarios: `administradores.mjs:303`, `red.mjs:475`,
+`retratos-en-red.mjs:37`, `revancha.mjs:20,153`, `transacciones.mjs:189`.
+No se rompen si se borra, pero conviene actualizarlos.
+
+**Antes de borrarla:**
+
+1. Borrar la función (`functions/index.js:431`).
+2. Borrar el esquema (`functions/esquemas.js:155`) y su import
+   (`functions/index.js:87-92`).
+3. Borrar el límite (`functions/limite-de-ritmo.js:71`).
+4. Borrar la función del cliente (`public/js/servidor.js:71-72`).
+5. Actualizar los tres tests:
+   - `ritmo.mjs`: usar otro límite de referencia (por ejemplo,
+     `crearSalaPrivada`, que también es 20).
+   - `revancha.mjs`: comparar con `crearSalaPrivada` en lugar de `crearSala`.
+   - `salas-publicas.mjs`: mover el bloque a verificar `crearSalaPublica`
+     (que ya existe), o borrarlo.
+6. Actualizar los comentarios (opcional, para no dejar referencias
+   a algo que ya no existe).
+7. Desplegar functions: `npx firebase deploy --only functions`.
+8. Verificar en producción: crear sala desde el dashboard y desde el
+   lobby.
+
+**No es urgente.** No rompe nada hoy. Va después del Bloque 2.
