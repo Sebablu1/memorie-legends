@@ -1539,3 +1539,216 @@ bloquea nada. Se cierra al encender la venta.
 Antes eran 79 functions a borrar y recrear (todas menos `webhookPago`,
 que no cambiaba de generación). Ahora son **las 80**. El comando de
 borrado del plan hay que ampliarlo con `webhookPago`.
+
+## 39. Plan de deploy de las 80 functions a v2
+
+Anotado el 5/10/2026, al cerrar el día. NO ejecutado todavía.
+
+Estado del proyecto cuando se anotó:
+
+- `functions/index.js` ya está migrado a v2 (commits f166435, 7fc8652).
+- Producción sigue en v1: las 80 functions en us-central1, 256 MB.
+- 3 partidas jugadas. 0 usuarios activos. Pagos apagados
+  (`SOLO_ADMIN_COMPRA = true`), el webhook no se llama.
+- 83 de 83 suites de Node en verde.
+
+Verificado contra producción el 5/10:
+
+- Los 80 nombres de `index.js` coinciden exactamente con los 80
+  desplegados. Sin diferencias.
+- Los 4 jobs de Scheduler están ENABLED con sus cron de siempre.
+- Número de proyecto: 346846781965.
+- Los 3 secretos están dados SÓLO a la cuenta v1
+  (`memorie-legends@appspot.gserviceaccount.com`). Esto es lo más
+  riesgoso del deploy — ver paso 22.
+
+Alcance del deploy: 80 functions (79 + `webhookPago`, que también
+cambia de generación). Downtime aceptado: 15-25 minutos.
+
+### Verificación previa (sin tocar producción)
+
+1. `git status` limpio, `git log -1` en `cb2bc55` o posterior.
+2. `node -e "import('./functions/index.js').then(m =>
+console.log(Object.keys(m).length))"` → 80.
+3. `npm test` → 83 de 83 en verde.
+4. `firebase functions:list --project=memorie-legends` → 80 en v1,
+   todas en us-central1. Guardar el output para comparar después.
+5. Ensayo en seco:
+   `firebase deploy --only functions --project=memorie-legends`
+   Tiene que fallar con `Upgrading from 1st Gen to 2nd Gen is not yet
+supported`. Si NO falla, algo cambió — parar y entender qué.
+
+🔴 **Desde el paso 6 hasta el final del 16, el backend está caído.**
+Toda llamada falla. Con 0 usuarios activos y pagos apagados, es
+aceptable.
+
+### Borrado (paso 6)
+
+6. Borrar las 80 de v1. **Los nombres van separados por ESPACIOS, no
+   por comas.** `functions:delete` es variádico (`[filters...]`), cada
+   argumento es un filtro suelto. Con comas falla con "The specified
+   filters do not match any existing functions".
+
+   `firebase functions:delete abandonarPartida abrirInscripcionesAdmin
+abrirVentanaDescarte accionDePartida acreditarReferido
+activarItemAdmin activarPackAdmin agregarAdministrador
+apagarCatalogoViejoAdmin avanzarPartida barrerPartidas
+borrarItemAdmin borrarPackAdmin borrarSalaPublica cancelarSalaAdmin
+cancelarSalasEnEsperaAdmin cancelarTorneoAdmin
+cerrarInscripcionesAdmin cerrarMirada cerrarPartida
+cerrarRankingAnual cerrarRankingMensual cerrarRankingSemanal
+cerrarVentanaDescarte comprarItem comprarPack crearOrdenDeCompra
+crearSala crearSalaPrivada crearSalaPublica crearTorneoAdmin
+desequiparItem desposeerItemAdmin detalleTorneoAdmin
+editarSalaAdmin editarSalaPublica editarTorneoAdmin
+eliminarSalaAdmin eliminarUsuarioAdmin equiparItem
+finalizarTorneoAdmin forzarBorrarItemAdmin guardarItemAdmin
+guardarPackAdmin guardarUmbralesAdmin horaDelServidor
+iniciarPartida iniciarTorneoAdmin inscribirseATorneo
+intentarDescarte latir leerUmbralesAdmin limpiarSalasCerradasAdmin
+listarAdministradores listarCatalogoAdmin listarPacks
+listarPacksAdmin listarPoseedoresItemAdmin listarReportesAdmin
+listarSalasAdmin listarTorneos listarTorneosAdmin listarUsuariosAdmin
+marcarListo misInsignias misItems quitarAdministrador
+reportarJugador resolverReporteAdmin revanchaDeSala
+revisarNombresAdmin salirDeSalaEnEspera saltarAusente
+sembrarCatalogoAdmin sembrarPacksAdmin soyAdministrador unirseASala
+unirseConCodigo volver webhookPago --region us-central1
+--project memorie-legends --force`
+
+   El CLI reparte de a 40 en paralelo con 30 reintentos y backoff, así
+   que no hace falta batchearlo.
+
+7. Confirmar que no quedó ninguna:
+   `firebase functions:list --project=memorie-legends`
+   Debe decir 0.
+
+### Deploy, por lotes
+
+Si un lote corta por cuota, esperar 2 minutos y repetir el mismo
+comando: lo ya creado se saltea.
+
+8. **La sonda** — 3 baratas, para ver que el camino de v2 funciona
+   antes de soltar el resto. Este primer deploy habilita APIs y toca
+   permisos, es el que más puede tardar.
+   `firebase deploy --only functions:horaDelServidor,functions:latir,functions:volver --project=memorie-legends`
+
+9. **Las 4 programadas**, en su propio lote. El Scheduler de v2 crea
+   jobs nuevos y conviene mirarlos solos.
+   `firebase deploy --only functions:barrerPartidas,functions:cerrarRankingSemanal,functions:cerrarRankingMensual,functions:cerrarRankingAnual --project=memorie-legends`
+
+10. **Partida.**
+    `firebase deploy --only functions:iniciarPartida,functions:accionDePartida,functions:intentarDescarte,functions:marcarListo,functions:avanzarPartida,functions:abrirVentanaDescarte,functions:cerrarVentanaDescarte,functions:cerrarMirada,functions:cerrarPartida,functions:saltarAusente --project=memorie-legends`
+
+11. **Salas.**
+    `firebase deploy --only functions:crearSala,functions:crearSalaPrivada,functions:crearSalaPublica,functions:unirseASala,functions:unirseConCodigo,functions:salirDeSalaEnEspera,functions:revanchaDeSala,functions:abandonarPartida,functions:borrarSalaPublica --project=memorie-legends`
+
+12. **Pagos y tienda.** Acá va `webhookPago` y acá nace su URL nueva.
+    `firebase deploy --only functions:webhookPago,functions:crearOrdenDeCompra,functions:listarPacks,functions:comprarItem,functions:comprarPack,functions:listarPacksAdmin,functions:guardarPackAdmin,functions:borrarPackAdmin,functions:activarPackAdmin,functions:sembrarPacksAdmin --project=memorie-legends`
+
+13. **Admin — catálogo.**
+    `firebase deploy --only functions:listarCatalogoAdmin,functions:guardarItemAdmin,functions:activarItemAdmin,functions:borrarItemAdmin,functions:apagarCatalogoViejoAdmin,functions:listarPoseedoresItemAdmin,functions:desposeerItemAdmin,functions:forzarBorrarItemAdmin,functions:sembrarCatalogoAdmin,functions:misItems --project=memorie-legends`
+
+14. **Admin — reportes y umbrales.**
+    `firebase deploy --only functions:reportarJugador,functions:listarReportesAdmin,functions:resolverReporteAdmin,functions:leerUmbralesAdmin,functions:guardarUmbralesAdmin,functions:revisarNombresAdmin,functions:soyAdministrador,functions:listarAdministradores,functions:agregarAdministrador,functions:quitarAdministrador --project=memorie-legends`
+
+15. **Torneos.**
+    `firebase deploy --only functions:crearTorneoAdmin,functions:editarTorneoAdmin,functions:abrirInscripcionesAdmin,functions:cerrarInscripcionesAdmin,functions:iniciarTorneoAdmin,functions:cancelarTorneoAdmin,functions:detalleTorneoAdmin,functions:finalizarTorneoAdmin,functions:inscribirseATorneo,functions:listarTorneos --project=memorie-legends`
+
+16. **Admin — salas, cuentas, rankings.**
+    `firebase deploy --only functions:listarSalasAdmin,functions:cancelarSalaAdmin,functions:editarSalaAdmin,functions:eliminarSalaAdmin,functions:limpiarSalasCerradasAdmin,functions:cancelarSalasEnEsperaAdmin,functions:listarUsuariosAdmin,functions:eliminarUsuarioAdmin,functions:cerrarRankingAnual,functions:cerrarRankingMensual --project=memorie-legends`
+
+17. **El resto.**
+    `firebase deploy --only functions:acreditarReferido,functions:abrirInscripcionesAdmin,functions:listarTorneosAdmin,functions:comprarItem,functions:acreditarReferido,functions:desequiparItem,functions:equiparItem,functions:misInsignias,functions:ranking-servidor... --project=memorie-legends`
+    (verificar contra la lista completa del paso 2; los que falten)
+
+### Verificación post-deploy
+
+18. Las 80, en v2 y en us-central1:
+    `firebase functions:list --project=memorie-legends`
+    Debe decir 80, todas con Version v2 (gen2).
+
+19. El webhook, que cambió de naturaleza:
+    `gcloud functions describe webhookPago --region=us-central1 --project=memorie-legends --gen2`
+
+20. La concurrencia:
+    `gcloud functions describe intentarDescarte --region=us-central1 --project=memorie-legends --gen2 --format="value(serviceConfig.maxInstanceRequestConcurrency)"`
+    Debe decir 80.
+
+21. Que ninguna lleve minInstances:
+    `gcloud functions describe intentarDescarte --region=us-central1 --project=memorie-legends --gen2 --format="value(serviceConfig.minInstanceCount)"`
+    Vacío o 0.
+
+22. 🔴 **LOS SECRETOS.** El punto más riesgoso del deploy.
+    En v2 las functions corren como
+    `346846781965-compute@developer.gserviceaccount.com`. El CLI agrega
+    el binding solo, pero **si falla lo hace en silencio**.
+
+    `gcloud secrets get-iam-policy PIMIENTA_CODIGOS --project=memorie-legends`
+    `gcloud secrets get-iam-policy MP_ACCESS_TOKEN --project=memorie-legends`
+    `gcloud secrets get-iam-policy MP_WEBHOOK_SECRET --project=memorie-legends`
+
+    En los tres tiene que aparecer
+    `346846781965-compute@developer.gserviceaccount.com`.
+
+    Si falta alguno, `crearSalaPrivada` y `unirseConCodigo` arrancan
+    con `process.env` vacío, hashean con cadena vacía y contestan 200.
+    Se arregla a mano:
+    `gcloud secrets add-iam-policy-binding PIMIENTA_CODIGOS --project=memorie-legends --member="serviceAccount:346846781965-compute@developer.gserviceaccount.com" --role="roles/secretmanager.secretAccessor"`
+    (repetir por cada uno que falte)
+
+23. Las 4 programadas:
+    `gcloud scheduler jobs list --project=memorie-legends`
+    Deben aparecer las 4 con `firebase-schedule-<nombre>-us-central1`,
+    todas ENABLED. Esperar 1 minuto y confirmar que `barrerPartidas`
+    corrió.
+
+24. Una partida de entrenamiento completa, sin errores de consola.
+
+25. La tienda: los packs aparecen y el checkout devuelve una URL.
+    Prueba `listarPacks` y `crearOrdenDeCompra`, que cambiaron de
+    puerta de secretos.
+
+26. Latencia desde Uruguay. Con el import bajando de 1526 a 752 ms,
+    el arranque en frío debería quedar cerca de 1275 ms contra los
+    2049 de antes. Anotar el número real.
+
+### El webhook: la URL nueva
+
+27. Sacar la dirección (no existe hasta que la función esté creada):
+    `gcloud functions describe webhookPago --region=us-central1 --project=memorie-legends --gen2 --format="value(serviceConfig.uri)"`
+
+    Va a devolver algo como
+    `https://webhookpago-<hash>-uc.a.run.app`. El hash lo asigna Google.
+
+    Esa dirección va a DOS lados:
+    1. `functions/index.js:1159` (constante `URL_WEBHOOK`). Después de
+       cambiarla hay que redesplegar `crearOrdenDeCompra`:
+       `firebase deploy --only functions:crearOrdenDeCompra --project=memorie-legends`
+    2. El panel de Mercado Pago, en configuración de notificaciones.
+
+    Qué pasa si sólo se hace uno:
+    - Sólo MP: cada compra nueva le dice a MP que avise a la URL vieja.
+      El panel no alcanza.
+    - Sólo index.js: las compras avisan bien, pero los avisos por
+      configuración global van al vacío.
+    - Ninguna: MP cobra, las Leyendas no llegan, y no hay error.
+
+    Hoy no rompe nada porque `SOLO_ADMIN_COMPRA = true`. Es lo primero
+    a cerrar antes de prender la venta.
+
+### Lo que no cierra (marcado, no bloqueante)
+
+`herramientas/sondear-webhook.mjs:65` tiene su propia copia de la URL
+de v1. No bloquea el deploy — acepta `URL_WEBHOOK` por variable de
+entorno. Pero su valor por defecto queda apuntando a una función que
+ya no existe. Actualizarla en el mismo commit que `index.js:1159`, o
+correrla siempre con la variable:
+`URL_WEBHOOK=https://webhookpago-<hash>-uc.a.run.app node herramientas/sondear-webhook.mjs`
+
+### Recordatorio
+
+`concurrency: 80` NO baja el arranque en frío de un jugador solo. Lo
+que baja es el import — de 1526 a 752 ms — y eso sí se va a ver en
+los 2049. La concurrencia se nota en la mesa de cuatro tocando a la
+vez: antes eran hasta cuatro instancias y cuatro arranques, ahora una.
