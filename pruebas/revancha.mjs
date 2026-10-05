@@ -61,7 +61,12 @@ const lee = (ruta) => readFileSync(new URL(ruta, import.meta.url), "utf8");
  * mal.
  */
 function cuerpoDe(fuente, nombre) {
-  const desde = fuente.indexOf(`export const ${nombre} = functions.`);
+  // Sin nombrar la envoltura. Decía `= functions.` y eso era una condición de
+  // más: lo que se busca es DÓNDE EMPIEZA esta función, no con qué se declara.
+  // Al pasar a v2 la declaración cambió a `= llamable(` y este `indexOf` dejó
+  // de encontrar nada: devolvía "" y las diez comprobaciones de abajo fallaban
+  // todas juntas, diciendo «la callable existe» sobre una cadena vacía.
+  const desde = fuente.indexOf(`export const ${nombre} = `);
   if (desde < 0) return "";
   const siguiente = fuente.indexOf("\nexport const ", desde + 1);
   return fuente.slice(desde, siguiente < 0 ? fuente.length : siguiente);

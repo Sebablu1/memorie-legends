@@ -261,6 +261,7 @@ console.log("\n=== Toda callable pasa su nombre al guardián ===");
   // de otra. Copiar y pegar un export entero es fácil; corregir la cadena de
   // adentro, menos.
   const mal = [];
+  const arranques = [];
   let actual = null;
   for (const linea of fuente.split("\n")) {
     // `= functions` a secas, sin exigir `.https.on` en la MISMA línea: cuando
@@ -268,11 +269,39 @@ console.log("\n=== Toda callable pasa su nombre al guardián ===");
     // líneas y esta auditoría dejaba de ver dónde empezaba. Daba un rojo que
     // decía "acreditarReferido declara crearOrdenDeCompra", que es exactamente
     // el error que busca, pero era suyo.
-    const m = linea.match(/^export const ([a-zA-Z]+) = functions/);
-    if (m) actual = m[1];
+    //
+    // SEGUNDA VUELTA — Y ES LA PRIMERA VEZ QUE ESTO MIRA ALGO.
+    //
+    // El patrón decía `= functions\b`, y ese `\b` NO era un borde de
+    // palabra: era un BYTE DE RETROCESO (0x08) guardado dentro del archivo.
+    // O sea que la expresión pedía un carácter de control después de
+    // `functions` y no podía matchear ninguna línea de ningún archivo.
+    // `actual` se quedaba siempre en null, el `if` de abajo nunca se
+    // cumplía, y este bloque venía dando ✓ sin haber mirado una sola
+    // función — desde antes de la migración a v2.
+    //
+    // Se descubrió de rebote: al revisar qué auditorías se habían quedado
+    // viejas con v2, apareció que ésta nunca había sido joven.
+    //
+    // Ahora el patrón es el BORDE de la declaración —`export const X =`— y
+    // no la envoltura. El borde no cambia cuando cambia la generación de
+    // Cloud Functions; la envoltura sí, y ya cambió dos veces: primero
+    // `runWith` partió la expresión en varias líneas, después v2 la
+    // reemplazó entera por `llamable(` y sus parientes.
+    //
+    // Y se cuenta lo que se vio. Si mañana esto se vuelve a quedar viejo,
+    // el conteo lo dice en voz alta en vez de dejar pasar el bloque entero
+    // en silencio, que es lo que pasó todo este tiempo.
+    const m = linea.match(/^export const ([a-zA-Z]+) = /);
+    if (m) {
+      actual = m[1];
+      arranques.push(m[1]);
+    }
     const s = linea.match(/exigirSesion\(context,\s*"([^"]+)"\)/);
     if (s && actual && s[1] !== actual) mal.push(`${actual} declara "${s[1]}"`);
   }
+  ok(arranques.length >= 70,
+     `la auditoría ve ${arranques.length} funciones exportadas (en cero estaría mirando al vacío)`);
   ok(mal.length === 0, mal.length ? `nombre cruzado: ${mal.join("; ")}` : "cada una declara su propio nombre");
 
   // Las de plata, además del techo en memoria, tienen el de Firestore.

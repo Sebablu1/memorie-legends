@@ -333,14 +333,43 @@ console.log("\n=== El webhook no lee el estado del payload ===");
   ok(codigo.includes("pagoCoincideConOrden("),
      "y todavía tiene que cuadrar con la orden antes de acreditar");
 
-  // Un secreto configurado pero NO declarado es invisible en producción: en
-  // Cloud Functions v1, `process.env` sigue vacío hasta que la función lo pide
-  // con `runWith`. El código anterior leía `PAGOS_SECRETO` sin declararlo, así
-  // que habría respondido "Sin configurar" para siempre con el secreto bien
-  // guardado y nadie entendiendo por qué.
-  ok(/runWith\(\{\s*secrets:/.test(codigo), "las funciones DECLARAN sus secretos");
-  const conRunWith = [...codigo.matchAll(/runWith\(\{\s*secrets:/g)].length;
-  ok(conRunWith >= 2, `las dos que tocan pagos lo declaran (${conRunWith})`);
+  /**
+   * Un secreto configurado pero NO declarado es invisible en producción:
+   * `process.env` sigue vacío hasta que la función lo pide. El código anterior
+   * leía `PAGOS_SECRETO` sin declararlo, así que habría respondido "Sin
+   * configurar" para siempre con el secreto bien guardado y nadie entendiendo
+   * por qué.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * ESTO CONTABA HASTA DOS, Y AL PASAR A v2 CONTÓ UNO
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Contaba cuántas veces aparecía `runWith({ secrets:` y exigía dos. En v2 la
+   * declaración de secretos dejó de ser `runWith` y pasó a ser un campo de las
+   * opciones, así que las dos callables de pago se declaran por una envoltura
+   * —`llamableConMercadoPago`— y el único `runWith` que queda es el del
+   * webhook, que sigue en v1 por su dirección.
+   *
+   * No se baja el número a uno: contar apariciones nunca fue lo que importaba.
+   * Lo que importa es que NINGUNA función que toque Mercado Pago quede sin sus
+   * secretos, y eso ahora se comprueba por nombre, que además agarra el caso
+   * que el conteo no agarraba: una tercera función declarada sin la envoltura.
+   */
+  ok(/const llamableConMercadoPago =[\s\S]{0,200}?secrets:\s*SECRETOS_MP/.test(codigo),
+     "existe una envoltura que declara los secretos de Mercado Pago");
+
+  for (const nombre of ["listarPacks", "crearOrdenDeCompra"]) {
+    ok(new RegExp(`export const ${nombre} = llamableConMercadoPago\\(`).test(codigo),
+       `${nombre} se declara con los secretos puestos`);
+    ok(!new RegExp(`export const ${nombre} = llamable\\(`).test(codigo),
+       `${nombre} NO se declara por la puerta sin secretos`);
+  }
+
+  // El webhook sigue en v1 —su dirección está registrada del lado de Mercado
+  // Pago— y allá la declaración se sigue escribiendo con `runWith`.
+  ok(/export const webhookPago = functions[\s\S]{0,200}?runWith\(\{\s*secrets:\s*SECRETOS_MP\s*\}\)/
+     .test(codigo),
+     "y el webhook, que se quedó en v1, declara los suyos con runWith");
   ok(codigo.includes('"MP_ACCESS_TOKEN"') && codigo.includes('"MP_WEBHOOK_SECRET"'),
      "y los nombres son los que lee el código");
 }

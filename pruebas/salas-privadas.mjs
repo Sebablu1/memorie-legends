@@ -422,20 +422,33 @@ console.log("\n=== 12. Las dos callables DECLARAN el secreto ===");
     new URL("../functions/index.js", import.meta.url), "utf8",
   );
 
-  ok(/const conPimienta = functions\.runWith\(\{\s*secrets:\s*\[SECRETO_PIMIENTA\]\s*\}\)/
-     .test(indice),
+  /**
+   * La envoltura cambió de forma al pasar a v2, no de trabajo.
+   *
+   * Era `const conPimienta = functions.runWith({ secrets: [SECRETO_PIMIENTA] })`
+   * y las dos callables se colgaban de ella con `conPimienta.https.onCall`. En
+   * v2 los secretos son un campo más de las opciones de `onCall`, así que la
+   * envoltura pasó a ser una función: `llamableConPimienta`.
+   *
+   * Lo que se defiende es lo mismo de siempre y por el mismo susto: un secreto
+   * que no se DECLARA no llega al entorno, el hash sale con cadena vacía y el
+   * servidor contesta 200 como si todo estuviera bien.
+   */
+  ok(/const llamableConPimienta =[\s\S]{0,200}?secrets:\s*\[SECRETO_PIMIENTA\]/.test(indice),
      "existe una envoltura que declara el secreto");
   ok(/const SECRETO_PIMIENTA = "PIMIENTA_CODIGOS"/.test(indice),
      "y el secreto es PIMIENTA_CODIGOS");
 
   for (const nombre of ["crearSalaPrivada", "unirseConCodigo"]) {
     const declara = new RegExp(
-      `export const ${nombre} = conPimienta\\.https\\.onCall`,
+      `export const ${nombre} = llamableConPimienta\\(`,
     ).test(indice);
     ok(declara, `${nombre} se declara con el secreto puesto`);
 
+    // `llamable(` a secas es la puerta común, la que NO lleva secretos. Que
+    // una de estas dos salga por ahí es exactamente el error que se busca.
     const suelta = new RegExp(
-      `export const ${nombre} = functions\\.https\\.onCall`,
+      `export const ${nombre} = llamable\\(`,
     ).test(indice);
     ok(!suelta, `${nombre} NO se declara sin él`);
   }
@@ -445,12 +458,34 @@ console.log("\n=== 12. Las dos callables DECLARAN el secreto ===");
    * por la misma puerta. Hoy son dos; el día que haya una tercera —una
    * limpieza de códigos vencidos, una migración— esto la agarra.
    */
-  const callables = [...indice.matchAll(
-    /export const (\w+) = (\w+)\.(?:runWith\([^)]*\)\.)?https\.onCall\(([\s\S]*?)\n\}\);/g,
-  )];
-  const sinSecreto = callables
-    .filter(([, , puerta, cuerpo]) => /salasPrivadas\./.test(cuerpo) && puerta !== "conPimienta")
-    .map(([, nombre]) => nombre);
+  /**
+   * Y se deja de extraer cuerpos con una expresión regular.
+   *
+   * La de antes era
+   * `/export const (\w+) = (\w+)\.(?:runWith\([^)]*\)\.)?https\.onCall\(([\s\S]*?)\n\}\);/g`
+   * y tenía dos problemas. El que la mató: nombraba la sintaxis de v1, así que
+   * después de migrar no matcheaba nada, `sinSecreto` quedaba vacío y esto
+   * daba ✓ sin haber mirado una sola función. El que ya tenía antes y nadie
+   * había visto: el `[\s\S]*?` corta en el PRIMER `\n});`, y una callable con
+   * un `});` anidado adentro —hay varias— se leía por la mitad. Un
+   * `salasPrivadas.` después de ese corte era invisible.
+   *
+   * Cortar por el BORDE de la declaración arregla los dos. Cada bloque va de
+   * un `export const` al siguiente, así que contiene el cuerpo entero, pase lo
+   * que pase adentro, y no depende de con qué esté declarada la función.
+   */
+  const bloques = indice.split(/\n(?=export const )/);
+  const sinSecreto = bloques
+    .map((bloque) => ({ bloque, cabeza: bloque.match(/^export const (\w+) = (\w+)\(/) }))
+    .filter(({ bloque, cabeza }) => cabeza && /salasPrivadas\./.test(bloque))
+    .filter(({ cabeza }) => cabeza[2] !== "llamableConPimienta")
+    .map(({ cabeza }) => cabeza[1]);
+
+  // Y un cerrojo contra el verde vacío: si el corte deja de encontrar
+  // funciones, esto lo dice en vez de dejar pasar el bloque en silencio.
+  const conSalasPrivadas = bloques.filter((b) => /salasPrivadas\./.test(b)).length;
+  ok(conSalasPrivadas >= 2,
+     `la auditoría ve ${conSalasPrivadas} funciones que tocan las salas privadas (en cero estaría mirando al vacío)`);
 
   ok(sinSecreto.length === 0,
      "ninguna función que toque las salas privadas se declara sin el secreto",

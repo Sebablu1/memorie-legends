@@ -10,12 +10,28 @@
  */
 
 /**
- * En firebase-functions v7 el subpaquete v1 dejó de tener export por defecto:
- * sigue exportando `https`, `pubsub` y compañía, pero uno por uno. Con
- * `import functions from` la variable queda en undefined y las 27 funciones
- * revientan al arrancar, no al desplegar. De ahí el namespace.
+ * El namespace de v1 sigue, y es SÓLO para `webhookPago`.
+ *
+ * Todo lo demás pasó a v2 —ver `llamable`, más abajo—. El webhook se queda
+ * donde está a propósito: su dirección está registrada del lado de Mercado
+ * Pago y escrita en `URL_WEBHOOK` unas líneas más abajo, y una función de v2
+ * se publica en otra dirección. Moverlo sería desconectar los pagos hasta
+ * volver a registrarlo allá.
+ *
+ * Mezclar v1 y v2 en el mismo archivo está soportado: cada export declara su
+ * generación por separado.
+ *
+ * (Lo de antes, que sigue valiendo: en firebase-functions v7 el subpaquete v1
+ * dejó de tener export por defecto, así que va como namespace. Con
+ * `import functions from` la variable queda en undefined y las funciones
+ * revientan al arrancar, no al desplegar.)
  */
 import * as functions from "firebase-functions/v1";
+// `onRequest` NO se importa: el único HTTP crudo que hay es `webhookPago`, y
+// se queda en v1 por su dirección. Importarlo sin usarlo sería dejar escrito
+// que acá hay una función de v2 que no existe.
+import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 
 /**
  * Los logs, estructurados.
@@ -30,8 +46,11 @@ import * as functions from "firebase-functions/v1";
  * El segundo argumento es un objeto y no texto pegado con `+`: así los campos
  * quedan consultables en Cloud Logging. Buscar por `codigo="ABC234"` sólo
  * funciona si el código viajó como campo.
+ *
+ * Sale de su propio subpaquete y ya no de `functions.logger`: es el mismo
+ * logger para las dos generaciones, y así no depende de cuál namespace quede.
  */
-const { logger } = functions;
+import { logger } from "firebase-functions/logger";
 import admin from "firebase-admin";
 import crypto from "node:crypto";
 
@@ -132,7 +151,7 @@ const CAMPO_SALDO = "credits";
 // ------------------------------------------------------------ libro mayor
 
 /** Se lanza siempre así, para que el módulo de saldo no dependa de functions. */
-const errorHttp = (codigo, mensaje) => new functions.https.HttpsError(codigo, mensaje);
+const errorHttp = (codigo, mensaje) => new HttpsError(codigo, mensaje);
 
 const marcaDeTiempo = () => admin.firestore.FieldValue.serverTimestamp();
 
@@ -190,7 +209,7 @@ const EXIGIR_APP_CHECK = false;
 
 const exigirSesion = (context, accion) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "Iniciá sesión para continuar.");
+    throw new HttpsError("unauthenticated", "Iniciá sesión para continuar.");
   }
 
   // `context.app` lo pone Firebase cuando el token de App Check vino y era
@@ -198,7 +217,7 @@ const exigirSesion = (context, accion) => {
   // aplicación", que no es lo mismo que "sos un atacante": también le pasa a
   // quien tenga la pestaña abierta desde antes del despliegue.
   if (EXIGIR_APP_CHECK && !context.app) {
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       "failed-precondition",
       "Recargá la página para seguir jugando.",
     );
@@ -207,6 +226,76 @@ const exigirSesion = (context, accion) => {
   if (accion) limite.exigirRitmo(context.auth.uid, accion);
   return context.auth.uid;
 };
+
+/**
+ * Las opciones con las que se despliega cada función de v2.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA REGIÓN SE ESCRIBE, NO SE HEREDA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `us-central1` es la misma de siempre y va explícita. En v1 era el valor por
+ * omisión y no hacía falta nombrarla; en v2 también lo es, pero dejarla
+ * implícita significa que el día que alguien cambie el default del proyecto
+ * —o que se mude a São Paulo, que es el paso siguiente— las ochenta se mueven
+ * sin que nadie lo haya escrito en ningún lado.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * `concurrency: 80`: QUÉ ARREGLA Y QUÉ NO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * En v1 cada instancia atiende UN pedido por vez. Cuatro jugadores tocando la
+ * misma mesa en el mismo segundo son cuatro instancias, y si no había ninguna
+ * caliente, cuatro arranques en frío. Con 80, una sola instancia los atiende a
+ * los cuatro: es el caso de esta mesa, y es donde esto se va a notar.
+ *
+ * Lo que NO arregla: el arranque en frío de quien llega solo a un backend
+ * dormido. Ése se paga igual, entero. La concurrencia cambia CUÁNTAS VECES se
+ * arranca, no cuánto tarda un arranque.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Y POR QUÉ 512 MiB
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * No por memoria: por CPU. En v2 la concurrencia mayor que 1 exige al menos
+ * un vCPU entero, y el vCPU va atado al escalón de memoria. Con 256 MiB la
+ * función recibe una fracción de CPU y el despliegue rechaza `concurrency`.
+ *
+ * NO lleva `minInstances`, a propósito y por ahora: se quiere medir cuánto
+ * aporta la concurrencia sola antes de pagar un costo fijo por tenerlas
+ * despiertas.
+ */
+const OPCIONES = Object.freeze({
+  region: "us-central1",
+  concurrency: 80,
+  memory: "512MiB",
+});
+
+/**
+ * Una callable de v2 que recibe el cuerpo de v1.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ UNA ENVOLTURA Y NO REESCRIBIR LAS SETENTA Y UNA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La migración de v1 a v2 cambia la firma: de `(data, context)` a `(request)`,
+ * con los datos en `request.data`. Reescrito a mano, eso es tocar setenta y un
+ * cuerpos y los seis lugares donde se lee `context` adentro de cada uno.
+ * Setenta y un diffs para no cambiar ninguna lógica es una superficie enorme
+ * para equivocarse en uno solo, y el que salga mal va a salir mal en
+ * producción y con plata de por medio.
+ *
+ * No hace falta, porque `request` de v2 TIENE lo mismo que `context` de v1 en
+ * todo lo que este archivo usa: `auth`, `auth.uid`, `auth.token`, `app` —el de
+ * App Check— y `rawRequest`, que es de donde sale la IP en `ipDe`. O sea que
+ * pasándole `request` como segundo argumento, los cuerpos quedan intactos y
+ * siguen siendo válidos palabra por palabra.
+ *
+ * Lo que se gana no es escribir menos: es que el diff de esta migración sea
+ * legible. Lo que cambia son los bordes; lo de adentro no se tocó, y eso se
+ * puede comprobar leyendo.
+ */
+const llamable = (manejador) => onCall(OPCIONES, (peticion) => manejador(peticion.data, peticion));
 
 // --------------------------------------------------------------- registro
 
@@ -428,11 +517,11 @@ async function abrirSalaEn(tx, { codigo, uid, entrada, nombre, nombreJugador, lu
  * hacer, y no el «no es para vos» del panel, que a quien tenga abierta una
  * página vieja no le serviría de nada.
  */
-export const crearSala = functions.https.onCall(async (data, context) => {
+export const crearSala = llamable(async (data, context) => {
   const uid = exigirSesion(context, "crearSala");
 
   if (!(await administradores.es(context))) {
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       "permission-denied",
       "Las salas que abren los jugadores ahora son privadas. Recargá la página y creá una sala privada.",
     );
@@ -442,7 +531,7 @@ export const crearSala = functions.https.onCall(async (data, context) => {
   const nombre = String(data?.nombre ?? "Sala").slice(0, 40);
 
   if (!esEntradaValida(entrada)) {
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       "invalid-argument",
       `Entrada inválida. Las disponibles son: ${ENTRADAS.join(", ")}.`,
     );
@@ -464,7 +553,7 @@ export const crearSala = functions.https.onCall(async (data, context) => {
     : Number(data.limitePuntos);
 
   if (!esLimiteDePartida(limitePuntos)) {
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       "invalid-argument",
       `Duración inválida. Las disponibles son: ${LIMITES_DE_PARTIDA.join(", ")}.`,
     );
@@ -488,14 +577,14 @@ export const crearSala = functions.https.onCall(async (data, context) => {
 
       return { codigo, entrada, limitePuntos };
     } catch (e) {
-      if (e instanceof functions.https.HttpsError) throw e;
+      if (e instanceof HttpsError) throw e;
       if (e.message === "codigo-ocupado") continue; // otro código y de nuevo
       logger.error("No se pudo crear la sala", { uid, entrada, error: e.message });
-      throw new functions.https.HttpsError("internal", "No pudimos crear la sala.");
+      throw new HttpsError("internal", "No pudimos crear la sala.");
     }
   }
 
-  throw new functions.https.HttpsError("internal", "No pudimos generar un código libre.");
+  throw new HttpsError("internal", "No pudimos generar un código libre.");
 });
 
 /**
@@ -542,12 +631,12 @@ export const crearSala = functions.https.onCall(async (data, context) => {
  * `dentro` responde lo único que el navegador no puede saber solo: si ya
  * está adentro o le falta entrar.
  */
-export const revanchaDeSala = functions.https.onCall(async (data, context) => {
+export const revanchaDeSala = llamable(async (data, context) => {
   const uid = exigirSesion(context, "revanchaDeSala");
   const { codigo, entrada } = validar(EsquemaRevancha, data, errorHttp);
 
   if (!esEntradaValida(entrada)) {
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       "invalid-argument",
       `Entrada inválida. Las disponibles son: ${ENTRADAS.join(", ")}.`,
     );
@@ -566,7 +655,7 @@ export const revanchaDeSala = functions.https.onCall(async (data, context) => {
         // transacción.
         const snap = await tx.get(refVieja);
         if (!snap.exists) {
-          throw new functions.https.HttpsError("not-found", "Esa sala no existe.");
+          throw new HttpsError("not-found", "Esa sala no existe.");
         }
         const sala = snap.data();
 
@@ -574,7 +663,7 @@ export const revanchaDeSala = functions.https.onCall(async (data, context) => {
         // panel. Acá es la que decide.
         const veredicto = puedeRevancha(sala, uid);
         if (!veredicto.puede) {
-          throw new functions.https.HttpsError("failed-precondition", veredicto.mensaje);
+          throw new HttpsError("failed-precondition", veredicto.mensaje);
         }
 
         // Ya la abrió otro. Se devuelve la suya, y de paso si ya está adentro.
@@ -637,14 +726,14 @@ export const revanchaDeSala = functions.https.onCall(async (data, context) => {
         return { codigo: nuevo, entrada, laAbrioOtro: false, dentro: true };
       });
     } catch (e) {
-      if (e instanceof functions.https.HttpsError) throw e;
+      if (e instanceof HttpsError) throw e;
       if (e.message === "codigo-ocupado") continue; // otro código y de nuevo
       logger.error("No se pudo abrir la revancha", { uid, codigo, entrada, error: e.message });
-      throw new functions.https.HttpsError("internal", "No pudimos abrir la revancha.");
+      throw new HttpsError("internal", "No pudimos abrir la revancha.");
     }
   }
 
-  throw new functions.https.HttpsError("internal", "No pudimos generar un código libre.");
+  throw new HttpsError("internal", "No pudimos generar un código libre.");
 });
 
 /**
@@ -654,12 +743,12 @@ export const revanchaDeSala = functions.https.onCall(async (data, context) => {
  * son atómicos, así que dos jugadores entrando a la vez no pueden dejar la
  * sala en cinco ni cobrarse dos veces.
  */
-export const unirseASala = functions.https.onCall(async (data, context) => {
+export const unirseASala = llamable(async (data, context) => {
   const uid = exigirSesion(context, "unirseASala");
   const codigo = validar(EsquemaDeSala, data, errorHttp).codigo;
 
   if (!esCodigoValido(codigo)) {
-    throw new functions.https.HttpsError("invalid-argument", "Código inválido.");
+    throw new HttpsError("invalid-argument", "Código inválido.");
   }
 
   const { nombre: nombreJugador, luce } = await identidadEnSala(uid);
@@ -697,7 +786,7 @@ async function sumarseALaSala(
   // La MISMA función que usa el navegador para avisar antes de intentarlo.
   const veredicto = puedeUnirse(sala, uid, saldo, { conCodigo, ganadas: ganado });
   if (!veredicto.puede) {
-    throw new functions.https.HttpsError("failed-precondition", veredicto.mensaje);
+    throw new HttpsError("failed-precondition", veredicto.mensaje);
   }
 
   const r = await moverLeyendas(tx, {
@@ -709,7 +798,7 @@ async function sumarseALaSala(
     idempotencia: claveDeEntrada(codigo, uid),
   });
   if (!r.aplicado) {
-    throw new functions.https.HttpsError("already-exists", "Ya pagaste la entrada a esta sala.");
+    throw new HttpsError("already-exists", "Ya pagaste la entrada a esta sala.");
   }
 
   // La lista se rellena hasta donde haga falta antes de sumar la propia.
@@ -741,17 +830,23 @@ async function sumarseALaSala(
 /**
  * El secreto con la pimienta de los códigos privados.
  *
- * Vive en Secret Manager, no en el repositorio ni en una variable suelta. En
- * Functions v1 hay que DECLARARLO en cada función que lo use: sin esto, el
- * proceso arranca sin `process.env.PIMIENTA_CODIGOS` y el hash sale sin
- * pimienta. Pasó: las dos callables se desplegaron sin declararlo y el
- * servidor hasheaba con cadena vacía contestando 200.
+ * Vive en Secret Manager, no en el repositorio ni en una variable suelta. Hay
+ * que DECLARARLO en cada función que lo use —esto no cambió al pasar a v2, lo
+ * único que cambió es dónde se escribe: antes era `runWith({ secrets })` y
+ * ahora es un campo más de las opciones—. Sin esto, el proceso arranca sin
+ * `process.env.PIMIENTA_CODIGOS` y el hash sale sin pimienta. Pasó: las dos
+ * callables se desplegaron sin declararlo y el servidor hasheaba con cadena
+ * vacía contestando 200.
  *
- * Toda función que hashee o compare un código va por `conPimienta`. Hoy son
- * dos; si mañana hay una tercera —una limpieza, una migración— también.
+ * Toda función que hashee o compare un código va por `llamableConPimienta`.
+ * Hoy son dos; si mañana hay una tercera —una limpieza, una migración—
+ * también.
  */
 const SECRETO_PIMIENTA = "PIMIENTA_CODIGOS";
-const conPimienta = functions.runWith({ secrets: [SECRETO_PIMIENTA] });
+const llamableConPimienta = (manejador) =>
+  onCall({ ...OPCIONES, secrets: [SECRETO_PIMIENTA] }, (peticion) =>
+    manejador(peticion.data, peticion),
+  );
 
 const salasPrivadas = crearSalasPrivadas({
   db,
@@ -770,7 +865,7 @@ const salasPrivadas = crearSalasPrivadas({
  * Lo que queda guardado es el hash: si quien la abrió pierde el código, no hay
  * forma de recuperarlo. Es la contrapartida de que no se pueda filtrar.
  */
-export const crearSalaPrivada = conPimienta.https.onCall(async (data, context) => {
+export const crearSalaPrivada = llamableConPimienta(async (data, context) => {
   const uid = exigirSesion(context, "crearSalaPrivada");
   limite.exigirRitmo(uid, "crearSalaPrivada");
 
@@ -778,7 +873,7 @@ export const crearSalaPrivada = conPimienta.https.onCall(async (data, context) =
     validar(EsquemaCrearSalaPrivada, data, errorHttp);
 
   if (!esEntradaValida(entrada)) {
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       "invalid-argument",
       `Entrada inválida. Las disponibles son: ${ENTRADAS.join(", ")}.`,
     );
@@ -786,7 +881,7 @@ export const crearSalaPrivada = conPimienta.https.onCall(async (data, context) =
 
   const limite_ = limitePuntos == null ? LIMITE_ELIMINACION : Number(limitePuntos);
   if (!esLimiteDePartida(limite_)) {
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       "invalid-argument",
       `Duración inválida. Las disponibles son: ${LIMITES_DE_PARTIDA.join(", ")}.`,
     );
@@ -810,7 +905,7 @@ export const crearSalaPrivada = conPimienta.https.onCall(async (data, context) =
  * combinaciones; a cinco por minuto, probarlas lleva más de trescientos mil
  * años.
  */
-export const unirseConCodigo = conPimienta.https.onCall(async (data, context) => {
+export const unirseConCodigo = llamableConPimienta(async (data, context) => {
   const uid = exigirSesion(context, "unirseConCodigo");
   await limite.exigirRitmoPorIP(ipDe(context), "unirseConCodigo");
 
@@ -825,7 +920,7 @@ export const unirseConCodigo = conPimienta.https.onCall(async (data, context) =>
  * `rooms` de sólo lectura para el navegador. Cada quien sólo puede marcarse
  * a sí mismo — el uid sale de la sesión, no de lo que manda el cliente.
  */
-export const marcarListo = functions.https.onCall(async (data, context) => {
+export const marcarListo = llamable(async (data, context) => {
   const uid = exigirSesion(context, "marcarListo");
   const codigo = validar(EsquemaDeSala, data, errorHttp).codigo;
   const listo = data?.listo !== false;
@@ -834,15 +929,15 @@ export const marcarListo = functions.https.onCall(async (data, context) => {
     const refSala = db.collection(SALAS).doc(codigo);
     const snap = await tx.get(refSala);
     if (!snap.exists) {
-      throw new functions.https.HttpsError("not-found", "Sala no encontrada.");
+      throw new HttpsError("not-found", "Sala no encontrada.");
     }
 
     const sala = snap.data();
     if (sala.estado !== ESTADOS_SALA.ESPERANDO) {
-      throw new functions.https.HttpsError("failed-precondition", "Esta sala ya no está esperando.");
+      throw new HttpsError("failed-precondition", "Esta sala ya no está esperando.");
     }
     if (!(sala.jugadores ?? []).includes(uid)) {
-      throw new functions.https.HttpsError("failed-precondition", "No estás en esta sala.");
+      throw new HttpsError("failed-precondition", "No estás en esta sala.");
     }
 
     const listos = new Set(sala.listos ?? []);
@@ -861,7 +956,7 @@ export const marcarListo = functions.https.onCall(async (data, context) => {
  * Al arrancar se congela el pozo: a partir de acá la entrada no cambia y
  * nadie más puede sumarse.
  */
-export const iniciarPartida = functions.https.onCall(async (data, context) => {
+export const iniciarPartida = llamable(async (data, context) => {
   const uid = exigirSesion(context, "iniciarPartida");
   const codigo = validar(EsquemaDeSala, data, errorHttp).codigo;
 
@@ -869,14 +964,14 @@ export const iniciarPartida = functions.https.onCall(async (data, context) => {
     const refSala = db.collection(SALAS).doc(codigo);
     const snap = await tx.get(refSala);
     if (!snap.exists) {
-      throw new functions.https.HttpsError("not-found", "Sala no encontrada.");
+      throw new HttpsError("not-found", "Sala no encontrada.");
     }
 
     const sala = snap.data();
     // La MISMA función que usa el navegador para decidir a quién mostrarle el
     // botón. Acá es la que decide.
     if (anfitrionDe(sala) !== uid) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "permission-denied",
         sala.publica
           ? "La partida la empieza quien se sentó primero."
@@ -884,12 +979,12 @@ export const iniciarPartida = functions.https.onCall(async (data, context) => {
       );
     }
     if (sala.estado !== ESTADOS_SALA.ESPERANDO) {
-      throw new functions.https.HttpsError("failed-precondition", "Esta sala ya no está esperando.");
+      throw new HttpsError("failed-precondition", "Esta sala ya no está esperando.");
     }
 
     const jugadores = sala.jugadores ?? [];
     if (jugadores.length < MIN_JUGADORES) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "failed-precondition",
         `Hacen falta al menos ${MIN_JUGADORES} jugadores para empezar.`,
       );
@@ -900,7 +995,7 @@ export const iniciarPartida = functions.https.onCall(async (data, context) => {
     const listos = new Set(sala.listos ?? []);
     const faltan = jugadores.filter((j) => !listos.has(j));
     if (faltan.length) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "failed-precondition",
         faltan.length === 1
           ? "Falta un jugador por marcarse listo."
@@ -971,7 +1066,7 @@ const salida = crearSalirDeSalaEnEspera({
   estados: ESTADOS_SALA,
 });
 
-export const salirDeSalaEnEspera = functions.https.onCall(async (data, context) => {
+export const salirDeSalaEnEspera = llamable(async (data, context) => {
   const uid = exigirSesion(context, "salirDeSalaEnEspera");
   return salida({ uid, codigo: data?.codigo });
 });
@@ -1015,6 +1110,18 @@ const mercadoPago = () =>
  * guardado y nadie entendiendo por qué.
  */
 const SECRETOS_MP = ["MP_ACCESS_TOKEN", "MP_WEBHOOK_SECRET"];
+
+/**
+ * La tercera puerta: `llamable` con los secretos de Mercado Pago declarados.
+ *
+ * La usan `listarPacks` —que mira el PREFIJO del token para saber si está en
+ * sandbox— y `crearOrdenDeCompra`. El webhook NO: ése sigue en v1 y declara
+ * sus secretos con `runWith`, como siempre.
+ */
+const llamableConMercadoPago = (manejador) =>
+  onCall({ ...OPCIONES, secrets: SECRETOS_MP }, (peticion) =>
+    manejador(peticion.data, peticion),
+  );
 
 /**
  * Mientras la compra se prueba en sandbox, sólo compran los administradores.
@@ -1105,13 +1212,13 @@ const publicas = crearSalasPublicas({
 });
 
 /** Abre una mesa pública, vacía. Sólo la administración. */
-export const crearSalaPublica = functions.https.onCall(async (data, context) => {
+export const crearSalaPublica = llamable(async (data, context) => {
   exigirSesion(context, "crearSalaPublica");
   return publicas.crear(context, validar(EsquemaCrearSalaPublica, data, errorHttp));
 });
 
 /** Retoca una mesa pública. La entrada y la duración, sólo si está vacía. */
-export const editarSalaPublica = functions.https.onCall(async (data, context) => {
+export const editarSalaPublica = llamable(async (data, context) => {
   exigirSesion(context, "editarSalaPublica");
   return publicas.editar(context, validar(EsquemaEditarSalaPublica, data, errorHttp));
 });
@@ -1120,7 +1227,7 @@ export const editarSalaPublica = functions.https.onCall(async (data, context) =>
  * Borra una mesa pública: cancela la que está esperando y devuelve las
  * entradas. Como una mesa cancelada nunca empieza, tampoco se reabre.
  */
-export const borrarSalaPublica = functions.https.onCall(async (data, context) => {
+export const borrarSalaPublica = llamable(async (data, context) => {
   exigirSesion(context, "borrarSalaPublica");
   return publicas.borrar(context, validar(EsquemaDeSala, data, errorHttp));
 });
@@ -1130,7 +1237,7 @@ export const borrarSalaPublica = functions.https.onCall(async (data, context) =>
  * crear, editar y borrar mesas. No protege nada: las tres de arriba lo
  * comprueban por su cuenta.
  */
-export const soyAdministrador = functions.https.onCall(async (_data, context) => {
+export const soyAdministrador = llamable(async (_data, context) => {
   exigirSesion(context, "soyAdministrador");
   return { admin: await administradores.es(context) };
 });
@@ -1191,7 +1298,7 @@ const packs = crearPacks({
  * Viaja un id y nada más: el precio lo pone el catálogo del servidor. Tiene
  * techo de plata porque mueve Leyendas — ver `limite-de-ritmo.js`.
  */
-export const comprarItem = functions.https.onCall(async (data, context) => {
+export const comprarItem = llamable(async (data, context) => {
   const uid = exigirSesion(context, "comprarItem");
   await limite.exigirRitmoDePlata(uid, "comprarItem");
   const { itemId } = validar(EsquemaItem, data, errorHttp);
@@ -1209,7 +1316,7 @@ export const comprarItem = functions.https.onCall(async (data, context) => {
  *
  * Mismo techo de plata que la compra simple: mueve Leyendas.
  */
-export const comprarPack = functions.https.onCall(async (data, context) => {
+export const comprarPack = llamable(async (data, context) => {
   const uid = exigirSesion(context, "comprarPack");
   await limite.exigirRitmoDePlata(uid, "comprarPack");
   const { itemIds } = validar(EsquemaPack, data, errorHttp);
@@ -1222,7 +1329,7 @@ export const comprarPack = functions.https.onCall(async (data, context) => {
  * No mueve saldo, así que va con el techo común. Lo que sí comprueba es que lo
  * tenga: sin eso la tienda sería decorativa.
  */
-export const equiparItem = functions.https.onCall(async (data, context) => {
+export const equiparItem = llamable(async (data, context) => {
   const uid = exigirSesion(context, "equiparItem");
   const { itemId } = validar(EsquemaItem, data, errorHttp);
   return tienda.equipar(uid, itemId);
@@ -1236,7 +1343,7 @@ export const equiparItem = functions.https.onCall(async (data, context) => {
  * artículo que se pueda elegir. Quien quiere jugar sin insignia no tenía forma
  * de decirlo.
  */
-export const desequiparItem = functions.https.onCall(async (data, context) => {
+export const desequiparItem = llamable(async (data, context) => {
   const uid = exigirSesion(context, "desequiparItem");
   const { tipo } = validar(EsquemaTipo, data, errorHttp);
   return tienda.desequipar(uid, tipo);
@@ -1250,7 +1357,7 @@ export const desequiparItem = functions.https.onCall(async (data, context) => {
  * permiten al cliente tocar `partidasGanadas`, y quien las escribe es el
  * cierre de partida en el servidor.
  */
-export const misInsignias = functions.https.onCall(async (_data, context) => {
+export const misInsignias = llamable(async (_data, context) => {
   const uid = exigirSesion(context, "misInsignias");
   const [estadisticas, { tengo, equipado }] = await Promise.all([
     insignias.estadisticasDe(uid),
@@ -1282,7 +1389,7 @@ export const misInsignias = functions.https.onCall(async (_data, context) => {
 });
 
 /** Qué tiene comprado y qué tiene puesto, en un solo viaje. */
-export const misItems = functions.https.onCall(async (_data, context) => {
+export const misItems = llamable(async (_data, context) => {
   const uid = exigirSesion(context, "misItems");
   return tienda.misItems(uid);
 });
@@ -1309,11 +1416,10 @@ export const misItems = functions.https.onCall(async (_data, context) => {
  * se muestran" aplicado en un solo lugar. Con lectura directa había que
  * repetir ese filtro en las reglas de Firestore y acordarse de los dos.
  */
-export const listarPacks = functions
+export const listarPacks = llamableConMercadoPago(
   // El secreto va para poder mirar el PREFIJO del token, nunca su valor: un
   // `TEST-` adelante es lo único que distingue el sandbox de producción.
-  .runWith({ secrets: SECRETOS_MP })
-  .https.onCall(async (_data, context) => {
+  async (_data, context) => {
     exigirSesion(context, "listarPacks");
 
     /**
@@ -1339,7 +1445,7 @@ export const listarPacks = functions
   });
 
 /** Todos, encendidos y apagados: el panel necesita ver lo retirado. */
-export const listarPacksAdmin = functions.https.onCall((_data, context) =>
+export const listarPacksAdmin = llamable((_data, context) =>
   packs.listarParaAdmin(context));
 
 /**
@@ -1348,19 +1454,19 @@ export const listarPacksAdmin = functions.https.onCall((_data, context) =>
  * Una sola función para las dos cosas, como `guardarItemAdmin`: "crear" y
  * "editar" se distinguen sólo en si el id ya existía.
  */
-export const guardarPackAdmin = functions.https.onCall((data, context) =>
+export const guardarPackAdmin = llamable((data, context) =>
   packs.guardar(context, data?.pack ?? data));
 
 /** Lo saca de la lista. Las órdenes ya pagadas no se tocan. */
-export const borrarPackAdmin = functions.https.onCall((data, context) =>
+export const borrarPackAdmin = llamable((data, context) =>
   packs.borrar(context, data?.id));
 
 /** Enciende o apaga sin reenviar el pack entero. */
-export const activarPackAdmin = functions.https.onCall((data, context) =>
+export const activarPackAdmin = llamable((data, context) =>
   packs.activar(context, data?.id, data?.activo));
 
 /** Escribe la semilla sin pisar lo que ya esté. */
-export const sembrarPacksAdmin = functions.https.onCall((_data, context) =>
+export const sembrarPacksAdmin = llamable((_data, context) =>
   packs.sembrar(context));
 
 /**
@@ -1369,11 +1475,11 @@ export const sembrarPacksAdmin = functions.https.onCall((_data, context) =>
  * No pisa lo que ya está: sembrar dos veces no revierte los precios que el
  * administrador haya cambiado.
  */
-export const sembrarCatalogoAdmin = functions.https.onCall((_data, context) =>
+export const sembrarCatalogoAdmin = llamable((_data, context) =>
   tienda.sembrarCatalogo(context));
 
 /** El catálogo entero, activos e inactivos: el panel necesita ver lo apagado. */
-export const listarCatalogoAdmin = functions.https.onCall((_data, context) =>
+export const listarCatalogoAdmin = llamable((_data, context) =>
   tienda.listarCatalogo(context));
 
 /**
@@ -1382,11 +1488,11 @@ export const listarCatalogoAdmin = functions.https.onCall((_data, context) =>
  * Una sola función para las dos cosas: "crear" y "editar" se distinguen sólo
  * en si el id ya existía, y dos caminos obligarían a duplicar la validación.
  */
-export const guardarItemAdmin = functions.https.onCall((data, context) =>
+export const guardarItemAdmin = llamable((data, context) =>
   tienda.guardarItem(context, validar(EsquemaItemAdmin, data, errorHttp)));
 
 /** Enciende o apaga un artículo. Es lo que se usa en vez de borrar. */
-export const activarItemAdmin = functions.https.onCall((data, context) => {
+export const activarItemAdmin = llamable((data, context) => {
   const { itemId, activo } = validar(EsquemaActivarItem, data, errorHttp);
   return tienda.activarItem(context, itemId, activo);
 });
@@ -1396,10 +1502,10 @@ export const activarItemAdmin = functions.https.onCall((data, context) => {
  * Apaga los artículos del catálogo de demostración, los que tienen un emoji
  * por imagen. Con `simular: true` sólo devuelve cuáles serían, sin tocar nada.
  */
-export const apagarCatalogoViejoAdmin = functions.https.onCall((data, context) =>
+export const apagarCatalogoViejoAdmin = llamable((data, context) =>
   tienda.apagarCatalogoViejo(context, { simular: data?.simular === true }));
 
-export const borrarItemAdmin = functions.https.onCall((data, context) =>
+export const borrarItemAdmin = llamable((data, context) =>
   tienda.borrarItem(context, validar(EsquemaItem, data, errorHttp).itemId));
 
 /**
@@ -1409,7 +1515,7 @@ export const borrarItemAdmin = functions.https.onCall((data, context) =>
  * borrar lo que alguien tiene, y hasta ahora no había forma de saber quién
  * era ese alguien ni cuántos eran.
  */
-export const listarPoseedoresItemAdmin = functions.https.onCall((data, context) =>
+export const listarPoseedoresItemAdmin = llamable((data, context) =>
   tienda.listarPoseedores(context, validar(EsquemaItem, data, errorHttp).itemId));
 
 /**
@@ -1417,7 +1523,7 @@ export const listarPoseedoresItemAdmin = functions.https.onCall((data, context) 
  *
  * Mueve saldo, así que su techo de ritmo vive en la tabla de plata.
  */
-export const desposeerItemAdmin = functions.https.onCall(async (data, context) => {
+export const desposeerItemAdmin = llamable(async (data, context) => {
   // Acá hay DOS uid y conviene no confundirlos: `uid` es quien pide —el
   // administrador, que es a quien se le cuenta el ritmo— y `aQuien` es la
   // persona a la que se le saca el artículo. Que el segundo venga en la
@@ -1436,13 +1542,13 @@ export const desposeerItemAdmin = functions.https.onCall(async (data, context) =
  * La advertencia la da el panel; acá lo único que se garantiza es que el
  * artículo no se borre si quedó alguien teniéndolo.
  */
-export const forzarBorrarItemAdmin = functions.https.onCall(async (data, context) => {
+export const forzarBorrarItemAdmin = llamable(async (data, context) => {
   const uid = exigirSesion(context, "forzarBorrarItemAdmin");
   await limite.exigirRitmoDePlata(uid, "forzarBorrarItemAdmin");
   return tienda.forzarBorrar(context, validar(EsquemaItem, data, errorHttp).itemId);
 });
 
-export const listarSalasAdmin = functions.https.onCall((_data, context) =>
+export const listarSalasAdmin = llamable((_data, context) =>
   panel.listarSalas(context));
 
 /**
@@ -1452,13 +1558,13 @@ export const listarSalasAdmin = functions.https.onCall((_data, context) =>
  * cada jugador y apaga la partida para que el cierre no reparta nada
  * después. Sin `forzar`, una sala en juego se niega.
  */
-export const cancelarSalaAdmin = functions.https.onCall((data, context) => {
+export const cancelarSalaAdmin = llamable((data, context) => {
   const d = validar(EsquemaCancelarSala, data, errorHttp);
   return panel.cancelarSala(context, { codigo: d.codigo, forzar: d.forzar });
 });
 
 /** Retoca el nombre o el cupo de una sala que todavía no empezó. */
-export const editarSalaAdmin = functions.https.onCall((data, context) =>
+export const editarSalaAdmin = llamable((data, context) =>
   panel.editarSala(context, validar(EsquemaEditarSala, data, errorHttp)));
 
 /**
@@ -1467,7 +1573,7 @@ export const editarSalaAdmin = functions.https.onCall((data, context) =>
  * Sólo las que no le deben nada a nadie. Lo que se movió queda igual en el
  * libro mayor, que es lo que no se borra nunca.
  */
-export const eliminarSalaAdmin = functions.https.onCall((data, context) =>
+export const eliminarSalaAdmin = llamable((data, context) =>
   panel.eliminarSala(context, validar(EsquemaDeSala, data, errorHttp)));
 
 /**
@@ -1477,10 +1583,10 @@ export const eliminarSalaAdmin = functions.https.onCall((data, context) =>
  * en cada refresco y descarta las cerradas después de leerlas, así que
  * abrir el panel cuesta lo que hayan sido todas las salas de la historia.
  */
-export const limpiarSalasCerradasAdmin = functions.https.onCall((data, context) =>
+export const limpiarSalasCerradasAdmin = llamable((data, context) =>
   panel.limpiarSalasCerradas(context, validar(EsquemaLimpiarSalas, data ?? {}, errorHttp)));
 
-export const cancelarSalasEnEsperaAdmin = functions.https.onCall((_data, context) =>
+export const cancelarSalasEnEsperaAdmin = llamable((_data, context) =>
   panel.cancelarTodasEnEspera(context));
 
 /**
@@ -1489,11 +1595,11 @@ export const cancelarSalasEnEsperaAdmin = functions.https.onCall((_data, context
  * Vive en el servidor porque `users` pasó a leerse sólo por su dueño —el saldo
  * está en ese documento— y ya no hay forma de listarla desde el navegador.
  */
-export const revisarNombresAdmin = functions.https.onCall((_data, context) =>
+export const revisarNombresAdmin = llamable((_data, context) =>
   panel.revisarNombres(context));
 
 /** Todas las cuentas, con saldo y partidas, para poder decidir sobre cada una. */
-export const listarUsuariosAdmin = functions.https.onCall((_data, context) =>
+export const listarUsuariosAdmin = llamable((_data, context) =>
   panel.listarUsuarios(context));
 
 /**
@@ -1504,7 +1610,7 @@ export const listarUsuariosAdmin = functions.https.onCall((_data, context) =>
  * están en el ranking de los demás. Ver la nota en admin.js sobre por qué no
  * toca Firebase Auth.
  */
-export const eliminarUsuarioAdmin = functions.https.onCall((data, context) =>
+export const eliminarUsuarioAdmin = llamable((data, context) =>
   panel.eliminarUsuario(context, { uid: data?.uid }));
 
 // ---------------------------------------------------------- moderación
@@ -1516,17 +1622,17 @@ export const eliminarUsuarioAdmin = functions.https.onCall((data, context) =>
  * token verificado. Aceptarlo del cuerpo dejaría firmar denuncias a nombre de
  * cualquiera.
  */
-export const reportarJugador = functions.https.onCall((data, context) => {
+export const reportarJugador = llamable((data, context) => {
   const uid = exigirSesion(context, "reportarJugador");
   return moderacion.reportar(uid, validar(EsquemaReporte, data, errorHttp));
 });
 
 /** La bandeja del administrador. */
-export const listarReportesAdmin = functions.https.onCall((data, context) =>
+export const listarReportesAdmin = llamable((data, context) =>
   moderacion.listar(context, { estado: data?.estado, limite: data?.limite }));
 
 /** Marcar uno como resuelto o ignorado. No toca la cuenta denunciada. */
-export const resolverReporteAdmin = functions.https.onCall((data, context) =>
+export const resolverReporteAdmin = llamable((data, context) =>
   moderacion.resolver(context, {
     id: data?.id,
     estado: data?.estado,
@@ -1543,14 +1649,14 @@ export const resolverReporteAdmin = functions.https.onCall((data, context) =>
  * en `administradores.exigir`, del lado del servidor, contra el correo
  * verificado del token.
  */
-export const listarAdministradores = functions.https.onCall((_data, context) =>
+export const listarAdministradores = llamable((_data, context) =>
   administradores.listar(context));
 
-export const agregarAdministrador = functions.https.onCall((data, context) =>
+export const agregarAdministrador = llamable((data, context) =>
   administradores.agregar(context, { correo: data?.correo }));
 
 /** Nadie puede quitarse a sí mismo ni quitar al raíz. Ver `administradores.js`. */
-export const quitarAdministrador = functions.https.onCall((data, context) =>
+export const quitarAdministrador = llamable((data, context) =>
   administradores.quitar(context, { correo: data?.correo }));
 
 // ------------------------------------------------------ partida en red
@@ -1745,21 +1851,21 @@ const torneos = crearTorneos({
 
 // ------------------------------------------------------ torneos: el panel
 
-export const crearTorneoAdmin = functions.https.onCall((data, context) =>
+export const crearTorneoAdmin = llamable((data, context) =>
   torneos.crear(context, validar(EsquemaTorneo, data, errorHttp)));
 
-export const editarTorneoAdmin = functions.https.onCall((data, context) => {
+export const editarTorneoAdmin = llamable((data, context) => {
   const d = validar(EsquemaEditarTorneo, data, errorHttp);
   return torneos.editar(context, d.torneoId, d);
 });
 
-export const abrirInscripcionesAdmin = functions.https.onCall((data, context) =>
+export const abrirInscripcionesAdmin = llamable((data, context) =>
   torneos.abrirInscripciones(context, validar(EsquemaIdTorneo, data, errorHttp).torneoId));
 
-export const cerrarInscripcionesAdmin = functions.https.onCall((data, context) =>
+export const cerrarInscripcionesAdmin = llamable((data, context) =>
   torneos.cerrarInscripciones(context, validar(EsquemaIdTorneo, data, errorHttp).torneoId));
 
-export const iniciarTorneoAdmin = functions.https.onCall((data, context) =>
+export const iniciarTorneoAdmin = llamable((data, context) =>
   torneos.iniciar(context, validar(EsquemaIdTorneo, data, errorHttp).torneoId));
 
 /**
@@ -1769,7 +1875,7 @@ export const iniciarTorneoAdmin = functions.https.onCall((data, context) =>
  * lo calcula el servidor con el pozo que el servidor guardó: si el monto
  * llegara del panel, un error de tipeo pagaría el pozo entero al primero.
  */
-export const finalizarTorneoAdmin = functions.https.onCall(async (data, context) => {
+export const finalizarTorneoAdmin = llamable(async (data, context) => {
   const d = validar(EsquemaGanadores, data, errorHttp);
   const r = await torneos.finalizar(context, d.torneoId, d.ganadores);
 
@@ -1782,12 +1888,12 @@ export const finalizarTorneoAdmin = functions.https.onCall(async (data, context)
   return r;
 });
 
-export const cancelarTorneoAdmin = functions.https.onCall((data, context) => {
+export const cancelarTorneoAdmin = llamable((data, context) => {
   const d = validar(EsquemaCancelarTorneo, data, errorHttp);
   return torneos.cancelar(context, d.torneoId, { motivo: d.motivo });
 });
 
-export const detalleTorneoAdmin = functions.https.onCall((data, context) =>
+export const detalleTorneoAdmin = llamable((data, context) =>
   torneos.detalle(context, validar(EsquemaIdTorneo, data, errorHttp).torneoId));
 
 /**
@@ -1801,7 +1907,7 @@ export const detalleTorneoAdmin = functions.https.onCall((data, context) =>
  * es la clase de campo que se borra sin querer en un formulario, y un cero
  * repartiría el premio a cualquiera.
  */
-export const guardarUmbralesAdmin = functions.https.onCall(async (data, context) => {
+export const guardarUmbralesAdmin = llamable(async (data, context) => {
   await administradores.exigir(context);
   const d = validar(EsquemaUmbrales, data, errorHttp);
   await db.collection("configuracion").doc("ranking").set(
@@ -1812,7 +1918,7 @@ export const guardarUmbralesAdmin = functions.https.onCall(async (data, context)
 });
 
 /** Los umbrales vigentes, para que el panel muestre lo que hay. */
-export const leerUmbralesAdmin = functions.https.onCall(async (_data, context) => {
+export const leerUmbralesAdmin = llamable(async (_data, context) => {
   await administradores.exigir(context);
   const snap = await db.collection("configuracion").doc("ranking").get();
   return { umbrales: umbralesValidos(snap.data()) };
@@ -1821,7 +1927,7 @@ export const leerUmbralesAdmin = functions.https.onCall(async (_data, context) =
 // --------------------------------------------------- torneos: el jugador
 
 /** Los torneos abiertos. No hace falta ser administrador para verlos. */
-export const listarTorneos = functions.https.onCall(async (_data, context) => {
+export const listarTorneos = llamable(async (_data, context) => {
   exigirSesion(context, "listarTorneos");
   return { torneos: await torneos.listar({ soloAbiertos: true }) };
 });
@@ -1847,7 +1953,7 @@ export const listarTorneos = functions.https.onCall(async (_data, context) => {
  * Es la misma función de siempre con otro filtro; lo que cambia es quién
  * puede llamarla.
  */
-export const listarTorneosAdmin = functions.https.onCall(async (_data, context) => {
+export const listarTorneosAdmin = llamable(async (_data, context) => {
   await administradores.exigir(context);
   return { torneos: await torneos.listar({ soloAbiertos: false }) };
 });
@@ -1859,7 +1965,7 @@ export const listarTorneosAdmin = functions.https.onCall(async (_data, context) 
  * entrada la lee el servidor del propio torneo, dentro de la transacción que
  * cobra.
  */
-export const inscribirseATorneo = functions.https.onCall(async (data, context) => {
+export const inscribirseATorneo = llamable(async (data, context) => {
   const uid = exigirSesion(context, "inscribirseATorneo");
   await limite.exigirRitmoDePlata(uid, "inscribirseATorneo");
   return torneos.inscribir(uid, validar(EsquemaIdTorneo, data, errorHttp).torneoId);
@@ -1870,7 +1976,7 @@ export const inscribirseATorneo = functions.https.onCall(async (data, context) =
  * plazo; esto queda para reintentos y como salida de emergencia. Los dos
  * caminos usan las mismas primitivas, así que no pueden divergir.
  */
-export const cerrarPartida = functions.https.onCall(async (data, context) => {
+export const cerrarPartida = llamable(async (data, context) => {
   const uid = exigirSesion(context, "cerrarPartida");
   const r = await cierre.cerrarPartida({ uid, codigo: data?.codigo });
   await despuesDelCierre(r, data?.codigo);
@@ -1899,13 +2005,13 @@ const enRed = crearMotorEnRed({
  * Devuelve el momento en que se atendió el pedido. El cliente hace varias
  * pasadas y se queda con la de viaje más corto; ver reglas/red.js.
  */
-export const horaDelServidor = functions.https.onCall(async (_data, context) => {
+export const horaDelServidor = llamable(async (_data, context) => {
   exigirSesion(context, "horaDelServidor");
   return { ahora: Date.now() };
 });
 
 /** Abre la ventana de reflejos. La hora y el identificador los pone el servidor. */
-export const abrirVentanaDescarte = functions.https.onCall(async (data, context) => {
+export const abrirVentanaDescarte = llamable(async (data, context) => {
   exigirSesion(context, "abrirVentanaDescarte");
   return enRed.abrirVentana({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
 });
@@ -1916,7 +2022,7 @@ export const abrirVentanaDescarte = functions.https.onCall(async (data, context)
  * Si resolviera acá, "el primero" sería el primero en LLEGAR, y ganaría
  * siempre la mejor conexión. Ver PROTOCOLO-REFLEJOS.md.
  */
-export const intentarDescarte = functions.https.onCall(async (data, context) => {
+export const intentarDescarte = llamable(async (data, context) => {
   const uid = exigirSesion(context, "intentarDescarte");
 
   // Precalentar: el mismo callable, para que la instancia que queda lista sea
@@ -1968,7 +2074,7 @@ export const intentarDescarte = functions.https.onCall(async (data, context) => 
 });
 
 /** Cierra la ventana y aplica los intentos en orden de reacción. */
-export const cerrarVentanaDescarte = functions.https.onCall(async (data, context) => {
+export const cerrarVentanaDescarte = llamable(async (data, context) => {
   exigirSesion(context, "cerrarVentanaDescarte");
   return enRed.cerrarVentana({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
 });
@@ -1980,7 +2086,7 @@ export const cerrarVentanaDescarte = functions.https.onCall(async (data, context
  * pero quien mira el reloj es el servidor y mira el suyo. Llamarla temprano
  * no adelanta nada; llamarla mil veces es lo mismo que llamarla una.
  */
-export const avanzarPartida = functions.https.onCall(async (data, context) => {
+export const avanzarPartida = llamable(async (data, context) => {
   exigirSesion(context, "avanzarPartida");
   const { codigo } = validar(EsquemaDeSala, data, errorHttp);
   const r = await enRed.avanzarPartida({ codigo });
@@ -1991,13 +2097,13 @@ export const avanzarPartida = functions.https.onCall(async (data, context) => {
 });
 
 /** Cierra la fase de mirar. La decide el servidor con su reloj. */
-export const cerrarMirada = functions.https.onCall(async (data, context) => {
+export const cerrarMirada = llamable(async (data, context) => {
   exigirSesion(context, "cerrarMirada");
   return enRed.cerrarMirada({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
 });
 
 /** Cualquier acción de turno. La lista de acciones válidas es blanca. */
-export const accionDePartida = functions.https.onCall(async (data, context) => {
+export const accionDePartida = llamable(async (data, context) => {
   const uid = exigirSesion(context, "accionDePartida");
   const a = validar(EsquemaAccion, data, errorHttp);
   return enRed.accionDeTurno({
@@ -2011,13 +2117,13 @@ export const accionDePartida = functions.https.onCall(async (data, context) => {
 });
 
 /** Señal de vida. Caerse no cuesta Leyendas; sólo hace que te salten el turno. */
-export const latir = functions.https.onCall(async (data, context) => {
+export const latir = llamable(async (data, context) => {
   const uid = exigirSesion(context, "latir");
   return enRed.latir({ uid, codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
 });
 
 /** Saltea el turno de quien lleva rato sin dar señales. */
-export const saltarAusente = functions.https.onCall(async (data, context) => {
+export const saltarAusente = llamable(async (data, context) => {
   exigirSesion(context, "saltarAusente");
   return enRed.saltarAusente({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
 });
@@ -2030,7 +2136,7 @@ export const saltarAusente = functions.https.onCall(async (data, context) => {
  * el cuerpo, cualquiera podría sacar a otro de la lista de ausentes y hacer que
  * lo esperaran de nuevo.
  */
-export const volver = functions.https.onCall(async (data, context) => {
+export const volver = llamable(async (data, context) => {
   const uid = exigirSesion(context, "volver");
   return enRed.volver({ uid, codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
 });
@@ -2064,19 +2170,19 @@ const abandono = crearAbandonarPartida({
   },
 });
 
-export const abandonarPartida = functions.https.onCall(async (data, context) => {
+export const abandonarPartida = llamable(async (data, context) => {
   const uid = exigirSesion(context, "abandonarPartida");
   return abandono({ uid, codigo: data?.codigo });
 });
 
 // -------------------------------------------------------------- referidos
 
-export const acreditarReferido = functions.https.onCall(async (data, context) => {
+export const acreditarReferido = llamable(async (data, context) => {
   const uid = exigirSesion(context, "acreditarReferido");
   await limite.exigirRitmoDePlata(uid, "acreditarReferido");
   const { referidoUid } = validar(EsquemaReferido, data, errorHttp);
   if (!referidoUid || referidoUid === uid) {
-    throw new functions.https.HttpsError("invalid-argument", "Referido inválido.");
+    throw new HttpsError("invalid-argument", "Referido inválido.");
   }
 
   return db.runTransaction(async (tx) => {
@@ -2088,7 +2194,7 @@ export const acreditarReferido = functions.https.onCall(async (data, context) =>
       idempotencia: `referido_${referidoUid}`,
     });
     if (!r.aplicado) {
-      throw new functions.https.HttpsError("already-exists", "Ese referido ya fue acreditado.");
+      throw new HttpsError("already-exists", "Ese referido ya fue acreditado.");
     }
     return { leyendas: LEYENDAS_POR_REFERIDO, saldo: r.saldo };
   });
@@ -2240,27 +2346,37 @@ async function barrerPartidasVencidas() {
  * Firebase, y es el que corresponde: lo que se está destrabando es una mesa
  * con gente esperando del otro lado.
  */
-export const barrerPartidas = functions.pubsub
-  .schedule("* * * * *")
-  .timeZone(ZONA)
-  .onRun(() => barrerPartidasVencidas());
+/**
+ * Las cuatro programadas pasan de `functions.pubsub.schedule(...)` a
+ * `onSchedule(...)`. El reloj no cambia: mismas expresiones cron y misma zona.
+ *
+ * Lo que sí cambia por debajo es la plomería. En v1 cada programada tenía un
+ * tema de Pub/Sub y un trabajo de Cloud Scheduler creados a su nombre; en v2
+ * el trabajo de Scheduler llama a la función por HTTP y el tema desaparece.
+ * El efecto práctico es que no se pueden actualizar en el lugar: hay que
+ * borrar las de v1 antes. Está anotado con los comandos aparte.
+ */
+export const barrerPartidas = onSchedule(
+  { ...OPCIONES, schedule: "* * * * *", timeZone: ZONA },
+  () => barrerPartidasVencidas(),
+);
 
 const ayer = () => new Date(Date.now() - 86400000);
 
-export const cerrarRankingSemanal = functions.pubsub
-  .schedule("0 0 * * 1") // lunes 00:00
-  .timeZone(ZONA)
-  .onRun(() => cierreDePeriodos.cerrarPeriodos("semanal", ayer()));
+export const cerrarRankingSemanal = onSchedule(
+  { ...OPCIONES, schedule: "0 0 * * 1", timeZone: ZONA }, // lunes 00:00
+  () => cierreDePeriodos.cerrarPeriodos("semanal", ayer()),
+);
 
-export const cerrarRankingMensual = functions.pubsub
-  .schedule("0 0 1 * *") // día 1 a las 00:00
-  .timeZone(ZONA)
-  .onRun(() => cierreDePeriodos.cerrarPeriodos("mensual", ayer()));
+export const cerrarRankingMensual = onSchedule(
+  { ...OPCIONES, schedule: "0 0 1 * *", timeZone: ZONA }, // día 1 a las 00:00
+  () => cierreDePeriodos.cerrarPeriodos("mensual", ayer()),
+);
 
-export const cerrarRankingAnual = functions.pubsub
-  .schedule("0 0 1 1 *") // 1 de enero 00:00
-  .timeZone(ZONA)
-  .onRun(() => cierreDePeriodos.cerrarPeriodos("anual", ayer()));
+export const cerrarRankingAnual = onSchedule(
+  { ...OPCIONES, schedule: "0 0 1 1 *", timeZone: ZONA }, // 1 de enero 00:00
+  () => cierreDePeriodos.cerrarPeriodos("anual", ayer()),
+);
 
 // ----------------------------------------------------------------- pagos
 
@@ -2285,9 +2401,7 @@ export const cerrarRankingAnual = functions.pubsub
  * al checkout no dice que haya pagado, y volver de la pantalla de pago
  * tampoco —el navegador puede cerrarse antes, o mentir—.
  */
-export const crearOrdenDeCompra = functions
-  .runWith({ secrets: SECRETOS_MP })
-  .https.onCall(async (data, context) => {
+export const crearOrdenDeCompra = llamableConMercadoPago(async (data, context) => {
   const uid = exigirSesion(context, "crearOrdenDeCompra");
 
   /**
@@ -2319,7 +2433,7 @@ export const crearOrdenDeCompra = functions
    */
   const paquete = await packs.paraCobrar(validar(EsquemaCompra, data, errorHttp).paqueteId);
   if (!paquete) {
-    throw new functions.https.HttpsError("invalid-argument", "Paquete inexistente.");
+    throw new HttpsError("invalid-argument", "Paquete inexistente.");
   }
 
   /**
@@ -2343,7 +2457,7 @@ export const crearOrdenDeCompra = functions
    */
   if (!process.env.MP_ACCESS_TOKEN) {
     logger.error("Falta MP_ACCESS_TOKEN: no se puede abrir el checkout", { uid });
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       "failed-precondition",
       "Los pagos todavía no están habilitados. Probá más tarde.",
     );
@@ -2381,7 +2495,7 @@ export const crearOrdenDeCompra = functions
     logger.error("No se pudo crear la preferencia de Mercado Pago", {
       uid, ordenId: refOrden.id, error: e.message,
     });
-    throw new functions.https.HttpsError("unavailable", "No pudimos abrir el pago. Probá de nuevo.");
+    throw new HttpsError("unavailable", "No pudimos abrir el pago. Probá de nuevo.");
   }
 
   await refOrden.set(

@@ -327,7 +327,28 @@ console.log("\n=== 5. Los imports de index.js resuelven ===");
   const texto = readFileSync(join(FUNCIONES, "index.js"), "utf8");
   const rotos = [];
   let revisados = 0;
-  for (const m of texto.matchAll(/import\s*\{([\s\S]*?)\}\s*from\s*"(\.[^"]+)"/g)) {
+  /**
+   * `[^}]*` y no `[\s\S]*?`, y la diferencia la destapó la migración a v2.
+   *
+   * El patrón pedía que la fuente empezara con un punto —sólo audita imports
+   * locales— pero dejaba que el contenido de las llaves se estirara por
+   * cualquier cosa, incluido un `}`. Mientras TODOS los imports con llaves del
+   * archivo fueron locales no se notó. Al entrar
+   * `import { onCall, HttpsError } from "firebase-functions/v2/https"`, que es
+   * externo, el `}` de esa línea dejó de cerrar el grupo: la expresión siguió
+   * estirándose hasta el próximo import local y se tragó todo el medio. Después
+   * armaba una regex con esa basura y reventaba con
+   * `SyntaxError: Invalid regular expression`, o sea que la auditoría moría
+   * antes de auditar.
+   *
+   * Con `[^}]*` el grupo no puede pasar de la primera llave de cierre, así que
+   * cada import se lee entero y solo. Los externos se descartan abajo, a la
+   * vista, en vez de depender de que el patrón no los alcance.
+   */
+  for (const m of texto.matchAll(/import\s*\{([^}]*)\}\s*from\s*"([^"]+)"/g)) {
+    // `./` y no `.`: abajo se hace `slice(2)` para sacarlo, así que un `../`
+    // cortaría mal la ruta. Hoy todos los locales de `index.js` son `./`.
+    if (!m[2].startsWith("./")) continue; // "firebase-functions/...", "zod": no son de acá
     const fuente = readFileSync(join(FUNCIONES, m[2].slice(2)), "utf8");
     for (const nombre of m[1].split(",").map((x) => x.trim()).filter(Boolean)) {
       revisados++;
