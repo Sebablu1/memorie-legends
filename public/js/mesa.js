@@ -3126,33 +3126,138 @@ function abrirModalPoder() {
    * ajeno. En red el objetivo se elige sobre la mesa y esta ventana no existe.
    * La carta elegida se identifica por el índice del jugador, no por su lugar
    * en la ventana, así que mover el orden no mueve ninguna jugada.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * Y EL FILTRO VA ANTES DEL `map`, QUE ANTES DEVOLVÍA `""`
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * Porque ahora el lugar de cada grupo en la lista es su número de paso
+   * —`data-grupo`— y las pestañas lo usan para saber a quién llevan. Dejando
+   * huecos, el 8 —que saca tu mano— habría numerado a los rivales 1, 2 y 3 con
+   * una pestaña 0 que no existe.
+   *
+   * Es lo contrario de lo que hace `manoParaElegir` dos funciones más arriba, y
+   * a propósito: allá el índice ES la dirección de la carta para el motor y
+   * compactarlo cambiaría la jugada; acá el índice es sólo el orden de los
+   * pasos, y a cada jugador lo sigue nombrando `data-objetivo`.
    */
-  const orden = [...estado.jugadores.keys()].sort((a, b) => (b === YO) - (a === YO));
+  const orden = [...estado.jugadores.keys()]
+    .sort((a, b) => (b === YO) - (a === YO))
+    .filter((i) => {
+      if (estado.jugadores[i].eliminado) return false;
+      if (soloPropias && i !== YO) return false;
+      if (tipo === "mirarRival" && i === YO) return false;
+      return true;
+    });
+
+  /** El rótulo del grupo. En escritorio es el único que hay. */
+  const titulo = (i) => (i === YO ? "Tus cartas" : estado.jugadores[i].nombre);
   const grupos = orden
-    .map((i) => {
-      const jugador = estado.jugadores[i];
-      if (jugador.eliminado) return "";
-      if (soloPropias && i !== YO) return "";
-      if (tipo === "mirarRival" && i === YO) return "";
-      const titulo = i === YO ? "Tus cartas" : jugador.nombre;
-      return `
-        <div class="grupo-objetivo">
-          <div class="titulo">${titulo}</div>
+    .map(
+      (i, paso) => `
+        <div class="grupo-objetivo${paso === 0 ? " actual" : ""}" data-grupo="${paso}">
+          <div class="titulo">${titulo(i)}</div>
           <div class="mano">${manoParaElegir(i)}</div>
-        </div>`;
-    })
+        </div>`,
+    )
     .join("");
+
+  /**
+   * LAS PESTAÑAS, QUE EN EL TELÉFONO SON LA ÚNICA PUERTA A LOS DEMÁS GRUPOS.
+   *
+   * Hasta acá las cuatro manos se apilaban y, abajo de 480 px de ancho, la
+   * última pedía scroll adentro de la ventana: 19 px a 375×667 y 46 a 360×640.
+   * Hacerlas más chicas era la salida anterior y llegó a su piso —40 px de
+   * ancho, anotado en `mesa.css`—, así que lo que queda es mostrar una por vez.
+   * Con una sola a la vista la carta pasa de 42 a 84 px, que es el doble.
+   *
+   * Pestañas y no un «Siguiente», y la razón es el reloj: la decisión del
+   * poder vence a los 10 segundos (`MS_PARA_DECIDIR`). Con un botón de avanzar,
+   * llegar al tercer rival costaba tres toques contra ese reloj; con las
+   * pestañas cuesta uno, siempre, y «el siguiente» sigue estando al lado.
+   *
+   * La etiqueta de la propia es «Vos» y no «Tus cartas»: son cuatro pestañas
+   * repartiéndose 336 px y «TUS CARTAS» no entra sin recortarse. «Vos» es el
+   * nombre que la mesa ya le da al jugador —ver la configuración de los
+   * asientos— así que no es una palabra nueva.
+   *
+   * Con un solo grupo —el 7— no hay nada que recorrer y no se dibujan. El
+   * `display: none` de escritorio lo pone `mesa.css`: arriba de 480 px los
+   * cuatro grupos se ven juntos, como siempre, y estos botones no existen.
+   */
+  const pestanas =
+    orden.length > 1
+      ? `
+      <div class="paso-grupos" role="group" aria-label="De quién mirar las cartas">
+        ${orden
+          .map(
+            (i, paso) => `
+          <button
+            class="paso-grupo${paso === 0 ? " actual" : ""}"
+            data-accion="ir-al-grupo"
+            data-grupo="${paso}"
+            aria-pressed="${paso === 0}"
+            type="button"
+          >${i === YO ? "Vos" : estado.jugadores[i].nombre}</button>`,
+          )
+          .join("")}
+      </div>`
+      : "";
 
   abrirModal(
     `
     <h2>⚡ Poder ${numero} — ${titulos[tipo]}</h2>
     <p>${descripciones[tipo]}</p>
-    <div class="objetivos">${grupos}</div>
+    ${pestanas}
+    <div class="objetivos paso-a-paso">${grupos}</div>
     <button class="accion sobria" data-accion="saltar" type="button">Cancelar y descartar</button>
   `,
     // A pantalla completa en el teléfono: con cuatro jugadores son cuatro manos
     // y en una tarjeta centrada no entran. Ver `abrirModal`.
     { completo: true },
+  );
+}
+
+/**
+ * Mostrar el grupo número `n` del cuadro del poder, y encender su pestaña.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * EL ÍNDICE VIVE EN EL DOM, NO EN UNA VARIABLE DE MÓDULO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Cuál se está viendo se lee de la clase `actual`, que es lo mismo que mira el
+ * CSS. Con una variable aparte habría dos verdades que mantener de acuerdo, y
+ * la ventana se abre y se cierra por seis caminos distintos —incluido el
+ * vencimiento del reloj, que no pasa por acá—: cualquiera que se olvidara de
+ * ponerla en cero abriría el próximo 9 en el rival de la vuelta anterior.
+ *
+ * El primer grupo arranca con `actual` escrito en el HTML, al lado de la clase
+ * `paso-a-paso` que enciende el recorte. Van juntos a propósito: `mesa.css`
+ * esconde todo lo que no es `actual`, así que una ventana con la clase y sin
+ * ningún `actual` sería una ventana vacía. Saliendo del mismo texto no pueden
+ * discrepar.
+ *
+ * Se recorta en vez de dar la vuelta: desde el último, «el siguiente» no
+ * existe y volver al primero sería devolverte al principio sin que lo pidieras.
+ */
+function mostrarGrupo(n) {
+  const grupos = [...dom.modal.querySelectorAll(".objetivos > .grupo-objetivo")];
+  if (!grupos.length) return;
+  const cual = Math.min(Math.max(n, 0), grupos.length - 1);
+  grupos.forEach((grupo, paso) => grupo.classList.toggle("actual", paso === cual));
+  dom.modal.querySelectorAll('[data-accion="ir-al-grupo"]').forEach((boton) => {
+    const suya = Number(boton.dataset.grupo) === cual;
+    boton.classList.toggle("actual", suya);
+    boton.setAttribute("aria-pressed", String(suya));
+  });
+}
+
+/** El grupo que se está viendo, o 0 si la ventana no tiene ninguno marcado. */
+function grupoActual() {
+  const grupos = [...dom.modal.querySelectorAll(".objetivos > .grupo-objetivo")];
+  return Math.max(
+    0,
+    grupos.findIndex((grupo) => grupo.classList.contains("actual")),
   );
 }
 
@@ -3313,6 +3418,16 @@ dom.modal.addEventListener("click", async (evento) => {
     return;
   }
 
+  // Las pestañas del cuadro del poder. No juegan nada: cambian de mano a la
+  // vista. Van antes del `[data-objetivo]` de abajo para que quede dicho que
+  // son otra cosa —no llevan ni jugador ni posición— y no por un conflicto.
+  const irAlGrupo = evento.target.closest('[data-accion="ir-al-grupo"]');
+  if (irAlGrupo) {
+    sonidos.clic();
+    mostrarGrupo(Number(irAlGrupo.dataset.grupo));
+    return;
+  }
+
   const objetivo = evento.target.closest("[data-objetivo]");
   if (!objetivo || !estado.poderPendiente) return;
 
@@ -3346,6 +3461,23 @@ dom.modal.addEventListener("click", async (evento) => {
       .forEach((el) =>
         el.classList.toggle("seleccionada", Number(el.dataset.pos) === pos),
       );
+    /**
+     * Y se pasa solo al grupo que sigue.
+     *
+     * Lo tuyo ya está elegido y lo que falta es una del rival, que en el
+     * teléfono no está a la vista. Esto es lo que hace que el paso a paso no
+     * cueste nada: en el camino de siempre —tu carta, la del rival— no hay
+     * ningún toque de más, y el reloj de 10 segundos queda igual que antes.
+     *
+     * Si cambiás de idea, la pestaña «Vos» te trae de vuelta y la carta sigue
+     * marcada: `seleccionada` es una clase en el DOM y el grupo escondido no
+     * se vuelve a dibujar.
+     *
+     * Arriba de 480 px no se nota: los grupos están todos a la vista y lo
+     * único que cambia es qué pestaña estaría encendida, y las pestañas ahí
+     * no se dibujan.
+     */
+    mostrarGrupo(grupoActual() + 1);
     return;
   }
 

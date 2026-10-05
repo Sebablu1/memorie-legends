@@ -2237,14 +2237,141 @@ button.accion.sobria:hover:not(:disabled) {
    el único momento en que la posición tiene que significar algo es cuando hay
    que usarla.
 
-   El scroll vuelve, y se acepta: es un gesto de más contra una jugada que no
-   se puede hacer. Lo que lo resuelve de verdad —mostrar un grupo por vez en
-   el 9 y el 10, que además permite cartas del doble de grandes— es otro
-   cambio y va aparte. */
+   El scroll volvió, y se aceptó: era un gesto de más contra una jugada que no
+   se puede hacer. Lo que lo resuelve de verdad —mostrar un grupo por vez, que
+   además permite cartas del doble de grandes— es el bloque que sigue. */
 @media (max-width: 480px) {
   .modal.completo .objetivos {
     gap: 10px;
   }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   UN GRUPO POR VEZ, EN EL TELÉFONO
+
+   Lo que quedó pendiente arriba. Las manos apiladas no entran: a 375×667 la
+   ventana pedía 19 px de scroll adentro suyo y a 360×640, 46. Achicar la carta
+   ya había llegado a su piso —40 px de ancho, y el porqué está en el bloque de
+   `max-height: 560px`—, así que lo que faltaba era mostrar menos a la vez.
+
+   Con una sola mano a la vista sobra lugar, y el lugar se gasta en la carta: de
+   42 px de ancho a 84, que es el doble. En un juego de memoria la carta del
+   cuadro no se lee —no tiene número a la vista, es un dorso— pero sí se TOCA, y
+   se toca eligiendo por posición contra un reloj de 10 segundos.
+
+   ── EL CORTE ES POR ANCHO, Y ACÁ SÍ ──
+
+   El resto de esta ventana corta por `max-height`, porque lo que no entraba era
+   el alto. Esto corta por `max-width: 480px` y no es una contradicción: lo que
+   no entra acá es el ANCHO de una mano de cuatro cartas grandes. Un teléfono
+   acostado —844×390— tiene ancho de sobra y ya resolvía lo suyo por otro
+   camino: con cartas de 40 px los cuatro grupos le entran en una sola fila, así
+   que ahí no hay scroll que arreglar y se queda como está.
+
+   ── POR QUÉ NO SE ESCONDE CON `:has()` ──
+
+   El recorte lo enciende una clase que escribe `abrirModalPoder`
+   —`paso-a-paso`— y no un `.objetivos:has(.actual)`. Es la misma precaución que
+   el reloj apurado, dos veces en esta hoja: `:has()` no existe en un iPhone con
+   iOS viejo. La diferencia es qué pasa cuando falla. Allá el aviso que más hay
+   que ver sería el que no se ve; acá, sin la clase, se verían los cuatro grupos
+   con scroll —lo de antes, que es malo pero jugable— y las pestañas quedarían
+   apretando al aire. Con la clase no hay nada que soportar: `paso-a-paso` y el
+   primer `actual` salen del mismo texto, así que no pueden discrepar. */
+@media (max-width: 480px) {
+  /* `block` y no flex, y hace falta para la cuenta de abajo: como flex, el
+     grupo se medía por su contenido y `.mano` no tenía un ancho DEFINIDO
+     contra el que resolver un porcentaje. Ocupando el ancho entero, sí. */
+  .modal.completo .objetivos.paso-a-paso {
+    display: block;
+  }
+
+  .modal.completo .objetivos.paso-a-paso > .grupo-objetivo {
+    display: none;
+  }
+
+  .modal.completo .objetivos.paso-a-paso > .grupo-objetivo.actual {
+    display: block;
+  }
+
+  /* El título del grupo lo dice la pestaña encendida. Repetirlo adentro gasta
+     21 px de alto para decir lo mismo dos veces. Sigue en el HTML: en
+     escritorio es el único rótulo que hay. */
+  .modal.completo .objetivos.paso-a-paso .grupo-objetivo .titulo {
+    display: none;
+  }
+
+  .modal.completo .objetivos.paso-a-paso .grupo-objetivo .mano {
+    gap: 6px;
+    /* 84 es el techo y es el doble de los 42 de antes. Debajo manda lo que
+       entra: cuatro cartas y tres huecos de 6 px en el ancho de la mano —320 px
+       en un teléfono de 360, 350 en uno de 390—, o sea 75 y 83. El `100%`
+       resuelve contra `.mano`, que es por lo que el grupo tiene que ser
+       `block`.
+
+       Dividido por cuatro aunque la mano tenga menos: la carta mide igual con
+       la mano entera que descompletada, como en la mesa. Y si tiene MÁS de
+       cuatro —el juego las reparte en algunas rondas— no se desborda: ceden por
+       el `flex-shrink` de `.mano > .carta` y entran más chicas.
+
+       Sólo el ancho. El alto sale del `aspect-ratio: 2 / 3` de `.mano > .carta`,
+       que gana sobre la altura fija de `.carta`, así que acá `--carta-alto` no
+       pinta nada. */
+    --carta-ancho: min(84px, calc((100% - 18px) / 4));
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   LAS PESTAÑAS
+
+   `display: none` de entrada, y se encienden sólo abajo de 480 px: arriba de
+   ahí los grupos se ven todos juntos y no hay nada que elegir. El HTML las
+   dibuja igual —`abrirModalPoder`— porque el corte es una medida de pantalla y
+   el JavaScript no se vuelve a ejecutar si el teléfono se gira.
+
+   44 px de alto, que es el blanco táctil del resto del sitio. Acá se paga
+   barato: con una sola mano a la vista el alto sobra, y es justo donde no hay
+   que errarle —un toque perdido son dos segundos de los diez—. */
+.paso-grupos {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .modal.completo .paso-grupos {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+}
+
+/* `flex: 1 1 0` reparte el ancho en partes iguales, así que la pestaña no se
+   mueve de lugar cuando cambia de nombre. Los nombres son cortos —«Vos» y los
+   de la mesa— y aun así lleva recorte: un nombre largo tiene que acortarse y no
+   empujar a los otros fuera de la pantalla. */
+.paso-grupo {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: 4px 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--texto-tenue);
+  font: inherit;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+/* El mismo oro que el título del grupo, que es lo que esta pestaña reemplaza. */
+.paso-grupo.actual {
+  border-color: rgba(212, 168, 67, 0.55);
+  background: rgba(212, 168, 67, 0.12);
+  color: var(--oro);
 }
 
 /* Acostado de verdad: la descripción del poder se va. El título ya dice cuál
