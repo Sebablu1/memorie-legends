@@ -1460,3 +1460,37 @@ por otra puerta.
 **Anotado para antes de deployar la migración:** verificar con
 `gcloud secrets get-iam-policy` que `<projectNumber>-compute@developer.gserviceaccount.com`
 tiene `roles/secretmanager.secretAccessor` en los tres secretos.
+
+## 36. §13b quedó a medias: las cinco suites que lo describían
+
+Anotado el 5 de octubre de 2026.
+
+El arreglo de §13b —`cerrarMirada` no puede cerrar una mirada que
+todavía no venció, `8b1d80c` del 30/9— se desplegó sólo del lado del
+servidor. Las cinco suites que describían el comportamiento viejo
+quedaron sin actualizar.
+
+No se vio porque `npm test` cortaba en la suite 17 de 83, y las cinco
+afectadas están después de la 17:
+abandono-red.mjs (la 17, la que cortaba)
+filtraciones.mjs
+mesa-red.mjs
+red-e2e.mjs
+red.mjs
+
+El error era el mismo en las cinco: `La mirada todavía no venció`. El
+test llamaba a `cerrarMirada` con el reloj parado en el instante del
+reparto, cuando todavía no habían pasado los 7 segundos de
+`MS_MIRADA_TOTAL`.
+
+Arreglado en `f82fd4d`: adelantar el reloj antes de las cinco llamadas
+y, en `red-e2e.mjs`, también el `declarado`, porque el cliente mide ese
+campo desde `ventana.abiertaEn`, no desde que se puede descartar.
+
+**Dos deudas que se tapaban entre sí:** el `&&` del `npm test` escondía
+las suites (cortaba en la 17 y las otras 4 no aparecían en rojo), y las
+suites escondían que el `&&` estaba escondiendo algo. Ni una ni la otra
+se veían solas.
+
+**Estado después de `f82fd4d`:** 83 de 83 suites de Node en verde. Primera
+vez en la vida del proyecto.
