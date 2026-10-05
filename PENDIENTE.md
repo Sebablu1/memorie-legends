@@ -1854,3 +1854,87 @@ borra hasta el fin de línea. Cualquier dirección queda en `"https:`.
 Cualquier aserción futura sobre una URL tiene que ir contra `fuente`,
 no contra `codigo`. La trampa está documentada en el comentario de la
 aserción nueva de `pagos.mjs`, y hay que acordarse cada vez.
+
+## 42. Red se parecía poco a entrenamiento — lo que se igualó y lo que no
+
+Reportado en una frase que no se podía accionar: «en red no se juega
+igual que en entrenamiento». Se hizo un inventario leyendo `mesa.js`
+entero y comparando los dos bloques —entrenamiento hasta la 3760, red
+de ahí en adelante— en vez de adivinar qué faltaba.
+
+### Lo que se igualó
+
+**El cuadro del poder.** Era un modal de texto con dos botones y el
+objetivo se elegía tocando la mesa. Ahora abre el mismo cuadro que el
+entrenamiento, con las cuatro manos, los títulos y las pestañas del
+paso a paso en móvil. Se reusa `abrirModalPoder` ENTERA, sin una copia
+de red: todo lo que lee viaja en la vista, y `manoParaElegir` dibuja
+sólo el dorso, así que una carta ajena que llega como `{ oculta: true }`
+se dibuja igual que una de verdad.
+
+**Los sonidos de los cuatro botones.** El `sonidos.X()` estaba debajo
+del `return` de la rama de red, así que en Leyendas levantar, tirar,
+cortar y pasar eran mudos. Subió arriba del `if (enRed())`. Era la
+mitad de la sensación de que algo faltaba, y eran cuatro líneas.
+
+**Mirar con el 7 o el 8.** `mostrarUnMomento` hacía lo mismo que
+`revelarUnMomento` menos dos líneas: el sonido y el barrido dorado.
+
+**El resumen de ronda.** Tenía cuatro columnas y le faltaban las dos
+que explican por qué cambió el puntaje: el −10 por quedarse sin cartas
+y el +10 por cortar mal. El dato ya viajaba en la vista
+(`puntosRonda`): no hubo que pedir nada nuevo.
+
+**El texto del velo.** Decía «Cargando entrenamiento…» en los dos
+modos, porque está escrito fijo en `mesa.html`. Ahora dice «Preparando
+la mesa…».
+
+**La pista de `levantada`.** Decía «Cambiala por una tuya, o tirala» y
+no mencionaba lo único que hace falta para decidir: que cambiarla deja
+el poder sin usar. Con una carta de poder en la mano ahora lo dice.
+
+### Lo que NO se igualó, y por qué
+
+**El modal de decisión del poder, en el momento correcto.** En
+entrenamiento la pregunta se hace al LEVANTAR, con la carta en la mano
+y tres salidas: usar, tirar, o cambiarla por una propia perdiendo el
+poder. En red el servidor abre la fase `poder` recién cuando la carta
+ya se tiró, así que en ese momento cambiarla por una propia es
+imposible — está en el descarte. Mover la pregunta significa cambiar
+qué se manda y cuándo, o sea tocar el motor del servidor. Por eso el
+modal de red tiene dos botones y no tres, y por eso la salida se
+anuncia por la pista en la fase `levantada` en vez de por un botón.
+
+**El reparto no vuela.** `animarReparto` corta con `if (enRed())`. En
+red las cartas aparecen puestas. Necesita medir distancias con la mesa
+ya dibujada y el reparto llega en una vista, no en una llamada local.
+
+**No hay botón «Siguiente ronda».** Es por diseño: el servidor avanza
+solo. El renglón en voz baja ya existe para que nadie espere un botón.
+
+**El resumen tapa al instante.** Entrenamiento espera
+`RITMO.trasCorte` —1,6 s con las manos destapadas— antes de abrir el
+modal. Red no. Igualarlo es trivial, pero hay que ver que no choque
+con el ritmo que marca el servidor.
+
+**El cronómetro de la fase.** Espeja el plazo del servidor con
+`espejoDelPlazo`, que es la única forma de que los cuatro relojes
+coincidan. Lo que falta por mirar es si se dibuja en todas las fases
+en que entrenamiento lo dibuja.
+
+**`elegibleParaPoder` es más estricto en red.** El modal de
+entrenamiento no filtra dentro de cada mano: una carta que no
+corresponde no hace nada, en silencio. Red rechaza con sonido y pista.
+Se mantuvo el de red —avisa mejor— pero no son idénticos.
+
+**El panel de Mercado Pago sigue apuntando a la URL de v1.** Es la
+otra mitad de §41 y se cambia a mano, allá. Hasta que no esté, prender
+la venta significa cobrar sin acreditar.
+
+### Lo que se borró
+
+`eligiendoPoder` y `marcarElegiblesDelPoder`, que resaltaban las
+cartas elegibles sobre la mesa. Con el objetivo elegido adentro del
+modal nadie las ponía ya. Quedaron sin usar en el CSS las clases
+`.elegible-poder` y `.elegida-poder`: no molestan, pero si alguien
+busca quién las pone, no hay nadie.
