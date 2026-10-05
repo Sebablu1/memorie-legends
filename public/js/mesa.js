@@ -2391,11 +2391,61 @@ function faseDescarte(alCerrar, duracion = MS_DESCARTE, rotulo = "DESCARTE") {
         listo();
         // Quién sigue lo decide quien abrió la ventana: la de la ronda
         // encadena el ciclo de turnos, la que abre `tirarCarta` devuelve a la
-        // decisión de cortar y no tiene que encadenar nada.
-        if (alCerrar) alCerrar();
+        // decisión de cortar y no tiene que encadenar nada. Salvo que la ronda
+        // se haya terminado acá mismo: ver `continuarTrasVentana`.
+        continuarTrasVentana(alCerrar);
       }, duracion),
     );
   });
+}
+
+/**
+ * Qué sigue cuando una ventana de descarte se cierra.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * EL CUELGUE QUE ARREGLA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `cerrarVentanaDescarte` no siempre devuelve a donde dice su nombre: si
+ * alguien vació su mano, corta la ronda ahí mismo y la fase queda en
+ * `finRonda`. Está bien puesto allá —es el único punto por el que pasan los
+ * dos caminos que vacían manos, y lo llaman la mesa local y el servidor— pero
+ * significa que quien la llama tiene que PREGUNTAR qué pasó.
+ *
+ * De los cuatro lugares que abren una ventana, sólo uno preguntaba: el de la
+ * ronda, porque encadena `cicloTurnos` y ahí adentro está la guarda. Los otros
+ * tres —la reapertura que abre `tirarCarta`, la que sigue a un poder, y el
+ * camino del jugador eliminado— cerraban la ventana, veían una fase que ya no
+ * era la que esperaban, y se iban sin hacer nada.
+ *
+ * El resultado, reportado jugando: cortaste quedándote sin cartas, la mesa
+ * reveló las cuatro manos —`dibujarJugador` destapa todo en `finRonda`—, los
+ * botones se apagaron, y el modal de fin de ronda nunca llegó. Sin error de
+ * consola: no se rompía nada, simplemente ya no quedaba nadie empujando.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ ACÁ Y NO EN CADA LLAMADOR
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque los llamadores no son cuatro: son cuatro que abren ventanas, y otros
+ * cuatro que esperan a `trasPonerMuestra` y después deciden. Ocho copias de la
+ * misma pregunta es ocho oportunidades de olvidarse, y la que se olvide va a
+ * colgar la mesa en silencio otra vez.
+ *
+ * Puesto adentro de `faseDescarte`, el que abre la ventana no necesita saber
+ * que el corte automático existe. Los ocho sitios quedan correctos sin tocar
+ * ninguno.
+ *
+ * No se espera el resultado, igual que no se esperaba `alCerrar`: el modal
+ * tiene su propio ritmo —1,6 s de manos a la vista antes de taparlas— y
+ * bloquear acá dejaría la ventana sin cerrar mientras tanto.
+ */
+function continuarTrasVentana(alCerrar) {
+  if (estado.fase === "finRonda" || estado.fase === "finPartida") {
+    mostrarFinRonda();
+    return;
+  }
+  if (alCerrar) alCerrar();
 }
 
 /** Avanza turnos hasta que le toque al humano o termine la ronda. */

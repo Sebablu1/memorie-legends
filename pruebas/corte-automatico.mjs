@@ -260,6 +260,65 @@ console.log("\n=== La regla vive donde la ven los dos modos ===");
     servidor.includes("motor.cerrarVentanaDescarte"),
     "y el servidor pasa por esa misma función",
   );
+
+  /**
+   * Y LA MESA LOCAL TIENE QUE MIRAR LO QUE ESA FUNCIÓN LE DEVOLVIÓ.
+   *
+   * Esta tercera pata faltaba, y la ausencia costó un cuelgue reportado
+   * jugando. Las dos de arriba comprueban que la REGLA es la misma en los dos
+   * modos, y lo es. Lo que no comprobaban es que cada modo se ENTERE.
+   *
+   * En red no hace falta pedirlo: la vista llega por un escucha y cualquier
+   * cambio de fase abre el modal. En entrenamiento el estado sólo se mueve
+   * cuando una función lo mueve, así que el que cierra la ventana tiene que
+   * preguntar si la ronda terminó ahí. No preguntaba: de los cuatro sitios que
+   * abren ventanas, tres se iban sin hacer nada y la mesa quedaba en `finRonda`
+   * con las manos destapadas, los botones apagados y ningún modal.
+   *
+   * Se audita por texto porque `mesa.js` es del navegador —toca el DOM, no se
+   * puede importar acá— y porque lo que hay que defender es justamente una
+   * línea de cableado, no un cálculo. Es la misma forma que las dos de arriba.
+   */
+  const mesa = readFileSync(new URL("../public/js/mesa.js", import.meta.url), "utf8");
+
+  /**
+   * El corte EXACTO importa, y la primera versión de esto no servía.
+   *
+   * Iba desde `cerrarVentanaDescarte` hasta `cicloTurnos`, y en el medio queda
+   * la DEFINICIÓN de `continuarTrasVentana` con su comentario. Así que el
+   * nombre aparecía en el trozo aunque nadie la llamara: volví a poner el
+   * cableado viejo a propósito y la prueba siguió en verde. Un cerrojo que no
+   * cierra es peor que no tener ninguno.
+   *
+   * Ahora el trozo termina donde termina `faseDescarte` —`}, duracion)`, que
+   * aparece una sola vez en el archivo— y se le sacan los comentarios, para
+   * que lo que se mide sea código y no prosa.
+   */
+  const sinComentarios = (texto) => texto.replace(/\/\/[^\n]*/g, "");
+  const desde = mesa.indexOf("estado = cerrarVentanaDescarte(estado);");
+  const hasta = mesa.indexOf("}, duracion)", desde);
+  ok(desde >= 0 && hasta > desde, "se encontró el cierre de la ventana en mesa.js", { desde, hasta });
+
+  const cola = sinComentarios(mesa.slice(desde, hasta));
+  ok(
+    cola.includes("continuarTrasVentana(alCerrar)"),
+    "y la mesa local pregunta qué le devolvió, en vez de seguir de largo",
+  );
+  ok(
+    !/\balCerrar\(\)/.test(cola),
+    "y no vuelve a encadenar a ciegas, que es lo que colgaba la mesa",
+  );
+
+  // Y que la función a la que ahora se delega haga las dos cosas: mirar las
+  // dos fases de final y abrir el resumen. Acá el corte arranca en la palabra
+  // `function`, así que el comentario de arriba queda afuera.
+  const arranque = mesa.indexOf("function continuarTrasVentana");
+  ok(arranque >= 0, "la guarda existe");
+  const guarda = mesa.slice(arranque, mesa.indexOf("async function cicloTurnos"));
+  ok(
+    /finRonda[\s\S]{0,80}finPartida[\s\S]{0,120}mostrarFinRonda\(\)/.test(guarda),
+    "y con la ronda terminada abre el resumen en vez de quedarse esperando",
+  );
 }
 
 console.log(fallos === 0 ? "\n✅ TODO OK" : `\n❌ ${fallos} fallos`);
