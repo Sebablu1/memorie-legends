@@ -1785,3 +1785,47 @@ botón "Siguiente ronda".
    correcto por los 1,6 s de `RITMO.trasCorte`. Es una dependencia de
    tiempos, no de lógica. Si algún día se acorta `RITMO.trasCorte`,
    el orden se invierte y el cartel queda mal.
+
+## 41. Deploy de las 80 functions a v2 — HECHO
+
+Completado el 5/10/2026.
+
+- Las 80 v1 borradas (con reintentos por quota, todas pasaron).
+- Las 80 v2 desplegadas en us-central1, con concurrency: 80 y 512 MiB.
+- Las 4 programadas con sus jobs ENABLED (verificado con
+  `gcloud scheduler jobs list --location=us-central1`).
+- Los 3 secretos bindeados a la nueva service account
+  (346846781965-compute@developer.gserviceaccount.com) durante el
+  deploy fallido inicial. Verificado en el exitoso.
+- `URL_WEBHOOK` actualizada a la dirección de Cloud Run:
+  https://webhookpago-ba7pwd2sjq-uc.a.run.app
+  Y `crearOrdenDeCompra` redeployada.
+
+### Pendientes, sin resolver
+
+1. **El panel de Mercado Pago** sigue apuntando a la URL vieja de v1.
+   Hay que entrar y cambiarla a la nueva antes de encender la venta.
+   Con una sola de las dos mitades, MP cobra y las Leyendas no llegan,
+   sin error en ningún lado. No urge: los pagos están apagados.
+
+2. **`herramientas/sondear-webhook.mjs:65`** sigue con la URL vieja
+   por defecto. No bloquea — lee `URL_WEBHOOK` del entorno. Anotado en
+   §38.
+
+### Hallazgo colateral (anotado para no volver a pisarlo)
+
+En `pagos.mjs` y cualquier auditoría de texto sobre `index.js`: el
+bloque
+
+const codigo = fuente.replace(/\/\/[^\n]\*/g, "")
+
+que saca comentarios se come también `https://` porque ve `//` y
+borra hasta el fin de línea. Cualquier dirección queda en `"https:`.
+Cualquier aserción futura sobre una URL de index.js tiene que ir
+contra `fuente`, no contra `codigo`. La trampa está documentada en el
+comentario de la aserción nueva de `pagos.mjs`.
+
+### Lo que falta medir
+
+Cold start real desde Uruguay con v2 desplegado. La proyección era
+~1275 ms (de 2049). El número real: [medir y anotar].
