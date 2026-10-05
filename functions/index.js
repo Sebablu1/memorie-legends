@@ -10,27 +10,42 @@
  */
 
 /**
- * El namespace de v1 sigue, y es SÓLO para `webhookPago`.
+ * Las ochenta en v2, y ni una línea de v1. Esa ausencia es medio arranque.
  *
- * Todo lo demás pasó a v2 —ver `llamable`, más abajo—. El webhook se queda
- * donde está a propósito: su dirección está registrada del lado de Mercado
- * Pago y escrita en `URL_WEBHOOK` unas líneas más abajo, y una función de v2
- * se publica en otra dirección. Moverlo sería desconectar los pagos hasta
- * volver a registrarlo allá.
+ * ─────────────────────────────────────────────────────────────────────────
+ * EL IMPORT QUE NO ESTÁ ES EL CAMBIO
+ * ─────────────────────────────────────────────────────────────────────────
  *
- * Mezclar v1 y v2 en el mismo archivo está soportado: cada export declara su
- * generación por separado.
+ * Acá decía `import * as functions from "firebase-functions/v1"`, y estaba
+ * por una sola función de las ochenta: `webhookPago`, que se había quedado en
+ * v1 porque su dirección está registrada del lado de Mercado Pago.
  *
- * (Lo de antes, que sigue valiendo: en firebase-functions v7 el subpaquete v1
- * dejó de tener export por defecto, así que va como namespace. Con
- * `import functions from` la variable queda en undefined y las funciones
- * revientan al arrancar, no al desplegar.)
+ * Esa línea costaba 1150 ms y 648 módulos de CommonJS. Medido con
+ * `herramientas/medir-arranque.mjs`: cargar este archivo entero son 1526 ms
+ * —el 74 % del arranque en frío de 2049 ms— y el 75 % de eso era ella sola.
+ * Los tres subpaquetes de v2 juntos son 400 ms y 231 módulos; las dos
+ * generaciones a la vez, 1177 ms, porque v2 agrega apenas 27 ms sobre lo que
+ * v1 ya trajo. Sin v1 el bloque de terceros baja a 555 ms.
+ *
+ * Y el costo no era de `webhookPago`: era de las OTRAS SETENTA Y NUEVE. El
+ * runtime carga este archivo entero para atender cualquiera de ellas, así que
+ * todas pagaban el arranque de una generación que no usan.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LO QUE HAY QUE HACER DEL LADO DE MERCADO PAGO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Una función de v2 se publica en OTRA dirección, y eso no se puede saber
+ * desde acá: la asigna Cloud Run al desplegar. `URL_WEBHOOK`, más abajo, no
+ * es documentación —viaja en cada preferencia de pago como `notification_url`—
+ * así que quedó marcada con un PENDIENTE y el comando que devuelve la
+ * dirección nueva.
+ *
+ * Se migró ahora y no antes porque los pagos están apagados
+ * (`SOLO_ADMIN_COMPRA`): no hay ninguna compra en vuelo que se pueda perder
+ * entre que cambia la dirección acá y se registra allá.
  */
-import * as functions from "firebase-functions/v1";
-// `onRequest` NO se importa: el único HTTP crudo que hay es `webhookPago`, y
-// se queda en v1 por su dirección. Importarlo sin usarlo sería dejar escrito
-// que acá hay una función de v2 que no existe.
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
 /**
@@ -1146,10 +1161,31 @@ const esSandboxMP = () => String(process.env.MP_ACCESS_TOKEN ?? "").startsWith("
  * EL WEBHOOK NO SE MUDA CON EL SITIO
  * ─────────────────────────────────────────────────────────────────────────
  *
- * `URL_WEBHOOK` es una Cloud Function, no una página: vive en
- * `cloudfunctions.net` y ahí se queda. Además está registrada del lado de
- * Mercado Pago, así que cambiarla acá sin cambiarla allá corta los avisos de
+ * `URL_WEBHOOK` es una Cloud Function, no una página. Está registrada del lado
+ * de Mercado Pago, así que cambiarla acá sin cambiarla allá corta los avisos de
  * pago — y un aviso perdido es una compra cobrada que nunca se acredita.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ⚠️ PENDIENTE: ESTA DIRECCIÓN ES LA DE v1 Y YA NO EXISTE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `webhookPago` pasó a v2, y una función de v2 se publica en una dirección de
+ * Cloud Run que asigna Google al desplegar. No se puede escribir de antemano
+ * ni inventarla: hay que leerla después del despliegue, con
+ *
+ *     gcloud functions describe webhookPago --region=us-central1 \
+ *       --project=memorie-legends --gen2 --format="value(serviceConfig.uri)"
+ *
+ * y hacer DOS cosas con ella: pegarla acá abajo y registrarla en el panel de
+ * Mercado Pago. Las dos, o los avisos de pago no llegan.
+ *
+ * Esto NO es documentación muerta: el valor viaja en cada preferencia como
+ * `notification_url` —ver `crearOrdenDeCompra`— así que mientras diga la
+ * dirección vieja, cada compra le pide a Mercado Pago que avise a una función
+ * que ya no está.
+ *
+ * No rompe nada hoy porque los pagos están apagados (`SOLO_ADMIN_COMPRA`).
+ * Es lo primero que hay que cerrar antes de volver a prenderlos.
  *
  * `URL_VUELTA` sí es una página del sitio: es adonde el comprador aterriza
  * después de pagar. Va al dominio propio, que es el que la gente reconoce.
@@ -2580,9 +2616,7 @@ async function entregarLoDelPack(ordenId) {
  *   firebase functions:secrets:set MP_ACCESS_TOKEN
  *   firebase functions:secrets:set MP_WEBHOOK_SECRET
  */
-export const webhookPago = functions
-  .runWith({ secrets: SECRETOS_MP })
-  .https.onRequest(async (req, res) => {
+export const webhookPago = onRequest({ ...OPCIONES, secrets: SECRETOS_MP }, async (req, res) => {
   if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
 
   const mp = mercadoPago();

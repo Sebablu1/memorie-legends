@@ -365,11 +365,27 @@ console.log("\n=== El webhook no lee el estado del payload ===");
        `${nombre} NO se declara por la puerta sin secretos`);
   }
 
-  // El webhook sigue en v1 —su dirección está registrada del lado de Mercado
-  // Pago— y allá la declaración se sigue escribiendo con `runWith`.
-  ok(/export const webhookPago = functions[\s\S]{0,200}?runWith\(\{\s*secrets:\s*SECRETOS_MP\s*\}\)/
-     .test(codigo),
-     "y el webhook, que se quedó en v1, declara los suyos con runWith");
+  /**
+   * Y el webhook también, que era el último que quedaba en v1.
+   *
+   * Se declaraba con `functions.runWith({ secrets: SECRETOS_MP })` y se había
+   * quedado allá por su dirección registrada en Mercado Pago. Pasó a v2 porque
+   * ese import costaba 1150 ms de arranque a las OTRAS setenta y nueve: el
+   * runtime carga el archivo entero para atender cualquiera.
+   *
+   * Lo que se defiende no cambió —que el webhook DECLARE sus secretos, porque
+   * uno sin declarar deja `process.env` vacío y el webhook contesta «Sin
+   * configurar» para siempre con el secreto bien guardado— pero se escribe
+   * distinto: en v2 es un campo más de las opciones.
+   */
+  ok(/export const webhookPago = onRequest\(\{[^}]*secrets:\s*SECRETOS_MP/.test(codigo),
+     "y el webhook, ya en v2, declara los suyos en las opciones");
+
+  // Y que no vuelva `runWith`: es la forma de v1, y si reaparece significa que
+  // volvió el import que se sacó, con sus 648 módulos atrás.
+  ok(!/runWith\(/.test(codigo),
+     "y no quedó ninguna declaración de secretos a la manera de v1",
+     /runWith\(/.test(codigo) ? "hay un runWith en index.js" : undefined);
   ok(codigo.includes('"MP_ACCESS_TOKEN"') && codigo.includes('"MP_WEBHOOK_SECRET"'),
      "y los nombres son los que lee el código");
 }
