@@ -4,7 +4,7 @@ Lo que está esperando algo — a Meta, a un banco, a una decisión, o a una
 próxima sesión. Cada punto dice **qué falta**, **de quién depende** y **cómo se
 sabe que se resolvió**.
 
-Última revisión: 4 de octubre de 2026.
+Última revisión: 5 de octubre de 2026.
 
 ---
 
@@ -1360,3 +1360,20 @@ functions en un `--only` selectivo, pasó. Las 78 restantes salieron como
 "Skipped (No changes detected)".
 
 Anotado para no volver a pisar el mismo rato.
+
+## 34. El 10 tiene un salto de maquetado, no un flash
+
+Anotado el 5 de octubre de 2026, al cerrar la precarga.
+
+Los dos <img> de `preguntarSiCambia` —el modal del 10, cuando muestra
+las dos cartas— no son `.carta .cara` sino imágenes sueltas dentro de
+`.cartas-del-diez`. El CSS de esa regla no tiene `background` ni
+`height`, así que mientras cargan los huecos miden 0 y el modal se
+reacomoda cuando las imágenes llegan.
+
+Con la precarga (commit anterior) ya no se ve en la práctica: las dos
+imágenes están en caché cuando el 10 se resuelve. Pero el defecto sigue
+latente si la precarga no terminó (primera partida, conexión mala).
+
+Arreglo: `height: 138px` (92 × 1.5, la proporción 2:3 de la carta) en
+`.cartas-del-diez img`. Una línea. No urgente.
