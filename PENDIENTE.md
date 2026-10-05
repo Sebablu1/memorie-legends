@@ -1377,3 +1377,86 @@ latente si la precarga no terminó (primera partida, conexión mala).
 
 Arreglo: `height: 138px` (92 × 1.5, la proporción 2:3 de la carta) en
 `.cartas-del-diez img`. Una línea. No urgente.
+
+## 35. Tres hallazgos del 5/10/2026 — al revisar la migración a v2
+
+### a. `npm test` cortaba en la suite 17 de 83, y nunca se notó
+
+El script `test` era una cadena de `&&` escrita a mano. `abandono-red.mjs`
+es la suite número 17, y estaba en rojo desde §13b. `&&` corta en el
+primer exit ≠ 0, así que las 66 suites siguientes no corrían nunca en una
+corrida normal.
+
+Entre las que no corrían estaba `suites-registradas.mjs` — el cerrojo que
+existe justamente para detectar que una suite se quedó sin correr — y era
+la última de la lista, la 83. Un cerrojo que no corre no cierra nada.
+
+Se descubrió cuando el runner nuevo corrió las 83 por primera vez: 78
+pasaron, 5 fallaron (las de §13b: `abandono-red`, `filtraciones`,
+`mesa-red`, `red-e2e`, `red`). Hasta entonces se creía que `npm test`
+cubría todo el proyecto.
+
+Arreglado en el commit `9281762`: la lista vive en
+`pruebas/lista-de-suites.mjs`, y `pruebas/correr-todas.mjs` las corre a
+todas sin cortar en la primera falla. Al final imprime resumen.
+
+### b. La migración a v2 no arregla el cold start de un usuario solo
+
+Verificado por Claude al preparar la migración: `concurrency: 80` cambia
+cuántas veces se arranca una instancia, no cuánto tarda un arranque. Un
+jugador solo en Florida, llamadas secuenciales, backend dormido: sigue
+pagando los 2049 ms de cold start. El número no se mueve.
+
+El beneficio real está en la mesa de 4 jugando simultáneo: en v1 cada
+instancia atiende un pedido por vez, así que cuatro jugadores tocando al
+mismo tiempo son cuatro instancias y, con el backend frío, cuatro
+arranques. Con `concurrency: 80` es una sola instancia.
+
+La causa probable del cold start de un usuario solo: `index.js` importa
+veinte módulos locales más `firebase-admin` y `zod`, y cada instancia de
+cada una de las 80 functions carga todo el grafo, use lo que use. Medir
+el tiempo de carga es gratis y no requiere desplegar nada.
+
+Migración en commit `f166435`. **No deployada.** El `functions/index.js`
+en el repo está en v2, pero producción sigue en v1. Cuando se decida
+deployar, primero medir el cold start.
+
+### c. `ritmo.mjs` nunca funcionó
+
+El patrón de auditoría tenía un byte `0x08` (backspace, carácter de
+control) incrustado donde debía ir `\b` (borde de palabra). La expresión
+pedía un carácter de control después de `functions`, así que no podía
+matchear ninguna línea de ningún archivo. `actual` quedaba en `null`, el
+`if` nunca se cumplía, y el bloque daba ✓ desde que se escribió.
+
+Es decir: el cruce de nombres de funciones ("marcarListo declara
+crearSala", el error que ese test existe para cazar) nunca se verificó.
+Claude lo arregló en `f166435`. Ahora ve las 80 y el cruce corre por
+primera vez. Pasa: no había ninguno escondido.
+
+### d. El techo de ritmo en memoria cambia con `concurrency: 80`
+
+`limite-de-ritmo.js` cuenta las acciones de juego en memoria, por
+instancia. Con `concurrency: 80` hay menos instancias, así que el
+contador se reparte entre menos procesos y el techo efectivo se vuelve
+más estricto que hoy. No es un bug — es el techo acercándose a lo que
+dice tener — pero un jugador que venía pasándose sin notarlo va a
+empezar a chocar.
+
+**Anotado para antes de deployar la migración:** mirar los números de
+`LIMITES` en `limite-de-ritmo.js`.
+
+### e. Los secretos y el cambio de service account
+
+En v1 el service account es `<projectId>@appspot.gserviceaccount.com`.
+En v2 es `<projectNumber>-compute@developer.gserviceaccount.com`. Los
+tres secretos (`PIMIENTA_CODIGOS`, `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`)
+están dados al primero. El CLI de Firebase los reasigna al segundo
+automáticamente durante el deploy — pero si eso falla en silencio, las
+funciones que usan secretos arrancan con `process.env` vacío y contestan
+200 hasheando con cadena vacía. Es exactamente el bug de §14, entrando
+por otra puerta.
+
+**Anotado para antes de deployar la migración:** verificar con
+`gcloud secrets get-iam-policy` que `<projectNumber>-compute@developer.gserviceaccount.com`
+tiene `roles/secretmanager.secretAccessor` en los tres secretos.
