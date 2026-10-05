@@ -1790,42 +1790,67 @@ botón "Siguiente ronda".
 
 Completado el 5/10/2026.
 
-- Las 80 v1 borradas (con reintentos por quota, todas pasaron).
-- Las 80 v2 desplegadas en us-central1, con concurrency: 80 y 512 MiB.
-- Las 4 programadas con sus jobs ENABLED (verificado con
-  `gcloud scheduler jobs list --location=us-central1`).
-- Los 3 secretos bindeados a la nueva service account
+- Las 80 v1 borradas. Los `Quota Exceeded` del delete reintentaron
+  todos y terminaron en `Successful delete operation`.
+- Las 80 v2 desplegadas en us-central1, con `concurrency: 80` y
+  512 MiB. Deployadas en lotes de 10 (con la sonda de 3, las 4
+  programadas, y el resto) porque `FUNCTIONS_DISCOVERY_TIMEOUT`
+  default es 10 s y algún lote no terminaba de analizarse. Se subió
+  a 60 s y pasó. Queda anotado.
+- Las 4 programadas con sus jobs ENABLED en us-central1:
+  firebase-schedule-barrerPartidas-us-central1
+  firebase-schedule-cerrarRankingSemanal-us-central1
+  firebase-schedule-cerrarRankingMensual-us-central1
+  firebase-schedule-cerrarRankingAnual-us-central1
+- Los 3 secretos bindeados a la service account nueva
   (346846781965-compute@developer.gserviceaccount.com) durante el
-  deploy fallido inicial. Verificado en el exitoso.
+  deploy fallido inicial. Verificado: no hubo que hacer nada a mano.
 - `URL_WEBHOOK` actualizada a la dirección de Cloud Run:
   https://webhookpago-ba7pwd2sjq-uc.a.run.app
-  Y `crearOrdenDeCompra` redeployada.
+  Y `crearOrdenDeCompra` redeployada para que use la nueva.
+
+### Latencia medida en producción
+
+Capturada con DevTools → Network desde Uruguay, sin recargar, en una
+partida por Leyendas:
+
+avanzarPartida 214 ms, 301 ms
+latir 199, 205, 300, 309, 321 ms
+
+Comparado con el cold start previo de ~2049 ms y las jugadas tibias
+de 200-400 ms: el rango tibio es el mismo (200-300 ms), pero la
+primera llamada ya no paga el cold start completo. La hipótesis de
+que el import era el grueso del arranque en frío se sostiene.
+
+**El cold start real (frío, después de 15-20 min de inactividad) NO
+se midió todavía.** Cuando se mida, anotar acá.
 
 ### Pendientes, sin resolver
 
 1. **El panel de Mercado Pago** sigue apuntando a la URL vieja de v1.
    Hay que entrar y cambiarla a la nueva antes de encender la venta.
    Con una sola de las dos mitades, MP cobra y las Leyendas no llegan,
-   sin error en ningún lado. No urge: los pagos están apagados.
+   sin error en ningún lado. No urge: los pagos están apagados
+   (`SOLO_ADMIN_COMPRA = true`).
 
 2. **`herramientas/sondear-webhook.mjs:65`** sigue con la URL vieja
    por defecto. No bloquea — lee `URL_WEBHOOK` del entorno. Anotado en
    §38.
 
-### Hallazgo colateral (anotado para no volver a pisarlo)
+### Hallazgos colaterales
 
-En `pagos.mjs` y cualquier auditoría de texto sobre `index.js`: el
-bloque
+**`FUNCTIONS_DISCOVERY_TIMEOUT`.** El default de firebase-tools es
+10 s, y con el grafo de imports actual no alcanza para lotes de 10.
+Subirlo a 60 s resolvió. Vale la pena tenerlo en cuenta en cualquier
+deploy futuro: `$env:FUNCTIONS_DISCOVERY_TIMEOUT="60"` antes de
+`firebase deploy`.
+
+**Bug latente en auditorías de texto sobre `index.js`.** El bloque
 
 const codigo = fuente.replace(/\/\/[^\n]\*/g, "")
 
-que saca comentarios se come también `https://` porque ve `//` y
+que saca comentarios se come también `https://`, porque ve `//` y
 borra hasta el fin de línea. Cualquier dirección queda en `"https:`.
-Cualquier aserción futura sobre una URL de index.js tiene que ir
-contra `fuente`, no contra `codigo`. La trampa está documentada en el
-comentario de la aserción nueva de `pagos.mjs`.
-
-### Lo que falta medir
-
-Cold start real desde Uruguay con v2 desplegado. La proyección era
-~1275 ms (de 2049). El número real: [medir y anotar].
+Cualquier aserción futura sobre una URL tiene que ir contra `fuente`,
+no contra `codigo`. La trampa está documentada en el comentario de la
+aserción nueva de `pagos.mjs`, y hay que acordarse cada vez.
