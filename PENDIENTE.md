@@ -1494,3 +1494,48 @@ se veían solas.
 
 **Estado después de `f82fd4d`:** 83 de 83 suites de Node en verde. Primera
 vez en la vida del proyecto.
+
+## 38. v1 fuera del grafo: cold start proyectado a ~1275 ms
+
+Anotado el 5 de octubre de 2026.
+
+Medido con `herramientas/medir-arranque.mjs` (commiteado en `7fc8652`
+porque la sección 5b queda como vigía permanente contra la vuelta de
+v1).
+
+ANTES: import de index.js 1526 ms 651 módulos CJS 96 MB RSS
+DESPUÉS: import de index.js 752 ms 339 módulos CJS 76 MB RSS
+Diferencia: -774 ms
+
+El culpable era `import * as functions from "firebase-functions/v1"`,
+que existía sólo por `webhookPago`. Las 79 restantes lo cargaban al
+pedo en cada arranque en frío, porque el runtime carga `index.js`
+entero para atender cualquiera.
+
+Cold start proyectado: de 2049 ms a ~1275 ms.
+
+### Lo que falta para que los pagos vuelvan a funcionar
+
+`URL_WEBHOOK` sigue con la dirección vieja de v1. En v2 la URL la
+asigna Cloud Run al crear el servicio, y no se puede saber de antemano.
+El PENDIENTE está en `index.js:1159` con el comando que la devuelve:
+
+gcloud functions describe webhookPago --gen2 --region=us-central1 \
+ --project=memorie-legends --format="value(serviceConfig.uri)"
+
+Después del deploy, la dirección va a DOS lados:
+
+1. `URL_WEBHOOK` en `functions/index.js:1159`
+2. El panel de Mercado Pago
+
+Si va sólo a uno, los avisos de pago se pierden en silencio: MP cobra
+pero las Leyendas no llegan al jugador.
+
+Mientras `SOLO_ADMIN_COMPRA = true`, el webhook no se llama y esto no
+bloquea nada. Se cierra al encender la venta.
+
+### Cambio importante para el plan de deploy
+
+Antes eran 79 functions a borrar y recrear (todas menos `webhookPago`,
+que no cambiaba de generación). Ahora son **las 80**. El comando de
+borrado del plan hay que ampliarlo con `webhookPago`.
