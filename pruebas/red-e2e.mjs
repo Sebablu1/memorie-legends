@@ -12,7 +12,7 @@
  * importa —qué le LLEGA a cada jugador— sino sólo qué quedó escrito.
  */
 
-import { crearMotorEnRed } from "../functions/partida-red.js";
+import { crearMotorEnRed, MS_MIRADA_TOTAL } from "../functions/partida-red.js";
 import { MS_REVELACION } from "../public/js/reglas/vista.js";
 
 let fallos = 0;
@@ -239,6 +239,8 @@ console.log("\n=== 4. Un reintento no cuenta dos veces ===");
 console.log("\n=== 5. La ventana de reflejos, de punta a punta ===");
 {
   await red.accionDeTurno({ uid: "beto", codigo: CODIGO, accion: "mirar", clientActionId: "b-mira", posicion: 1 });
+  // La mirada dura 7 s y el servidor no la deja cerrar antes (ver §13b).
+  reloj = db.leer(`partidas/${CODIGO}`).ventana.abiertaEn + MS_MIRADA_TOTAL;
   await red.cerrarMirada({ codigo: CODIGO });
   ok(A.vista.fase === "descarte", "los dos pasan a la fase de descarte", A.vista.fase);
 
@@ -248,22 +250,51 @@ console.log("\n=== 5. La ventana de reflejos, de punta a punta ===");
   ok(A.vista.ventana.abiertaEn === 100000, "con la hora del SERVIDOR", A.vista.ventana.abiertaEn);
   ok(!("intentos" in A.vista.ventana), "pero no los intentos de nadie");
 
-  // El caso que justifica todo el protocolo, con numeros coherentes:
-  //
-  //   B reacciona en el ms 250 y tiene 25 ms de latencia  -> llega en el 275
-  //   A reacciona en el ms 120 y tiene 350 ms de latencia -> llega en el 470
-  //
-  // B LLEGA PRIMERO. Si el servidor resolviera por orden de llegada, ganaria
-  // B. Pero A reaccionó 130 ms antes, y eso es lo que se mide.
-  reloj = 100275;
+  /**
+   * El caso que justifica todo el protocolo, con números coherentes:
+   *
+   *   B reacciona en el ms 250 y tiene 25 ms de latencia  -> llega en el 275
+   *   A reacciona en el ms 120 y tiene 350 ms de latencia -> llega en el 470
+   *
+   * B LLEGA PRIMERO. Si el servidor resolviera por orden de llegada, ganaría
+   * B. Pero A reaccionó 130 ms antes, y eso es lo que se mide.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * LOS 250 Y LOS 120 SON DESDE QUE SE PUEDE DESCARTAR, NO DESDE CERO
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Y por eso llevan `MS_MIRADA_TOTAL` sumado, de los dos lados.
+   *
+   * La ventana abre con la MIRADA y dura 7 s de mirar más 5 de descartar, así
+   * que sus primeros 7 segundos son memorización: nadie puede descartar ahí.
+   * Esto decía `reloj = 100275` y `declarado: 250` a secas, de cuando
+   * `cerrarMirada` cerraba la mirada en el mismo instante del reparto y el
+   * descarte empezaba en el ms 0 de la ventana. Desde §13b eso ya no pasa.
+   *
+   * Van los dos sumados y no sólo el reloj, porque `declarado` también se mide
+   * desde `abiertaEn`: así lo calcula el cliente de verdad —ver
+   * `public/js/partida-red.js`, `tocadoEn + desfase - ventana.abiertaEn`—.
+   * Moviendo sólo el reloj la prueba seguiría pasando, y por el motivo
+   * equivocado: los dos declarados quedarían tan lejos de su llegada que
+   * `tiempoEfectivo` los descartaría por disparatados y los recortaría al piso
+   * de cada uno. Ganaría A igual, pero por tener más incertidumbre, no por
+   * haber reaccionado antes — que es exactamente lo contrario de lo que esta
+   * prueba existe para demostrar.
+   *
+   * Con los dos corridos, la cuenta es la misma de siempre, 7000 más arriba:
+   * el efectivo de A da 7120 y el de B 7250, o sea los mismos 130 ms.
+   */
+  const abreElDescarte = ventana.abiertaEn + MS_MIRADA_TOTAL;
+
+  reloj = abreElDescarte + 275;
   await capturar(() => red.intentarDescarte({
     uid: "beto", codigo: CODIGO, windowId: ventana.id, posicion: 0,
-    clientActionId: "b-descarta", declarado: 250, latencia: 25, incertidumbre: 15,
+    clientActionId: "b-descarta", declarado: MS_MIRADA_TOTAL + 250, latencia: 25, incertidumbre: 15,
   }));
-  reloj = 100470;
+  reloj = abreElDescarte + 470;
   await capturar(() => red.intentarDescarte({
     uid: "ana", codigo: CODIGO, windowId: ventana.id, posicion: 0,
-    clientActionId: "a-descarta", declarado: 120, latencia: 350, incertidumbre: 180,
+    clientActionId: "a-descarta", declarado: MS_MIRADA_TOTAL + 120, latencia: 350, incertidumbre: 180,
   }));
 
   const anotados = db.leer(`partidas/${CODIGO}`).ventana.intentos;

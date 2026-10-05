@@ -14,7 +14,7 @@
  * encontraría las filtraciones que uno ya imaginó; buscar el identificador en
  * el JSON entero encuentra también la que se cuele en un campo nuevo.
  */
-import { crearMotorEnRed } from "../functions/partida-red.js";
+import { crearMotorEnRed, MS_MIRADA_TOTAL } from "../functions/partida-red.js";
 import { MS_REVELACION } from "../public/js/reglas/vista.js";
 
 class E extends Error { constructor(c, m) { super(m); this.codigo = c; } }
@@ -58,6 +58,14 @@ let reloj = 100000;
 function trasLaGracia(db) {
   const v = db.leer("partidas/ABCDEF").ventana;
   return v.abiertaEn + v.duracionMs + v.graciaMs + 1;
+}
+
+/** El momento en que la mirada ya venció y el servidor deja cerrarla.
+ *  Se le pregunta a la partida por el mismo motivo que arriba: la ventana
+ *  abre con la mirada y cada ronda abre la suya, así que escribir el número
+ *  a mano serviría para la primera vuelta del bucle y no para las otras. */
+function trasLaMirada(db) {
+  return db.leer("partidas/ABCDEF").ventana.abiertaEn + MS_MIRADA_TOTAL;
 }
 const db = db0();
 const red = crearMotorEnRed({
@@ -128,6 +136,8 @@ for (let ronda = 0; ronda < 3; ronda++) {
     try { await red.accionDeTurno({ uid, codigo: "ABCDEF", accion: "mirar", clientActionId: `m${ronda}${i}`, posicion: i % 4 }); } catch {}
     auditar(`mirar r${ronda} ${uid}`);
   }
+  // La mirada dura 7 s y el servidor no la deja cerrar antes (ver §13b).
+  reloj = trasLaMirada(db);
   await red.cerrarMirada({ codigo: "ABCDEF" });
   auditar(`cerrarMirada r${ronda}`);
 

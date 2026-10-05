@@ -15,7 +15,7 @@
 
 import { crearMoverLeyendas } from "../functions/leyendas.js";
 import { crearAbandonarPartida } from "../functions/abandono.js";
-import { crearMotorEnRed } from "../functions/partida-red.js";
+import { crearMotorEnRed, MS_MIRADA_TOTAL } from "../functions/partida-red.js";
 import { MS_REVELACION } from "../public/js/reglas/vista.js";
 import { ESTADOS_SALA, MODOS } from "../public/js/reglas/salas.js";
 
@@ -148,6 +148,11 @@ const capturar = async (fn) => {
 };
 
 const partidaDe = (db) => db.leer(`partidas/${CODIGO}`);
+
+/** El momento en que la mirada ya venció y el servidor deja cerrarla.
+ *  Se le pregunta a la partida en vez de escribirlo: la ventana abre con la
+ *  mirada y su hora la fija el reparto. */
+const trasLaMirada = (db) => partidaDe(db).ventana.abiertaEn + MS_MIRADA_TOTAL;
 const saldoDe = (db, uid) => db.leer(`users/${uid}`).credits;
 const vistaDe = (db, uid) => db.leer(`partidas/${CODIGO}/vistas/${uid}`);
 
@@ -189,6 +194,8 @@ console.log("\n=== 2. La partida puede continuar sin él ===");
 {
   reloj = 3000000;
   const { db, enRed, abandonar } = await montar();
+  // La mirada dura 7 s y el servidor no la deja cerrar antes (ver §13b).
+  reloj = trasLaMirada(db);
   await enRed.cerrarMirada({ codigo: CODIGO });
   const { ventana } = await enRed.abrirVentana({ codigo: CODIGO });
   reloj = ventana.abiertaEn + 20000;
@@ -234,9 +241,11 @@ console.log("\n=== 3. El que abandonó no puede hacer nada más ===");
   }
 
   // Ni descartar en una ventana.
+  // La mirada dura 7 s y el servidor no la deja cerrar antes (ver §13b).
+  reloj = trasLaMirada(db);
   await enRed.cerrarMirada({ codigo: CODIGO });
   const { ventana } = await enRed.abrirVentana({ codigo: CODIGO });
-  reloj = ventana.abiertaEn + 300;
+  reloj = ventana.abiertaEn + MS_MIRADA_TOTAL + 300;
   const descarte = await capturar(() => enRed.intentarDescarte({
     uid: "ana", codigo: CODIGO, windowId: ventana.id, posicion: 0,
     clientActionId: "d", declarado: 200, latencia: 30, incertidumbre: 15,

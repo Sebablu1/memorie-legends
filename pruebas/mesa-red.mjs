@@ -10,7 +10,7 @@
  *   - que nada de eso filtre una carta.
  */
 
-import { crearMotorEnRed } from "../functions/partida-red.js";
+import { crearMotorEnRed, MS_MIRADA_TOTAL } from "../functions/partida-red.js";
 import { MS_REVELACION } from "../public/js/reglas/vista.js";
 import { crearFiltroDeVersion, elegibleParaPoder, pasoDelPoder } from "../public/js/reglas/red.js";
 
@@ -149,6 +149,12 @@ function trasLaGracia(db) {
   const v = db.leer(`partidas/${CODIGO}`).ventana;
   return v.abiertaEn + v.duracionMs + v.graciaMs + 1;
 }
+/** El momento en que la mirada ya venció y el servidor deja cerrarla.
+ *  Se le pregunta a la partida, igual que arriba: cada ronda abre su propia
+ *  ventana, así que el número escrito a mano valdría para una sola. */
+function trasLaMirada(db) {
+  return db.leer(`partidas/${CODIGO}`).ventana.abiertaEn + MS_MIRADA_TOTAL;
+}
 const CUATRO = ["ana", "beto", "caro", "dani"];
 const CODIGO = "MESA01";
 
@@ -254,6 +260,8 @@ console.log("\n=== 3. Cuatro jugadores, una ronda completa ===");
     ok(!enAlguna, "y no queda escrita en ninguna vista");
   }
 
+  // La mirada dura 7 s y el servidor no la deja cerrar antes (ver §13b).
+  reloj = trasLaMirada(db);
   await red.cerrarMirada({ codigo: CODIGO });
   ok(M.every((m) => m.estado.fase === "descarte"), "los cuatro pasan a descarte");
 
@@ -329,6 +337,8 @@ console.log("\n=== 4. Desconexión y reconexión ===");
   const { db, red } = montar();
   const M = CUATRO.map((u) => mesa(db, CODIGO, u));
   await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: CUATRO, nombres: CUATRO });
+  // La mirada dura 7 s y el servidor no la deja cerrar antes (ver §13b).
+  reloj = trasLaMirada(db);
   await red.cerrarMirada({ codigo: CODIGO });
   const { ventana } = await red.abrirVentana({ codigo: CODIGO });
   reloj = trasLaGracia(db);

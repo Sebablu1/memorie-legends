@@ -409,6 +409,22 @@ async function partidaEnDescarte() {
   reloj = 100000;
   const { db, red } = montar();
   await red.repartir({ yaSentados: true, codigo: "ABCDEF", jugadores: CUATRO, nombres: CUATRO });
+
+  /**
+   * Y recién acá se puede cerrar la mirada. El reloj avanza los 7 segundos que
+   * dura.
+   *
+   * Antes esto cerraba en el mismo instante del reparto, y funcionaba porque
+   * `cerrarMirada` no preguntaba la hora. §13b le puso dos guardas —la mirada
+   * no puede terminar antes de empezar ni antes de vencer— porque sin ellas
+   * cualquiera podía llamarla durante la cuenta regresiva y saltarles la
+   * memorización a los otros tres.
+   *
+   * El reloj se mueve DESPUÉS de repartir, que es lo que deja intacto el resto
+   * del archivo: `ventana.abiertaEn` se fija en el reparto, así que sigue
+   * valiendo 100000 y las comprobaciones del caso 2 no se tocan.
+   */
+  reloj = 100000 + MS_MIRADA_TOTAL;
   await red.cerrarMirada({ codigo: "ABCDEF" });
   const { ventana } = await red.abrirVentana({ codigo: "ABCDEF" });
   return { db, red, ventana };
