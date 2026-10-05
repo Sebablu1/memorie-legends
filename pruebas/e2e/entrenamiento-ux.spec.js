@@ -97,7 +97,12 @@ test("la pantalla de carga está en el HTML, no la inventa el JavaScript", async
   // repartir—. Si la creara el JavaScript, llegaría tarde a su propio trabajo.
   const html = await (await page.request.get("/mesa.html")).text();
   expect(html).toContain('id="veloCarga"');
-  expect(html).toContain("Cargando entrenamiento");
+  // El texto es NEUTRO a propósito: este mismo archivo sirve la mesa de
+  // entrenamiento y la de Leyendas, así que decía "Cargando entrenamiento…"
+  // también en una partida apostada. Lo que esta prueba defiende no cambió
+  // —que el velo venga en el HTML servido— y por eso el texto se actualiza
+  // en vez de sacarse la comprobación.
+  expect(html).toContain("Preparando la mesa");
   // WebP y no PNG: el velo llegó a mostrar un original de 149 KB para
   // dibujarlo a 260px. El escudo de 320 pesa 26 y es lo primero que se
   // descarga al entrar a la mesa.

@@ -215,6 +215,27 @@ async function pausar(page) {
 const carta = (page, jugador, pos) =>
   page.locator(`.jugador[data-jugador="${jugador}"] .carta[data-posicion="${pos}"]`);
 
+/**
+ * La misma carta, pero dentro del cuadro del poder.
+ *
+ * Dos de las pruebas de abajo tocaban la carta SOBRE LA MESA para elegir el
+ * objetivo, porque así se hacía en red: el modal se cerraba y se marcaba qué
+ * se podía tocar. Ahora el objetivo se elige adentro del modal, igual que en
+ * entrenamiento, y la mesa queda detrás del velo — Playwright lo dice con
+ * todas las letras: «subtree intercepts pointer events».
+ *
+ * Lo que se comprueba no cambió: que la carta termine boca arriba con la cara
+ * que mandó el servidor, y que la acción haya viajado. Lo único que se mudó es
+ * dónde se hace clic. Por eso `seVe` sigue mirando la mesa: el modal se cierra
+ * al elegir y la revelación ocurre allá.
+ *
+ * El cuadro usa `data-objetivo`/`data-pos` y la mesa `data-jugador`/
+ * `data-posicion`: son las mismas dos coordenadas con otro nombre, y el motor
+ * recibe las mismas.
+ */
+const cartaEnElCuadro = (page, jugador, pos) =>
+  page.locator(`#modal .objetivos [data-objetivo="${jugador}"][data-pos="${pos}"]`);
+
 /** Boca arriba y con la cara que mandó el servidor. */
 async function seVe(page, jugador, pos, cual) {
   await expect(carta(page, jugador, pos), "la carta sigue de dorso").toHaveClass(/\bvisible\b/);
@@ -247,7 +268,7 @@ test("la carta que mira un 8 se da vuelta", async ({ page }) => {
   });
 
   await page.locator('[data-accion="red-elegir-objetivo"]').click();
-  await carta(page, 2, 3).click();
+  await cartaEnElCuadro(page, 2, 3).click();
   await expect.poll(() => page.evaluate(() => window.__pedidos)).toEqual(["poderMirar"]);
   await seVe(page, 2, 3, DOCE);
 });
@@ -264,8 +285,8 @@ test("las dos cartas del 10 se dan vuelta", async ({ page }) => {
   });
 
   await page.locator('[data-accion="red-elegir-objetivo"]').click();
-  await carta(page, 0, 0).click();
-  await carta(page, 1, 2).click();
+  await cartaEnElCuadro(page, 0, 0).click();
+  await cartaEnElCuadro(page, 1, 2).click();
   await expect.poll(() => page.evaluate(() => window.__pedidos)).toEqual(["poderCambio"]);
   await seVe(page, 0, 0, SIETE);
   await seVe(page, 1, 2, DOCE);

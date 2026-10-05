@@ -2695,7 +2695,13 @@ button.accion.con-poder {
    La de red no tenía NINGUNA regla —ni relleno en las celdas— así que sus
    encabezados salían pegados: «JugadorEn manoTotal». Se veía sólo al
    terminar una partida apostada, que es la pantalla que menos conviene
-   tener descuidada. */
+   tener descuidada.
+
+   Y desde que la de red muestra las mismas seis columnas —el cambio del
+   corte y el total de la ronda, que antes no mostraba— comparten también
+   el alineado de los números, la fila del que cortó y los colores del
+   ajuste. Lo único que sigue siendo de una sola es `tr.propio`: en
+   entrenamiento uno siempre es el de abajo y no hace falta buscarse. */
 .tabla-final,
 .tabla-resultado {
   width: 100%;
@@ -2729,22 +2735,27 @@ button.accion.con-poder {
   background: rgba(212, 168, 67, 0.07);
 }
 
-.tabla-final td.num {
+.tabla-final td.num,
+.tabla-resultado td.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-.tabla-final tr.cortador td {
+.tabla-final tr.cortador td,
+.tabla-resultado tr.cortador td {
   color: var(--oro-claro);
   font-weight: 700;
   background: rgba(212, 168, 67, 0.07);
 }
 
-.tabla-final tr.fuera td { opacity: 0.45; }
+.tabla-final tr.fuera td,
+.tabla-resultado tr.fuera td { opacity: 0.45; }
 
 /* El ajuste del corte: verde si restó, rojo si castigó. */
-.tabla-final td.bueno { color: #8fd4b4; font-weight: 700; }
-.tabla-final td.malo { color: #d9604f; font-weight: 700; }
+.tabla-final td.bueno,
+.tabla-resultado td.bueno { color: #8fd4b4; font-weight: 700; }
+.tabla-final td.malo,
+.tabla-resultado td.malo { color: #d9604f; font-weight: 700; }
 
 .corona {
   font-size: 3.2rem;

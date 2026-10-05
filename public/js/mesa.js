@@ -1219,13 +1219,6 @@ function avisarSiMeToca() {
 
 /** Marca como pulsables sólo las cartas que la fase actual permite tocar. */
 function marcarCartasJugables() {
-  // Con un poder en curso lo elegible no es la mano propia sino lo que la
-  // regla del poder permita, que puede estar en la mesa de otro.
-  if (eligiendoPoder) {
-    marcarElegiblesDelPoder();
-    return;
-  }
-
   const miMano = document.querySelector(`.jugador[data-jugador="${YO}"] .mano`);
   if (!miMano) return;
 
@@ -1307,42 +1300,6 @@ function puedoAtacarAhi(objetivo, posicion) {
   return quePosicionesPuedoAtacar().some(
     (p) => p.objetivo === objetivo && p.posicion === posicion,
   );
-}
-
-/**
- * Resalta las cartas que el poder en curso permite tocar, y apaga el resto.
- *
- * No revela nada: marca posiciones, no cartas. Quién puede ser objetivo del
- * 8, 9 o 10 ya se sabe con sólo mirar la mesa —son los otros jugadores— y
- * cuántas cartas tiene cada uno también.
- */
-function marcarElegiblesDelPoder() {
-  const puede = elegibleParaPoder({
-    numero: eligiendoPoder.numero,
-    yo: YO,
-    jugadores: estado.jugadores,
-    propiaElegida: eligiendoPoder.propia,
-  });
-
-  document.querySelectorAll(".jugador[data-jugador]").forEach((jugadorEl) => {
-    const i = Number(jugadorEl.dataset.jugador);
-    jugadorEl.querySelectorAll(".carta[data-posicion]").forEach((cartaEl) => {
-      const pos = Number(cartaEl.dataset.posicion);
-      const elegible = puede(i, pos);
-      cartaEl.classList.toggle("elegible-poder", elegible);
-      // Lo no elegible se apaga: se ve que existe, pero que no es para ahora.
-      cartaEl.classList.toggle("apagada", !elegible);
-    });
-  });
-
-  // La que ya se eligió queda marcada, para no perderla de vista.
-  if (eligiendoPoder.propia !== null) {
-    const propia = document.querySelector(
-      `.jugador[data-jugador="${YO}"] .carta[data-posicion="${eligiendoPoder.propia}"]`,
-    );
-    propia?.classList.add("elegida-poder");
-    propia?.classList.remove("apagada");
-  }
 }
 
 function actualizarBotones() {
@@ -2653,12 +2610,12 @@ async function poderDeIA(i) {
 // ------------------------------------------------- acciones del humano
 
 dom.btnLevantar.addEventListener("click", () => {
+  sonidos.voltear();
   if (enRed()) {
     pedir("levantar", () => Red.levantar(salaPedida));
     return;
   }
   if (estado.fase !== "turno" || estado.indiceTurno !== YO) return;
-  sonidos.voltear();
   estado = levantar(estado);
   const poder = PODERES[estado.levantada?.numero];
   pista(
@@ -2675,6 +2632,7 @@ dom.btnLevantar.addEventListener("click", () => {
 });
 
 dom.btnTirar.addEventListener("click", async () => {
+  sonidos.whoosh();
   if (enRed()) {
     await pedir("tirar", () => Red.tirarCarta(salaPedida));
     return;
@@ -2684,7 +2642,6 @@ dom.btnTirar.addEventListener("click", async () => {
   // cualquier otra, la mesa tiene sus reflejos, y recién entonces se abre la
   // elección del poder. Preguntar antes le habría dado a las cartas de poder
   // un atajo que salteaba la ventana de todos.
-  sonidos.whoosh();
   estado = tirarCarta(estado);
   dibujar();
   if (await trasPonerMuestra()) {
@@ -2697,12 +2654,12 @@ dom.btnTirar.addEventListener("click", async () => {
 });
 
 dom.btnCortar.addEventListener("click", async () => {
+  sonidos.corte();
   if (enRed()) {
     await pedir("cortar", () => Red.cortar(salaPedida));
     return;
   }
   if (estado.fase !== "postLevantada" || estado.indiceTurno !== YO) return;
-  sonidos.corte();
   estado = cortar(estado);
   pista("Corte. Se revelan todas las manos…");
   dibujar();
@@ -2710,12 +2667,12 @@ dom.btnCortar.addEventListener("click", async () => {
 });
 
 dom.btnPasar.addEventListener("click", () => {
+  sonidos.clic();
   if (enRed()) {
     pedir("pasar", () => Red.pasarTurno(salaPedida));
     return;
   }
   if (estado.fase !== "postLevantada" || estado.indiceTurno !== YO) return;
-  sonidos.clic();
   estado = pasarTurno(estado);
   dibujar();
   cicloTurnos();
@@ -2727,6 +2684,10 @@ dom.btnHeVuelto?.addEventListener("click", heVuelto);
 // Clic en el mazo equivale a levantar.
 dom.mazoCarta.addEventListener("click", () => {
   if (enRed()) {
+    // Acá el sonido va DENTRO de la rama y no arriba, al revés que en los
+    // cuatro botones: abajo esto delega en `btnLevantar`, que ya suena. Puesto
+    // arriba, en entrenamiento se escucharía dos veces.
+    sonidos.voltear();
     pedir("levantar", () => Red.levantar(salaPedida));
     return;
   }
@@ -3365,13 +3326,28 @@ dom.modal.addEventListener("click", async (evento) => {
     return;
   }
   if (evento.target.closest('[data-accion="red-elegir-objetivo"]')) {
-    cerrarModal();
-    // Elegir el objetivo es un clic sobre la mesa, no otro modal: se marca
-    // qué se puede tocar y el clic siguiente manda la jugada.
-    const numero = miVista?.poderPendiente?.numero;
-    eligiendoPoder = { numero, propia: null };
-    dibujar();
-    pista(pasoDelPoder({ numero, propiaElegida: null }));
+    /**
+     * El objetivo se elige DENTRO del modal, igual que en entrenamiento.
+     *
+     * Antes esto cerraba el modal y marcaba las cartas elegibles sobre la
+     * mesa, para que el clic siguiente mandara la jugada. Era una decisión de
+     * diseño —el modal tapa la mesa, y en red hay otros tres esperando— y se
+     * dio de baja: las dos mitades del juego tienen que verse igual, y la de
+     * red se sentía incompleta justamente acá.
+     *
+     * Se llama a `abrirModalPoder`, la MISMA función del entrenamiento, sin
+     * una versión de red. Puede hacerlo porque todo lo que esa función lee
+     * —`estado.poderPendiente.{tipo,numero}` y, de cada jugador, `mano`,
+     * `nombre` y `eliminado`— viaja en la vista y lo arma `comoEstado`. Y
+     * porque `manoParaElegir` dibuja sólo el dorso: nunca mira el número, así
+     * que una carta ajena que llega como `{ oculta: true }` se dibuja igual
+     * que una de verdad.
+     *
+     * Lo que sí cambia es a dónde va el clic, y de eso se ocupa el manejador
+     * de `[data-objetivo]`, más abajo.
+     */
+    abrirModalPoder();
+    pista(pasoDelPoder({ numero: miVista?.poderPendiente?.numero, propiaElegida: null }));
     return;
   }
 
@@ -3526,6 +3502,13 @@ dom.modal.addEventListener("click", async (evento) => {
   const i = Number(objetivo.dataset.objetivo);
   const pos = Number(objetivo.dataset.pos);
   const { tipo } = estado.poderPendiente;
+
+  // En red la jugada no se resuelve acá: se manda y se espera la vista nueva.
+  // El modal es el mismo; lo que cambia es quién decide. Ver `pedirPoderEnRed`.
+  if (enRed()) {
+    await pedirPoderEnRed(i, pos);
+    return;
+  }
 
   if (tipo === "mirarPropia" || tipo === "mirarRival") {
     const r = usarPoderMirar(estado, i, pos);
@@ -3776,7 +3759,6 @@ let dejarDeRescatar = null;
 let descartando = false;
 
 /** Poder en curso: qué se está eligiendo. */
-let eligiendoPoder = null;
 
 /**
  * Las tres fases que no tienen reloj.
@@ -3998,10 +3980,28 @@ function pistaDeRed(vista) {
       return miTurno
         ? "Es tu turno. <b>Levantá</b> del mazo."
         : `Juega <b>${quien}</b>.`;
-    case "levantada":
-      return miTurno
-        ? "Cambiala por una tuya, o tirala."
-        : `<b>${quien}</b> está decidiendo.`;
+    case "levantada": {
+      if (!miTurno) return `<b>${quien}</b> está decidiendo.`;
+      /**
+       * Con una carta de poder en la mano, la pista dice QUÉ se pierde.
+       *
+       * Es el momento equivalente al modal de decisión del entrenamiento, que
+       * acá no existe: el servidor abre la fase `poder` recién cuando la carta
+       * ya se tiró, así que mientras se la tiene en la mano la única autoridad
+       * es esta línea. Y lo que estaba escrito —«Cambiala por una tuya, o
+       * tirala»— no decía lo único que hay que saber para decidir: que
+       * cambiarla deja el poder sin usar.
+       *
+       * La carta se mira acá y no en el servidor porque `vista.levantada` sólo
+       * viaja a quien está en turno (ver `reglas/vista.js`): nadie más puede
+       * saber que es un poder, y así tiene que seguir siendo.
+       */
+      const poder = PODERES[vista.levantada?.numero];
+      return poder
+        ? `Levantaste un <b>${vista.levantada.numero}</b>. <b>Tirala</b> para usar el poder, ` +
+          "o tocá una de tus cartas para <b>cambiarla</b> (perdés el poder)."
+        : "Cambiala por una tuya, o tirala.";
+    }
     case "poder":
       return miTurno
         ? "Levantaste un poder."
@@ -4358,7 +4358,6 @@ function pintarVista(vista) {
 
   // Si la fase dejó de ser la del poder —porque se resolvió, o porque a un
   // ausente se lo saltearon— la elección en curso ya no tiene sentido.
-  if (vista.fase !== "poder" && eligiendoPoder) eligiendoPoder = null;
 
   // Y lo mismo con la carta que se mandó a descartar: vale mientras dure SU
   // ventana. Entre una ventana y la siguiente la fase pasa por turno o por
@@ -4546,21 +4545,35 @@ function modalesDeRed(vista) {
  */
 function abrirModalPoderDeRed(vista) {
   const numero = vista.poderPendiente?.numero;
-  const explicacion =
-    {
-      7: "Mirá una carta <b>tuya</b>.",
-      8: "Mirá una carta de <b>otro jugador</b>.",
-      9: "Cambiá una carta tuya por una de otro, <b>a ciegas</b>.",
-      10: "Cambiá una carta tuya por una de otro, <b>viendo las dos</b>.",
-    }[numero] ?? "";
+  const tipo = vista.poderPendiente?.tipo;
+
+  /**
+   * La carta sale de la MUESTRA, no de `levantada`.
+   *
+   * Cuando la fase es `poder` la carta ya se tiró: está arriba del descarte, y
+   * `levantada` quedó en null. Es la misma carta —`poderPendiente.numero` sale
+   * de ella— pero hay que buscarla donde está.
+   *
+   * Es la diferencia con el entrenamiento, que muestra esta imagen un paso
+   * antes: allá la pregunta se hace al LEVANTAR, con la carta todavía en la
+   * mano. Acá se hace después de tirarla, que es cuando el servidor abre la
+   * fase. El momento no se movió —ver las reglas de este cambio— así que lo
+   * que se iguala es lo que se ve, no cuándo se pregunta.
+   */
+  const carta = vista.muestra;
 
   abrirModal(`
-    <h2>🔮 Levantaste un ${numero}</h2>
-    <p class="aviso-poder">${explicacion}</p>
-    <p class="aviso-suave">Usar el poder es opcional.</p>
-    <div class="botonera-modal">
-      <button class="accion sobria" data-accion="red-saltar-poder" type="button">No usarlo</button>
+    ${carta?.palo && carta?.numero
+      ? `<div class="carta-poder">
+           <img src="${caraDeCarta(carta)}" alt="${carta.numero} de ${carta.palo}" />
+         </div>`
+      : ""}
+    <h2>¡Levantaste un PODER ${numero}!</h2>
+    <p class="nombre-poder">${TITULOS_PODER[tipo] ?? ""}</p>
+    <p>${EFECTOS_PODER[tipo] ?? ""}</p>
+    <div class="botonera-poder">
       <button class="accion" data-accion="red-elegir-objetivo" type="button">🔮 Usar poder</button>
+      <button class="accion sobria" data-accion="red-saltar-poder" type="button">💨 No usarlo</button>
     </div>
   `);
 }
@@ -4773,20 +4786,42 @@ function pintarLogros() {
 
 /** Resultado de la ronda o de la partida, con lo que publicó el servidor. */
 function abrirModalFinDeRed(vista) {
+  /**
+   * Las mismas seis columnas que en entrenamiento, con el dato que ya llegaba.
+   *
+   * Tenía cuatro: Jugador, En mano, Total y el estado. Faltaban las dos que
+   * explican POR QUÉ cambió el puntaje —el −10 por quedarse sin cartas, el +10
+   * por cortar mal— así que cortabas perfecto, ganabas el bono, y lo único que
+   * veías era que tu total había bajado sin saber de dónde.
+   *
+   * No hubo que pedir nada nuevo: `puntosRonda` viaja por jugador en la vista
+   * y `puntosDeMano` también. La cuenta es la de `mostrarFinRonda`: el cambio
+   * es lo que el corte sumó o restó SOBRE la mano, o sea la ronda menos la
+   * mano.
+   */
   const filas = vista.jugadores
     .map((j, i) => {
-      const enMano = vista.puntosDeMano?.[i];
-      return `<tr${i === YO ? ' class="propio"' : ""}>
-        <td>${escapar(j.nombre)}</td>
-        <td>${enMano ?? "—"}</td>
-        <td>${j.puntos}</td>
+      const mano = vista.puntosDeMano?.[i];
+      const enRonda = j.puntosRonda ?? 0;
+      const cambio = mano == null ? null : enRonda - mano;
+      const esCortador = i === vista.indiceCortador;
+      return `<tr class="${i === YO ? "propio" : ""} ${esCortador ? "cortador" : ""} ${j.eliminado ? "fuera" : ""}">
+        <td>${escapar(j.nombre)}${esCortador ? " ✂️" : ""}</td>
+        <td class="num">${mano ?? "—"}</td>
+        <td class="num ${cambio < 0 ? "bueno" : cambio > 0 ? "malo" : ""}">${
+          cambio == null ? "—" : `${cambio > 0 ? "+" : ""}${cambio || 0}`
+        }</td>
+        <td class="num">${enRonda > 0 ? "+" : ""}${enRonda}</td>
+        <td class="num"><b>${j.puntos}</b></td>
         <td>${j.eliminado ? "eliminado" : ""}</td>
       </tr>`;
     })
     .join("");
 
   const tabla = `<table class="tabla-resultado">
-    <thead><tr><th>Jugador</th><th>En mano</th><th>Total</th><th></th></tr></thead>
+    <thead>
+      <tr><th>Jugador</th><th class="num">Mano</th><th class="num">Cambio</th><th class="num">Ronda</th><th class="num">Total</th><th></th></tr>
+    </thead>
     <tbody>${filas}</tbody></table>`;
 
   if (vista.fase === "finPartida") {
@@ -4918,9 +4953,116 @@ let pidiendo = false;
 
 /** Clic sobre una carta, en modo red. */
 /** Poder en curso: qué se está eligiendo. */
-// eligiendoPoder ya está declarado arriba
 
 // ---------- FUNCIÓN clicEnCartaDeRed CON LA VISUALIZACIÓN EN DESCARTE ----------
+/**
+ * El objetivo del poder, elegido dentro del modal, en red.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ES LA MISMA PANTALLA QUE EN ENTRENAMIENTO, CON OTRO QUE DECIDE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * El modal lo arma `abrirModalPoder`, la función del entrenamiento, sin una
+ * copia para red. Lo único que no se puede compartir es esto: allá la jugada
+ * se resuelve corriendo el motor sobre el estado local, y acá se manda y se
+ * espera la vista que publique el servidor. Pintar un resultado antes sería
+ * adivinar.
+ *
+ * El cuerpo es el que estaba en `clicEnCartaDeRed`, movido acá para que el
+ * clic sobre la mesa y el clic dentro del modal pidan exactamente lo mismo.
+ *
+ * Con el objetivo elegido adentro del modal, el camino de la mesa dejó de
+ * existir: se borraron `eligiendoPoder`, su rama en `clicEnCartaDeRed` y
+ * `marcarElegiblesDelPoder`, que resaltaba las cartas elegibles sobre la mesa.
+ * El resaltado ahora no hace falta — el modal muestra sólo los grupos que
+ * corresponden— y `elegibleParaPoder`, que era la regla de ese resaltado,
+ * sigue acá abajo decidiendo si el clic vale.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ `seleccionPropia` Y NO `eligiendoPoder.propia`
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque es la variable que el modal ya usa para marcar la carta elegida con
+ * la clase `seleccionada`, y la que limpian los dos caminos que cancelan.
+ * Con dos variables para el mismo dato, el día que una se limpie y la otra no,
+ * el 9 siguiente arranca con media jugada vieja adentro.
+ */
+async function pedirPoderEnRed(indiceJugador, posicion) {
+  const numero = estado.poderPendiente?.numero;
+  if (!numero) return;
+
+  // La misma regla que pinta las cartas decide si el clic vale. Si fueran dos
+  // reglas distintas, tarde o temprano una se vería elegible y al tocarla no
+  // pasaría nada.
+  const puede = elegibleParaPoder({
+    numero,
+    yo: YO,
+    jugadores: estado.jugadores,
+    propiaElegida: seleccionPropia,
+  });
+  if (!puede(indiceJugador, posicion)) {
+    sonidos.error();
+    pista(`⚠️ Esa carta no. ${pasoDelPoder({ numero, propiaElegida: seleccionPropia })}`);
+    return;
+  }
+
+  // 7 y 8: un solo clic, sobre la carta a mirar.
+  if (numero === 7 || numero === 8) {
+    seleccionPropia = null;
+    cerrarModal();
+    const r = await pedir("poder", () =>
+      Red.accion(salaPedida, "poderMirar", {
+        posicion,
+        objetivo: { indice: indiceJugador },
+      }),
+    );
+    if (r?.carta) mostrarUnMomento(indiceJugador, posicion, r.carta);
+    return;
+  }
+
+  // 9 y 10: primero una carta propia, después una ajena. Mismo orden y mismas
+  // marcas que en entrenamiento, incluido el paso al grupo siguiente.
+  if (indiceJugador === YO) {
+    seleccionPropia = posicion;
+    dom.modal
+      .querySelectorAll('[data-objetivo="' + YO + '"]')
+      .forEach((el) =>
+        el.classList.toggle("seleccionada", Number(el.dataset.pos) === posicion),
+      );
+    mostrarGrupo(grupoActual() + 1);
+    return;
+  }
+
+  if (seleccionPropia == null) {
+    const p = dom.modal.querySelector("p");
+    if (p) p.textContent = "Primero elegí una carta tuya.";
+    return;
+  }
+
+  const propia = seleccionPropia;
+  seleccionPropia = null;
+  cerrarModal();
+
+  const r = await pedir("poder", () =>
+    Red.accion(salaPedida, "poderCambio", {
+      posicion: propia,
+      objetivo: { indice: indiceJugador, posicion },
+    }),
+  );
+
+  // El 10 muestra las dos cartas y pregunta; el 9 cambia a ciegas y ya está.
+  //
+  // Las cartas llegan en la RESPUESTA a este pedido, no en la vista, y ésa es
+  // toda la protección: si viajaran en la vista las tendrían los cuatro.
+  if (r?.revelada?.propia || r?.revelada?.rival) {
+    revelaciones.set(clave(YO, propia), r.revelada.propia);
+    revelaciones.set(clave(indiceJugador, posicion), r.revelada.rival);
+    dibujar();
+    efectoCambio("cambioConVista", YO, propia, indiceJugador, posicion);
+    preguntarSiCambia(r.revelada, propia, indiceJugador, posicion);
+  }
+}
+
 async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
   if (!miVista) return;
 
@@ -4999,71 +5141,6 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
   }
 
   // ---- Resto del código original (poderes, mirar, etc.) ----
-  if (eligiendoPoder && miVista.fase === "poder") {
-    const numero = eligiendoPoder.numero;
-
-    // La misma regla que pinta las cartas decide si el clic vale. Si fueran
-    // dos reglas distintas, tarde o temprano una carta se vería elegible y
-    // al tocarla no pasaría nada.
-    const puede = elegibleParaPoder({
-      numero,
-      yo: YO,
-      jugadores: estado.jugadores,
-      propiaElegida: eligiendoPoder.propia,
-    });
-    if (!puede(indiceJugador, posicion)) {
-      sonidos.error();
-      pista(
-        `⚠️ Esa carta no. ${pasoDelPoder({ numero, propiaElegida: eligiendoPoder.propia })}`,
-      );
-      return;
-    }
-
-    // 7 y 8: un solo clic, sobre la carta a mirar.
-    if (numero === 7 || numero === 8) {
-      const objetivo = { indice: indiceJugador };
-      eligiendoPoder = null;
-      dibujar();
-      const r = await pedir("poder", () =>
-        Red.accion(salaPedida, "poderMirar", { posicion, objetivo }),
-      );
-      if (r?.carta) mostrarUnMomento(indiceJugador, posicion, r.carta);
-      return;
-    }
-
-    // 9 y 10: primero una carta propia, después una ajena.
-    if (eligiendoPoder.propia === null) {
-      eligiendoPoder.propia = posicion;
-      dibujar();
-      pista(pasoDelPoder({ numero, propiaElegida: posicion }));
-      return;
-    }
-
-    const propia = eligiendoPoder.propia;
-    eligiendoPoder = null;
-    dibujar();
-    const r = await pedir("poder", () =>
-      Red.accion(salaPedida, "poderCambio", {
-        posicion: propia,
-        objetivo: { indice: indiceJugador, posicion },
-      }),
-    );
-    // El 10 muestra las dos cartas y pregunta; el 9 cambia a ciegas y ya está.
-    //
-    // Las cartas llegan en la RESPUESTA a este pedido, no en la vista, y ésa
-    // es toda la protección: si viajaran en la vista las tendrían los cuatro.
-    // Por eso el modal se abre acá, con lo que devolvió el servidor, y no
-    // desde `modalesDeRed`, que sólo ve lo que es público.
-    if (r?.revelada?.propia || r?.revelada?.rival) {
-      revelaciones.set(clave(YO, propia), r.revelada.propia);
-      revelaciones.set(clave(indiceJugador, posicion), r.revelada.rival);
-      dibujar();
-      efectoCambio("cambioConVista", YO, propia, indiceJugador, posicion);
-      preguntarSiCambia(r.revelada, propia, indiceJugador, posicion);
-    }
-    return;
-  }
-
   if (miVista.fase === "mirar" && indiceJugador === YO) {
     // Antes de que abra, ni mirar ni descartar: el servidor rechazaría las
     // dos, y la pista ya dice qué se está esperando.
@@ -5221,8 +5298,23 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
  */
 function mostrarUnMomento(indiceJugador, posicion, carta, ms = MS_MIRAR) {
   const llave = clave(indiceJugador, posicion);
+  /**
+   * El sonido y el barrido, que faltaban.
+   *
+   * Esto hace lo mismo que `revelarUnMomento` del entrenamiento menos estas
+   * dos líneas, y la diferencia se sentía: en red usabas un 7 o un 8 y la
+   * carta aparecía y desaparecía muda, sin que nada dijera que había pasado
+   * algo. Son las dos que convierten una carta que cambia de dibujo en una
+   * carta que alguien dio vuelta.
+   *
+   * No se unifican las dos funciones: `revelarUnMomento` es `async` y se
+   * espera —el entrenamiento encadena lo que sigue— y ésta no puede esperar,
+   * porque lo que sigue en red lo manda el servidor cuando quiere.
+   */
+  sonidos.voltear();
   revelaciones.set(llave, carta);
   dibujar();
+  marcarEfecto(indiceJugador, posicion, "efecto-mirar", ms);
   setTimeout(() => {
     revelaciones.delete(llave);
     dibujar();
@@ -5414,9 +5506,11 @@ function mostrarMesaEnRedPendiente(sala) {
 }
 
 if (salaPedida) {
-  // El velo dice "Cargando entrenamiento…", que acá no corresponde. Se quita
-  // enseguida: la mesa por Leyendas tiene su propio camino y no pasa por
-  // `arrancarRonda`, que es donde se saca en entrenamiento.
+  // El velo se quita enseguida: la mesa por Leyendas tiene su propio camino y
+  // no pasa por `arrancarRonda`, que es donde se saca en entrenamiento.
+  //
+  // (Antes acá decía además que el velo mentía, porque su texto era "Cargando
+  // entrenamiento…" en los dos modos. Ya no: el texto es neutro.)
   quitarVeloCarga();
   entrarDesdeSala();
 } else {
