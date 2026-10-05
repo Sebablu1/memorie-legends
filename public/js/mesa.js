@@ -60,7 +60,7 @@ import {
 } from "./modulos/cartas.js";
 import { retratoDe, usarRetratoPropio, RETRATO_INICIAL } from "./modulos/retratos.js";
 import { esRutaDelSitio } from "./reglas/catalogo.js";
-import { caraDeCarta } from "./reglas/baraja.js";
+import { caraDeCarta, imagenCarta, PALOS, NUMEROS } from "./reglas/baraja.js";
 import { guardarVestuario, vestuarioGuardado } from "./modulos/vestuario.js";
 import { LIMITE_ELIMINACION, puntosMano } from "./reglas/puntaje.js";
 import * as IA from "./reglas/ia.js";
@@ -384,6 +384,48 @@ let YO = 0;
 // carta. Ésa es la línea que saca el salto — la mesa abre ya vestida y la
 // lectura de Firestore, cuando llega, casi siempre confirma lo mismo.
 vestirLaMesa();
+
+/**
+ * Las 48 caras, pedidas apenas la mesa deja de estar ocupada.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * QUÉ ARREGLA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Cada cara se pedía recién cuando su carta llegaba a la mesa, y entonces la
+ * carta se mostraba vacía hasta que la imagen bajaba. Era el destello blanco
+ * —ahora oscuro, ver `.carta .cara` en `mesa.css`— y el fondo lo disimula pero
+ * no lo saca: lo que falta sigue siendo la carta.
+ *
+ * Las 48 y no «las que se van a usar», porque las que se van a usar ya se
+ * piden solas: en el primer dibujado el navegador pide las dieciséis caras de
+ * la mesa —`dibujarCarta` escribe el `<img>` aunque la carta esté boca abajo—.
+ * Las que faltan son las treinta y dos del mazo, y ésas son justamente las que
+ * aparecen de golpe: la que levantás, la que queda de muestra, la del cuadro
+ * del poder.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * EL `setTimeout` DE CERO, Y QUE NO SE ESPERE NADA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * El cero no es «enseguida»: es «después de que termine lo que está haciendo
+ * ahora». Deja salir el primer dibujado antes de soltar cuarenta y ocho
+ * pedidos, que si no competirían con las imágenes que la mesa necesita YA.
+ *
+ * Y no se espera a que lleguen. Son 3,5 MB: dibujar la mesa recién cuando
+ * estén todas cambiaría medio segundo de carta vacía por varios segundos de
+ * pantalla de carga con datos móviles. Si llegan a tiempo, la carta sale
+ * entera; si no, sale con el fondo oscuro, que es exactamente lo de antes.
+ * Por eso tampoco hay nada que falle acá: una imagen que no baja no rompe la
+ * partida, sólo deja de ahorrar el destello.
+ */
+setTimeout(() => {
+  for (const palo of PALOS) {
+    for (const numero of NUMEROS) {
+      new Image().src = imagenCarta(palo, numero);
+    }
+  }
+}, 0);
 
 /**
  * Cómo corre esta mesa.
