@@ -1136,9 +1136,24 @@ body::before {
   box-shadow: var(--sombra-carta);
 }
 
+/* El mismo fondo que el dorso, y antes era el crema del papel (#f6f1e4).
+
+   Ése era el destello blanco. La cara se pinta con este fondo mientras su
+   `<img>` no llegó, y la imagen tapa el fondo entero apenas llega —`width` y
+   `height` al 100 % con `object-fit: cover`, abajo—, así que el crema no se
+   veía NUNCA salvo en ese rato. Un rectángulo blanco del tamaño de una carta
+   sobre una mesa oscura.
+
+   Medido: forzando una cara con la imagen demorada, la carta queda blanca
+   entera hasta que llega. Pasa cada vez que una cara se muestra por primera
+   vez —la mirada inicial, la muestra, la carta que levantás— porque recién ahí
+   se pide esa imagen.
+
+   Oscuro no es sólo «menos feo»: una carta que todavía no cargó se parece a
+   una carta dada vuelta, que es lo que el jugador ya espera ver. */
 .carta .cara {
   transform: rotateY(180deg);
-  background: #f6f1e4;
+  background: var(--noche-3);
 }
 
 .carta.jugable:hover .cara,
