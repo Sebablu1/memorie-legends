@@ -388,6 +388,44 @@ console.log("\n=== El webhook no lee el estado del payload ===");
      /runWith\(/.test(codigo) ? "hay un runWith en index.js" : undefined);
   ok(codigo.includes('"MP_ACCESS_TOKEN"') && codigo.includes('"MP_WEBHOOK_SECRET"'),
      "y los nombres son los que lee el código");
+
+  /**
+   * Y la dirección a la que se le pide a Mercado Pago que avise.
+   *
+   * No es una prueba de comportamiento: eso ya lo cubre el doble de más
+   * arriba, que comprueba que `urlWebhook` llegue a `notification_url`. Con un
+   * valor inventado, además, así que esa prueba pasa igual diga lo que diga la
+   * constante de verdad.
+   *
+   * Esto es un cerrojo contra volver a la dirección de v1. En v1 el webhook
+   * vivía en `cloudfunctions.net`; en v2 es un servicio de Cloud Run y termina
+   * en `run.app`. Si alguien revierte esa línea —un merge, un copiar y pegar de
+   * una rama vieja— no falla nada: la función existe, la orden se crea, el
+   * checkout abre. Lo único que pasa es que el aviso de pago se manda a una
+   * dirección muerta, y entonces Mercado Pago cobra y las Leyendas no llegan
+   * nunca. Sin error en ningún lado.
+   *
+   * Se comprueba la FORMA y no la dirección exacta: el sufijo lo asigna Google
+   * y cambiaría si alguna vez hay que recrear el servicio. Lo que no puede
+   * cambiar es que sea de Cloud Run.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * VA CONTRA `fuente` Y NO CONTRA `codigo`, Y ES OBLIGATORIO
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * `codigo` es el archivo sin comentarios, y el que los saca —arriba, donde
+   * se arma— es un `replace` que borra desde dos barras seguidas hasta el fin
+   * de la línea. No sabe distinguir un comentario de una cadena, así que se
+   * come TODA dirección `https` desde las barras del protocolo en adelante: la
+   * constante queda en `"https:` y la expresión de abajo no matchea nunca.
+   *
+   * Lo escribí primero contra `codigo` y daba rojo con la dirección correcta
+   * puesta, que es la peor clase de prueba. Cualquier aserción futura sobre
+   * una URL de este archivo tiene el mismo problema y la misma solución.
+   */
+  ok(/const URL_WEBHOOK = "https:\/\/[^"]+\.run\.app"/.test(fuente),
+     "y la URL del webhook es la de Cloud Run, no la de v1",
+     fuente.match(/const URL_WEBHOOK = "[^"]*"/)?.[0]);
 }
 
 // ═══════════════════ la sonda entiende TODO lo que el webhook contesta

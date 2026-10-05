@@ -36,10 +36,12 @@
  * ─────────────────────────────────────────────────────────────────────────
  *
  * Una función de v2 se publica en OTRA dirección, y eso no se puede saber
- * desde acá: la asigna Cloud Run al desplegar. `URL_WEBHOOK`, más abajo, no
- * es documentación —viaja en cada preferencia de pago como `notification_url`—
- * así que quedó marcada con un PENDIENTE y el comando que devuelve la
- * dirección nueva.
+ * antes de desplegarla: la asigna Cloud Run al crear el servicio. Ya está
+ * desplegada y `URL_WEBHOOK`, más abajo, tiene la nueva — que no es
+ * documentación: viaja en cada preferencia como `notification_url`.
+ *
+ * Falta la otra mitad, y no está en este archivo: el panel de Mercado Pago
+ * sigue apuntando a la de v1 y se cambia a mano. Ver `URL_WEBHOOK`.
  *
  * Se migró ahora y no antes porque los pagos están apagados
  * (`SOLO_ADMIN_COMPRA`): no hay ninguna compra en vuelo que se pueda perder
@@ -1165,34 +1167,46 @@ const esSandboxMP = () => String(process.env.MP_ACCESS_TOKEN ?? "").startsWith("
  * de Mercado Pago, así que cambiarla acá sin cambiarla allá corta los avisos de
  * pago — y un aviso perdido es una compra cobrada que nunca se acredita.
  *
+ * Y NO es documentación: el valor viaja en cada preferencia como
+ * `notification_url` —ver `crearOrdenDeCompra`—. Es la dirección que Mercado
+ * Pago va a usar de verdad.
+ *
  * ─────────────────────────────────────────────────────────────────────────
- * ⚠️ PENDIENTE: ESTA DIRECCIÓN ES LA DE v1 Y YA NO EXISTE
+ * POR QUÉ CAMBIÓ DE DOMINIO, Y POR QUÉ NO SE PODÍA ESCRIBIR ANTES
  * ─────────────────────────────────────────────────────────────────────────
  *
- * `webhookPago` pasó a v2, y una función de v2 se publica en una dirección de
- * Cloud Run que asigna Google al desplegar. No se puede escribir de antemano
- * ni inventarla: hay que leerla después del despliegue, con
+ * En v1 vivía en `us-central1-memorie-legends.cloudfunctions.net/webhookPago`,
+ * una dirección predecible: región, proyecto y nombre de la función. En v2
+ * cada función es un servicio de Cloud Run y su dirección lleva un sufijo que
+ * asigna Google al crearla —`ba7pwd2sjq` acá—, así que no se puede componer
+ * de antemano ni adivinar. Hay que desplegar primero y leerla después:
  *
  *     gcloud functions describe webhookPago --region=us-central1 \
  *       --project=memorie-legends --gen2 --format="value(serviceConfig.uri)"
  *
- * y hacer DOS cosas con ella: pegarla acá abajo y registrarla en el panel de
- * Mercado Pago. Las dos, o los avisos de pago no llegan.
+ * Por eso este bloque estuvo un tiempo con un PENDIENTE y la dirección vieja
+ * adentro: entre la migración y el despliegue no había forma honesta de
+ * escribir la nueva. Ya está desplegada y la de abajo salió de ese comando.
  *
- * Esto NO es documentación muerta: el valor viaja en cada preferencia como
- * `notification_url` —ver `crearOrdenDeCompra`— así que mientras diga la
- * dirección vieja, cada compra le pide a Mercado Pago que avise a una función
- * que ya no está.
+ * ─────────────────────────────────────────────────────────────────────────
+ * LO QUE FALTA, Y NO ESTÁ EN ESTE ARCHIVO
+ * ─────────────────────────────────────────────────────────────────────────
  *
- * No rompe nada hoy porque los pagos están apagados (`SOLO_ADMIN_COMPRA`).
- * Es lo primero que hay que cerrar antes de volver a prenderlos.
+ * Esta constante es la mitad. La otra es el panel de Mercado Pago, que tiene
+ * su propia configuración de notificaciones y sigue apuntando a la de v1. Se
+ * cambia a mano, allá.
+ *
+ * Mientras tanto no se pierde ninguna compra porque los pagos están apagados
+ * (`SOLO_ADMIN_COMPRA`), pero las dos tienen que estar antes de prender la
+ * venta: con una sola, Mercado Pago cobra y las Leyendas no llegan nunca — sin
+ * error en ningún lado, porque el aviso simplemente no aparece.
  *
  * `URL_VUELTA` sí es una página del sitio: es adonde el comprador aterriza
  * después de pagar. Va al dominio propio, que es el que la gente reconoce.
  * El de Firebase sigue sirviendo el sitio igual, así que esto es cosmético
  * para el comprador y no cambia ningún cobro.
  */
-const URL_WEBHOOK = "https://us-central1-memorie-legends.cloudfunctions.net/webhookPago";
+const URL_WEBHOOK = "https://webhookpago-ba7pwd2sjq-uc.a.run.app";
 const URL_VUELTA = "https://memorielegends.com/tienda.html";
 
 /**
