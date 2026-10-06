@@ -1938,3 +1938,96 @@ cartas elegibles sobre la mesa. Con el objetivo elegido adentro del
 modal nadie las ponía ya. Quedaron sin usar en el CSS las clases
 `.elegible-poder` y `.elegida-poder`: no molestan, pero si alguien
 busca quién las pone, no hay nadie.
+
+## 43. Migración a São Paulo — HECHA
+
+Completado el 5/10/2026.
+
+- Firestore migrado a la base `southamerica` (región
+  `southamerica-east1`) dentro del mismo proyecto. Multi-database del
+  plan Blaze.
+- Export de `(default)` en Iowa → bucket `memorie-legends-backup` →
+  copia a `memorie-legends-backup-sa` → import a `southamerica`.
+- Reglas copiadas a mano a la base nueva.
+- Las 80 functions redesplegadas en `southamerica-east1` (recreate
+  completo: las de us-central1 borradas, las nuevas creadas).
+- Cliente (`public/js/firebase.js`) apuntando a la base y la región
+  nuevas. Ninguna de las dos se hereda del `firebaseConfig`: se piden
+  en cada `get*`, y por omisión serían `(default)` y `us-central1`.
+- `firebase.json` con `"database": "southamerica"` para que
+  `firebase deploy --only firestore:rules` apunte al lugar correcto.
+  Sin eso, `fsConfig.js` cae en `(default)` y las reglas se
+  desplegarían a la base abandonada con mensaje de éxito.
+- 15 herramientas de `herramientas/` actualizadas a la base nueva.
+- Los 4 jobs de Cloud Scheduler recreados en southamerica-east1.
+
+### Latencia medida
+
+- Antes: ~200-400 ms por jugada (us-central1 desde Uruguay).
+- Después: ~60-110 ms por jugada (southamerica-east1).
+
+Esto es latencia de RED, que es lo que la mudanza podía mejorar. El
+arranque en frío es otro problema: lo que lo bajó fue sacar
+`firebase-functions/v1` del grafo de imports (§38), de 1526 a 752 ms.
+
+### La URL del webhook
+
+El mismo servicio contesta en dos direcciones:
+
+    https://southamerica-east1-memorie-legends.cloudfunctions.net/webhookPago
+    https://webhookpago-ba7pwd2sjq-rj.a.run.app
+
+Se eligió la primera: región, proyecto y nombre, sin el sufijo que
+sortea Google al crear el servicio. Si algún día hay que recrearlo, el
+sufijo puede salir distinto y la segunda quedaría muerta. Para una
+dirección registrada afuera, eso importa.
+
+Comprobadas con un GET, que el handler rechaza con 405 sin tocar nada:
+las dos de São Paulo contestan 405 —o sea que llegan hasta nuestro
+código— y la de Iowa, 404.
+
+El cerrojo de `pruebas/pagos.mjs` cambió con esto. Pedía que la
+dirección terminara en `run.app`, lo que alcanzaba cuando la de v1
+vivía en `cloudfunctions.net` y la de v2 en Cloud Run. Ahora la buena
+y la mala sólo se diferencian en la región, así que lo que se mira es
+la región.
+
+### Pendientes
+
+1. **El panel de Mercado Pago** sigue apuntando a la URL de v1
+   (us-central1), que devuelve 404 desde la mudanza. Hay que cambiarla
+   a la de arriba. No urge: los pagos están apagados
+   (`SOLO_ADMIN_COMPRA`). Pero es lo primero antes de prenderlos: con
+   una sola de las dos mitades, Mercado Pago cobra y las Leyendas no
+   llegan nunca, sin error en ningún lado.
+
+2. **`herramientas/sondear-webhook.mjs:67`** sigue con la URL vieja por
+   defecto. Tiene su propio ⚠️ PENDIENTE escrito y acepta
+   `URL_WEBHOOK` por entorno, así que no bloquea. Actualizarla junto
+   con el panel.
+
+3. **Dos herramientas usan `lib/firestore`** (ruta interna de
+   `firebase-admin`) para acceder a la base con nombre:
+   `auditar-catalogo.mjs` y `salas-retenidas.mjs`. Llegan al paquete
+   por ruta relativa —no está en el `node_modules` de la raíz— y por
+   ruta relativa Node no aplica el mapa de `exports`, así que
+   `firebase-admin/firestore` no resuelve. Es frágil: si el paquete
+   reacomoda carpetas, se rompen. Ruidoso, al menos, no silencioso. La
+   solución de fondo sería instalar `firebase-admin` en la raíz.
+
+4. **La base `(default)` en Iowa sigue con todos los datos.** No se
+   borró. Queda como respaldo. Y es el riesgo de fondo de toda esta
+   migración: pedir la base por omisión NO da error, contesta bien y
+   mira lo que ya no juega nadie. Por eso cada `getFirestore` del
+   repositorio lleva el nombre escrito.
+
+5. **No se verificó que las reglas de la base `southamerica` sean
+   idénticas a las de `(default)`.** Se copiaron a mano. Una
+   comparación línea por línea sería prudente, y ahora que
+   `firebase.json` apunta al lugar correcto, un
+   `firebase deploy --only firestore:rules` las dejaría iguales a las
+   del repositorio — que es la fuente de verdad.
+
+6. **No se verificaron los índices de la base nueva.** Una consulta
+   compuesta podría pedir uno que no se haya migrado, y eso recién se
+   ve al correrla. Las herramientas de ranking son las candidatas.

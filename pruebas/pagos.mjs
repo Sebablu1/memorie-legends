@@ -397,17 +397,34 @@ console.log("\n=== El webhook no lee el estado del payload ===");
    * valor inventado, además, así que esa prueba pasa igual diga lo que diga la
    * constante de verdad.
    *
-   * Esto es un cerrojo contra volver a la dirección de v1. En v1 el webhook
-   * vivía en `cloudfunctions.net`; en v2 es un servicio de Cloud Run y termina
-   * en `run.app`. Si alguien revierte esa línea —un merge, un copiar y pegar de
-   * una rama vieja— no falla nada: la función existe, la orden se crea, el
-   * checkout abre. Lo único que pasa es que el aviso de pago se manda a una
-   * dirección muerta, y entonces Mercado Pago cobra y las Leyendas no llegan
-   * nunca. Sin error en ningún lado.
+   * Esto es un cerrojo contra volver a una dirección muerta. Si alguien
+   * revierte esa línea —un merge, un copiar y pegar de una rama vieja— no
+   * falla nada: la función existe, la orden se crea, el checkout abre. Lo único
+   * que pasa es que el aviso de pago se manda a donde ya no hay nadie, y
+   * entonces Mercado Pago cobra y las Leyendas no llegan nunca. Sin error en
+   * ningún lado.
    *
-   * Se comprueba la FORMA y no la dirección exacta: el sufijo lo asigna Google
-   * y cambiaría si alguna vez hay que recrear el servicio. Lo que no puede
-   * cambiar es que sea de Cloud Run.
+   * ───────────────────────────────────────────────────────────────────────
+   * LO QUE SE MIRA CAMBIÓ CON LA MUDANZA A SÃO PAULO, Y TENÍA QUE CAMBIAR
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Pedía que la dirección terminara en `run.app`, porque la de v1 vivía en
+   * `cloudfunctions.net` y la de v2 era un servicio de Cloud Run: el dominio
+   * alcanzaba para distinguirlas.
+   *
+   * Al mudarse a `southamerica-east1` dejó de alcanzar. El mismo servicio
+   * contesta en las dos formas, y se eligió la de `cloudfunctions.net` —región,
+   * proyecto y nombre, sin el sufijo que sortea Google— porque sobrevive a que
+   * el servicio se recree. O sea que la dirección BUENA de hoy y la MALA de
+   * antes sólo se diferencian en la región:
+   *
+   *     https://us-central1-memorie-legends.cloudfunctions.net/webhookPago        ← muerta
+   *     https://southamerica-east1-memorie-legends.cloudfunctions.net/webhookPago ← viva
+   *
+   * Así que ahora lo que se mira es la REGIÓN, que es lo único que de verdad
+   * las separa. Y se agrega la comprobación en negativo —que no diga
+   * `us-central1`— porque es el error concreto que se quiere agarrar y así el
+   * rojo lo nombra en vez de hacerlo deducir.
    *
    * ───────────────────────────────────────────────────────────────────────
    * VA CONTRA `fuente` Y NO CONTRA `codigo`, Y ES OBLIGATORIO
@@ -423,9 +440,14 @@ console.log("\n=== El webhook no lee el estado del payload ===");
    * puesta, que es la peor clase de prueba. Cualquier aserción futura sobre
    * una URL de este archivo tiene el mismo problema y la misma solución.
    */
-  ok(/const URL_WEBHOOK = "https:\/\/[^"]+\.run\.app"/.test(fuente),
-     "y la URL del webhook es la de Cloud Run, no la de v1",
-     fuente.match(/const URL_WEBHOOK = "[^"]*"/)?.[0]);
+  const direccion = fuente.match(/const URL_WEBHOOK =\s*"([^"]*)"/)?.[1];
+
+  ok(/^https:\/\/southamerica-east1-[\w-]+\.cloudfunctions\.net\/webhookPago$/.test(direccion ?? ""),
+     "y la URL del webhook es la de São Paulo", direccion);
+
+  ok(!/us-central1/.test(direccion ?? ""),
+     "y no volvió a la de us-central1, que devuelve 404 desde la mudanza",
+     /us-central1/.test(direccion ?? "") ? direccion : undefined);
 }
 
 // ═══════════════════ la sonda entiende TODO lo que el webhook contesta

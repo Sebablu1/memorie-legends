@@ -1215,41 +1215,44 @@ const esSandboxMP = () => String(process.env.MP_ACCESS_TOKEN ?? "").startsWith("
  * Pago va a usar de verdad.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * ⚠️ PENDIENTE: ESTA DIRECCIÓN ES LA DE us-central1 Y VA A DEJAR DE EXISTIR
+ * DOS MUDANZAS, DOS DIRECCIONES, Y POR QUÉ ÉSTA NO LLEVA EL HASH
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Es la segunda vez que este bloque queda con una dirección vieja adentro, y
- * por el mismo motivo que la primera: una función de v2 es un servicio de
- * Cloud Run y su dirección lleva un sufijo que asigna Google al CREARLA. No se
- * puede componer ni adivinar; hay que desplegar y leerla.
+ * Este bloque estuvo con una dirección vieja adentro dos veces. La primera fue
+ * la mudanza de v1 a v2; la segunda, la de región. En las dos por el mismo
+ * motivo: una función de v2 es un servicio de Cloud Run y su dirección lleva
+ * un sufijo que asigna Google al CREARLA, y mudar de región no mueve nada —
+ * borra allá y crea acá, con sufijo nuevo. El de Iowa era `-uc`, el de São
+ * Paulo es `-rj`.
  *
- * La primera vez fue la mudanza de v1 a v2. Ésta es la mudanza de región: las
- * ochenta pasan a `southamerica-east1`, y una función no cambia de lugar — se
- * borra en Iowa y nace en São Paulo, con dirección nueva. La de abajo va a
- * quedar apuntando a un servicio que ya no está.
+ * El mismo servicio contesta en dos direcciones, y la de abajo es la otra:
  *
- * Después del despliegue:
+ *     https://southamerica-east1-memorie-legends.cloudfunctions.net/webhookPago
+ *     https://webhookpago-ba7pwd2sjq-rj.a.run.app
+ *
+ * Se eligió la primera, que es región + proyecto + nombre y no tiene nada que
+ * Google haya sorteado. Si algún día hay que recrear el servicio, el sufijo
+ * `ba7pwd2sjq` puede salir distinto y la segunda quedaría muerta; la primera
+ * no. Para una dirección que además está registrada afuera —en el panel de
+ * Mercado Pago— eso es lo que importa.
+ *
+ * Comprobadas las tres con un GET, que este mismo handler rechaza con 405 sin
+ * tocar nada: las dos de arriba contestan 405 —o sea que llegan hasta acá— y
+ * la de Iowa, 404.
  *
  *     gcloud functions describe webhookPago --region=southamerica-east1 \
  *       --project=memorie-legends --gen2 --format="value(serviceConfig.uri)"
  *
- * y esa dirección va a DOS lados: acá abajo y el panel de Mercado Pago. Las
- * dos, o los avisos de pago no llegan.
- *
- * Hoy no se pierde nada porque los pagos están apagados
- * (`SOLO_ADMIN_COMPRA`). Es lo primero que hay que cerrar antes de prenderlos.
- *
- * Ojo con `pruebas/pagos.mjs`: hay un cerrojo que exige que esta constante
- * termine en `run.app`. La dirección nueva también lo hace, así que no hay que
- * tocarlo — pero si alguna vez da rojo, es acá donde hay que mirar.
+ * devuelve la forma con hash, que es la que informa Cloud Run.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * LO QUE FALTA, Y NO ESTÁ EN ESTE ARCHIVO
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Esta constante es la mitad. La otra es el panel de Mercado Pago, que tiene
- * su propia configuración de notificaciones y sigue apuntando a la de v1. Se
- * cambia a mano, allá.
+ * Esta constante es la mitad, y ya está. La otra es el panel de Mercado Pago,
+ * que tiene su propia configuración de notificaciones y sigue apuntando a la
+ * de v1 en Iowa — una dirección que devuelve 404 desde que las ochenta se
+ * mudaron. Se cambia a mano, allá, por la misma que está acá abajo.
  *
  * Mientras tanto no se pierde ninguna compra porque los pagos están apagados
  * (`SOLO_ADMIN_COMPRA`), pero las dos tienen que estar antes de prender la
@@ -1261,7 +1264,8 @@ const esSandboxMP = () => String(process.env.MP_ACCESS_TOKEN ?? "").startsWith("
  * El de Firebase sigue sirviendo el sitio igual, así que esto es cosmético
  * para el comprador y no cambia ningún cobro.
  */
-const URL_WEBHOOK = "https://webhookpago-ba7pwd2sjq-uc.a.run.app";
+const URL_WEBHOOK =
+  "https://southamerica-east1-memorie-legends.cloudfunctions.net/webhookPago";
 const URL_VUELTA = "https://memorielegends.com/tienda.html";
 
 /**
