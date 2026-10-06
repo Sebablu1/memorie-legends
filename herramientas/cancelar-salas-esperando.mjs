@@ -10,7 +10,11 @@ import { MOTIVOS } from "../functions/reglas/economia.js";
 if (!admin.apps.length) {
   admin.initializeApp();
 }
-const db = getFirestore();
+// La base con nombre: la `(default)` quedó con los datos viejos y no da
+
+// ningún error si se le escribe. Ver `functions/index.js`.
+
+const db = getFirestore("southamerica");
 
 // Crear la función moverLeyendas con las dependencias reales
 const moverLeyendas = crearMoverLeyendas({

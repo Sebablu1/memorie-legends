@@ -69,6 +69,9 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
  */
 import { logger } from "firebase-functions/logger";
 import admin from "firebase-admin";
+// El namespace sigue para `admin.initializeApp()` y los `FieldValue`; la base
+// con nombre sólo la sabe dar este subpaquete. Ver `const db`, más abajo.
+import { getFirestore } from "firebase-admin/firestore";
 import crypto from "node:crypto";
 
 import {
@@ -153,7 +156,38 @@ import {
 } from "./reglas/ranking.js";
 
 admin.initializeApp();
-const db = admin.firestore();
+
+/**
+ * La base es `southamerica`, no la `(default)`.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Y POR ESO ACÁ SE IMPORTA `getFirestore` EN VEZ DE USAR `admin.firestore()`
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `admin.firestore()` no sabe de bases con nombre: su argumento es una `App`,
+ * no una cadena. Probado contra la versión instalada —firebase-admin 12.7.0—
+ * `admin.firestore("southamerica")` revienta con «this.ensureApp(...).firestore
+ * is not a function», que es un error que no nombra el problema. El que acepta
+ * el nombre es `getFirestore` del subpaquete `firebase-admin/firestore`, y
+ * devuelve una instancia con `databaseId: "southamerica"`.
+ *
+ * Los `admin.firestore.FieldValue.*` del resto del archivo NO cambian: son
+ * estáticos del namespace, no de la instancia, y no dependen de qué base se
+ * esté usando.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA `(default)` SIGUE EXISTIENDO, Y ÉSE ES EL PELIGRO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La migración copió los datos a la base nueva; la vieja quedó donde estaba,
+ * con todo adentro. O sea que cualquier código que siga pidiendo la base por
+ * omisión no falla: escribe, lee y contesta bien — sobre datos que ya no son
+ * los que juega nadie. No hay error que avise.
+ *
+ * Las quince herramientas de `herramientas/` están en esa situación. Ver el
+ * PENDIENTE que acompaña este cambio.
+ */
+const db = getFirestore("southamerica");
 
 const ZONA = ZONA_POR_DEFECTO;
 
@@ -251,11 +285,20 @@ const exigirSesion = (context, accion) => {
  * LA REGIÓN SE ESCRIBE, NO SE HEREDA
  * ─────────────────────────────────────────────────────────────────────────
  *
- * `us-central1` es la misma de siempre y va explícita. En v1 era el valor por
- * omisión y no hacía falta nombrarla; en v2 también lo es, pero dejarla
- * implícita significa que el día que alguien cambie el default del proyecto
- * —o que se mude a São Paulo, que es el paso siguiente— las ochenta se mueven
- * sin que nadie lo haya escrito en ningún lado.
+ * `southamerica-east1` es São Paulo, y va explícita. No es la región por
+ * omisión de nadie —`us-central1` lo es, en v1 y en v2— así que dejarla
+ * implícita no sería heredar: sería volver a Iowa sin que nadie lo escriba.
+ *
+ * El paso siguiente del que hablaba este comentario es éste. La mudanza no es
+ * sólo de las funciones: Firestore se migró a una base nueva en la misma
+ * región —ver `const db`, más arriba— y la idea es que el viaje de una jugada
+ * deje de cruzar el continente dos veces. Lo que se gana es latencia de red;
+ * el arranque en frío es otro problema y no se toca desde acá.
+ *
+ * Moverlas de región las RECREA: una función no cambia de lugar, se borra en
+ * la vieja y nace en la nueva, con dirección nueva. Está anotado en el
+ * PENDIENTE de la URL del webhook, que es la única que tiene una dirección
+ * escrita en algún lado.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * `concurrency: 80`: QUÉ ARREGLA Y QUÉ NO
@@ -283,7 +326,7 @@ const exigirSesion = (context, accion) => {
  * despiertas.
  */
 const OPCIONES = Object.freeze({
-  region: "us-central1",
+  region: "southamerica-east1",
   concurrency: 80,
   memory: "512MiB",
 });
@@ -1172,21 +1215,33 @@ const esSandboxMP = () => String(process.env.MP_ACCESS_TOKEN ?? "").startsWith("
  * Pago va a usar de verdad.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * POR QUÉ CAMBIÓ DE DOMINIO, Y POR QUÉ NO SE PODÍA ESCRIBIR ANTES
+ * ⚠️ PENDIENTE: ESTA DIRECCIÓN ES LA DE us-central1 Y VA A DEJAR DE EXISTIR
  * ─────────────────────────────────────────────────────────────────────────
  *
- * En v1 vivía en `us-central1-memorie-legends.cloudfunctions.net/webhookPago`,
- * una dirección predecible: región, proyecto y nombre de la función. En v2
- * cada función es un servicio de Cloud Run y su dirección lleva un sufijo que
- * asigna Google al crearla —`ba7pwd2sjq` acá—, así que no se puede componer
- * de antemano ni adivinar. Hay que desplegar primero y leerla después:
+ * Es la segunda vez que este bloque queda con una dirección vieja adentro, y
+ * por el mismo motivo que la primera: una función de v2 es un servicio de
+ * Cloud Run y su dirección lleva un sufijo que asigna Google al CREARLA. No se
+ * puede componer ni adivinar; hay que desplegar y leerla.
  *
- *     gcloud functions describe webhookPago --region=us-central1 \
+ * La primera vez fue la mudanza de v1 a v2. Ésta es la mudanza de región: las
+ * ochenta pasan a `southamerica-east1`, y una función no cambia de lugar — se
+ * borra en Iowa y nace en São Paulo, con dirección nueva. La de abajo va a
+ * quedar apuntando a un servicio que ya no está.
+ *
+ * Después del despliegue:
+ *
+ *     gcloud functions describe webhookPago --region=southamerica-east1 \
  *       --project=memorie-legends --gen2 --format="value(serviceConfig.uri)"
  *
- * Por eso este bloque estuvo un tiempo con un PENDIENTE y la dirección vieja
- * adentro: entre la migración y el despliegue no había forma honesta de
- * escribir la nueva. Ya está desplegada y la de abajo salió de ese comando.
+ * y esa dirección va a DOS lados: acá abajo y el panel de Mercado Pago. Las
+ * dos, o los avisos de pago no llegan.
+ *
+ * Hoy no se pierde nada porque los pagos están apagados
+ * (`SOLO_ADMIN_COMPRA`). Es lo primero que hay que cerrar antes de prenderlos.
+ *
+ * Ojo con `pruebas/pagos.mjs`: hay un cerrojo que exige que esta constante
+ * termine en `run.app`. La dirección nueva también lo hace, así que no hay que
+ * tocarlo — pero si alguna vez da rojo, es acá donde hay que mirar.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * LO QUE FALTA, Y NO ESTÁ EN ESTE ARCHIVO

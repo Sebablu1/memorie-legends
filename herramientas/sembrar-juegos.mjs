@@ -69,7 +69,9 @@ async function principal() {
   const { initializeApp, applicationDefault } = await import("firebase-admin/app");
   const { getFirestore } = await import("firebase-admin/firestore");
   initializeApp({ credential: applicationDefault(), projectId: PROYECTO });
-  const db = getFirestore();
+  // La base con nombre: la `(default)` quedó con los datos viejos y no da
+  // ningún error si se le escribe. Ver `functions/index.js`.
+  const db = getFirestore("southamerica");
 
   console.log(
     escribir

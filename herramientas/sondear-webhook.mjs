@@ -62,6 +62,25 @@
 import crypto from "node:crypto";
 import { pathToFileURL } from "node:url";
 
+/**
+ * ⚠️ PENDIENTE: ESTE VALOR POR OMISIÓN ESTÁ DOS MUDANZAS ATRASADO.
+ *
+ * Es la dirección de v1 en `us-central1`, y ya no existe ninguna de las dos
+ * cosas: el webhook pasó a v2 —donde cada función es un servicio de Cloud Run
+ * con un sufijo que asigna Google— y después a `southamerica-east1`. No se
+ * puede componer ni adivinar: hay que desplegar y leerla.
+ *
+ *     gcloud functions describe webhookPago --region=southamerica-east1 \
+ *       --project=memorie-legends --gen2 --format="value(serviceConfig.uri)"
+ *
+ * Mientras tanto la sonda funciona igual pasándosela por el entorno, que es
+ * para lo que existe esa variable:
+ *
+ *     URL_WEBHOOK="https://…" node herramientas/sondear-webhook.mjs
+ *
+ * Sin ella, el error va a ser de red y va a parecer un problema del webhook
+ * cuando es de esta línea. El valor no se inventa: se pega cuando exista.
+ */
 const URL_WEBHOOK =
   process.env.URL_WEBHOOK ??
   "https://us-central1-memorie-legends.cloudfunctions.net/webhookPago";

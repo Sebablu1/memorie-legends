@@ -64,7 +64,9 @@ async function principal() {
   const { getFirestore } = await import("firebase-admin/firestore");
 
   initializeApp({ credential: applicationDefault(), projectId: "memorie-legends" });
-  const db = getFirestore();
+  // La base con nombre: la `(default)` quedó con los datos viejos y no da
+  // ningún error si se le escribe. Ver `functions/index.js`.
+  const db = getFirestore("southamerica");
 
   const snap = await db.collection("catalogo").get();
 

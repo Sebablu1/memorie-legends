@@ -52,6 +52,7 @@
     ]
   },
   "firestore": {
+    "database": "southamerica",
     "rules": "firestore.rules"
   }
 }

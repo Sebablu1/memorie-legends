@@ -38,7 +38,18 @@ try {
   process.exit(1);
 }
 
-const db = admin.firestore();
+/**
+ * La base con nombre, y por eso no alcanza `admin.firestore()`.
+ *
+ * Su argumento es una `App`, no una cadena. El que acepta el nombre es
+ * `getFirestore` del subpaquete, pedido por la ruta de `lib/` porque este
+ * archivo llega al paquete por ruta relativa y así el `exports` no se aplica.
+ *
+ * Sin esto leería la `(default)`, que quedó con los datos viejos y contesta
+ * sin error. Ver `functions/index.js`.
+ */
+const { getFirestore } = require("../functions/node_modules/firebase-admin/lib/firestore");
+const db = getFirestore("southamerica");
 
 const dinero = (n) => String(n ?? 0).padStart(6);
 const fecha = (t) => {

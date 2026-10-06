@@ -37,7 +37,9 @@ import { stdin, stdout, argv, exit } from "node:process";
 
 const API_KEY = "AIzaSyAd3EscVwcQwXOq3oudzGb3NBLK_AAAdh0";
 const PROYECTO = "memorie-legends";
-const REGION = "us-central1";
+// São Paulo, como Firestore y como las ochenta functions. No es la región
+// por omisión de nadie: escrita a mano o se vuelve a Iowa sin que se note.
+const REGION = "southamerica-east1";
 const ADMIN = "soporte.memorie.legends@gmail.com";
 
 // ─────────────────────────────────────────────────────── preguntar

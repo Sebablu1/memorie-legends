@@ -56,9 +56,31 @@ import {
   httpsCallable,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
-const db = getFirestore(app);
-// Las funciones viven en us-central1, que es la región por defecto.
-const funciones = getFunctions(app);
+/**
+ * La base `southamerica` y las funciones en São Paulo. Las dos a mano.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * NINGUNA DE LAS DOS SE HEREDA DEL `firebaseConfig`
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * El proyecto no cambió: es el mismo `projectId` y la misma clave. Lo que
+ * cambió es a qué base y a qué región se habla adentro de ese proyecto, y eso
+ * no viaja en la configuración — se pide en cada `get*`.
+ *
+ * Por omisión, `getFirestore(app)` pide la base `(default)` y
+ * `getFunctions(app)` pide `us-central1`. Las dos siguen existiendo: la base
+ * vieja quedó con todos sus datos y las funciones de Iowa se borran al
+ * desplegar. O sea que olvidarse de uno de estos dos argumentos no da error:
+ * da una pantalla que lee datos que ya nadie juega, o llamadas a funciones que
+ * no están. Están escritos a propósito, los dos.
+ *
+ * Verificado contra el build 10.7.1 que carga este archivo, no contra la
+ * documentación: `getFirestore(e, t)` toma el nombre de la base como segundo
+ * argumento y cae en `"(default)"` si falta, y `getFunctions(e, t)` toma la
+ * región con `"us-central1"` por defecto.
+ */
+const db = getFirestore(app, "southamerica");
+const funciones = getFunctions(app, "southamerica-east1");
 
 /**
  * App Check, si está configurado.

@@ -109,7 +109,22 @@ async function desdeFirestore() {
   } catch {
     /* ya estaba */
   }
-  const db = admin.firestore();
+  /**
+   * La base con nombre, y por eso no alcanza `admin.firestore()`.
+   *
+   * Su argumento es una `App`, no una cadena: pasarle `"southamerica"` revienta
+   * con «this.ensureApp(...).firestore is not a function». El que acepta el
+   * nombre es `getFirestore` del subpaquete, y acá se lo pide por la ruta de
+   * `lib/` porque este archivo llega al paquete por ruta relativa —no está en
+   * el `node_modules` de la raíz— y por ruta relativa el `exports` del paquete
+   * no se aplica.
+   *
+   * Hace falta porque la `(default)` quedó con todos los datos viejos: pedirle
+   * la base por omisión no da error, contesta bien, y mira lo que ya no juega
+   * nadie. Ver `functions/index.js`.
+   */
+  const { getFirestore } = require("../functions/node_modules/firebase-admin/lib/firestore");
+  const db = getFirestore("southamerica");
 
   const snap = await db.collection(COLECCION_CATALOGO).get();
   const items = [];

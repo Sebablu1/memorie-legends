@@ -33,9 +33,10 @@
  * NO TOCA LA RED NI FIRESTORE
  * ─────────────────────────────────────────────────────────────────────────
  *
- * `index.js` llama a `admin.initializeApp()` y `admin.firestore()` al cargar,
- * y las dos cosas son locales: arman los objetos y no hablan con nadie hasta
- * la primera consulta. Por eso esto corre sin credenciales. Si algún día
+ * `index.js` llama a `admin.initializeApp()` y a `getFirestore("southamerica")`
+ * al cargar, y las dos cosas son locales: arman los objetos y no hablan con
+ * nadie hasta la primera consulta. Por eso esto corre sin credenciales — y por
+ * eso mide lo mismo con la base vieja o con la nueva. Si algún día
  * dejara de cargar sin ellas, el error aparece como «no se pudo importar» en
  * la primera medición y no hay que adivinar.
  */
