@@ -729,6 +729,15 @@ const {
   efectoCambio,
 } = interfaz;
 
+const _aprendidas = new Map();
+function pistaSiAprende(clave, texto) {
+  const veces = _aprendidas.get(clave) ?? 0;
+  if (veces < 2) {
+    _aprendidas.set(clave, veces + 1);
+    pista(texto);
+  }
+}
+
 /**
  * Los carteles cortos, en un solo sitio.
  *
@@ -3052,7 +3061,7 @@ document.addEventListener("click", async (evento) => {
   ) {
     if (!dobleClic) {
       destelloPrimerToque(cartaEl);
-      pista("¡Doble toque en la del rival!");
+      pistaSiAprende("doble-rival", "¡Doble toque en la del rival!");
       return;
     }
 
@@ -3088,7 +3097,7 @@ document.addEventListener("click", async (evento) => {
     }
     if (!dobleClic) {
       destelloPrimerToque(cartaEl);
-      pista("¡Doble toque si estás seguro!");
+      pistaSiAprende("doble-propia", "¡Doble toque si estás seguro!");
       return;
     }
     manejadorDescarte(posicion);
@@ -4978,7 +4987,7 @@ async function pedir(accion, ejecutar) {
     return;
   }
   pidiendo = true;
-  pista("Procesando…");
+  
   // Con retraso: la mayoría de las jugadas vuelven en menos de lo que tarda
   // en aparecer, y para ésas es mejor no mostrar nada. Ver spinner.js.
   mostrarCargando("Enviando la jugada…");
@@ -5190,7 +5199,7 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
     );
     if (r?.entregada) {
       sonidos.aviso();
-      pista("Carta elegida. Se resuelve al cerrar la ventana.");
+      
     }
     return;
   }
@@ -5225,7 +5234,7 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
         if (r?.anotado) {
           sonidos.aviso();
           marcarEnviada(posicion);
-          pista("Carta registrada. Se resolverá al cerrar la ventana.");
+          
         }
       } catch (error) {
         console.error("Falló el descarte durante la mirada:", error);
@@ -5262,7 +5271,7 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
     if (!ventana || ventana.cerrada) return;
 
     if (!dobleClic) {
-      pista("Tocá <b>dos veces</b> la carta del rival que conocés.");
+      pistaSiAprende("dos-rival", "Tocá <b>dos veces</b> la carta del rival que conocés.");
       return;
     }
 
@@ -5315,7 +5324,7 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
     if (!ventana || ventana.cerrada) return;
 
     if (!dobleClic) {
-      pista("Tocá <b>dos veces</b> para descartar.");
+      pistaSiAprende("dos-propia", "Tocá <b>dos veces</b> para descartar.");
       return;
     }
 
@@ -5332,7 +5341,7 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
       // todavía no existe.
       sonidos.aviso();
       marcarEnviada(posicion);
-      pista("Carta registrada. Se resolverá al cerrar la ventana.");
+      
     }
     return;
   }
