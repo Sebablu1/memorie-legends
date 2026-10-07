@@ -128,3 +128,30 @@ export {
   orderBy,
   limit,
 };
+
+/**
+ * Despierta las funciones críticas apenas hay sesión.
+ *
+ * El cold start de Cloud Functions v2 es de ~1.9 s, y lo paga el primero
+ * que toca una función dormida. Sin esto, ese primero es el que aprieta
+ * "jugar", y la espera se siente como que la app se colgó.
+ *
+ * Con esto, el ping sale cuando el usuario ya está identificado, mientras
+ * la app lee el perfil y arma el lobby. Cuando llega a la mesa, las tres
+ * funciones están calientes.
+ *
+ * No bloquea, no rompe: los pings van sin `await` y con el error ignorado.
+ * Si fallan, las funciones se despertarán en el primer uso real, como antes.
+ * Esto es una optimización, no una dependencia.
+ */
+const FUNCIONES_CALIENTES = Object.freeze([
+  "accionDePartida",
+  "intentarDescarte",
+  "latir",
+]);
+
+export function precalentarFunciones() {
+  for (const nombre of FUNCIONES_CALIENTES) {
+    httpsCallable(funciones, nombre)({}).catch(() => {});
+  }
+}

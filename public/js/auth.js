@@ -10,6 +10,7 @@ import {
   getDoc,
   setDoc,
   SUPPORT_EMAIL,
+  precalentarFunciones,
 } from "./firebase.js";
 
 import { hay as hayCodigoPendiente } from "./codigo-pendiente.js";
@@ -66,10 +67,7 @@ const quitarVelo = () => {
 /** El velo se cae solo si Firebase no contesta. Se cancela en cuanto contesta. */
 const rendicion = setTimeout(() => {
   quitarVelo();
-  avisar(
-    "No pudimos comprobar tu sesión. Podés iniciarla abajo.",
-    "warning",
-  );
+  avisar("No pudimos comprobar tu sesión. Podés iniciarla abajo.", "warning");
 }, MS_ESPERA_MAXIMA);
 
 // ==========================================================
@@ -95,11 +93,15 @@ const avisar = (texto, clase = "info") => {
  */
 function explicar(error) {
   const textos = {
-    "auth/popup-closed-by-user": "Cerraste la ventana de Google. Probá de nuevo.",
-    "auth/cancelled-popup-request": "Cerraste la ventana de Google. Probá de nuevo.",
-    "auth/popup-blocked": "El navegador bloqueó la ventana. Permitile abrir ventanas a este sitio.",
+    "auth/popup-closed-by-user":
+      "Cerraste la ventana de Google. Probá de nuevo.",
+    "auth/cancelled-popup-request":
+      "Cerraste la ventana de Google. Probá de nuevo.",
+    "auth/popup-blocked":
+      "El navegador bloqueó la ventana. Permitile abrir ventanas a este sitio.",
     "auth/unauthorized-domain": `Dominio no autorizado. Escribinos a ${SUPPORT_EMAIL}`,
-    "auth/network-request-failed": "No hay conexión. Revisá tu red y probá de nuevo.",
+    "auth/network-request-failed":
+      "No hay conexión. Revisá tu red y probá de nuevo.",
     "auth/too-many-requests": "Demasiados intentos. Esperá unos minutos.",
     "auth/invalid-email": "Ese correo no tiene un formato válido.",
     // Los tres de credenciales dicen LO MISMO a propósito. Distinguir "no
@@ -109,7 +111,9 @@ function explicar(error) {
     "auth/wrong-password": "Correo o contraseña incorrectos.",
     "auth/invalid-credential": "Correo o contraseña incorrectos.",
   };
-  return textos[error?.code] ?? error?.message ?? "Algo salió mal. Probá de nuevo.";
+  return (
+    textos[error?.code] ?? error?.message ?? "Algo salió mal. Probá de nuevo."
+  );
 }
 
 // ==========================================================
@@ -124,6 +128,10 @@ onAuthStateChanged(auth, async (usuario) => {
     quitarVelo();
     return;
   }
+
+  // Despierta las funciones críticas mientras se lee el perfil. No espera
+  // respuesta: es una optimización, no una dependencia. Ver `firebase.js`.
+  precalentarFunciones();
 
   try {
     const perfil = await getDoc(doc(db, "users", usuario.uid));
@@ -187,7 +195,9 @@ onAuthStateChanged(auth, async (usuario) => {
        * nadie lo lee: está anotado en PENDIENTE. Cuando se arregle, esto
        * podría salir de acá.)
        */
-      window.location.replace(hayCodigoPendiente() ? "lobby.html" : "dashboard.html");
+      window.location.replace(
+        hayCodigoPendiente() ? "lobby.html" : "dashboard.html",
+      );
       return;
     }
 
@@ -255,38 +265,48 @@ async function manejarSegundoPaso(error) {
   } catch (fallo) {
     // Ni siquiera se pudo abrir el segundo paso. Se dice, en vez de dejar la
     // pantalla como si la contraseña hubiera estado mal.
-    avisar(fallo?.message ?? "No pudimos pedirte el código. Probá de nuevo.", "error");
+    avisar(
+      fallo?.message ?? "No pudimos pedirte el código. Probá de nuevo.",
+      "error",
+    );
   }
   return true;
 }
 
-document.getElementById("btnVolverAlLogin")?.addEventListener("click", volverAlPrimerPaso);
+document
+  .getElementById("btnVolverAlLogin")
+  ?.addEventListener("click", volverAlPrimerPaso);
 
-document.getElementById("formSegundoPaso")?.addEventListener("submit", async (evento) => {
-  evento.preventDefault();
-  if (!resolucionPendiente) {
-    volverAlPrimerPaso();
-    return;
-  }
+document
+  .getElementById("formSegundoPaso")
+  ?.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    if (!resolucionPendiente) {
+      volverAlPrimerPaso();
+      return;
+    }
 
-  const campo = document.getElementById("codigoMfa");
-  const boton = evento.target.querySelector('button[type="submit"]');
-  if (boton) boton.disabled = true;
-  avisar("Comprobando el código…", "info");
+    const campo = document.getElementById("codigoMfa");
+    const boton = evento.target.querySelector('button[type="submit"]');
+    if (boton) boton.disabled = true;
+    avisar("Comprobando el código…", "info");
 
-  try {
-    await terminarConCodigo(resolucionPendiente, campo.value);
-    // Entró. `onAuthStateChanged` se encarga del resto.
-    mostrarVelo("Iniciando sesión…");
-  } catch (error) {
-    if (boton) boton.disabled = false;
-    // La resolución NO se tira: el código pudo haber vencido —duran 30
-    // segundos— y lo único que hace falta es escribir el siguiente.
-    campo.value = "";
-    campo.focus();
-    avisar(error?.message ?? "Ese código no sirvió. Probá con el siguiente.", "error");
-  }
-});
+    try {
+      await terminarConCodigo(resolucionPendiente, campo.value);
+      // Entró. `onAuthStateChanged` se encarga del resto.
+      mostrarVelo("Iniciando sesión…");
+    } catch (error) {
+      if (boton) boton.disabled = false;
+      // La resolución NO se tira: el código pudo haber vencido —duran 30
+      // segundos— y lo único que hace falta es escribir el siguiente.
+      campo.value = "";
+      campo.focus();
+      avisar(
+        error?.message ?? "Ese código no sirvió. Probá con el siguiente.",
+        "error",
+      );
+    }
+  });
 
 // ==========================================================
 // ENTRAR CON GOOGLE
@@ -341,27 +361,35 @@ formulario?.addEventListener("submit", async (evento) => {
 // RESTABLECER LA CONTRASEÑA
 // ==========================================================
 
-document.getElementById("resetPasswordBtn")?.addEventListener("click", async () => {
-  const correo = document.getElementById("email").value.trim();
+document
+  .getElementById("resetPasswordBtn")
+  ?.addEventListener("click", async () => {
+    const correo = document.getElementById("email").value.trim();
 
-  if (!correo) {
-    avisar("Escribí tu correo arriba y volvé a tocar acá.", "warning");
-    document.getElementById("email").focus();
-    return;
-  }
-
-  avisar("Enviando el correo…", "info");
-
-  try {
-    await sendPasswordResetEmail(auth, correo);
-    // Se dice lo mismo exista o no la cuenta. Contestar "no existe" convierte
-    // este botón en una forma de averiguar qué correos están registrados.
-    avisar(`Si hay una cuenta con ${correo}, te llega un correo en un minuto.`, "success");
-  } catch (error) {
-    if (error?.code === "auth/user-not-found") {
-      avisar(`Si hay una cuenta con ${correo}, te llega un correo en un minuto.`, "success");
+    if (!correo) {
+      avisar("Escribí tu correo arriba y volvé a tocar acá.", "warning");
+      document.getElementById("email").focus();
       return;
     }
-    avisar(explicar(error), "error");
-  }
-});
+
+    avisar("Enviando el correo…", "info");
+
+    try {
+      await sendPasswordResetEmail(auth, correo);
+      // Se dice lo mismo exista o no la cuenta. Contestar "no existe" convierte
+      // este botón en una forma de averiguar qué correos están registrados.
+      avisar(
+        `Si hay una cuenta con ${correo}, te llega un correo en un minuto.`,
+        "success",
+      );
+    } catch (error) {
+      if (error?.code === "auth/user-not-found") {
+        avisar(
+          `Si hay una cuenta con ${correo}, te llega un correo en un minuto.`,
+          "success",
+        );
+        return;
+      }
+      avisar(explicar(error), "error");
+    }
+  });
