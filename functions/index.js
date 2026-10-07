@@ -99,7 +99,11 @@ import { crearInsignias } from "./insignias.js";
 import { crearTorneos } from "./torneos.js";
 import { crearRankingDePartidas } from "./ranking.js";
 import { umbralesValidos } from "./reglas/configuracion.js";
-import { LIMITE_ELIMINACION, LIMITES_DE_PARTIDA, esLimiteDePartida } from "./reglas/puntaje.js";
+import {
+  LIMITE_ELIMINACION,
+  LIMITES_DE_PARTIDA,
+  esLimiteDePartida,
+} from "./reglas/puntaje.js";
 import { COLECCION_CATALOGO, esRutaDelSitio } from "./reglas/catalogo.js";
 import {
   validar,
@@ -150,10 +154,7 @@ import {
   esCodigoValido,
 } from "./reglas/salas.js";
 
-import {
-  clavePeriodo,
-  ZONA_POR_DEFECTO,
-} from "./reglas/ranking.js";
+import { clavePeriodo, ZONA_POR_DEFECTO } from "./reglas/ranking.js";
 
 admin.initializeApp();
 
@@ -325,12 +326,13 @@ const exigirSesion = (context, accion) => {
  * aporta la concurrencia sola antes de pagar un costo fijo por tenerlas
  * despiertas.
  */
+
 const OPCIONES = Object.freeze({
   region: "southamerica-east1",
   concurrency: 80,
   memory: "512MiB",
+  cors: { maxAge: 3600 },
 });
-
 /**
  * Una callable de v2 que recibe el cuerpo de v1.
  *
@@ -355,7 +357,8 @@ const OPCIONES = Object.freeze({
  * legible. Lo que cambia son los bordes; lo de adentro no se tocó, y eso se
  * puede comprobar leyendo.
  */
-const llamable = (manejador) => onCall(OPCIONES, (peticion) => manejador(peticion.data, peticion));
+const llamable = (manejador) =>
+  onCall(OPCIONES, (peticion) => manejador(peticion.data, peticion));
 
 // --------------------------------------------------------------- registro
 
@@ -386,7 +389,9 @@ const azarCodigo = () => crypto.randomInt(0, 2 ** 32) / 2 ** 32;
  */
 function ipDe(context) {
   const req = context?.rawRequest;
-  const reenviada = String(req?.headers?.["x-forwarded-for"] ?? "").split(",")[0].trim();
+  const reenviada = String(req?.headers?.["x-forwarded-for"] ?? "")
+    .split(",")[0]
+    .trim();
   return reenviada || req?.ip || "sin-ip";
 }
 
@@ -439,7 +444,10 @@ const SIN_NADA = Object.freeze({
  * mesa de alguien.
  */
 const desdeRetratos = (retratos) =>
-  (retratos ?? []).map((retrato) => ({ ...SIN_NADA, retrato: retrato ?? null }));
+  (retratos ?? []).map((retrato) => ({
+    ...SIN_NADA,
+    retrato: retrato ?? null,
+  }));
 
 async function identidadEnSala(uid) {
   const perfil = await db.collection(USUARIOS).doc(uid).get();
@@ -489,7 +497,10 @@ async function identidadEnSala(uid) {
     ]);
     return { nombre, luce: { retrato, dorso, insignia, marco, titulo } };
   } catch (error) {
-    logger.warn("No se pudo leer lo equipado para la sala", { uid, error: error.message });
+    logger.warn("No se pudo leer lo equipado para la sala", {
+      uid,
+      error: error.message,
+    });
     return { nombre, luce: { ...SIN_NADA } };
   }
 }
@@ -516,7 +527,10 @@ async function identidadEnSala(uid) {
  * @throws Error("codigo-ocupado") si el código ya existe — quien llama reintenta
  * @throws Error("ya-pagada") si la entrada de este código ya se había cobrado
  */
-async function abrirSalaEn(tx, { codigo, uid, entrada, nombre, nombreJugador, luce, extra }) {
+async function abrirSalaEn(
+  tx,
+  { codigo, uid, entrada, nombre, nombreJugador, luce, extra },
+) {
   const refSala = db.collection(SALAS).doc(codigo);
   if ((await tx.get(refSala)).exists) throw new Error("codigo-ocupado");
 
@@ -608,9 +622,8 @@ export const crearSala = llamable(async (data, context) => {
    * Si no viene —un navegador viejo, o una sala abierta desde otro lado— es
    * la de siempre, 150.
    */
-  const limitePuntos = data?.limitePuntos == null
-    ? LIMITE_ELIMINACION
-    : Number(data.limitePuntos);
+  const limitePuntos =
+    data?.limitePuntos == null ? LIMITE_ELIMINACION : Number(data.limitePuntos);
 
   if (!esLimiteDePartida(limitePuntos)) {
     throw new HttpsError(
@@ -631,15 +644,25 @@ export const crearSala = llamable(async (data, context) => {
     try {
       await db.runTransaction((tx) =>
         abrirSalaEn(tx, {
-          codigo, uid, entrada, nombre, nombreJugador, luce,
+          codigo,
+          uid,
+          entrada,
+          nombre,
+          nombreJugador,
+          luce,
           extra: { limitePuntos },
-        }));
+        }),
+      );
 
       return { codigo, entrada, limitePuntos };
     } catch (e) {
       if (e instanceof HttpsError) throw e;
       if (e.message === "codigo-ocupado") continue; // otro código y de nuevo
-      logger.error("No se pudo crear la sala", { uid, entrada, error: e.message });
+      logger.error("No se pudo crear la sala", {
+        uid,
+        entrada,
+        error: e.message,
+      });
       throw new HttpsError("internal", "No pudimos crear la sala.");
     }
   }
@@ -728,12 +751,16 @@ export const revanchaDeSala = llamable(async (data, context) => {
 
         // Ya la abrió otro. Se devuelve la suya, y de paso si ya está adentro.
         if (sala.revancha?.codigo) {
-          const suya = await tx.get(db.collection(SALAS).doc(sala.revancha.codigo));
+          const suya = await tx.get(
+            db.collection(SALAS).doc(sala.revancha.codigo),
+          );
           return {
             codigo: sala.revancha.codigo,
             entrada: sala.revancha.entrada ?? sala.entrada,
             laAbrioOtro: true,
-            dentro: Boolean(suya.exists && (suya.data().jugadores ?? []).includes(uid)),
+            dentro: Boolean(
+              suya.exists && (suya.data().jugadores ?? []).includes(uid),
+            ),
           };
         }
 
@@ -788,7 +815,12 @@ export const revanchaDeSala = llamable(async (data, context) => {
     } catch (e) {
       if (e instanceof HttpsError) throw e;
       if (e.message === "codigo-ocupado") continue; // otro código y de nuevo
-      logger.error("No se pudo abrir la revancha", { uid, codigo, entrada, error: e.message });
+      logger.error("No se pudo abrir la revancha", {
+        uid,
+        codigo,
+        entrada,
+        error: e.message,
+      });
       throw new HttpsError("internal", "No pudimos abrir la revancha.");
     }
   }
@@ -818,7 +850,14 @@ export const unirseASala = llamable(async (data, context) => {
     const snapSala = await tx.get(refSala);
     const sala = snapSala.exists ? snapSala.data() : null;
 
-    return sumarseALaSala(tx, { refSala, sala, codigo, uid, nombreJugador, luce });
+    return sumarseALaSala(tx, {
+      refSala,
+      sala,
+      codigo,
+      uid,
+      nombreJugador,
+      luce,
+    });
   });
 });
 
@@ -834,7 +873,8 @@ export const unirseASala = llamable(async (data, context) => {
  * de la misma transacción, y `pruebas/transacciones.mjs` audita ese orden.
  */
 async function sumarseALaSala(
-  tx, { refSala, sala, codigo, uid, nombreJugador, luce, conCodigo = false },
+  tx,
+  { refSala, sala, codigo, uid, nombreJugador, luce, conCodigo = false },
 ) {
   const snapUsuario = await tx.get(db.collection(USUARIOS).doc(uid));
   const perfil = snapUsuario.exists ? snapUsuario.data() : {};
@@ -844,7 +884,10 @@ async function sumarseALaSala(
   const { ganado } = bolsillosDe(perfil);
 
   // La MISMA función que usa el navegador para avisar antes de intentarlo.
-  const veredicto = puedeUnirse(sala, uid, saldo, { conCodigo, ganadas: ganado });
+  const veredicto = puedeUnirse(sala, uid, saldo, {
+    conCodigo,
+    ganadas: ganado,
+  });
   if (!veredicto.puede) {
     throw new HttpsError("failed-precondition", veredicto.mensaje);
   }
@@ -858,7 +901,10 @@ async function sumarseALaSala(
     idempotencia: claveDeEntrada(codigo, uid),
   });
   if (!r.aplicado) {
-    throw new HttpsError("already-exists", "Ya pagaste la entrada a esta sala.");
+    throw new HttpsError(
+      "already-exists",
+      "Ya pagaste la entrada a esta sala.",
+    );
   }
 
   // La lista se rellena hasta donde haga falta antes de sumar la propia.
@@ -867,8 +913,11 @@ async function sumarseALaSala(
   // la lista; empujando la del recién llegado sobre una vacía, su cara
   // terminaría en el asiento del primer jugador. Los huecos van vacíos, que
   // es lo que la mesa entiende como «usá lo de la casa».
-  const luces = [...(sala.jugadoresLuce ?? desdeRetratos(sala.jugadoresRetratos))];
-  while (luces.length < (sala.jugadores ?? []).length) luces.push({ ...SIN_NADA });
+  const luces = [
+    ...(sala.jugadoresLuce ?? desdeRetratos(sala.jugadoresRetratos)),
+  ];
+  while (luces.length < (sala.jugadores ?? []).length)
+    luces.push({ ...SIN_NADA });
 
   tx.update(refSala, {
     jugadores: [...(sala.jugadores ?? []), uid],
@@ -929,8 +978,11 @@ export const crearSalaPrivada = llamableConPimienta(async (data, context) => {
   const uid = exigirSesion(context, "crearSalaPrivada");
   limite.exigirRitmo(uid, "crearSalaPrivada");
 
-  const { entrada, nombre, limitePuntos, vigenciaMinutos } =
-    validar(EsquemaCrearSalaPrivada, data, errorHttp);
+  const { entrada, nombre, limitePuntos, vigenciaMinutos } = validar(
+    EsquemaCrearSalaPrivada,
+    data,
+    errorHttp,
+  );
 
   if (!esEntradaValida(entrada)) {
     throw new HttpsError(
@@ -939,7 +991,8 @@ export const crearSalaPrivada = llamableConPimienta(async (data, context) => {
     );
   }
 
-  const limite_ = limitePuntos == null ? LIMITE_ELIMINACION : Number(limitePuntos);
+  const limite_ =
+    limitePuntos == null ? LIMITE_ELIMINACION : Number(limitePuntos);
   if (!esLimiteDePartida(limite_)) {
     throw new HttpsError(
       "invalid-argument",
@@ -994,7 +1047,10 @@ export const marcarListo = llamable(async (data, context) => {
 
     const sala = snap.data();
     if (sala.estado !== ESTADOS_SALA.ESPERANDO) {
-      throw new HttpsError("failed-precondition", "Esta sala ya no está esperando.");
+      throw new HttpsError(
+        "failed-precondition",
+        "Esta sala ya no está esperando.",
+      );
     }
     if (!(sala.jugadores ?? []).includes(uid)) {
       throw new HttpsError("failed-precondition", "No estás en esta sala.");
@@ -1005,7 +1061,11 @@ export const marcarListo = llamable(async (data, context) => {
     else listos.delete(uid);
 
     tx.update(refSala, { listos: [...listos] });
-    return { listo, listos: listos.size, jugadores: (sala.jugadores ?? []).length };
+    return {
+      listo,
+      listos: listos.size,
+      jugadores: (sala.jugadores ?? []).length,
+    };
   });
 });
 
@@ -1039,7 +1099,10 @@ export const iniciarPartida = llamable(async (data, context) => {
       );
     }
     if (sala.estado !== ESTADOS_SALA.ESPERANDO) {
-      throw new HttpsError("failed-precondition", "Esta sala ya no está esperando.");
+      throw new HttpsError(
+        "failed-precondition",
+        "Esta sala ya no está esperando.",
+      );
     }
 
     const jugadores = sala.jugadores ?? [];
@@ -1069,7 +1132,9 @@ export const iniciarPartida = llamable(async (data, context) => {
      * repartir, porque buscarlo es leer y `repartirEn` escribe: Firestore no
      * deja leer después. La mesa nueva se escribe al final.
      */
-    const siguiente = sala.publica ? await publicas.reservarSiguiente(tx) : null;
+    const siguiente = sala.publica
+      ? await publicas.reservarSiguiente(tx)
+      : null;
 
     // El reparto va en ESTA transacción, no en otra. Si fueran dos, la sala
     // podría quedar en "jugando" sin partida detrás —o con una partida que
@@ -1197,7 +1262,8 @@ const llamableConMercadoPago = (manejador) =>
 const SOLO_ADMIN_COMPRA = true;
 
 /** ¿Las credenciales de Mercado Pago son de prueba? Lo dice el prefijo. */
-const esSandboxMP = () => String(process.env.MP_ACCESS_TOKEN ?? "").startsWith("TEST-");
+const esSandboxMP = () =>
+  String(process.env.MP_ACCESS_TOKEN ?? "").startsWith("TEST-");
 
 /**
  * Adónde avisa Mercado Pago, y adónde vuelve el comprador. No son lo mismo.
@@ -1323,13 +1389,19 @@ const publicas = crearSalasPublicas({
 /** Abre una mesa pública, vacía. Sólo la administración. */
 export const crearSalaPublica = llamable(async (data, context) => {
   exigirSesion(context, "crearSalaPublica");
-  return publicas.crear(context, validar(EsquemaCrearSalaPublica, data, errorHttp));
+  return publicas.crear(
+    context,
+    validar(EsquemaCrearSalaPublica, data, errorHttp),
+  );
 });
 
 /** Retoca una mesa pública. La entrada y la duración, sólo si está vacía. */
 export const editarSalaPublica = llamable(async (data, context) => {
   exigirSesion(context, "editarSalaPublica");
-  return publicas.editar(context, validar(EsquemaEditarSalaPublica, data, errorHttp));
+  return publicas.editar(
+    context,
+    validar(EsquemaEditarSalaPublica, data, errorHttp),
+  );
 });
 
 /**
@@ -1547,15 +1619,19 @@ export const listarPacks = llamableConMercadoPago(
     return {
       packs: await packs.listarParaLaTienda(),
       compra: {
-        habilitada: !SOLO_ADMIN_COMPRA || (await administradores.puedeAdministrar(correo)),
+        habilitada:
+          !SOLO_ADMIN_COMPRA ||
+          (await administradores.puedeAdministrar(correo)),
         esSandbox: esSandboxMP(),
       },
     };
-  });
+  },
+);
 
 /** Todos, encendidos y apagados: el panel necesita ver lo retirado. */
 export const listarPacksAdmin = llamable((_data, context) =>
-  packs.listarParaAdmin(context));
+  packs.listarParaAdmin(context),
+);
 
 /**
  * Crea o reemplaza un paquete.
@@ -1564,19 +1640,23 @@ export const listarPacksAdmin = llamable((_data, context) =>
  * "editar" se distinguen sólo en si el id ya existía.
  */
 export const guardarPackAdmin = llamable((data, context) =>
-  packs.guardar(context, data?.pack ?? data));
+  packs.guardar(context, data?.pack ?? data),
+);
 
 /** Lo saca de la lista. Las órdenes ya pagadas no se tocan. */
 export const borrarPackAdmin = llamable((data, context) =>
-  packs.borrar(context, data?.id));
+  packs.borrar(context, data?.id),
+);
 
 /** Enciende o apaga sin reenviar el pack entero. */
 export const activarPackAdmin = llamable((data, context) =>
-  packs.activar(context, data?.id, data?.activo));
+  packs.activar(context, data?.id, data?.activo),
+);
 
 /** Escribe la semilla sin pisar lo que ya esté. */
 export const sembrarPacksAdmin = llamable((_data, context) =>
-  packs.sembrar(context));
+  packs.sembrar(context),
+);
 
 /**
  * Llena el catálogo con la semilla de demostración.
@@ -1585,11 +1665,13 @@ export const sembrarPacksAdmin = llamable((_data, context) =>
  * administrador haya cambiado.
  */
 export const sembrarCatalogoAdmin = llamable((_data, context) =>
-  tienda.sembrarCatalogo(context));
+  tienda.sembrarCatalogo(context),
+);
 
 /** El catálogo entero, activos e inactivos: el panel necesita ver lo apagado. */
 export const listarCatalogoAdmin = llamable((_data, context) =>
-  tienda.listarCatalogo(context));
+  tienda.listarCatalogo(context),
+);
 
 /**
  * Crea o reemplaza un artículo.
@@ -1598,7 +1680,8 @@ export const listarCatalogoAdmin = llamable((_data, context) =>
  * en si el id ya existía, y dos caminos obligarían a duplicar la validación.
  */
 export const guardarItemAdmin = llamable((data, context) =>
-  tienda.guardarItem(context, validar(EsquemaItemAdmin, data, errorHttp)));
+  tienda.guardarItem(context, validar(EsquemaItemAdmin, data, errorHttp)),
+);
 
 /** Enciende o apaga un artículo. Es lo que se usa en vez de borrar. */
 export const activarItemAdmin = llamable((data, context) => {
@@ -1612,10 +1695,12 @@ export const activarItemAdmin = llamable((data, context) => {
  * por imagen. Con `simular: true` sólo devuelve cuáles serían, sin tocar nada.
  */
 export const apagarCatalogoViejoAdmin = llamable((data, context) =>
-  tienda.apagarCatalogoViejo(context, { simular: data?.simular === true }));
+  tienda.apagarCatalogoViejo(context, { simular: data?.simular === true }),
+);
 
 export const borrarItemAdmin = llamable((data, context) =>
-  tienda.borrarItem(context, validar(EsquemaItem, data, errorHttp).itemId));
+  tienda.borrarItem(context, validar(EsquemaItem, data, errorHttp).itemId),
+);
 
 /**
  * Quiénes compraron un artículo.
@@ -1625,7 +1710,11 @@ export const borrarItemAdmin = llamable((data, context) =>
  * era ese alguien ni cuántos eran.
  */
 export const listarPoseedoresItemAdmin = llamable((data, context) =>
-  tienda.listarPoseedores(context, validar(EsquemaItem, data, errorHttp).itemId));
+  tienda.listarPoseedores(
+    context,
+    validar(EsquemaItem, data, errorHttp).itemId,
+  ),
+);
 
 /**
  * Le saca un artículo a una persona y le devuelve lo que pagó.
@@ -1654,11 +1743,15 @@ export const desposeerItemAdmin = llamable(async (data, context) => {
 export const forzarBorrarItemAdmin = llamable(async (data, context) => {
   const uid = exigirSesion(context, "forzarBorrarItemAdmin");
   await limite.exigirRitmoDePlata(uid, "forzarBorrarItemAdmin");
-  return tienda.forzarBorrar(context, validar(EsquemaItem, data, errorHttp).itemId);
+  return tienda.forzarBorrar(
+    context,
+    validar(EsquemaItem, data, errorHttp).itemId,
+  );
 });
 
 export const listarSalasAdmin = llamable((_data, context) =>
-  panel.listarSalas(context));
+  panel.listarSalas(context),
+);
 
 /**
  * Cancela una sala y devuelve las entradas.
@@ -1674,7 +1767,8 @@ export const cancelarSalaAdmin = llamable((data, context) => {
 
 /** Retoca el nombre o el cupo de una sala que todavía no empezó. */
 export const editarSalaAdmin = llamable((data, context) =>
-  panel.editarSala(context, validar(EsquemaEditarSala, data, errorHttp)));
+  panel.editarSala(context, validar(EsquemaEditarSala, data, errorHttp)),
+);
 
 /**
  * Borra una sala cerrada, con su partida y las vistas de cada jugador.
@@ -1683,7 +1777,8 @@ export const editarSalaAdmin = llamable((data, context) =>
  * libro mayor, que es lo que no se borra nunca.
  */
 export const eliminarSalaAdmin = llamable((data, context) =>
-  panel.eliminarSala(context, validar(EsquemaDeSala, data, errorHttp)));
+  panel.eliminarSala(context, validar(EsquemaDeSala, data, errorHttp)),
+);
 
 /**
  * Borra TODAS las salas cerradas.
@@ -1693,10 +1788,15 @@ export const eliminarSalaAdmin = llamable((data, context) =>
  * abrir el panel cuesta lo que hayan sido todas las salas de la historia.
  */
 export const limpiarSalasCerradasAdmin = llamable((data, context) =>
-  panel.limpiarSalasCerradas(context, validar(EsquemaLimpiarSalas, data ?? {}, errorHttp)));
+  panel.limpiarSalasCerradas(
+    context,
+    validar(EsquemaLimpiarSalas, data ?? {}, errorHttp),
+  ),
+);
 
 export const cancelarSalasEnEsperaAdmin = llamable((_data, context) =>
-  panel.cancelarTodasEnEspera(context));
+  panel.cancelarTodasEnEspera(context),
+);
 
 /**
  * Busca nombres guardados que podrían hacer daño si se dibujaran sin escapar.
@@ -1705,11 +1805,13 @@ export const cancelarSalasEnEsperaAdmin = llamable((_data, context) =>
  * está en ese documento— y ya no hay forma de listarla desde el navegador.
  */
 export const revisarNombresAdmin = llamable((_data, context) =>
-  panel.revisarNombres(context));
+  panel.revisarNombres(context),
+);
 
 /** Todas las cuentas, con saldo y partidas, para poder decidir sobre cada una. */
 export const listarUsuariosAdmin = llamable((_data, context) =>
-  panel.listarUsuarios(context));
+  panel.listarUsuarios(context),
+);
 
 /**
  * Da de baja una cuenta.
@@ -1720,7 +1822,8 @@ export const listarUsuariosAdmin = llamable((_data, context) =>
  * toca Firebase Auth.
  */
 export const eliminarUsuarioAdmin = llamable((data, context) =>
-  panel.eliminarUsuario(context, { uid: data?.uid }));
+  panel.eliminarUsuario(context, { uid: data?.uid }),
+);
 
 // ---------------------------------------------------------- moderación
 
@@ -1738,7 +1841,8 @@ export const reportarJugador = llamable((data, context) => {
 
 /** La bandeja del administrador. */
 export const listarReportesAdmin = llamable((data, context) =>
-  moderacion.listar(context, { estado: data?.estado, limite: data?.limite }));
+  moderacion.listar(context, { estado: data?.estado, limite: data?.limite }),
+);
 
 /** Marcar uno como resuelto o ignorado. No toca la cuenta denunciada. */
 export const resolverReporteAdmin = llamable((data, context) =>
@@ -1746,7 +1850,8 @@ export const resolverReporteAdmin = llamable((data, context) =>
     id: data?.id,
     estado: data?.estado,
     nota: data?.nota,
-  }));
+  }),
+);
 
 // ------------------------------------------------- administradores
 
@@ -1759,14 +1864,17 @@ export const resolverReporteAdmin = llamable((data, context) =>
  * verificado del token.
  */
 export const listarAdministradores = llamable((_data, context) =>
-  administradores.listar(context));
+  administradores.listar(context),
+);
 
 export const agregarAdministrador = llamable((data, context) =>
-  administradores.agregar(context, { correo: data?.correo }));
+  administradores.agregar(context, { correo: data?.correo }),
+);
 
 /** Nadie puede quitarse a sí mismo ni quitar al raíz. Ver `administradores.js`. */
 export const quitarAdministrador = llamable((data, context) =>
-  administradores.quitar(context, { correo: data?.correo }));
+  administradores.quitar(context, { correo: data?.correo }),
+);
 
 // ------------------------------------------------------ partida en red
 
@@ -1842,7 +1950,12 @@ const rankingDePartidas = crearRankingDePartidas({
    */
   identidadDe: async (uid) => {
     const { nombre, luce } = await identidadEnSala(uid);
-    return { nombre, retrato: luce.retrato, marco: luce.marco, titulo: luce.titulo };
+    return {
+      nombre,
+      retrato: luce.retrato,
+      marco: luce.marco,
+      titulo: luce.titulo,
+    };
   },
 });
 
@@ -1859,7 +1972,8 @@ const rankingDePartidas = crearRankingDePartidas({
  */
 async function despuesDelCierre(r, codigo = null) {
   if (!r || r.yaEstaba) return;
-  if (r.puntuable) await rankingDePartidas.registrarPartidaSinRomper(r.puntuable);
+  if (r.puntuable)
+    await rankingDePartidas.registrarPartidaSinRomper(r.puntuable);
   const ganadas = await insignias.otorgarAVarios(r.jugadores ?? []);
   await publicarLogros(codigo, ganadas);
 }
@@ -1909,7 +2023,10 @@ async function publicarLogros(codigo, ganadas) {
       ),
     );
   } catch (e) {
-    logger.warn("No se pudo publicar el aviso de insignias", { codigo, error: e.message });
+    logger.warn("No se pudo publicar el aviso de insignias", {
+      codigo,
+      error: e.message,
+    });
   }
 }
 
@@ -1961,7 +2078,8 @@ const torneos = crearTorneos({
 // ------------------------------------------------------ torneos: el panel
 
 export const crearTorneoAdmin = llamable((data, context) =>
-  torneos.crear(context, validar(EsquemaTorneo, data, errorHttp)));
+  torneos.crear(context, validar(EsquemaTorneo, data, errorHttp)),
+);
 
 export const editarTorneoAdmin = llamable((data, context) => {
   const d = validar(EsquemaEditarTorneo, data, errorHttp);
@@ -1969,13 +2087,22 @@ export const editarTorneoAdmin = llamable((data, context) => {
 });
 
 export const abrirInscripcionesAdmin = llamable((data, context) =>
-  torneos.abrirInscripciones(context, validar(EsquemaIdTorneo, data, errorHttp).torneoId));
+  torneos.abrirInscripciones(
+    context,
+    validar(EsquemaIdTorneo, data, errorHttp).torneoId,
+  ),
+);
 
 export const cerrarInscripcionesAdmin = llamable((data, context) =>
-  torneos.cerrarInscripciones(context, validar(EsquemaIdTorneo, data, errorHttp).torneoId));
+  torneos.cerrarInscripciones(
+    context,
+    validar(EsquemaIdTorneo, data, errorHttp).torneoId,
+  ),
+);
 
 export const iniciarTorneoAdmin = llamable((data, context) =>
-  torneos.iniciar(context, validar(EsquemaIdTorneo, data, errorHttp).torneoId));
+  torneos.iniciar(context, validar(EsquemaIdTorneo, data, errorHttp).torneoId),
+);
 
 /**
  * Cierra el torneo y paga.
@@ -2003,7 +2130,8 @@ export const cancelarTorneoAdmin = llamable((data, context) => {
 });
 
 export const detalleTorneoAdmin = llamable((data, context) =>
-  torneos.detalle(context, validar(EsquemaIdTorneo, data, errorHttp).torneoId));
+  torneos.detalle(context, validar(EsquemaIdTorneo, data, errorHttp).torneoId),
+);
 
 /**
  * Los umbrales de los premios físicos del ranking mensual.
@@ -2019,11 +2147,16 @@ export const detalleTorneoAdmin = llamable((data, context) =>
 export const guardarUmbralesAdmin = llamable(async (data, context) => {
   await administradores.exigir(context);
   const d = validar(EsquemaUmbrales, data, errorHttp);
-  await db.collection("configuracion").doc("ranking").set(
-    { remera: d.remera, llavero: d.llavero, actualizadoEn: marcaDeTiempo() },
-    { merge: true },
-  );
-  return { umbrales: umbralesValidos({ remera: d.remera, llavero: d.llavero }) };
+  await db
+    .collection("configuracion")
+    .doc("ranking")
+    .set(
+      { remera: d.remera, llavero: d.llavero, actualizadoEn: marcaDeTiempo() },
+      { merge: true },
+    );
+  return {
+    umbrales: umbralesValidos({ remera: d.remera, llavero: d.llavero }),
+  };
 });
 
 /** Los umbrales vigentes, para que el panel muestre lo que hay. */
@@ -2077,7 +2210,10 @@ export const listarTorneosAdmin = llamable(async (_data, context) => {
 export const inscribirseATorneo = llamable(async (data, context) => {
   const uid = exigirSesion(context, "inscribirseATorneo");
   await limite.exigirRitmoDePlata(uid, "inscribirseATorneo");
-  return torneos.inscribir(uid, validar(EsquemaIdTorneo, data, errorHttp).torneoId);
+  return torneos.inscribir(
+    uid,
+    validar(EsquemaIdTorneo, data, errorHttp).torneoId,
+  );
 });
 
 /**
@@ -2105,7 +2241,11 @@ const enRed = crearMotorEnRed({
   semillaDe: () => crypto.randomBytes(4).readUInt32BE(0),
   // Con esto, una partida que llega a `finPartida` se cierra sola al vencer
   // su plazo. Sin esto se quedaba viva para siempre.
-  cierre: { leer: cierre.leer, planificar: cierre.planificar, aplicar: cierre.aplicar },
+  cierre: {
+    leer: cierre.leer,
+    planificar: cierre.planificar,
+    aplicar: cierre.aplicar,
+  },
 });
 
 /**
@@ -2122,7 +2262,9 @@ export const horaDelServidor = llamable(async (_data, context) => {
 /** Abre la ventana de reflejos. La hora y el identificador los pone el servidor. */
 export const abrirVentanaDescarte = llamable(async (data, context) => {
   exigirSesion(context, "abrirVentanaDescarte");
-  return enRed.abrirVentana({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
+  return enRed.abrirVentana({
+    codigo: validar(EsquemaDeSala, data, errorHttp).codigo,
+  });
 });
 
 /**
@@ -2143,7 +2285,10 @@ export const intentarDescarte = llamable(async (data, context) => {
   // como mucho una vez cada veinte segundos, y un bucle que lo abuse choca con
   // el mismo límite que un bucle de descartes.
   if (data?.calentar === true) {
-    return enRed.calentar({ uid, codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
+    return enRed.calentar({
+      uid,
+      codigo: validar(EsquemaDeSala, data, errorHttp).codigo,
+    });
   }
 
   // La carta que da quien le acertó a un rival. Va por este mismo callable
@@ -2185,7 +2330,9 @@ export const intentarDescarte = llamable(async (data, context) => {
 /** Cierra la ventana y aplica los intentos en orden de reacción. */
 export const cerrarVentanaDescarte = llamable(async (data, context) => {
   exigirSesion(context, "cerrarVentanaDescarte");
-  return enRed.cerrarVentana({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
+  return enRed.cerrarVentana({
+    codigo: validar(EsquemaDeSala, data, errorHttp).codigo,
+  });
 });
 
 /**
@@ -2208,7 +2355,9 @@ export const avanzarPartida = llamable(async (data, context) => {
 /** Cierra la fase de mirar. La decide el servidor con su reloj. */
 export const cerrarMirada = llamable(async (data, context) => {
   exigirSesion(context, "cerrarMirada");
-  return enRed.cerrarMirada({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
+  return enRed.cerrarMirada({
+    codigo: validar(EsquemaDeSala, data, errorHttp).codigo,
+  });
 });
 
 /** Cualquier acción de turno. La lista de acciones válidas es blanca. */
@@ -2228,13 +2377,18 @@ export const accionDePartida = llamable(async (data, context) => {
 /** Señal de vida. Caerse no cuesta Leyendas; sólo hace que te salten el turno. */
 export const latir = llamable(async (data, context) => {
   const uid = exigirSesion(context, "latir");
-  return enRed.latir({ uid, codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
+  return enRed.latir({
+    uid,
+    codigo: validar(EsquemaDeSala, data, errorHttp).codigo,
+  });
 });
 
 /** Saltea el turno de quien lleva rato sin dar señales. */
 export const saltarAusente = llamable(async (data, context) => {
   exigirSesion(context, "saltarAusente");
-  return enRed.saltarAusente({ codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
+  return enRed.saltarAusente({
+    codigo: validar(EsquemaDeSala, data, errorHttp).codigo,
+  });
 });
 
 /**
@@ -2247,7 +2401,10 @@ export const saltarAusente = llamable(async (data, context) => {
  */
 export const volver = llamable(async (data, context) => {
   const uid = exigirSesion(context, "volver");
-  return enRed.volver({ uid, codigo: validar(EsquemaDeSala, data, errorHttp).codigo });
+  return enRed.volver({
+    uid,
+    codigo: validar(EsquemaDeSala, data, errorHttp).codigo,
+  });
 });
 
 // ------------------------------------------------- abandono en curso
@@ -2399,7 +2556,9 @@ async function barrerPartidasVencidas() {
       logger.info("Barrido de salas vencidas", vencidas);
     }
   } catch (e) {
-    logger.warn("No se pudieron cancelar las salas vencidas", { error: e?.message });
+    logger.warn("No se pudieron cancelar las salas vencidas", {
+      error: e?.message,
+    });
   }
 
   const codigos = await enRed.vencidas();
@@ -2429,7 +2588,10 @@ async function barrerPartidasVencidas() {
       vacio = await enRed.vaciarMesaDesierta({ codigo });
       if (vacio?.vaciada) vaciadas++;
     } catch (e) {
-      problemas.push({ codigo, motivo: `vaciar: ${e?.message ?? "error desconocido"}` });
+      problemas.push({
+        codigo,
+        motivo: `vaciar: ${e?.message ?? "error desconocido"}`,
+      });
     }
 
     let ultimo = null;
@@ -2466,8 +2628,16 @@ async function barrerPartidasVencidas() {
     });
   }
 
-  const resumen = { revisadas: codigos.length, pasos, cerradas, vaciadas, problemas, detalle };
-  if (pasos || vaciadas || problemas.length) logger.info("Barrido de partidas", resumen);
+  const resumen = {
+    revisadas: codigos.length,
+    pasos,
+    cerradas,
+    vaciadas,
+    problemas,
+    detalle,
+  };
+  if (pasos || vaciadas || problemas.length)
+    logger.info("Barrido de partidas", resumen);
   return resumen;
 }
 
@@ -2531,118 +2701,131 @@ export const cerrarRankingAnual = onSchedule(
  * al checkout no dice que haya pagado, y volver de la pantalla de pago
  * tampoco —el navegador puede cerrarse antes, o mentir—.
  */
-export const crearOrdenDeCompra = llamableConMercadoPago(async (data, context) => {
-  const uid = exigirSesion(context, "crearOrdenDeCompra");
+export const crearOrdenDeCompra = llamableConMercadoPago(
+  async (data, context) => {
+    const uid = exigirSesion(context, "crearOrdenDeCompra");
 
-  /**
-   * Mientras la compra se prueba, sólo compran los administradores.
-   *
-   * ─────────────────────────────────────────────────────────────────────────
-   * Y VA ACÁ ARRIBA, ANTES DE TODO
-   * ─────────────────────────────────────────────────────────────────────────
-   *
-   * Antes de leer el paquete y antes de escribir la orden. Si estuviera más
-   * abajo, cada clic de un curioso dejaría una orden en `pendiente` que nadie
-   * va a pagar nunca, y `ordenes/` es justo la colección que hay que poder
-   * conciliar a mano: llenarla de intentos que el propio sistema rechazó la
-   * vuelve inservible para eso.
-   *
-   * El cliente además apaga el botón, pero eso es cortesía. Esto es el
-   * control: `crearOrdenDeCompra` es llamable por cualquiera con una sesión.
-   */
-  if (SOLO_ADMIN_COMPRA) await administradores.exigir(context);
+    /**
+     * Mientras la compra se prueba, sólo compran los administradores.
+     *
+     * ─────────────────────────────────────────────────────────────────────────
+     * Y VA ACÁ ARRIBA, ANTES DE TODO
+     * ─────────────────────────────────────────────────────────────────────────
+     *
+     * Antes de leer el paquete y antes de escribir la orden. Si estuviera más
+     * abajo, cada clic de un curioso dejaría una orden en `pendiente` que nadie
+     * va a pagar nunca, y `ordenes/` es justo la colección que hay que poder
+     * conciliar a mano: llenarla de intentos que el propio sistema rechazó la
+     * vuelve inservible para eso.
+     *
+     * El cliente además apaga el botón, pero eso es cortesía. Esto es el
+     * control: `crearOrdenDeCompra` es llamable por cualquiera con una sesión.
+     */
+    if (SOLO_ADMIN_COMPRA) await administradores.exigir(context);
 
-  await limite.exigirRitmoDePlata(uid, "crearOrdenDeCompra");
-  /**
-   * El pack se lee del servidor, con el id como única cosa que manda el
-   * cliente.
-   *
-   * `paraCobrar` devuelve `null` tanto si no existe como si está APAGADO.
-   * Las dos cosas tienen que cortar la compra: retirar un pack de la tienda y
-   * que igual se pueda comprar mandando el id a mano no sería retirarlo.
-   */
-  const paquete = await packs.paraCobrar(validar(EsquemaCompra, data, errorHttp).paqueteId);
-  if (!paquete) {
-    throw new HttpsError("invalid-argument", "Paquete inexistente.");
-  }
-
-  /**
-   * Si los pagos no están configurados, no se anota nada.
-   *
-   * ─────────────────────────────────────────────────────────────────────────
-   * POR QUÉ ESTA COMPROBACIÓN VA ANTES DE ESCRIBIR LA ORDEN
-   * ─────────────────────────────────────────────────────────────────────────
-   *
-   * Estaba después, y cada persona que apretaba «Comprar» con los secretos
-   * sin cargar dejaba una orden en `pendiente` que nunca iba a existir del
-   * lado de Mercado Pago. Basura acumulándose en `ordenes`, y del peor tipo:
-   * indistinguible a simple vista de una orden real que quedó sin acreditar.
-   * Justo la colección que hay que poder conciliar a mano cuando algo falla.
-   *
-   * No es lo mismo que el fallo de más abajo. Ahí la orden SÍ se conserva a
-   * propósito: los secretos estaban, se intentó de verdad, y que el intento
-   * quede anotado es lo que permite entender después qué pasó. Acá no hubo
-   * intento — el sistema no estaba en condiciones de recibir un peso— y una
-   * orden es el registro de un intento, no de un clic.
-   */
-  if (!process.env.MP_ACCESS_TOKEN) {
-    logger.error("Falta MP_ACCESS_TOKEN: no se puede abrir el checkout", { uid });
-    throw new HttpsError(
-      "failed-precondition",
-      "Los pagos todavía no están habilitados. Probá más tarde.",
+    await limite.exigirRitmoDePlata(uid, "crearOrdenDeCompra");
+    /**
+     * El pack se lee del servidor, con el id como única cosa que manda el
+     * cliente.
+     *
+     * `paraCobrar` devuelve `null` tanto si no existe como si está APAGADO.
+     * Las dos cosas tienen que cortar la compra: retirar un pack de la tienda y
+     * que igual se pueda comprar mandando el id a mano no sería retirarlo.
+     */
+    const paquete = await packs.paraCobrar(
+      validar(EsquemaCompra, data, errorHttp).paqueteId,
     );
-  }
+    if (!paquete) {
+      throw new HttpsError("invalid-argument", "Paquete inexistente.");
+    }
 
-  const refOrden = db.collection("ordenes").doc();
-  await refOrden.set({
-    id: refOrden.id,
-    uid,
-    paqueteId: paquete.id,
-    leyendas: leyendasDePaquete(paquete),
-    importe: paquete.precioUYU, // del catálogo del servidor
-    moneda: MONEDA,
-    // Qué artículos le tocan, congelados igual que las Leyendas: si alguien
-    // edita el pack entre la compra y el aviso de pago, se entrega lo que se
-    // compró y no lo que el pack dice hoy.
-    itemsExclusivos: Array.isArray(paquete.itemsExclusivos) ? paquete.itemsExclusivos : [],
-    estado: "pendiente",
-    creada: admin.firestore.FieldValue.serverTimestamp(),
-  });
+    /**
+     * Si los pagos no están configurados, no se anota nada.
+     *
+     * ─────────────────────────────────────────────────────────────────────────
+     * POR QUÉ ESTA COMPROBACIÓN VA ANTES DE ESCRIBIR LA ORDEN
+     * ─────────────────────────────────────────────────────────────────────────
+     *
+     * Estaba después, y cada persona que apretaba «Comprar» con los secretos
+     * sin cargar dejaba una orden en `pendiente` que nunca iba a existir del
+     * lado de Mercado Pago. Basura acumulándose en `ordenes`, y del peor tipo:
+     * indistinguible a simple vista de una orden real que quedó sin acreditar.
+     * Justo la colección que hay que poder conciliar a mano cuando algo falla.
+     *
+     * No es lo mismo que el fallo de más abajo. Ahí la orden SÍ se conserva a
+     * propósito: los secretos estaban, se intentó de verdad, y que el intento
+     * quede anotado es lo que permite entender después qué pasó. Acá no hubo
+     * intento — el sistema no estaba en condiciones de recibir un peso— y una
+     * orden es el registro de un intento, no de un clic.
+     */
+    if (!process.env.MP_ACCESS_TOKEN) {
+      logger.error("Falta MP_ACCESS_TOKEN: no se puede abrir el checkout", {
+        uid,
+      });
+      throw new HttpsError(
+        "failed-precondition",
+        "Los pagos todavía no están habilitados. Probá más tarde.",
+      );
+    }
 
-  let checkout;
-  try {
-    checkout = await mercadoPago().crearPreferencia({
-      orden: { id: refOrden.id },
-      paquete,
+    const refOrden = db.collection("ordenes").doc();
+    await refOrden.set({
+      id: refOrden.id,
+      uid,
+      paqueteId: paquete.id,
+      leyendas: leyendasDePaquete(paquete),
+      importe: paquete.precioUYU, // del catálogo del servidor
       moneda: MONEDA,
-      urlWebhook: URL_WEBHOOK,
-      urlVuelta: URL_VUELTA,
+      // Qué artículos le tocan, congelados igual que las Leyendas: si alguien
+      // edita el pack entre la compra y el aviso de pago, se entrega lo que se
+      // compró y no lo que el pack dice hoy.
+      itemsExclusivos: Array.isArray(paquete.itemsExclusivos)
+        ? paquete.itemsExclusivos
+        : [],
+      estado: "pendiente",
+      creada: admin.firestore.FieldValue.serverTimestamp(),
     });
-  } catch (e) {
-    // La orden queda en `pendiente` y sin checkout: no se borra, porque saber
-    // que alguien intentó comprar y no pudo es justamente lo que hay que poder
-    // mirar después.
-    logger.error("No se pudo crear la preferencia de Mercado Pago", {
-      uid, ordenId: refOrden.id, error: e.message,
-    });
-    throw new HttpsError("unavailable", "No pudimos abrir el pago. Probá de nuevo.");
-  }
 
-  await refOrden.set(
-    { preferenciaId: checkout.preferenciaId, esSandbox: checkout.esSandbox },
-    { merge: true },
-  );
+    let checkout;
+    try {
+      checkout = await mercadoPago().crearPreferencia({
+        orden: { id: refOrden.id },
+        paquete,
+        moneda: MONEDA,
+        urlWebhook: URL_WEBHOOK,
+        urlVuelta: URL_VUELTA,
+      });
+    } catch (e) {
+      // La orden queda en `pendiente` y sin checkout: no se borra, porque saber
+      // que alguien intentó comprar y no pudo es justamente lo que hay que poder
+      // mirar después.
+      logger.error("No se pudo crear la preferencia de Mercado Pago", {
+        uid,
+        ordenId: refOrden.id,
+        error: e.message,
+      });
+      throw new HttpsError(
+        "unavailable",
+        "No pudimos abrir el pago. Probá de nuevo.",
+      );
+    }
 
-  const urlCheckout = checkout.url;
+    await refOrden.set(
+      { preferenciaId: checkout.preferenciaId, esSandbox: checkout.esSandbox },
+      { merge: true },
+    );
 
-  return {
-    ordenId: refOrden.id,
-    importe: paquete.precioUYU,
-    moneda: MONEDA,
-    leyendas: leyendasDePaquete(paquete),
-    urlCheckout,
-  };
-});
+    const urlCheckout = checkout.url;
+
+    return {
+      ordenId: refOrden.id,
+      importe: paquete.precioUYU,
+      moneda: MONEDA,
+      leyendas: leyendasDePaquete(paquete),
+      urlCheckout,
+    };
+  },
+);
 
 /**
  * Le da al comprador los artículos que trae su pack.
@@ -2677,7 +2860,9 @@ async function entregarLoDelPack(ordenId) {
   try {
     const snap = await db.collection("ordenes").doc(String(ordenId)).get();
     const orden = snap.exists ? snap.data() : null;
-    const ids = Array.isArray(orden?.itemsExclusivos) ? orden.itemsExclusivos : [];
+    const ids = Array.isArray(orden?.itemsExclusivos)
+      ? orden.itemsExclusivos
+      : [];
     if (!orden?.uid || !ids.length) return;
 
     const entregados = [];
@@ -2687,16 +2872,26 @@ async function entregarLoDelPack(ordenId) {
         if (r.nuevo) entregados.push(itemId);
       } catch (e) {
         logger.error("No se pudo entregar un artículo del pack", {
-          ordenId, uid: orden.uid, item: itemId, error: e.message,
+          ordenId,
+          uid: orden.uid,
+          item: itemId,
+          error: e.message,
         });
       }
     }
 
     if (entregados.length) {
-      logger.info("Artículos de pack entregados", { ordenId, uid: orden.uid, entregados });
+      logger.info("Artículos de pack entregados", {
+        ordenId,
+        uid: orden.uid,
+        entregados,
+      });
     }
   } catch (e) {
-    logger.error("No se pudieron entregar los artículos del pack", { ordenId, error: e.message });
+    logger.error("No se pudieron entregar los artículos del pack", {
+      ordenId,
+      error: e.message,
+    });
   }
 }
 
@@ -2710,138 +2905,167 @@ async function entregarLoDelPack(ordenId) {
  *   firebase functions:secrets:set MP_ACCESS_TOKEN
  *   firebase functions:secrets:set MP_WEBHOOK_SECRET
  */
-export const webhookPago = onRequest({ ...OPCIONES, secrets: SECRETOS_MP }, async (req, res) => {
-  if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
+export const webhookPago = onRequest(
+  { ...OPCIONES, secrets: SECRETOS_MP },
+  async (req, res) => {
+    if (req.method !== "POST")
+      return res.status(405).send("Method Not Allowed");
 
-  const mp = mercadoPago();
+    const mp = mercadoPago();
 
-  if (!process.env.MP_WEBHOOK_SECRET || !process.env.MP_ACCESS_TOKEN) {
-    logger.error("Faltan las credenciales de Mercado Pago: el webhook no puede verificar nada");
-    // 500 y no 200: que MP lo reintente cuando esté configurado, en vez de
-    // dar el aviso por entregado y perder el pago.
-    return res.status(500).send("Sin configurar");
-  }
-
-  // Mercado Pago manda el id del pago en la QUERY, y ése es el que firma.
-  const dataId = req.query?.["data.id"] ?? req.query?.id ?? req.body?.data?.id;
-  const tipo = req.query?.type ?? req.body?.type;
-
-  const firma = mp.verificarFirma({
-    firma: req.get("x-signature"),
-    requestId: req.get("x-request-id"),
-    dataId,
-    crypto,
-  });
-
-  if (!firma.valida) {
-    // Sin volcar la firma recibida: es lo que un atacante querría ver para
-    // saber qué tan cerca estuvo. El motivo sí, que sirve para diagnosticar.
-    logger.warn("Webhook de Mercado Pago rechazado", { motivo: firma.motivo, origen: req.ip });
-    return res.status(401).send("Firma inválida");
-  }
-
-  // Sólo interesan las notificaciones de pago. Al resto se le contesta 200
-  // para que MP no reintente eternamente algo que no vamos a procesar.
-  if (tipo && tipo !== "payment") return res.status(200).send("ignorado");
-  if (!dataId) return res.status(400).send("Sin id de pago");
-
-  // ────────────────────────────────────────────────────────────────────
-  // ACÁ ESTÁ LO IMPORTANTE: el aviso no dice que te pagaron, dice que MIRES.
-  //
-  // El estado se lee de la API de Mercado Pago, NUNCA del cuerpo del pedido.
-  // La versión anterior confiaba en `req.body.estado === "pagado"`, y eso
-  // significa que cualquiera capaz de producir un cuerpo aceptado acuñaba
-  // Leyendas. La firma tampoco alcanza por sí sola: el manifiesto que MP firma
-  // cubre el id, el request-id y la marca de tiempo, no el cuerpo entero.
-  // ────────────────────────────────────────────────────────────────────
-  let pago;
-  try {
-    pago = await mp.consultarPago(dataId);
-  } catch (e) {
-    logger.error("No se pudo consultar el pago en Mercado Pago", { dataId, error: e.message });
-    // 500 para que MP reintente: puede haber sido un problema pasajero suyo.
-    return res.status(500).send("No se pudo confirmar");
-  }
-
-  if (!pago.aprobado) {
-    // Se anota el estado real y no se acredita nada. `authorized` está retenido
-    // y todavía puede caerse: tratarlo como pagado sería regalar Leyendas.
-    if (pago.ordenId) {
-      await db.collection("ordenes").doc(pago.ordenId)
-        .set({ estado: pago.estado, detalle: pago.detalle ?? null }, { merge: true });
-    }
-    logger.info("Pago no aprobado", { pagoId: pago.id, estado: pago.estado });
-    return res.status(200).send("ok");
-  }
-
-  try {
-    await db.runTransaction(async (tx) => {
-      const refOrden = db.collection("ordenes").doc(String(pago.ordenId));
-      const snap = await tx.get(refOrden);           // ← leer primero
-      const orden = snap.exists ? { id: snap.id, ...snap.data() } : null;
-
-      const coincide = pagoCoincideConOrden(pago, orden, { moneda: MONEDA });
-      if (!coincide.ok) {
-        // "Ya pagada" es un reintento de MP y es normal: se contesta bien.
-        if (coincide.motivo === "ya_pagada") return;
-        // Lo demás no. Un importe o una moneda que no cuadran con la orden es
-        // la señal de que algo se manipuló, y no se acredita nada.
-        throw Object.assign(new Error(coincide.motivo), { noAcreditar: true, pago: pago.id });
-      }
-
-      /**
-       * Lo que se acredita sale de la ORDEN, no del paquete.
-       *
-       * `orden.leyendas` se congeló cuando se creó la orden, con el precio y
-       * la cantidad de ese momento. Si alguien edita el paquete entre la
-       * compra y el aviso de pago, al comprador se le acredita lo que compró
-       * y no lo que el paquete dice hoy.
-       *
-       * Acá se leía además el paquete vivo, para sacarle la insignia que
-       * prometía. Esa insignia se fue —se escribía en un campo que nadie
-       * lee— y con ella el último motivo para mirar el paquete.
-       */
-      await moverLeyendas(tx, {
-        uid: orden.uid,
-        delta: orden.leyendas,
-        motivo: MOTIVOS.COMPRA,
-        referencia: pago.id,
-        // Idempotencia por pago: MP reintenta el aviso hasta que le contestes
-        // 200, y a veces igual manda duplicados.
-        idempotencia: `compra_${pago.id}`,
-      });
-
-      tx.set(
-        refOrden,
-        {
-          estado: "pagado",
-          transaccionId: pago.id,
-          importePagado: pago.importe,
-          modoVivo: pago.modoVivo,
-          pagada: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true },
+    if (!process.env.MP_WEBHOOK_SECRET || !process.env.MP_ACCESS_TOKEN) {
+      logger.error(
+        "Faltan las credenciales de Mercado Pago: el webhook no puede verificar nada",
       );
+      // 500 y no 200: que MP lo reintente cuando esté configurado, en vez de
+      // dar el aviso por entregado y perder el pago.
+      return res.status(500).send("Sin configurar");
+    }
 
-      // Acá se le escribía al comprador del Pack Élite la insignia
-      // `comprador-elite`, en un campo que no lee nadie y con un id que no
-      // existía en ningún catálogo. Los paquetes dan Leyendas; las insignias
-      // se ganan jugando. Lo que SÍ trae un pack se entrega abajo, fuera de
-      // esta transacción.
+    // Mercado Pago manda el id del pago en la QUERY, y ése es el que firma.
+    const dataId =
+      req.query?.["data.id"] ?? req.query?.id ?? req.body?.data?.id;
+    const tipo = req.query?.type ?? req.body?.type;
+
+    const firma = mp.verificarFirma({
+      firma: req.get("x-signature"),
+      requestId: req.get("x-request-id"),
+      dataId,
+      crypto,
     });
 
-    await entregarLoDelPack(pago.ordenId);
-
-    return res.status(200).send("ok");
-  } catch (e) {
-    if (e.noAcreditar) {
-      logger.error("Pago aprobado que NO coincide con su orden: no se acreditó nada", {
-        pagoId: e.pago, motivo: e.message, ordenId: pago.ordenId,
+    if (!firma.valida) {
+      // Sin volcar la firma recibida: es lo que un atacante querría ver para
+      // saber qué tan cerca estuvo. El motivo sí, que sirve para diagnosticar.
+      logger.warn("Webhook de Mercado Pago rechazado", {
+        motivo: firma.motivo,
+        origen: req.ip,
       });
-      // 200: reintentar no va a arreglarlo, y hay que mirarlo a mano.
-      return res.status(200).send("no coincide");
+      return res.status(401).send("Firma inválida");
     }
-    logger.error("No se pudo acreditar la compra", { pagoId: pago.id, error: e.message });
-    return res.status(500).send("Error");
-  }
-});
+
+    // Sólo interesan las notificaciones de pago. Al resto se le contesta 200
+    // para que MP no reintente eternamente algo que no vamos a procesar.
+    if (tipo && tipo !== "payment") return res.status(200).send("ignorado");
+    if (!dataId) return res.status(400).send("Sin id de pago");
+
+    // ────────────────────────────────────────────────────────────────────
+    // ACÁ ESTÁ LO IMPORTANTE: el aviso no dice que te pagaron, dice que MIRES.
+    //
+    // El estado se lee de la API de Mercado Pago, NUNCA del cuerpo del pedido.
+    // La versión anterior confiaba en `req.body.estado === "pagado"`, y eso
+    // significa que cualquiera capaz de producir un cuerpo aceptado acuñaba
+    // Leyendas. La firma tampoco alcanza por sí sola: el manifiesto que MP firma
+    // cubre el id, el request-id y la marca de tiempo, no el cuerpo entero.
+    // ────────────────────────────────────────────────────────────────────
+    let pago;
+    try {
+      pago = await mp.consultarPago(dataId);
+    } catch (e) {
+      logger.error("No se pudo consultar el pago en Mercado Pago", {
+        dataId,
+        error: e.message,
+      });
+      // 500 para que MP reintente: puede haber sido un problema pasajero suyo.
+      return res.status(500).send("No se pudo confirmar");
+    }
+
+    if (!pago.aprobado) {
+      // Se anota el estado real y no se acredita nada. `authorized` está retenido
+      // y todavía puede caerse: tratarlo como pagado sería regalar Leyendas.
+      if (pago.ordenId) {
+        await db
+          .collection("ordenes")
+          .doc(pago.ordenId)
+          .set(
+            { estado: pago.estado, detalle: pago.detalle ?? null },
+            { merge: true },
+          );
+      }
+      logger.info("Pago no aprobado", { pagoId: pago.id, estado: pago.estado });
+      return res.status(200).send("ok");
+    }
+
+    try {
+      await db.runTransaction(async (tx) => {
+        const refOrden = db.collection("ordenes").doc(String(pago.ordenId));
+        const snap = await tx.get(refOrden); // ← leer primero
+        const orden = snap.exists ? { id: snap.id, ...snap.data() } : null;
+
+        const coincide = pagoCoincideConOrden(pago, orden, { moneda: MONEDA });
+        if (!coincide.ok) {
+          // "Ya pagada" es un reintento de MP y es normal: se contesta bien.
+          if (coincide.motivo === "ya_pagada") return;
+          // Lo demás no. Un importe o una moneda que no cuadran con la orden es
+          // la señal de que algo se manipuló, y no se acredita nada.
+          throw Object.assign(new Error(coincide.motivo), {
+            noAcreditar: true,
+            pago: pago.id,
+          });
+        }
+
+        /**
+         * Lo que se acredita sale de la ORDEN, no del paquete.
+         *
+         * `orden.leyendas` se congeló cuando se creó la orden, con el precio y
+         * la cantidad de ese momento. Si alguien edita el paquete entre la
+         * compra y el aviso de pago, al comprador se le acredita lo que compró
+         * y no lo que el paquete dice hoy.
+         *
+         * Acá se leía además el paquete vivo, para sacarle la insignia que
+         * prometía. Esa insignia se fue —se escribía en un campo que nadie
+         * lee— y con ella el último motivo para mirar el paquete.
+         */
+        await moverLeyendas(tx, {
+          uid: orden.uid,
+          delta: orden.leyendas,
+          motivo: MOTIVOS.COMPRA,
+          referencia: pago.id,
+          // Idempotencia por pago: MP reintenta el aviso hasta que le contestes
+          // 200, y a veces igual manda duplicados.
+          idempotencia: `compra_${pago.id}`,
+        });
+
+        tx.set(
+          refOrden,
+          {
+            estado: "pagado",
+            transaccionId: pago.id,
+            importePagado: pago.importe,
+            modoVivo: pago.modoVivo,
+            pagada: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        // Acá se le escribía al comprador del Pack Élite la insignia
+        // `comprador-elite`, en un campo que no lee nadie y con un id que no
+        // existía en ningún catálogo. Los paquetes dan Leyendas; las insignias
+        // se ganan jugando. Lo que SÍ trae un pack se entrega abajo, fuera de
+        // esta transacción.
+      });
+
+      await entregarLoDelPack(pago.ordenId);
+
+      return res.status(200).send("ok");
+    } catch (e) {
+      if (e.noAcreditar) {
+        logger.error(
+          "Pago aprobado que NO coincide con su orden: no se acreditó nada",
+          {
+            pagoId: e.pago,
+            motivo: e.message,
+            ordenId: pago.ordenId,
+          },
+        );
+        // 200: reintentar no va a arreglarlo, y hay que mirarlo a mano.
+        return res.status(200).send("no coincide");
+      }
+      logger.error("No se pudo acreditar la compra", {
+        pagoId: pago.id,
+        error: e.message,
+      });
+      return res.status(500).send("Error");
+    }
+  },
+);
