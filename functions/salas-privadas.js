@@ -74,7 +74,7 @@ export const normalizarCodigo = (codigo) =>
  * límite de cinco intentos por minuto, no el costo de una vuelta de hash.
  */
 export const hashDeCodigo = (codigo, pimienta = "") =>
-  crypto.createHash("sha256").update(`${pimienta}:${normalizarCodigo(codigo)}`).digest("hex");
+  crypto.createHmac("sha256", pimienta).update(normalizarCodigo(codigo)).digest("hex");
 
 /** Un código nuevo, con el azar del sistema. */
 export function generarCodigoSecreto(bytes = (n) => crypto.randomBytes(n)) {
