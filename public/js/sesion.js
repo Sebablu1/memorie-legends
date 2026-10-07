@@ -10,7 +10,16 @@
  * COLECCION y CAMPO_SALDO acá.
  */
 
-import { auth, db, doc, getDoc, updateDoc, onAuthStateChanged, signOut } from "./firebase.js";
+import {
+  auth,
+  db,
+  doc,
+  getDoc,
+  updateDoc,
+  onAuthStateChanged,
+  signOut,
+  precalentarFunciones,
+} from "./firebase.js";
 
 export const COLECCION = "users";
 export const CAMPO_SALDO = "credits";
@@ -20,6 +29,11 @@ export function esperarSesion() {
   return new Promise((resolve) => {
     const cortar = onAuthStateChanged(auth, (usuario) => {
       cortar();
+      // Despierta las funciones críticas apenas hay sesión. Corre en TODAS
+      // las páginas que esperan sesión —dashboard, lobby, mesa— así que el
+      // primer toque del jugador no paga el arranque en frío. No espera
+      // respuesta ni rompe nada si falla.
+      if (usuario) precalentarFunciones();
       resolve(usuario);
     });
   });
@@ -62,7 +76,11 @@ export async function leerPerfil(uid) {
     comprado: Number(datos.creditosComprados ?? 0),
     ganado: Number(
       datos.creditosGanados ??
-        Math.max(0, Number(datos[CAMPO_SALDO] ?? 0) - Number(datos.creditosComprados ?? 0)),
+        Math.max(
+          0,
+          Number(datos[CAMPO_SALDO] ?? 0) -
+            Number(datos.creditosComprados ?? 0),
+        ),
     ),
 
     partidas: Number(datos.gamesPlayed ?? 0),
