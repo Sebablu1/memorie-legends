@@ -378,7 +378,11 @@ console.log("\n=== El webhook no lee el estado del payload ===");
    * configurar» para siempre con el secreto bien guardado— pero se escribe
    * distinto: en v2 es un campo más de las opciones.
    */
-  ok(/export const webhookPago = onRequest\(\{[^}]*secrets:\s*SECRETOS_MP/.test(codigo),
+  // `\s*` entre el paréntesis y la llave: el código tiene las opciones en su
+  // propia línea, y exigir `({` pegado obligaba a que el formateo fuera uno
+  // en particular. Lo que este test defiende es que `secrets: SECRETOS_MP`
+  // esté entre las opciones del `onRequest`, no cómo están partidas las líneas.
+  ok(/export const webhookPago = onRequest\(\s*\{[^}]*secrets:\s*SECRETOS_MP/.test(codigo),
      "y el webhook, ya en v2, declara los suyos en las opciones");
 
   // Y que no vuelva `runWith`: es la forma de v1, y si reaparece significa que

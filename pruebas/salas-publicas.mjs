@@ -521,10 +521,15 @@ console.log("\n=== 10. index.js usa estas mismas piezas ===");
   ok(control > 0 && control < crearSala.indexOf("db.runTransaction"),
      "crearSala exige ser administrador ANTES de abrir nada");
 
+  // Se busca sin el `(context` pegado: el código tiene las tres llamadas
+  // formateadas igual —`publicas.crear(\n  context,`— pero un reformateo
+  // cualquiera (prettier, alguien partiendo la línea) rompería el match sin
+  // que se rompa nada de lo que este test defiende. Lo que importa es que la
+  // llamada pase por el módulo, y eso lo dice `publicas.crear(` a secas.
   for (const [funcion, llamada] of [
-    ["crearSalaPublica", "publicas.crear(context"],
-    ["editarSalaPublica", "publicas.editar(context"],
-    ["borrarSalaPublica", "publicas.borrar(context"],
+    ["crearSalaPublica", "publicas.crear("],
+    ["editarSalaPublica", "publicas.editar("],
+    ["borrarSalaPublica", "publicas.borrar("],
   ]) {
     ok(bloque(`export const ${funcion}`).includes(llamada),
        `${funcion} pasa por el módulo, que exige ser administrador`);
