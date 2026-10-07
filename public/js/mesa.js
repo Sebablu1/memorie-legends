@@ -40,9 +40,11 @@ import {
   dondeEntraLoQueSabe,
 } from "./reglas/motor.js";
 
-
 import { crearTemporizadores, esperar } from "./modulos/temporizadores.js";
-import { crearMedidorDeTiempos, encenderPanelDeTiempos } from "./modulos/tiempos.js";
+import {
+  crearMedidorDeTiempos,
+  encenderPanelDeTiempos,
+} from "./modulos/tiempos.js";
 import { crearInterfaz, escapar } from "./modulos/ui.js";
 import { mostrarCargando, ocultarCargando } from "./spinner.js";
 import {
@@ -58,13 +60,22 @@ import {
   usarMazoCentral,
   dorsoDelMazo,
 } from "./modulos/cartas.js";
-import { retratoDe, usarRetratoPropio, RETRATO_INICIAL } from "./modulos/retratos.js";
+import {
+  retratoDe,
+  usarRetratoPropio,
+  RETRATO_INICIAL,
+} from "./modulos/retratos.js";
 import { esRutaDelSitio } from "./reglas/catalogo.js";
 import { caraDeCarta, imagenCarta, PALOS, NUMEROS } from "./reglas/baraja.js";
 import { guardarVestuario, vestuarioGuardado } from "./modulos/vestuario.js";
 import { LIMITE_ELIMINACION, puntosMano } from "./reglas/puntaje.js";
 import * as IA from "./reglas/ia.js";
-import { MODOS, ENTRADAS, ESTADOS_SALA, costoDeAbandonar } from "./reglas/salas.js";
+import {
+  MODOS,
+  ENTRADAS,
+  ESTADOS_SALA,
+  costoDeAbandonar,
+} from "./reglas/salas.js";
 import * as Red from "./partida-red.js";
 import {
   elegibleParaPoder,
@@ -187,10 +198,12 @@ function vestirLaMesa() {
    * de ahí que la ruta venga filtrada por `propio`.
    */
   if (miPano) {
-    document.querySelector(".mesa")?.style.setProperty(
-      "--pano",
-      `url("${miPano}") center / 100% 100% no-repeat`,
-    );
+    document
+      .querySelector(".mesa")
+      ?.style.setProperty(
+        "--pano",
+        `url("${miPano}") center / 100% 100% no-repeat`,
+      );
   }
 
   aplicarDorsoPropio();
@@ -468,7 +481,9 @@ const partidaEconomica = {
  * alguien lo escriba a mano en la barra de direcciones, lo único que consigue
  * es elegirse su propio mazo contra la máquina.
  */
-const semillaPedida = Number(new URLSearchParams(location.search).get("semilla"));
+const semillaPedida = Number(
+  new URLSearchParams(location.search).get("semilla"),
+);
 /**
  * Con cuántos puntos se queda afuera en ESTA mesa.
  *
@@ -703,8 +718,16 @@ const interfaz = crearInterfaz({
   msAnuncio: RITMO.anunciarPoder,
   msMarcaPoder: MS_MARCA_PODER,
 });
-const { pista, abrirModal, cerrarModal, marcarEfecto,
-        mostrarCartel, marcarManoMirada, anunciarPoder, efectoCambio } = interfaz;
+const {
+  pista,
+  abrirModal,
+  cerrarModal,
+  marcarEfecto,
+  mostrarCartel,
+  marcarManoMirada,
+  anunciarPoder,
+  efectoCambio,
+} = interfaz;
 
 /**
  * Los carteles cortos, en un solo sitio.
@@ -718,12 +741,12 @@ const { pista, abrirModal, cerrarModal, marcarEfecto,
  * a propósito: el 7 se anuncia con 👁 y se confirma con 👁.
  */
 const CARTELES = {
-  mirarPropia:  ["👁", "Miró"],
-  mirarRival:   ["🔍", "Miró"],
-  cambio:       ["🔄", "Cambio"],
-  sinCambio:    ["🤝", "Sin cambio"],
-  tuTurno:      ["🃏", "Tu turno"],
-  decidir:      ["✂️", "Decidí"],
+  mirarPropia: ["👁", "Miró"],
+  mirarRival: ["🔍", "Miró"],
+  cambio: ["🔄", "Cambio"],
+  sinCambio: ["🤝", "Sin cambio"],
+  tuTurno: ["🃏", "Tu turno"],
+  decidir: ["✂️", "Decidí"],
 };
 
 /** Muestra uno de CARTELES por su nombre. `tuyo` lo pinta en dorado. */
@@ -754,9 +777,6 @@ let seleccionPropia = null;
  */
 const revelaciones = new Map();
 
-
-
-
 /**
  * Fases en las que "el turno" quiere decir algo.
  *
@@ -768,7 +788,12 @@ const revelaciones = new Map();
  *
  * En el final de ronda tampoco: ahí se está mirando el marcador.
  */
-const FASES_CON_TURNO = new Set(["turno", "levantada", "postLevantada", "poder"]);
+const FASES_CON_TURNO = new Set([
+  "turno",
+  "levantada",
+  "postLevantada",
+  "poder",
+]);
 
 /**
  * La cara de un asiento.
@@ -952,7 +977,9 @@ function dibujarJugador(jugador, i) {
   // lo mismo. El texto es fijo y no sale de ningún dato del jugador, así que
   // no hay nada que escapar.
   const ausente = !jugador.eliminado && estaAusente(i);
-  const marcaDeAusente = ausente ? ' <span class="marca-ausente">ausente</span>' : "";
+  const marcaDeAusente = ausente
+    ? ' <span class="marca-ausente">ausente</span>'
+    : "";
   const titulo = tituloDe(jugador);
 
   /**
@@ -1196,11 +1223,13 @@ let ultimoAviso = "";
  */
 function avisarSiMeToca() {
   const mio = estado.indiceTurno === YO;
-  const cual =
-    !mio ? null
-    : estado.fase === "turno" ? "tuTurno"
-    : estado.fase === "postLevantada" ? "decidir"
-    : null;
+  const cual = !mio
+    ? null
+    : estado.fase === "turno"
+      ? "tuTurno"
+      : estado.fase === "postLevantada"
+        ? "decidir"
+        : null;
 
   if (!cual) {
     // Fuera de mis fases se olvida lo avisado, para que el turno siguiente
@@ -1317,7 +1346,8 @@ function actualizarBotones() {
   // que era el ícono de este botón cuando no tenía uno. Dos símbolos para
   // lo mismo, uno encima del otro, es ruido; que hay poder ya lo dicen el
   // ámbar y el latido de `.con-poder`.
-  if (dom.btnTirarTexto) dom.btnTirarTexto.textContent = poderDisponible ? "Poder" : "Tirar";
+  if (dom.btnTirarTexto)
+    dom.btnTirarTexto.textContent = poderDisponible ? "Poder" : "Tirar";
   dom.btnCortar.disabled = !(estado.fase === "postLevantada" && miTurno);
   dom.btnPasar.disabled = !(estado.fase === "postLevantada" && miTurno);
 
@@ -1333,7 +1363,12 @@ function actualizarBotones() {
    * Vale para los dos modos porque `estoyMarcado` ya sabe de dónde leer.
    */
   const marcado = estoyMarcado() && !estado.jugadores[YO]?.eliminado;
-  for (const boton of [dom.btnLevantar, dom.btnTirar, dom.btnCortar, dom.btnPasar]) {
+  for (const boton of [
+    dom.btnLevantar,
+    dom.btnTirar,
+    dom.btnCortar,
+    dom.btnPasar,
+  ]) {
     boton.hidden = marcado;
   }
   if (dom.btnHeVuelto) dom.btnHeVuelto.hidden = !marcado;
@@ -1348,16 +1383,14 @@ function actualizarBotones() {
    * cada dibujado y pisaría cualquier otra pista mientras dure.
    */
   if (marcado && !estabaMarcado && enRed()) {
-    pista("Se acabó tu tiempo y quedaste <b>ausente</b>. Tocá <b>He vuelto</b> para seguir.");
+    pista(
+      "Se acabó tu tiempo y quedaste <b>ausente</b>. Tocá <b>He vuelto</b> para seguir.",
+    );
   }
   estabaMarcado = marcado;
 }
 
-
 // -------------------------------------------------------- temporizadores
-
-
-
 
 async function revelarUnMomento(i, pos, ms = MS_MIRAR) {
   sonidos.voltear();
@@ -1370,9 +1403,6 @@ async function revelarUnMomento(i, pos, ms = MS_MIRAR) {
 }
 
 // ----------------------------------------------------- reloj del turno
-
-
-
 
 /**
  * Se acabó el tiempo: se resuelve la decisión pendiente con la salida más
@@ -1427,7 +1457,9 @@ function pasarPorTiempo() {
   // veinte segundos frente a la decisión de cortar sin tocar nada. Los plazos
   // de diez —tirar, soltar el poder— no marcan: vencerlos es jugar apurado.
   ausenteLocal = true;
-  pista("Se acabó el tiempo: <b>pasaste</b> el turno y quedaste <b>ausente</b>.");
+  pista(
+    "Se acabó el tiempo: <b>pasaste</b> el turno y quedaste <b>ausente</b>.",
+  );
   dibujar();
   cicloTurnos();
 }
@@ -1662,6 +1694,21 @@ function relojDeLaFase() {
     return espejoDelPlazo(estado.fase);
   }
 
+  /**
+   * El reloj de la ventana de descarte.
+   *
+   * Los otros tres relojes de red —turno, postLevantada y las decisiones de
+   * diez segundos— ya espejaban el plazo del servidor. Éste no: la fase
+   * `descarte` caía al `return null` del final, así que en Leyendas la barra
+   * no aparecía nunca. En entrenamiento sí, pero por otro camino: allá lo
+   * dibuja `faseDescarte` con su propio `correrTemporizador`. Por eso acá se
+   * devuelve `null` sin red, para no dibujar dos barras.
+   */
+  if (estado.fase === "descarte") {
+    if (!enRed()) return null;
+    return espejoDelPlazo("descarte");
+  }
+
   return null;
 }
 
@@ -1688,15 +1735,7 @@ function sincronizarReloj() {
 
 // ------------------------------------------------- efectos de los poderes
 
-
-
-
-
-
-
 // ------------------------------------------------------------ modal
-
-
 
 // ---------------------------------------------------------- abandono
 
@@ -1833,7 +1872,8 @@ async function animarReparto() {
   if (!mazo || !asientos.length) return;
 
   const centro = mazo.getBoundingClientRect();
-  const cartasDe = (asiento) => asiento.querySelectorAll(".carta[data-posicion]");
+  const cartasDe = (asiento) =>
+    asiento.querySelectorAll(".carta[data-posicion]");
   const maxCartas = Math.max(...asientos.map((a) => cartasDe(a).length));
   if (!maxCartas) return;
 
@@ -1853,7 +1893,10 @@ async function animarReparto() {
 
       carta.style.setProperty("--dx", `${Math.round(dx)}px`);
       carta.style.setProperty("--dy", `${Math.round(dy)}px`);
-      carta.style.setProperty("--retraso-reparto", `${repartidas * MS_ENTRE_CARTAS}ms`);
+      carta.style.setProperty(
+        "--retraso-reparto",
+        `${repartidas * MS_ENTRE_CARTAS}ms`,
+      );
       carta.classList.add("repartiendo");
       repartidas++;
     }
@@ -1960,7 +2003,9 @@ function encenderDebugDeCartas() {
     const propia = document.querySelector(".jugador.propio .mano > .carta");
     const centro = document.querySelector("#muestraCarta .carta");
     const proporcion =
-      propia && centro ? (centro.offsetWidth / propia.offsetWidth).toFixed(2) : "—";
+      propia && centro
+        ? (centro.offsetWidth / propia.offsetWidth).toFixed(2)
+        : "—";
 
     caja.innerHTML = `
       <b>${innerWidth}×${innerHeight}</b> · ${devicePixelRatio}x
@@ -2088,7 +2133,8 @@ function resolverUltimoDescarte() {
 
   // Acertarle a un rival suena como ser primero: las dos son aciertos. Antes
   // caía en el sonido de error, y el que acertaba creía que había fallado.
-  const acerto = ultimo.resultado === "primero" || ultimo.resultado === "rivalAcierto";
+  const acerto =
+    ultimo.resultado === "primero" || ultimo.resultado === "rivalAcierto";
   if (acerto) sonidos.acierto();
   else if (ultimo.resultado === "tarde") sonidos.aviso();
   else sonidos.error();
@@ -2115,7 +2161,9 @@ function resolverUltimoDescarte() {
  */
 function empezarEntregaLocal(objetivo) {
   let avisar;
-  const terminada = new Promise((listo) => { avisar = listo; });
+  const terminada = new Promise((listo) => {
+    avisar = listo;
+  });
   atacando = {
     ...objetivo,
     terminada,
@@ -2152,7 +2200,8 @@ function completarEntregaLocal(posicion) {
 
   // Si la ventana sigue abierta, vuelve su reloj; si no, no queda ninguno.
   const resta = finDeLaVentana - Date.now();
-  if (manejadorDescarte && resta > 0) correrTemporizador(resta, "descarte (resto)");
+  if (manejadorDescarte && resta > 0)
+    correrTemporizador(resta, "descarte (resto)");
   else cancelarTemporizador();
 
   dibujar();
@@ -2226,11 +2275,12 @@ async function trasResolverElPoder(pistaFinal = "CORTAR O PASAR") {
    * adelante es peor que no decir nada.
    */
   const donde = dondeEntraLoQueSabe(estado, YO);
-  const rotulo = donde.propia && donde.ajena
-    ? "TENÉS UN PAR: TUYO O DEL RIVAL"
-    : donde.propia
-      ? "ESA CARTA TUYA ENTRA: DESCARTALA"
-      : "BUSCÁ LA CARTA DEL RIVAL";
+  const rotulo =
+    donde.propia && donde.ajena
+      ? "TENÉS UN PAR: TUYO O DEL RIVAL"
+      : donde.propia
+        ? "ESA CARTA TUYA ENTRA: DESCARTALA"
+        : "BUSCÁ LA CARTA DEL RIVAL";
 
   // Tres segundos, los mismos que una reapertura: ya se sabe qué se busca y
   // en qué mano. El servidor llega al mismo número por su cuenta, leyendo
@@ -2341,7 +2391,10 @@ function faseDescarte(alCerrar, duracion = MS_DESCARTE, rotulo = "DESCARTE") {
         cancelarTemporizador();
         // Lo que se destapó lo vio toda la mesa, la IA incluida.
         memorias = memorias.map((m) =>
-          IA.absorberRevelaciones(m, cartasExpuestas(estado.ventanaDescarte?.intentos ?? [])),
+          IA.absorberRevelaciones(
+            m,
+            cartasExpuestas(estado.ventanaDescarte?.intentos ?? []),
+          ),
         );
         estado = cerrarVentanaDescarte(estado);
         dibujar();
@@ -2578,8 +2631,12 @@ async function poderDeIA(i) {
     if (!conviene) {
       // No cambió: sigue sabiendo qué tiene el rival ahí.
       memorias[i] = IA.recordar(
-        memorias[i], estado.jugadores[i].dificultad,
-        objetivo.indiceRival, objetivo.posicionRival, r.revelada.rival, () => 0,
+        memorias[i],
+        estado.jugadores[i].dificultad,
+        objetivo.indiceRival,
+        objetivo.posicionRival,
+        r.revelada.rival,
+        () => 0,
       );
       dibujar();
       sonidos.clic();
@@ -3008,7 +3065,8 @@ document.addEventListener("click", async (evento) => {
       pista("No era esa: te comés una carta.");
       return;
     }
-    if (resultado === "acierto") empezarEntregaLocal({ indiceJugador, posicion });
+    if (resultado === "acierto")
+      empezarEntregaLocal({ indiceJugador, posicion });
     return;
   }
 
@@ -3294,10 +3352,14 @@ function abrirModalPoder() {
  * existe y volver al primero sería devolverte al principio sin que lo pidieras.
  */
 function mostrarGrupo(n) {
-  const grupos = [...dom.modal.querySelectorAll(".objetivos > .grupo-objetivo")];
+  const grupos = [
+    ...dom.modal.querySelectorAll(".objetivos > .grupo-objetivo"),
+  ];
   if (!grupos.length) return;
   const cual = Math.min(Math.max(n, 0), grupos.length - 1);
-  grupos.forEach((grupo, paso) => grupo.classList.toggle("actual", paso === cual));
+  grupos.forEach((grupo, paso) =>
+    grupo.classList.toggle("actual", paso === cual),
+  );
   dom.modal.querySelectorAll('[data-accion="ir-al-grupo"]').forEach((boton) => {
     const suya = Number(boton.dataset.grupo) === cual;
     boton.classList.toggle("actual", suya);
@@ -3307,7 +3369,9 @@ function mostrarGrupo(n) {
 
 /** El grupo que se está viendo, o 0 si la ventana no tiene ninguno marcado. */
 function grupoActual() {
-  const grupos = [...dom.modal.querySelectorAll(".objetivos > .grupo-objetivo")];
+  const grupos = [
+    ...dom.modal.querySelectorAll(".objetivos > .grupo-objetivo"),
+  ];
   return Math.max(
     0,
     grupos.findIndex((grupo) => grupo.classList.contains("actual")),
@@ -3347,13 +3411,20 @@ dom.modal.addEventListener("click", async (evento) => {
      * de `[data-objetivo]`, más abajo.
      */
     abrirModalPoder();
-    pista(pasoDelPoder({ numero: miVista?.poderPendiente?.numero, propiaElegida: null }));
+    pista(
+      pasoDelPoder({
+        numero: miVista?.poderPendiente?.numero,
+        propiaElegida: null,
+      }),
+    );
     return;
   }
 
   // La segunda mitad del 10. Sirve igual en entrenamiento y en red: lo que
   // cambia es quién aplica la decisión, y de eso se ocupa `resolverElDiez`.
-  const diez = evento.target.closest('[data-accion="diez-cambiar"], [data-accion="diez-dejar"]');
+  const diez = evento.target.closest(
+    '[data-accion="diez-cambiar"], [data-accion="diez-dejar"]',
+  );
   if (diez) {
     await resolverElDiez(diez.dataset.accion === "diez-cambiar");
     return;
@@ -3378,7 +3449,9 @@ dom.modal.addEventListener("click", async (evento) => {
   if (evento.target.closest('[data-accion="revancha-crear"]')) {
     sonidos.clic();
     const elegida = Number(document.getElementById("apuestaRevancha")?.value);
-    await irALaRevancha(ENTRADAS.includes(elegida) ? elegida : apuestaDeLaMesa());
+    await irALaRevancha(
+      ENTRADAS.includes(elegida) ? elegida : apuestaDeLaMesa(),
+    );
     return;
   }
   if (evento.target.closest('[data-accion="revancha-unirme"]')) {
@@ -3599,7 +3672,12 @@ dom.modal.addEventListener("click", async (evento) => {
  * segundos: se está decidiendo CON ellas, no mirándolas de recuerdo. Se tapan
  * al resolver.
  */
-function preguntarSiCambia(revelada, posicionPropia, indiceRival, posicionRival) {
+function preguntarSiCambia(
+  revelada,
+  posicionPropia,
+  indiceRival,
+  posicionRival,
+) {
   const nombreRival = estado.jugadores[indiceRival].nombre;
   abrirModal(`
     <h2>Cambio viendo ambas cartas</h2>
@@ -3631,7 +3709,9 @@ async function resolverElDiez(cambiar) {
   seleccionPropia = null;
 
   if (enRed()) {
-    await pedir("resolverCambio", () => Red.resolverCambio(salaPedida, cambiar));
+    await pedir("resolverCambio", () =>
+      Red.resolverCambio(salaPedida, cambiar),
+    );
     return;
   }
 
@@ -3902,7 +3982,9 @@ let cuentaEnRed = null;
 
 function cuentaRegresivaEnRed(vista) {
   const abre =
-    vista.fase === "mirar" && !vista.esperando ? vista.ventana?.abiertaEn : null;
+    vista.fase === "mirar" && !vista.esperando
+      ? vista.ventana?.abiertaEn
+      : null;
   if (abre == null || abre <= Red.ahoraDelServidor()) {
     apagarCuentaEnRed();
     return;
@@ -3936,7 +4018,8 @@ function avanzarCuentaEnRed() {
   // el primero, el «3». Con más de la cuenta entera —relojes que no terminan
   // de coincidir— se queda en el primero.
   const quedan = Math.ceil(falta / MS_POR_PASO);
-  const paso = PASOS_DE_LA_CUENTA[Math.max(0, PASOS_DE_LA_CUENTA.length - quedan)];
+  const paso =
+    PASOS_DE_LA_CUENTA[Math.max(0, PASOS_DE_LA_CUENTA.length - quedan)];
   if (paso !== cuenta.paso) {
     cuenta.paso = paso;
     caja.hidden = false;
@@ -3946,7 +4029,10 @@ function avanzarCuentaEnRed() {
   // Hasta el próximo cambio de paso, no un intervalo fijo: un intervalo se
   // corre, y la cuenta tiene que caer en cero cuando el servidor abre.
   const hastaElProximo = falta - (quedan - 1) * MS_POR_PASO;
-  cuenta.temporizador = setTimeout(avanzarCuentaEnRed, Math.max(16, hastaElProximo));
+  cuenta.temporizador = setTimeout(
+    avanzarCuentaEnRed,
+    Math.max(16, hastaElProximo),
+  );
 }
 
 function apagarCuentaEnRed() {
@@ -3999,7 +4085,7 @@ function pistaDeRed(vista) {
       const poder = PODERES[vista.levantada?.numero];
       return poder
         ? `Levantaste un <b>${vista.levantada.numero}</b>. <b>Tirala</b> para usar el poder, ` +
-          "o tocá una de tus cartas para <b>cambiarla</b> (perdés el poder)."
+            "o tocá una de tus cartas para <b>cambiarla</b> (perdés el poder)."
         : "Cambiala por una tuya, o tirala.";
     }
     case "poder":
@@ -4362,10 +4448,12 @@ function pintarVista(vista) {
   // Y lo mismo con la carta que se mandó a descartar: vale mientras dure SU
   // ventana. Entre una ventana y la siguiente la fase pasa por turno o por
   // postLevantada, así que salir de `descarte` es el momento exacto.
-  if (vista.fase !== "descarte" && posicionEnviada != null) posicionEnviada = null;
+  if (vista.fase !== "descarte" && posicionEnviada != null)
+    posicionEnviada = null;
   // Y el acierto que esperaba su carta, igual: resuelta la ventana, el
   // servidor ya eligió al azar. Sin esto la mesa quedaba apagada para siempre.
-  if (atacando && (vista.fase !== "descarte" || vista.ventana?.cerrada)) olvidarAtaque();
+  if (atacando && (vista.fase !== "descarte" || vista.ventana?.cerrada))
+    olvidarAtaque();
   estado = comoEstado(vista);
   // Antes de dibujar: si algo se expuso, tiene que verse en este mismo pintado.
   mostrarRevelaciones(vista);
@@ -4424,7 +4512,8 @@ let ultimaCalentada = -Infinity;
 function calentarSiHaceFalta(vista) {
   const primera = faseAntesDeCalentar === null;
   const entra =
-    vista.fase !== faseAntesDeCalentar && FASES_ANTES_DE_UNA_VENTANA.has(vista.fase);
+    vista.fase !== faseAntesDeCalentar &&
+    FASES_ANTES_DE_UNA_VENTANA.has(vista.fase);
   faseAntesDeCalentar = vista.fase;
 
   if (!primera && !entra) return;
@@ -4507,7 +4596,10 @@ function modalesDeRed(vista) {
   }
   if (eraPoder) cerrarModal();
 
-  if (faseAnterior !== vista.fase && FASES_QUE_CIERRAN_SU_MODAL.has(faseAnterior)) {
+  if (
+    faseAnterior !== vista.fase &&
+    FASES_QUE_CIERRAN_SU_MODAL.has(faseAnterior)
+  ) {
     cerrarModal();
   }
 
@@ -4563,11 +4655,13 @@ function abrirModalPoderDeRed(vista) {
   const carta = vista.muestra;
 
   abrirModal(`
-    ${carta?.palo && carta?.numero
-      ? `<div class="carta-poder">
+    ${
+      carta?.palo && carta?.numero
+        ? `<div class="carta-poder">
            <img src="${caraDeCarta(carta)}" alt="${carta.numero} de ${carta.palo}" />
          </div>`
-      : ""}
+        : ""
+    }
     <h2>¡Levantaste un PODER ${numero}!</h2>
     <p class="nombre-poder">${TITULOS_PODER[tipo] ?? ""}</p>
     <p>${EFECTOS_PODER[tipo] ?? ""}</p>
@@ -4626,7 +4720,8 @@ function escucharLaSala() {
           // Se repinta sólo si cambió algo de lo que el panel muestra: la
           // sala recibe escrituras por otros motivos y repintar en cada una
           // le borraría al jugador el selector de apuesta a medio elegir.
-          if (`${estadoDeLaSala}|${revanchaAbierta?.codigo ?? ""}` !== antes) pintarRevancha();
+          if (`${estadoDeLaSala}|${revanchaAbierta?.codigo ?? ""}` !== antes)
+            pintarRevancha();
         },
         // Un fallo acá no puede romper el final de la partida: el jugador ve
         // su resultado igual, sólo que sin el aviso de la revancha ajena.
@@ -4775,9 +4870,10 @@ function pintarLogros() {
       // servidor manda cero cuando la clave de idempotencia frenó el pago
       // —un reintento, una posesión borrada a mano— y prometer un saldo que
       // no llegó es peor que no decir nada.
-      const paga = Number(l.leyendas) > 0
-        ? `<span class="logro-paga">+${Number(l.leyendas)} Leyendas</span>`
-        : "";
+      const paga =
+        Number(l.leyendas) > 0
+          ? `<span class="logro-paga">+${Number(l.leyendas)} Leyendas</span>`
+          : "";
       return `<p class="logro-nuevo">🏆 ¡Ganaste la insignia ${escapar(l.nombre ?? l.id)}! ${paga}</p>`;
     })
     .join("");
@@ -4938,8 +5034,9 @@ async function pedir(accion, ejecutar) {
  */
 const esDesincronizacion = (error) =>
   error?.codigo === "failed-precondition" &&
-  /No es tu turno|ventana .*(cerr|termin)|no está en fase|no se puede hacer ahora/i
-    .test(error?.message ?? "");
+  /No es tu turno|ventana .*(cerr|termin)|no está en fase|no se puede hacer ahora/i.test(
+    error?.message ?? "",
+  );
 
 const esoYaPaso = (error) =>
   /No es tu turno/i.test(error?.message ?? "")
@@ -5002,7 +5099,9 @@ async function pedirPoderEnRed(indiceJugador, posicion) {
   });
   if (!puede(indiceJugador, posicion)) {
     sonidos.error();
-    pista(`⚠️ Esa carta no. ${pasoDelPoder({ numero, propiaElegida: seleccionPropia })}`);
+    pista(
+      `⚠️ Esa carta no. ${pasoDelPoder({ numero, propiaElegida: seleccionPropia })}`,
+    );
     return;
   }
 
@@ -5027,7 +5126,10 @@ async function pedirPoderEnRed(indiceJugador, posicion) {
     dom.modal
       .querySelectorAll('[data-objetivo="' + YO + '"]')
       .forEach((el) =>
-        el.classList.toggle("seleccionada", Number(el.dataset.pos) === posicion),
+        el.classList.toggle(
+          "seleccionada",
+          Number(el.dataset.pos) === posicion,
+        ),
       );
     mostrarGrupo(grupoActual() + 1);
     return;
@@ -5079,7 +5181,12 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
     olvidarAtaque();
     dibujar();
     const r = await pedir("entregar", () =>
-      Red.entregarCarta(salaPedida, pendiente.ventana, pendiente.clientActionId, posicion),
+      Red.entregarCarta(
+        salaPedida,
+        pendiente.ventana,
+        pendiente.clientActionId,
+        posicion,
+      ),
     );
     if (r?.entregada) {
       sonidos.aviso();
@@ -5373,7 +5480,10 @@ async function arrancarModoLeyendas(sala, uid) {
   // El plazo sale de la vista que publica el servidor: con él, el golpe a
   // `avanzarPartida` se manda sólo cuando de verdad venció algo, en vez de
   // cada 900 ms toda la partida.
-  dejarDeAvanzar = Red.mantenerEnMarcha(salaPedida, () => miVista?.plazo?.hasta ?? null);
+  dejarDeAvanzar = Red.mantenerEnMarcha(
+    salaPedida,
+    () => miVista?.plazo?.hasta ?? null,
+  );
 
   // Además de con cada vista nueva, por reloj: si el ausente ya estaba
   // marcado antes de entrar en la fase sin reloj, `latir` no republica
