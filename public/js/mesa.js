@@ -4594,7 +4594,7 @@ function modalesDeRed(vista) {
     abrirModalPoderDeRed(vista);
     return;
   }
-  if (eraPoder) cerrarModal();
+  if (eraPoder && vista.fase !== "cambioConVista") cerrarModal();
 
   if (
     faseAnterior !== vista.fase &&
