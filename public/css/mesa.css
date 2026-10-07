@@ -3717,7 +3717,7 @@ button.accion.con-poder {
 
 .cartas-del-diez img {
   width: 92px;
-  max-width: 26vw;
+  max-width: 26vw; aspect-ratio: 2 / 3;
   border-radius: 8px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
 }

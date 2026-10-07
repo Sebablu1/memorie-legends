@@ -1264,7 +1264,7 @@ function marcarCartasJugables() {
   const habilitar =
     (estado.fase === "mirar" &&
       estado.jugadores[YO].posicionMirada == null &&
-      !miradaTodaviaCerrada(miVista)) ||
+      !miradaTodaviaCerrada(miVista) && !enCuentaRegresiva) ||
     estado.fase === "descarte" ||
     (estado.fase === "levantada" && miTurno);
 
@@ -5196,56 +5196,6 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
   }
   // Con un acierto esperando su carta, lo demás de la ventana espera.
   if (miVista.fase === "descarte" && atacando) return;
-
-  // ---- NUEVO: Permitir mirar (clic simple) en fase descarte ----
-  if (miVista.fase === "descarte" && indiceJugador === YO) {
-    // Clic simple: mostrar la carta (mirar)
-    if (!dobleClic) {
-      const jugador = estado.jugadores[YO];
-      if (jugador && jugador.mano && jugador.mano[posicion]) {
-        const carta = jugador.mano[posicion];
-        const llave = clave(YO, posicion);
-        // Si ya está revelada, no hacer nada
-        if (revelaciones.has(llave)) return;
-        revelaciones.set(llave, carta);
-        dibujar();
-        setTimeout(() => {
-          revelaciones.delete(llave);
-          dibujar();
-        }, MS_REVELACION || 2000);
-        pista("Mirando tu carta...");
-      } else {
-        pista("No hay carta en esa posición.");
-      }
-      return;
-    }
-
-    // Doble clic: descarte (lógica original)
-    const ventana = miVista.ventana;
-    if (!ventana || ventana.cerrada || descartando) return;
-    descartando = true;
-    const tocadoEn = Date.now();
-    try {
-      const r = await Red.intentarDescarte(
-        salaPedida,
-        ventana,
-        posicion,
-        tocadoEn,
-      );
-      if (r?.anotado) {
-        sonidos.aviso();
-        marcarEnviada(posicion);
-        pista("Carta registrada. Se resolverá al cerrar la ventana.");
-      }
-    } catch (error) {
-      console.error("Falló el descarte:", error);
-      pista(`⚠️ ${error?.message ?? "No pudimos registrar la jugada."}`);
-      sonidos.error();
-    } finally {
-      descartando = false;
-    }
-    return;
-  }
 
   // ---- Resto del código original (poderes, mirar, etc.) ----
   if (miVista.fase === "mirar" && indiceJugador === YO) {
