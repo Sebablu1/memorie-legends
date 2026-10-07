@@ -1709,12 +1709,11 @@ export const borrarItemAdmin = llamable((data, context) =>
  * borrar lo que alguien tiene, y hasta ahora no había forma de saber quién
  * era ese alguien ni cuántos eran.
  */
-export const listarPoseedoresItemAdmin = llamable((data, context) =>
-  tienda.listarPoseedores(
-    context,
-    validar(EsquemaItem, data, errorHttp).itemId,
-  ),
-);
+export const listarPoseedoresItemAdmin = llamable(async (data, context) => {
+  exigirSesion(context, "listarPoseedoresItemAdmin");
+  const { itemId } = validar(EsquemaItem, data, errorHttp);
+  return tienda.listarPoseedores(context, itemId);
+});
 
 /**
  * Le saca un artículo a una persona y le devuelve lo que pagó.
