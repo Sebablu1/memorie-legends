@@ -528,6 +528,66 @@ export function crearAdmin({
    * y se informa cuál falló y por qué. Una transacción única las haría
    * fracasar a todas por culpa de una.
    */
+  /**
+   * Cancela las salas en espera cuyo código ya venció.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * POR QUÉ EXISTE
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * El creador de una sala privada paga la entrada al abrirla. Si nadie
+   * se suma y nadie la cancela, esa entrada quedaba retenida para
+   * siempre: solo volvía si él mismo salía, o si un admin la cancelaba
+   * a mano. Pasó de verdad —el PENDIENTE §22 lo documentó— y este barrido
+   * lo cierra solo cuando el código de invitación vence.
+   *
+   * La señal es el vencimiento del código, que es exactamente el momento
+   * en que la sala deja de ser alcanzable.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * POR QUÉ NO EXIGE ADMIN
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * La llama el barredor de tareas programadas, no una persona.
+   * `cancelarTodasEnEspera` sí lo exige, y está bien: es una acción
+   * manual sobre TODAS las salas vivas. Ésta solo toca las que ya
+   * vencieron —trabajo de mantenimiento— y el uid que queda en la sala
+   * dice de dónde vino.
+   *
+   * Una transacción por sala, igual que las otras dos cancelaciones.
+   */
+  async function cancelarVencidas() {
+    const t = Date.now();
+    const snap = await db.collection(salas).where("estado", "==", estados.ESPERANDO).get();
+
+    // Filtro en memoria y no en la consulta: `codigoVence` convive con
+    // `estado` en el mismo where, y eso pediría un índice compuesto que
+    // todavía no existe. Las salas en espera son pocas y efímeras.
+    const vencidas = snap.docs
+      .filter((d) => {
+        const vence = Number(d.data().codigoVence);
+        return Number.isFinite(vence) && vence <= t;
+      })
+      .map((d) => d.id);
+
+    const hechas = [];
+    const fallidas = [];
+    for (const codigo of vencidas) {
+      try {
+        hechas.push(await cancelarUna(codigo, "sistema:codigo-vencido"));
+      } catch (e) {
+        fallidas.push({ codigo, motivo: e?.message ?? "error desconocido" });
+      }
+    }
+
+    return {
+      intentadas: vencidas.length,
+      canceladas: hechas.filter((h) => !h.yaEstaba).length,
+      yaEstaban: hechas.filter((h) => h.yaEstaba).length,
+      devueltasEnTotal: hechas.reduce((s, h) => s + h.devueltas, 0),
+      fallidas,
+    };
+  }
   async function cancelarTodasEnEspera(context) {
     const quien = await exigirAdmin(context);
 
@@ -708,7 +768,7 @@ export function crearAdmin({
   }
 
   return {
-    listarSalas, cancelarSala, cancelarTodasEnEspera,
+    listarSalas, cancelarSala, cancelarTodasEnEspera, cancelarVencidas,
     editarSala, eliminarSala, limpiarSalasCerradas,
     revisarNombres, listarUsuarios, eliminarUsuario, exigirAdmin,
   };

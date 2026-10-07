@@ -2381,6 +2381,27 @@ const cierreDePeriodos = crearCierreDePeriodos({
 const PASOS_POR_PARTIDA = 8;
 
 async function barrerPartidasVencidas() {
+  /**
+   * Primero las salas en espera cuyo código ya venció: devuelve la
+   * entrada a quien la puso. Ver `cancelarVencidas` en `admin.js`.
+   *
+   * Va acá y no en una tarea propia para no crear un segundo barrido
+   * que mantener: es el mismo trabajo —destrabar cosas que se quedaron
+   * quietas— y corre con la misma frecuencia.
+   *
+   * En su propio try/catch: si falla, la partida igual avanza. Al revés
+   * sería peor —una sala trabada no puede impedir que se cierren las
+   * partidas vencidas—.
+   */
+  try {
+    const vencidas = await panel.cancelarVencidas();
+    if (vencidas.canceladas || vencidas.fallidas.length) {
+      logger.info("Barrido de salas vencidas", vencidas);
+    }
+  } catch (e) {
+    logger.warn("No se pudieron cancelar las salas vencidas", { error: e?.message });
+  }
+
   const codigos = await enRed.vencidas();
   if (!codigos.length) return { revisadas: 0, pasos: 0, cerradas: 0 };
 
