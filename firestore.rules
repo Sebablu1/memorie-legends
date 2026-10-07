@@ -45,10 +45,61 @@ service cloud.firestore {
              .hasOnly(['username', 'photoURL']);
     }
 
+    /**
+     * Los campos con los que puede nacer un perfil, y ninguno más.
+     *
+     * ────────────────────────────────────────────────────────────────────
+     * POR QUÉ ES UNA LISTA CERRADA Y NO SÓLO COMPROBAR EL SALDO
+     * ────────────────────────────────────────────────────────────────────
+     *
+     * La versión anterior comprobaba los TRES campos de plata —`credits`,
+     * `creditosComprados`, `creditosGanados`— y nada más. Eso impedía
+     * crearse un perfil con un millón de Leyendas, pero dejaba entrar
+     * cualquier otro campo: `wins: 999999`, `gamesPlayed: 999999`, un
+     * `dorso`, un `avatar` o una `insignia` equipados de entrada, un
+     * `createdAt` de 1999. Todo eso pasa las comprobaciones de saldo sin
+     * inmutarse.
+     *
+     * Hoy no se ve desde ninguna pantalla —el perfil lo lee sólo su dueño—
+     * pero si mañana el ranking lee `wins` o el perfil muestra el
+     * `createdAt`, el dato ya está escrito y envenenado. Cerrarlo ahora
+     * cuesta una lista; cerrarlo cuando ya hay datos sucios cuesta una
+     * migración.
+     *
+     * ────────────────────────────────────────────────────────────────────
+     * LA LISTA ESTÁ ATADA AL CÓDIGO DEL CLIENTE
+     * ────────────────────────────────────────────────────────────────────
+     *
+     * Son los campos que escriben los TRES caminos que crean un perfil:
+     * `register.js` por el formulario, `register.js` otra vez por Google,
+     * y `auth.js` para quien entra con Google sin pasar por el formulario.
+     * El que agregue un campo nuevo en cualquiera de los tres tiene que
+     * venir a agregarlo acá, o el registro deja de funcionar. `provider`
+     * entra en la lista aunque sólo lo escriban los caminos de Google:
+     * `hasOnly` acepta subconjuntos, así que no molesta al formulario.
+     */
+    function camposDePerfilNuevo() {
+      return request.resource.data.keys().hasOnly([
+        'username',
+        'email',
+        'credits',
+        'creditosComprados',
+        'creditosGanados',
+        'gamesPlayed',
+        'wins',
+        'createdAt',
+        'provider',
+      ]);
+    }
+
     // Saldo de bienvenida permitido al crear la cuenta. Cualquier otro
     // valor se rechaza, para que nadie se cree el perfil con un millón.
+    // El número tiene que coincidir con `LEYENDAS_REGISTRO` de
+    // `public/js/reglas/economia.js`: lo comprueba
+    // `pruebas/leyendas-iniciales.mjs`.
     function saldoDeBienvenidaValido() {
-      return request.resource.data.credits == 100
+      return camposDePerfilNuevo()
+             && request.resource.data.credits == 100
              && request.resource.data.creditosComprados == 0
              && request.resource.data.creditosGanados == 100;
     }

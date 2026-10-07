@@ -101,7 +101,52 @@ export const CASOS = [
   { nombre: "juego, leído sin sesión", esperado: "ALLOW", ...leer(SIN_SESION, "juegos/memorie", { nombre: "Memorie Legends", activo: true }) },
   { nombre: "juego, escrito por alguien con sesión", esperado: "DENY",
     auth: BETO, ruta: "juegos/memorie", metodo: "create", recurso: undefined, datosNuevos: { nombre: "Otro", activo: true } },
-];
+  // El perfil nuevo: sólo puede nacer con los campos que el cliente escribe
+  // y con el saldo de bienvenida. Los dos ALLOW cubren los dos caminos del
+  // cliente —formulario y Google—, y los dos DENY cubren las dos formas de
+  // ensuciarlo: un campo de más y un saldo inventado.
+  {
+    nombre: "perfil nuevo, con sus campos y el saldo de bienvenida",
+    esperado: "ALLOW",
+    auth: BETO, ruta: "users/beto", metodo: "create", recurso: undefined,
+    datosNuevos: {
+      username: "beto", email: "b@b.com",
+      credits: 100, creditosComprados: 0, creditosGanados: 100,
+      gamesPlayed: 0, wins: 0, createdAt: "2026-10-07T00:00:00.000Z",
+    },
+  },
+  {
+    nombre: "perfil nuevo de Google, con `provider`",
+    esperado: "ALLOW",
+    auth: BETO, ruta: "users/beto", metodo: "create", recurso: undefined,
+    datosNuevos: {
+      username: "beto", email: "b@b.com",
+      credits: 100, creditosComprados: 0, creditosGanados: 100,
+      gamesPlayed: 0, wins: 0, createdAt: "2026-10-07T00:00:00.000Z",
+      provider: "google.com",
+    },
+  },
+  {
+    nombre: "perfil nuevo con un campo de más",
+    esperado: "DENY",
+    auth: BETO, ruta: "users/beto", metodo: "create", recurso: undefined,
+    datosNuevos: {
+      username: "beto", email: "b@b.com",
+      credits: 100, creditosComprados: 0, creditosGanados: 100,
+      gamesPlayed: 0, wins: 0, createdAt: "2026-10-07T00:00:00.000Z",
+      dorso: "dorso_viajero",
+    },
+  },
+  {
+    nombre: "perfil nuevo con el saldo de bienvenida mal",
+    esperado: "DENY",
+    auth: BETO, ruta: "users/beto", metodo: "create", recurso: undefined,
+    datosNuevos: {
+      username: "beto", email: "b@b.com",
+      credits: 999999, creditosComprados: 0, creditosGanados: 999999,
+      gamesPlayed: 0, wins: 0, createdAt: "2026-10-07T00:00:00.000Z",
+    },
+  },];
 
 /** El cuerpo que espera el servicio de pruebas. */
 export function cuerpoDePrueba(reglas, casos = CASOS) {
