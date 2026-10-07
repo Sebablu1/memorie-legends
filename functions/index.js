@@ -2442,8 +2442,36 @@ export const abandonarPartida = llamable(async (data, context) => {
 
 // -------------------------------------------------------------- referidos
 
+/**
+ * Acredita las Leyendas de un referido, sólo desde el panel de administración.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ AHORA ES SÓLO-ADMIN
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La versión anterior acreditaba al que llamaba con cualquier `referidoUid`
+ * que mandara. No comprobaba que ese uid fuera una cuenta real, ni que
+ * existiera una relación entre las dos, ni que fuera una cuenta nueva. Con
+ * una cuenta propia y un bucle, 5 llamadas por minuto (el techo de plata) a
+ * 25 Leyendas cada una son 7.500 Leyendas por hora, 180.000 por día. La clave
+ * de idempotencia `referido_${referidoUid}` no defiende: los uids inventados
+ * son únicos y cada uno genera su propio asiento.
+ *
+ * Y nadie la llamaba: no aparece en `public/`. Era un cabo suelto de una
+ * versión anterior del juego, con un agujero que se activa el día que la
+ * venta se encienda (`SOLO_ADMIN_COMPRA = false`), porque ahí las Leyendas
+ * pasan a tener precio real.
+ *
+ * Se cierra exigiendo administrador. No se borra del todo porque hay dos
+ * pruebas que comprueban que sigue desplegada (`sin-bono-diario.mjs`,
+ * `sin-ruleta.mjs`), y borrar todo lo que la nombra es un cambio más grande
+ * que no urge. El día que se implemente un sistema de referidos de verdad
+ * —códigos únicos por jugador, colección `codigosReferido`, validación de
+ * reuso— esta función se reemplaza por la buena.
+ */
 export const acreditarReferido = llamable(async (data, context) => {
   const uid = exigirSesion(context, "acreditarReferido");
+  await administradores.exigir(context);
   await limite.exigirRitmoDePlata(uid, "acreditarReferido");
   const { referidoUid } = validar(EsquemaReferido, data, errorHttp);
   if (!referidoUid || referidoUid === uid) {
