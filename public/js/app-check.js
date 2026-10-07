@@ -43,7 +43,7 @@ import { app } from "./firebase.js";
  *
  * Vacía = App Check apagado.
  */
-const CLAVE_RECAPTCHA = "6Lcd56UtAAAAAME1Ckf4zKXIY_CC8OaZ_t3Kffm-";
+const CLAVE_RECAPTCHA = "6LfBLuQtAAAAAKpwv-UyPKsfsoBWPUG7DIN61Iu_";
 
 /**
  * ¿El navegador pide token? Hoy, NO — y va atado a `EXIGIR_APP_CHECK`.
