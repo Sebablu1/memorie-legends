@@ -47,6 +47,7 @@ const firebaseFalso = (hayUsuario) => `
   export async function signInWithEmailAndPassword(){}
   export async function signInWithPopup(){}
   export async function sendPasswordResetEmail(){}
+  export function precalentarFunciones() {}
 `;
 
 const conFirebase = (page, hayUsuario) =>
@@ -121,6 +122,7 @@ test("si Firebase no contesta, el velo igual se va", async ({ page }) => {
         export async function signInWithEmailAndPassword(){}
         export async function signInWithPopup(){}
         export async function sendPasswordResetEmail(){}
+  export function precalentarFunciones() {}
       `,
     }));
 
