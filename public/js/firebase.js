@@ -53,6 +53,7 @@ import {
 
 import {
   getFunctions,
+  connectFunctionsEmulator,
   httpsCallable,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
@@ -81,6 +82,13 @@ import {
  */
 const db = getFirestore(app, "southamerica");
 const funciones = getFunctions(app, "southamerica-east1");
+
+// En local se apunta al emulador. Sin esto, firebase serve levanta las
+// funciones en localhost:5001 pero el cliente sigue llamando a produccion.
+// En produccion la condicion no se cumple y las llamadas siguen su curso.
+if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+  connectFunctionsEmulator(funciones, "localhost", 5001);
+}
 
 /**
  * App Check, si está configurado.

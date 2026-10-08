@@ -576,7 +576,25 @@ export function resolverVentana(estado, ventana, indiceDe, intentarDescarte, int
  * la tabla —qué fase merece reloj y qué hacer cuando se agota— que es la parte
  * que se puede leer, discutir y probar sin levantar nada.
  */
-export const MS_PARA_DECIDIR = 10_000;
+export const MS_PARA_DECIDIR = 5_000;
+
+/**
+ * Lo que tiene el jugador para usar un poder, cuando la caja ya esta abierta.
+ *
+ * Diez segundos: elegir con que carta cambia el 9, o ver las dos del 10 y
+ * decidir, es una jugada con informacion nueva en pantalla. Cinco alcanzan para
+ * tirar o cambiar la levantada, no para esto.
+ */
+export const MS_PARA_USAR_PODER = 10_000;
+
+/**
+ * Cuanto dura la decision segun la fase.
+ *
+ * `levantada` (tirar/cambiar/usar sin abrir la caja) son cinco. `poder` y
+ * `cambioConVista` (la caja abierta, con las cartas a la vista) son diez.
+ */
+export const msDeLaDecision = (fase) =>
+  fase === 'levantada' ? MS_PARA_DECIDIR : MS_PARA_USAR_PODER;
 
 /**
  * Qué hace el servidor cuando se agotan los diez segundos, por fase.

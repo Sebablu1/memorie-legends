@@ -83,6 +83,7 @@ import {
   esperaUnaDecision,
   decisionQueVence,
   MS_PARA_DECIDIR,
+  msDeLaDecision,
   MS_GRACIA_ENTREGA,
 } from "./reglas/red.js";
 import { MS_REVELACION } from "./reglas/vista.js";
@@ -1706,7 +1707,7 @@ function relojDeLaFase() {
      */
     if (!enRed()) {
       if (estado.indiceTurno !== YO) return null;
-      return { ms: MS_PARA_DECIDIR, alVencer: resolverDecisionPorTiempo };
+      return { ms: msDeLaDecision(estado.fase), alVencer: resolverDecisionPorTiempo };
     }
     return espejoDelPlazo(estado.fase);
   }

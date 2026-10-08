@@ -44,6 +44,7 @@ import {
   entregasPendientes,
   MS_GRACIA_ENTREGA,
   MS_PARA_DECIDIR,
+  msDeLaDecision,
   decisionQueVence,
 } from "./reglas/red.js";
 
@@ -501,7 +502,7 @@ export function crearMotorEnRed({
         const decision = decisionQueVence(estado.fase);
         if (!decision) return null;
         return nuevo(estado.fase, `t${estado.turnosRonda}-${estado.indiceTurno}`,
-                     ahoraMs + MS_PARA_DECIDIR, decision);
+                     ahoraMs + msDeLaDecision(estado.fase), decision);
       }
     }
   }
