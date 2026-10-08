@@ -63,7 +63,7 @@ test("un poder tirado abre PRIMERO la ventana y DESPUÉS el poder", async ({ pag
   await esperarReloj(page, /Descarte/i);
   const segundos = await segundosDelReloj(page);
   expect(segundos, "la mesa reacciona antes que el poder").toBeLessThanOrEqual(SEG_REAPERTURA);
-  expect(segundos, "y es la ventana corta, no la de la ronda").toBeLessThan(SEG_RONDA);
+  expect(segundos, "y es la ventana larga, no la de la ronda").toBeGreaterThan(SEG_RONDA);
 
   // Y recién después llega la elección del objetivo.
   await expect(page.locator("#modal .objetivos")).toBeVisible({ timeout: 15_000 });

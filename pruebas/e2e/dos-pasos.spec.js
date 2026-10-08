@@ -79,6 +79,10 @@ const FIREBASE = `
   }
   export async function signInWithPopup(){}
   export async function sendPasswordResetEmail(){}
+  // Faltaba acá. Como ES modules rompe el import entero si falta un nombre,
+  // su ausencia hacía que uth.js no cargara, que onAuthStateChanged no
+  // se registrara, y que el velo de carga se quedara puesto para siempre.
+  export function precalentarFunciones(){}
 `;
 
 const servir = (page, ruta, cuerpo) =>

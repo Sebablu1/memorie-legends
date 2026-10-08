@@ -1,5 +1,5 @@
 /**
- * Tirar y cambiar reabren los reflejos, y esa ventana dura 2 segundos.
+ * Tirar y cambiar reabren los reflejos, y esa ventana dura 3 segundos.
  *
  * Es la regla nueva y la que más piezas movió: el motor, el orquestador de red
  * y el cliente. Las suites de `pruebas/` cubren las dos primeras; lo que sólo
@@ -33,7 +33,7 @@ test("tirar cambia la muestra y abre la ventana corta", async ({ page }) => {
   await esperarReloj(page, /Descarte/i);
   const segundos = await segundosDelReloj(page);
   expect(segundos, "dura lo de una reapertura").toBeLessThanOrEqual(SEG_REAPERTURA);
-  expect(segundos, "y menos que la ventana de la ronda").toBeLessThan(SEG_RONDA);
+  expect(segundos, "y más larga que la ventana de la ronda").toBeGreaterThan(SEG_RONDA);
   expect(segundos).toBeGreaterThan(0);
 
   // Y la carta tirada quedó de muestra: eso es lo que les da algo a lo que
@@ -89,7 +89,7 @@ test("cambiar una carta propia también abre la ventana", async ({ page }) => {
   await esperarReloj(page, /Descarte/i);
   const segundos = await segundosDelReloj(page);
   expect(segundos, "también dura lo de una reapertura").toBeLessThanOrEqual(SEG_REAPERTURA);
-  expect(segundos, "y menos que la de la ronda").toBeLessThan(SEG_RONDA);
+  expect(segundos, "y más larga que la de la ronda").toBeGreaterThan(SEG_RONDA);
   expect(await numeroDeLaMuestra(page)).not.toBe(muestraAntes);
 
   expect(errores).toEqual([]);

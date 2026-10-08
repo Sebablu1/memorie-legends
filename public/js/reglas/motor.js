@@ -47,7 +47,7 @@ export const MS_MIRADA_TOTAL = MS_ELEGIR_MIRADA + MS_MIRAR;
  * frenético: entre la mirada y esta ventana el ciclo de apertura caía de 7 s a
  * 4, sin que nadie hubiera pedido eso.
  */
-export const MS_DESCARTE = 5000;
+export const MS_DESCARTE = 2000;
 
 /**
  * Las ventanas que abren tirar y cambiar.

@@ -1587,7 +1587,15 @@ function espejoDelPlazo(fase) {
   const plazo = miVista?.plazo?.fase === fase ? miVista.plazo : null;
   if (!plazo) return null;
 
-  const restante = plazo.hasta - Red.ahoraDelServidor();
+  // plazo.hasta es el vencimiento REAL del servidor: duracion + gracia.
+  // La gracia existe para que lleguen los paquetes lentos que se tocaron a
+  // tiempo (ver MS_GRACIA en reglas/red.js), no para que el jugador tenga
+  // mas tiempo: su intento se rechaza apenas pasa duracionMs. Si la barra
+  // la mostraba, una reapertura de 3 s se veia como una de 5 s y parecia que
+  // todas las ventanas duraban lo mismo. Solo se descuenta para pintar; el
+  // servidor sigue usandola para cerrar.
+  const gracia = Number(miVista?.ventana?.graciaMs) || 0;
+  const restante = plazo.hasta - gracia - Red.ahoraDelServidor();
   if (restante <= 0) return null;
   return { ms: restante, alVencer: () => {} };
 }

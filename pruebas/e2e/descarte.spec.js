@@ -57,7 +57,7 @@ test("tres clics seguidos son UN intento, no tres", async ({ page }) => {
   expect(errores).toEqual([]);
 });
 
-test("la ventana de la ronda dura 5 segundos, no 2", async ({ page }) => {
+test("la ventana de la ronda dura 2 segundos", async ({ page }) => {
   // La distinción importa: en la ventana de la ronda se viene de memorizar UNA
   // carta y hay que buscar en cuatro manos. Se unificó con las reaperturas en
   // 2 s y el juego quedó frenético, así que se volvió atrás. Esto lo vigila.
@@ -66,8 +66,8 @@ test("la ventana de la ronda dura 5 segundos, no 2", async ({ page }) => {
   await esperarReloj(page, /descarte/i);
 
   const segundos = await segundosDelReloj(page);
-  expect(segundos).toBeGreaterThan(3.5);
-  expect(segundos).toBeLessThanOrEqual(5);
+  expect(segundos).toBeGreaterThan(1.5);
+  expect(segundos).toBeLessThanOrEqual(2);
 
   expect(errores).toEqual([]);
 });

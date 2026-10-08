@@ -304,6 +304,7 @@ export function crearMotorEnRed({
       id: ventana.id,
       abiertaEn: ventana.abiertaEn,
       duracionMs: ventana.duracionMs,
+      graciaMs: ventana.graciaMs,
       cerrada: ventana.cerrada,
     };
   }
