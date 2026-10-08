@@ -1,6 +1,12 @@
 /**
  * La Ruleta de Leyendas se eliminó, y esta prueba la mantiene eliminada.
  *
+ * ESTO NO ES UNA LIMPIEZA PENDIENTE: no borrar este archivo. La ausencia que
+ * defiende es además la frontera del Decreto 449/995 — el MEF exige
+ * autorización previa cuando una promoción fomenta el consumo Y adjudica POR
+ * AZAR, y sin azar no hay nada que autorizar. Una ruleta cumpliría las dos
+ * condiciones de una sola vez.
+ *
  * ─────────────────────────────────────────────────────────────────────────
  * POR QUÉ UNA AUDITORÍA DEL CÓDIGO Y NO UNA PRUEBA DE COMPORTAMIENTO
  * ─────────────────────────────────────────────────────────────────────────
