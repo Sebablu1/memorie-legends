@@ -11,7 +11,7 @@ import {
 
 // Un solo número para las dos formas de entrar, y el mismo que exige la regla
 // de Firestore. Antes cada archivo tenía el suyo escrito a mano.
-import { LEYENDAS_REGISTRO, saldoDeRegistro } from "./reglas/economia.js";
+import { LEYENDAS_REGISTRO, saldoDeRegistro, VERSION_TERMINOS } from "./reglas/economia.js";
 
 // Quien llegó por un link corto vuelve al LOBBY, no al tablero: es el caso
 // más común de una invitación, porque a quien te invita un amigo suele no
@@ -49,6 +49,13 @@ form.addEventListener("submit", async (e) => {
     return;
   }
 
+  const acepto = document.getElementById("aceptoTerminos")?.checked;
+  if (!acepto) {
+    mensaje.textContent = "⚠️ Tenés que aceptar los Términos y Condiciones";
+    mensaje.className = "mensaje error";
+    return;
+  }
+
   if (!password || password.length < 6) {
     mensaje.textContent = "⚠️ La contraseña debe tener al menos 6 caracteres";
     mensaje.className = "mensaje error";
@@ -78,6 +85,7 @@ form.addEventListener("submit", async (e) => {
       gamesPlayed: 0,
       wins: 0,
       createdAt: new Date().toISOString(),
+      terminos: { version: VERSION_TERMINOS, aceptado: new Date().toISOString() },
     });
 
     console.log("✅ Usuario guardado en Firestore");
@@ -165,6 +173,7 @@ async function crearPerfilSiFalta(usuario) {
     gamesPlayed: 0,
     wins: 0,
     createdAt: new Date().toISOString(),
+    terminos: { version: VERSION_TERMINOS, aceptado: new Date().toISOString() },
     provider: usuario.providerData?.[0]?.providerId ?? "google.com",
   });
 

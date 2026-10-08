@@ -29,6 +29,15 @@
  * mintiendo, y la que mentía era justamente la que decía ser la oficial.
  */
 export const LEYENDAS_REGISTRO = 100;
+
+/**
+ * Version de los Terminos y Condiciones que el jugador acepto.
+ *
+ * Cambiar este string cuando cambie el texto de terminos.html: obliga a
+ * volver a aceptarlos en la proxima inscripcion a torneo. La copia vive aca
+ * y no en register.html para que no haya tres numeros mintiendo.
+ */
+export const VERSION_TERMINOS = "2026-10";
 export const LEYENDAS_POR_REFERIDO = 25;
 
 /**

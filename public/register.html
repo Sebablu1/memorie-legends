@@ -29,6 +29,32 @@
       .support-footer a:hover {
         text-decoration: underline;
       }
+      .terminos-check {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        margin: 14px 0;
+        font-size: 0.82rem;
+        color: #c0c0c0;
+        text-align: left;
+        line-height: 1.4;
+      }
+      .terminos-check input {
+        width: auto;
+        margin-top: 3px;
+        flex-shrink: 0;
+      }
+      .terminos-check span {
+        min-width: 0;
+        flex: 1;
+      }
+      .terminos-check a {
+        color: #d4a843;
+        text-decoration: none;
+      }
+      .terminos-check a:hover {
+        text-decoration: underline;
+      }
     </style>
       <link rel="stylesheet" href="css/pie.css" />
     <meta name="description" content="Creá tu cuenta gratis en Memorie Legends y llevate Leyendas de regalo. Juego de memoria y estrategia con baraja española, contra la IA o con amigos." />
@@ -145,6 +171,10 @@
             required
           />
         </div>
+        <label class="terminos-check">
+          <input type="checkbox" id="aceptoTerminos" required />
+          <span>Acepto los <a href="/terminos.html" target="_blank">Términos y Condiciones</a> y el <a href="/reglamento-torneos.html" target="_blank">Reglamento de Torneos</a>.</span>
+        </label>
         <button type="submit" class="btn-primary">Registrarse</button>
       </form>
 

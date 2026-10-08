@@ -89,6 +89,7 @@ service cloud.firestore {
         'wins',
         'createdAt',
         'provider',
+        'terminos',
       ]);
     }
 
@@ -97,11 +98,24 @@ service cloud.firestore {
     // El número tiene que coincidir con `LEYENDAS_REGISTRO` de
     // `public/js/reglas/economia.js`: lo comprueba
     // `pruebas/leyendas-iniciales.mjs`.
+
+
+    // Aceptacion de Terminos: mapa con version y fecha, ni mas ni menos.
+    // Sin esto, un perfil se puede crear sin dejar rastro de que acepto.
+    function terminosValidos() {
+      return request.resource.data.terminos is map
+             && request.resource.data.terminos.keys().hasOnly(['version', 'aceptado'])
+             && request.resource.data.terminos.version is string
+             && request.resource.data.terminos.version.size() > 0
+             && request.resource.data.terminos.aceptado is string;
+    }
+
     function saldoDeBienvenidaValido() {
       return camposDePerfilNuevo()
              && request.resource.data.credits == 100
              && request.resource.data.creditosComprados == 0
-             && request.resource.data.creditosGanados == 100;
+             && request.resource.data.creditosGanados == 100
+             && terminosValidos();
     }
 
     // ---------------------------------------------------- perfiles
