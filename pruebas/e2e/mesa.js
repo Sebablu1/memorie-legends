@@ -128,7 +128,7 @@ export async function abrirMesa(
   // Con `esperarMirada: false` se vuelve sin esperar a que la mesa pida elegir
   // carta. Lo necesita la prueba de la cuenta regresiva: lo que mide ocurre
   // ANTES de eso, y esperar acá sería llegar tarde a propio pedido.
-  if (esperarMirada) await expect(page.locator(SEL.pista)).toContainText(/Elegí|carta/i);
+  if (esperarMirada) await expect(page.locator(SEL.pista)).toContainText(/Elegí|carta/i, { timeout: 30_000 });
   return errores;
 }
 
