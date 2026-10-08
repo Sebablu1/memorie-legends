@@ -55,9 +55,21 @@
       .terminos-check a:hover {
         text-decoration: underline;
       }
+      /* El cartel para quien llegó del login con la sesión de Google abierta
+         y sin perfil. Nace tapado y lo destapa `register.js`. */
+      .terminar-google {
+        text-align: left;
+        margin: 10px 0 0;
+      }
+      .terminar-google p {
+        font-size: 0.9rem;
+        color: #c0c0c0;
+        line-height: 1.5;
+        margin: 0 0 14px;
+      }
     </style>
       <link rel="stylesheet" href="css/pie.css" />
-    <meta name="description" content="Creá tu cuenta gratis en Memorie Legends y llevate Leyendas de regalo. Juego de memoria y estrategia con baraja española, contra la IA o con amigos." />
+    <meta name="description" content="Creá tu cuenta gratis en Memorie Legends y empezá con 100 Leyendas de bienvenida. Juego de memoria y estrategia con baraja española, contra la IA o con amigos." />
     <!-- La tarjeta que se ve al compartir el enlace.
 
          La imagen va con URL ABSOLUTA y en JPG a propósito. Una ruta relativa
@@ -75,7 +87,7 @@
     <meta property="og:locale" content="es_AR" />
     <meta property="og:url" content="https://memorielegends.com/register.html" />
     <meta property="og:title" content="Crear cuenta — Memorie Legends" />
-    <meta property="og:description" content="Creá tu cuenta gratis en Memorie Legends y llevate Leyendas de regalo. Juego de memoria y estrategia con baraja española, contra la IA o con amigos." />
+    <meta property="og:description" content="Creá tu cuenta gratis en Memorie Legends y empezá con 100 Leyendas de bienvenida. Juego de memoria y estrategia con baraja española, contra la IA o con amigos." />
     <meta property="og:image" content="https://memorielegends.com/img/compartir-escudo-2.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
@@ -83,7 +95,7 @@
     <meta property="og:image:alt" content="Logo de Memorie Legends sobre fondo oscuro" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Crear cuenta — Memorie Legends" />
-    <meta name="twitter:description" content="Creá tu cuenta gratis en Memorie Legends y llevate Leyendas de regalo. Juego de memoria y estrategia con baraja española, contra la IA o con amigos." />
+    <meta name="twitter:description" content="Creá tu cuenta gratis en Memorie Legends y empezá con 100 Leyendas de bienvenida. Juego de memoria y estrategia con baraja española, contra la IA o con amigos." />
     <meta name="twitter:image" content="https://memorielegends.com/img/compartir-escudo-2.jpg" />
   </head>
   <body class="acceso">
@@ -116,6 +128,25 @@
       <h2>Crear Cuenta</h2>
 
       <div id="mensaje" class="mensaje"></div>
+
+      <!-- La casilla va ARRIBA de los dos botones, y fuera del formulario,
+           porque vale para los dos caminos.
+
+           Estuvo adentro del `<form>`, y entonces el botón de Google no la
+           alcanzaba: se podía crear una cuenta por Google sin marcarla, y el
+           perfil quedaba igual con `terminos.aceptado` escrito. Una aceptación
+           registrada que nunca ocurrió no sirve para lo único que se guarda,
+           que es poder decir que esta persona vio el texto y dijo que sí.
+
+           Sin `required`: fuera de un `<form>` ese atributo no hace nada, y
+           dejarlo puesto haría creer que el navegador la está pidiendo. La
+           pide `register.js`, en los dos botones y en el cartel de abajo. El
+           `aria-required` sí queda, que es lo que leen los lectores de
+           pantalla. -->
+      <label class="terminos-check">
+        <input type="checkbox" id="aceptoTerminos" aria-required="true" />
+        <span>Acepto los <a href="/terminos.html" target="_blank">Términos y Condiciones</a> y el <a href="/reglamento-torneos.html" target="_blank">Reglamento de Torneos</a>.</span>
+      </label>
 
       <!-- Con Google primero, igual que en el login.
 
@@ -171,12 +202,22 @@
             required
           />
         </div>
-        <label class="terminos-check">
-          <input type="checkbox" id="aceptoTerminos" required />
-          <span>Acepto los <a href="/terminos.html" target="_blank">Términos y Condiciones</a> y el <a href="/reglamento-torneos.html" target="_blank">Reglamento de Torneos</a>.</span>
-        </label>
         <button type="submit" class="btn-primary">Registrarse</button>
       </form>
+
+      <!-- Para quien llegó del login con la sesión de Google ya abierta y sin
+           perfil: `auth.js` lo manda acá en vez de crearle el perfil allá.
+           Nace tapado; `register.js` lo destapa y esconde el formulario, que
+           no le sirve a alguien que ya se identificó. -->
+      <div id="terminarGoogle" class="terminar-google" hidden>
+        <p>
+          Ya entraste con Google. Para terminar de crear tu cuenta, aceptá los
+          Términos acá arriba y confirmá.
+        </p>
+        <button id="terminarGoogleBtn" type="button" class="btn-primary">
+          Crear mi cuenta
+        </button>
+      </div>
 
       <p class="link">
         ¿Ya tienes cuenta? <a href="login.html">Inicia sesión</a>

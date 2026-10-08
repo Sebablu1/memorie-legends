@@ -8,7 +8,6 @@ import {
   db,
   doc,
   getDoc,
-  setDoc,
   SUPPORT_EMAIL,
   precalentarFunciones,
 } from "./firebase.js";
@@ -21,7 +20,9 @@ import {
   terminarConCodigo,
 } from "./mfa.js";
 
-import { saldoDeRegistro } from "./reglas/economia.js";
+// Este archivo ya no importa nada de `reglas/economia.js`: no crea perfiles,
+// así que no necesita el saldo de bienvenida ni la versión de los Términos.
+// Lo hace `register.js`, que es el único que los escribe.
 
 // ==========================================================
 // EL VELO DE CARGA
@@ -135,24 +136,39 @@ onAuthStateChanged(auth, async (usuario) => {
 
   try {
     const perfil = await getDoc(doc(db, "users", usuario.uid));
-    let datos = perfil.data();
+    const datos = perfil.data();
 
     if (!datos) {
-      // Primera vez: la cuenta existe en Auth pero no tiene perfil. Pasa
-      // siempre con Google, que no pasa por el formulario de registro.
-      const correo = usuario.email || "usuario@email.com";
-      const nombre = usuario.displayName || correo.split("@")[0] || "Usuario";
-
-      await setDoc(doc(db, "users", usuario.uid), {
-        username: nombre,
-        email: correo,
-        ...saldoDeRegistro(),
-        gamesPlayed: 0,
-        wins: 0,
-        createdAt: new Date().toISOString(),
-        provider: usuario.providerData?.[0]?.providerId ?? "password",
-      });
-      datos = { username: nombre };
+      /*
+       * Hay sesión y no hay perfil: la cuenta nació en Google, por este botón,
+       * y todavía no aceptó nada. Se la manda al registro, que es el único
+       * lugar donde se crea un perfil.
+       *
+       * ──────────────────────────────────────────────────────────────────
+       * ESTE ARCHIVO YA NO CREA PERFILES
+       * ──────────────────────────────────────────────────────────────────
+       *
+       * Hasta ahora lo hacía por su cuenta, y eran TRES los lugares que
+       * escribían un perfil nuevo. `economia.js` y `firestore.rules` avisan
+       * los dos de lo que cuesta: el día que se le agregó `terminos` a la
+       * regla, este archivo no se enteró y Firestore empezó a rechazar la
+       * creación. Quien entraba con Google por primera vez quedaba con cuenta
+       * en Auth, sin perfil, y leyendo «probá recargar la página» para
+       * siempre, porque recargar hacía exactamente lo mismo.
+       *
+       * Ahora quedan dos caminos, los dos en `register.js` —el formulario y
+       * el botón de Google— y los dos detrás de la casilla de los Términos.
+       * Lo que se gana no es sólo no repetir el bug: es que no haya ningún
+       * camino por el que se acrediten las Leyendas de bienvenida sin que
+       * nadie haya aceptado nada. Un `terminos.aceptado` escrito sin casilla
+       * es peor que no tenerlo, porque dice que pasó algo que no pasó.
+       *
+       * El velo se queda puesto: abajo hay un `replace`, y destaparlo acá
+       * mostraría el formulario de login durante el viaje.
+       */
+      mostrarVelo("Terminando de crear tu cuenta…");
+      window.location.replace("register.html");
+      return;
     }
 
     // El saldo NO se guarda acá. localStorage lo edita cualquiera desde la

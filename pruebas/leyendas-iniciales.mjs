@@ -30,7 +30,7 @@
  * exactamente la clase de suerte de la que no conviene depender.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { LEYENDAS_REGISTRO, saldoDeRegistro } from "../public/js/reglas/economia.js";
 
@@ -71,14 +71,41 @@ console.log("\n=== 2. Nadie escribe el número a mano ===");
 // =====================================================================
 
 /**
- * Los dos archivos que crean el perfil.
+ * Los archivos que crean el perfil, BUSCADOS y no escritos a mano.
  *
- * `register.js` lo hace por partida doble —correo y Google— y `auth.js` cuando
- * alguien entra con Google sin haberse registrado antes. Los tres caminos
- * tienen que escribir la MISMA constante: si uno pone un literal, ese camino
- * queda fuera de este control y vuelve a poder divergir.
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ SE BUSCAN
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Acá había una lista fija: `register.js` y `auth.js`. Era correcta y aun así
+ * dejó pasar el bug que importaba. Cuando se agregó `terminos` a la regla de
+ * Firestore, los dos archivos siguieron en la lista y las dos aserciones
+ * siguieron en verde —porque miraban el saldo, no el campo nuevo—, mientras
+ * `auth.js` creaba perfiles sin `terminos` y Firestore los rechazaba. Quien
+ * entraba con Google por primera vez quedaba encerrado sin cuenta.
+ *
+ * Una lista fija sólo defiende de lo que ya se pensó. Ahora se recorre
+ * `public/js` y el conjunto sale del código: cualquier archivo que llame a
+ * `saldoDeRegistro()` queda sujeto a estas comprobaciones el día que aparezca,
+ * sin que nadie tenga que acordarse de venir a anotarlo acá.
  */
-for (const archivo of ["public/js/register.js", "public/js/auth.js"]) {
+const CREADORES = readdirSync(join(RAIZ, "public/js"))
+  .filter((n) => n.endsWith(".js"))
+  .map((n) => `public/js/${n}`)
+  .filter((rel) => /\.\.\.saldoDeRegistro\(\)/.test(leer(rel)));
+
+ok(CREADORES.length > 0, "se encontró al menos un creador de perfiles", CREADORES);
+
+// Hoy tiene que ser `register.js` y nada más. Si mañana aparece otro, esto
+// avisa: no para prohibirlo, sino para que la decisión sea explícita y pase
+// por la casilla de los Términos como los demás.
+ok(
+  CREADORES.length === 1 && CREADORES[0] === "public/js/register.js",
+  "el único que crea perfiles es register.js",
+  CREADORES,
+);
+
+for (const archivo of CREADORES) {
   const texto = leer(archivo);
 
   const literales = [...texto.matchAll(/credits:\s*(\d+)/g)].map((m) => m[1]);
@@ -103,6 +130,70 @@ for (const archivo of ["public/js/register.js", "public/js/auth.js"]) {
   ok(
     /import \{[^}]*saldoDeRegistro[^}]*\}/.test(texto),
     `${archivo} lo importa en vez de redeclararlo`,
+  );
+
+  /*
+   * Y la aceptación de los Términos, por el mismo ayudante.
+   *
+   * Esto es lo que faltaba. `firestore.rules` exige `terminos` con sus dos
+   * campos exactos para dejar crear un perfil, así que un creador que no lo
+   * escriba no es un creador con un campo de menos: es un camino de registro
+   * ROTO, que falla recién en producción y con un «permission-denied» que no
+   * explica nada.
+   *
+   * Se exige el ayudante y no un objeto armado a mano por la misma razón que
+   * el saldo: son dos campos que la regla compara uno por uno, y la versión
+   * tiene que ser la de `economia.js` y no una copia que se quedó atrás.
+   */
+  ok(
+    /terminos:\s*aceptacionTerminos\(\)/.test(texto),
+    `${archivo} escribe la aceptación de los Términos`,
+  );
+  ok(
+    /import \{[^}]*aceptacionTerminos[^}]*\}/.test(texto),
+    `${archivo} importa aceptacionTerminos`,
+  );
+
+  const terminosAMano = [...texto.matchAll(/terminos:\s*\{/g)].map((m) => m[0]);
+  ok(
+    terminosAMano.length === 0,
+    `${archivo} no arma el objeto de Términos a mano`,
+    terminosAMano,
+  );
+}
+
+// =====================================================================
+console.log("\n=== 2a. auth.js no crea perfiles ===");
+// =====================================================================
+
+/*
+ * La otra mitad del cerrojo, y la que de verdad defiende del bug que pasó.
+ *
+ * Arriba se comprueba que todo el que cree un perfil lo haga bien. Acá se
+ * comprueba que `auth.js` NO lo haga, que es una afirmación distinta: aunque
+ * algún día alguien le agregue `terminos` y pase las de arriba, seguiría
+ * creando una cuenta sin que nadie haya marcado ninguna casilla, porque en el
+ * login no hay casilla que marcar. Una aceptación asentada sin que ocurra es
+ * peor que no asentar nada: dice que pasó algo que no pasó, y es justamente el
+ * dato con el que se defiende la bonificación de bienvenida.
+ *
+ * Un solo camino de nacimiento, y es el que muestra el texto.
+ */
+{
+  const texto = leer("public/js/auth.js");
+
+  ok(
+    !/setDoc\s*\(/.test(texto),
+    "auth.js no escribe documentos: manda al registro",
+    [...texto.matchAll(/setDoc\s*\([^)]*/g)].map((m) => m[0]),
+  );
+  ok(
+    !/saldoDeRegistro/.test(texto),
+    "auth.js no toca el saldo de bienvenida",
+  );
+  ok(
+    /location\.replace\(\s*["']register\.html["']\s*\)/.test(texto),
+    "y a quien no tiene perfil lo manda a register.html",
   );
 }
 

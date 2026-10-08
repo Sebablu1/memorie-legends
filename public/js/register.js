@@ -2,6 +2,7 @@ import {
   auth,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  onAuthStateChanged,
   googleProvider,
   db,
   doc,
@@ -11,7 +12,11 @@ import {
 
 // Un solo número para las dos formas de entrar, y el mismo que exige la regla
 // de Firestore. Antes cada archivo tenía el suyo escrito a mano.
-import { LEYENDAS_REGISTRO, saldoDeRegistro, VERSION_TERMINOS } from "./reglas/economia.js";
+import {
+  LEYENDAS_REGISTRO,
+  saldoDeRegistro,
+  aceptacionTerminos,
+} from "./reglas/economia.js";
 
 // Quien llegó por un link corto vuelve al LOBBY, no al tablero: es el caso
 // más común de una invitación, porque a quien te invita un amigo suele no
@@ -27,6 +32,19 @@ const avisar = (texto, clase = "") => {
   mensaje.textContent = texto;
   mensaje.className = `mensaje ${clase}`;
 };
+
+/**
+ * Hay un registro en marcha en esta misma pestaña.
+ *
+ * Existe por una carrera concreta. `createUserWithEmailAndPassword` deja la
+ * sesión abierta ANTES de que corra el `setDoc`, así que el
+ * `onAuthStateChanged` del final de este archivo se despierta en un instante
+ * en el que hay sesión y todavía no hay perfil — que es exactamente la
+ * situación que ese bloque trata como «entró con Google y no terminó». Sin
+ * esta bandera, crear una cuenta por correo mostraría el cartel de terminar
+ * con Google en el medio.
+ */
+let registrandoAhora = false;
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -62,6 +80,7 @@ form.addEventListener("submit", async (e) => {
     return;
   }
 
+  registrandoAhora = true;
   boton.disabled = true;
   boton.textContent = "Creando cuenta...";
   mensaje.textContent = "";
@@ -85,7 +104,7 @@ form.addEventListener("submit", async (e) => {
       gamesPlayed: 0,
       wins: 0,
       createdAt: new Date().toISOString(),
-      terminos: { version: VERSION_TERMINOS, aceptado: new Date().toISOString() },
+      terminos: aceptacionTerminos(),
     });
 
     console.log("✅ Usuario guardado en Firestore");
@@ -103,7 +122,7 @@ form.addEventListener("submit", async (e) => {
     console.log("✅ Datos guardados en localStorage");
 
     // 4. Mostrar mensaje de éxito
-    mensaje.textContent = "🎉 ¡Cuenta creada! +100 Leyendas de regalo";
+    mensaje.textContent = `🎉 ¡Cuenta creada! +${LEYENDAS_REGISTRO} Leyendas de bienvenida`;
     mensaje.className = "mensaje success";
     boton.textContent = "Entrando...";
 
@@ -173,7 +192,7 @@ async function crearPerfilSiFalta(usuario) {
     gamesPlayed: 0,
     wins: 0,
     createdAt: new Date().toISOString(),
-    terminos: { version: VERSION_TERMINOS, aceptado: new Date().toISOString() },
+    terminos: aceptacionTerminos(),
     provider: usuario.providerData?.[0]?.providerId ?? "google.com",
   });
 
@@ -196,30 +215,141 @@ function explicar(error) {
   return textos[error?.code] ?? error?.message ?? "No pudimos crear la cuenta.";
 }
 
+/**
+ * ¿Marcó la casilla?
+ *
+ * La misma pregunta para los dos caminos. El formulario además la tiene como
+ * `required`, así que el navegador la pide solo; el botón de Google no está
+ * dentro de ningún `<form>` y no tiene quién se la pida, de ahí esta función.
+ */
+const aceptoLosTerminos = () =>
+  document.getElementById("aceptoTerminos")?.checked === true;
+
+const PEDIR_CASILLA = "⚠️ Tenés que aceptar los Términos y Condiciones";
+
 botonGoogle?.addEventListener("click", async () => {
+  /*
+   * La casilla también acá, y no es un detalle de formulario.
+   *
+   * Antes este botón no la miraba: estaba fuera del `<form>`, así que ni el
+   * navegador ni el `submit` la alcanzaban. Pero el perfil que crea escribe
+   * `terminos.aceptado` igual, con la fecha del momento. O sea que dejaba
+   * asentada una aceptación que nunca ocurrió.
+   *
+   * Eso es peor que no guardar nada. Lo único que ese campo tiene que poder
+   * decir es «esta persona vio el texto y dijo que sí»; si se escribe sin
+   * casilla, dice algo que no pasó, y entonces no sirve para lo único que se
+   * escribió. Se pregunta antes de abrir la ventana de Google para no dejar a
+   * nadie a medio registrar.
+   */
+  if (!aceptoLosTerminos()) {
+    avisar(PEDIR_CASILLA, "error");
+    document.getElementById("aceptoTerminos")?.focus();
+    return;
+  }
+
+  registrandoAhora = true;
   botonGoogle.disabled = true;
   avisar("Conectando con Google…", "info");
 
   try {
     const { user } = await signInWithPopup(auth, googleProvider);
-    const { nueva, nombre } = await crearPerfilSiFalta(user);
-
-    // Sólo lo que sirve para identificar. El saldo vive en Firestore: acá
-    // sería un número que cualquiera edita desde la consola del navegador.
-    localStorage.setItem(
-      "user",
-      JSON.stringify({ id: user.uid, username: nombre }),
-    );
-
-    avisar(
-      nueva
-        ? `🎉 ¡Cuenta creada! +${LEYENDAS_REGISTRO} Leyendas de regalo`
-        : "Ya tenías cuenta. Entrando…",
-      "success",
-    );
-    window.location.replace(hayCodigoPendiente() ? "lobby.html" : "dashboard.html");
+    await crearPerfilYEntrar(user);
   } catch (error) {
     botonGoogle.disabled = false;
+    avisar(explicar(error), "error");
+    console.error(error);
+  }
+});
+
+/**
+ * Crea el perfil si falta y entra. Lo comparten los dos botones de Google: el
+ * de esta pantalla y el cartel de abajo, que atiende a quien llegó con la
+ * sesión ya abierta desde el login.
+ */
+async function crearPerfilYEntrar(user) {
+  const { nueva, nombre } = await crearPerfilSiFalta(user);
+
+  // Sólo lo que sirve para identificar. El saldo vive en Firestore: acá
+  // sería un número que cualquiera edita desde la consola del navegador.
+  localStorage.setItem(
+    "user",
+    JSON.stringify({ id: user.uid, username: nombre }),
+  );
+
+  avisar(
+    nueva
+      ? `🎉 ¡Cuenta creada! +${LEYENDAS_REGISTRO} Leyendas de bienvenida`
+      : "Ya tenías cuenta. Entrando…",
+    "success",
+  );
+  window.location.replace(hayCodigoPendiente() ? "lobby.html" : "dashboard.html");
+}
+
+// ==========================================================
+// QUIEN YA ENTRÓ CON GOOGLE Y NO TIENE PERFIL
+// ==========================================================
+//
+// `auth.js` manda acá a quien abrió sesión con Google desde el login y no
+// tiene perfil. Antes esa persona nacía allá, sin ver ninguna casilla; ahora
+// se termina de registrar en esta pantalla, que es la única que crea perfiles
+// y la única que muestra los Términos.
+//
+// Lo que ve es el cartel y la casilla, no el formulario entero: ya se
+// identificó con Google y pedirle usuario, correo y contraseña sería hacerle
+// repetir lo que acaba de hacer.
+//
+// La sesión se lee de Firebase y no de un parámetro en la dirección. Un
+// `?google=1` lo escribe cualquiera y queda pegado en el historial; la sesión
+// es lo único que de verdad dice si hay alguien adentro.
+
+const cajaTerminar = document.getElementById("terminarGoogle");
+const botonTerminar = document.getElementById("terminarGoogleBtn");
+
+onAuthStateChanged(auth, async (usuario) => {
+  // Un registro en curso en esta pestaña pasa por acá a mitad de camino, con
+  // sesión y sin perfil todavía. No es el caso que este bloque atiende.
+  if (!usuario || registrandoAhora || !cajaTerminar) return;
+
+  try {
+    const perfil = await getDoc(doc(db, "users", usuario.uid));
+    if (perfil.exists()) return;
+
+    // El formulario de correo no sirve para esta persona: ya tiene con qué
+    // identificarse. Se esconde para que no haya dos caminos a la vista.
+    form.hidden = true;
+    botonGoogle.hidden = true;
+    document.querySelector(".or-divider")?.setAttribute("hidden", "");
+    cajaTerminar.hidden = false;
+  } catch (error) {
+    // Si no se pudo leer el perfil, se deja la pantalla como estaba: el
+    // formulario sigue ahí y la persona tiene cómo seguir.
+    console.error("No se pudo saber si ya hay perfil:", error);
+  }
+});
+
+botonTerminar?.addEventListener("click", async () => {
+  if (!aceptoLosTerminos()) {
+    avisar(PEDIR_CASILLA, "error");
+    document.getElementById("aceptoTerminos")?.focus();
+    return;
+  }
+
+  const usuario = auth.currentUser;
+  if (!usuario) {
+    avisar("Se cerró la sesión. Entrá de nuevo con Google.", "error");
+    return;
+  }
+
+  registrandoAhora = true;
+  botonTerminar.disabled = true;
+  botonTerminar.textContent = "Creando cuenta…";
+
+  try {
+    await crearPerfilYEntrar(usuario);
+  } catch (error) {
+    botonTerminar.disabled = false;
+    botonTerminar.textContent = "Crear mi cuenta";
     avisar(explicar(error), "error");
     console.error(error);
   }

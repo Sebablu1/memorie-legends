@@ -99,8 +99,9 @@ test("el botón está, con el logo entero y el texto que corresponde", async ({ 
   await expect(page.locator(".or-divider")).toBeVisible();
 });
 
-test("una cuenta nueva recibe su perfil con las Leyendas de regalo", async ({ page }) => {
+test("una cuenta nueva recibe su perfil con las Leyendas de bienvenida", async ({ page }) => {
   const llamadas = await abrir(page, { perfilExistente: false });
+  await page.locator("#aceptoTerminos").check();
   await page.locator("#googleBtn").click();
   await page.waitForURL(/dashboard\.html/, { timeout: 9000 });
 
@@ -115,12 +116,40 @@ test("una cuenta nueva recibe su perfil con las Leyendas de regalo", async ({ pa
   expect(d.username).toBe("Jugador Nuevo");
   expect(d.provider).toBe("google.com");
   expect(typeof d.createdAt).toBe("string");
+
+  // La aceptación de los Términos, que es lo que la regla de Firestore exige
+  // para dejar crear el perfil. Sin esto el registro falla con
+  // "permission-denied" y la persona queda con cuenta en Auth y sin perfil.
+  expect(d.terminos, "sin la aceptación, Firestore rechaza la creación").toBeTruthy();
+  expect(typeof d.terminos.version).toBe("string");
+  expect(d.terminos.version.length).toBeGreaterThan(0);
+  expect(typeof d.terminos.aceptado).toBe("string");
+  // Ni un campo más: `terminosValidos()` usa `hasOnly` con estos dos.
+  expect(Object.keys(d.terminos).sort()).toEqual(["aceptado", "version"]);
+});
+
+test("sin marcar la casilla, Google no crea nada", async ({ page }) => {
+  // El botón de Google está FUERA del `<form>`, así que no hay validación
+  // nativa que lo frene: la casilla la pide `register.js`. Si esto se rompe,
+  // se crea un perfil con `terminos.aceptado` escrito sin que nadie haya
+  // aceptado nada — una aceptación asentada que no ocurrió, que es peor que
+  // no tener ninguna.
+  const llamadas = await abrir(page, { perfilExistente: false });
+
+  await page.locator("#googleBtn").click();
+
+  await expect(page.locator("#mensaje")).toContainText(/aceptar los Términos/i);
+  expect(llamadas.escrituras.length, "ESCRIBIÓ el perfil sin aceptación").toBe(0);
+  expect(page.url(), "navegó igual").toContain("register.html");
+  // Y el botón sigue vivo: se marca la casilla y se puede seguir.
+  await expect(page.locator("#googleBtn")).toBeEnabled();
 });
 
 test("a quien YA tenía cuenta no se le toca el saldo", async ({ page }) => {
   // Ésta es la prueba que importa. Un `setDoc` sin mirar antes le pondría el
   // saldo en 100 a alguien que tiene 2.500, y le borraría 87 partidas.
   const llamadas = await abrir(page, { perfilExistente: true });
+  await page.locator("#aceptoTerminos").check();
   await page.locator("#googleBtn").click();
   await page.waitForURL(/dashboard\.html/, { timeout: 9000 });
 
@@ -153,6 +182,7 @@ test("si se cierra la ventana de Google, se puede reintentar", async ({ page }) 
   await page.goto("/register.html");
   await expect(page.locator("#registerForm")).toBeVisible({ timeout: 9000 });
 
+  await page.locator("#aceptoTerminos").check();
   await page.locator("#googleBtn").click();
   await expect(page.locator("#mensaje")).toContainText(/ventana de google/i);
 

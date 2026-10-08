@@ -31,13 +31,56 @@
 export const LEYENDAS_REGISTRO = 100;
 
 /**
- * Version de los Terminos y Condiciones que el jugador acepto.
+ * Versión del texto de los Términos que está publicado hoy.
  *
- * Cambiar este string cuando cambie el texto de terminos.html: obliga a
- * volver a aceptarlos en la proxima inscripcion a torneo. La copia vive aca
- * y no en register.html para que no haya tres numeros mintiendo.
+ * Se cambia cuando cambia el fondo de `terminos.html`, y lo único que hace es
+ * dejar constancia de CUÁL texto se aceptó: el perfil y cada inscripción
+ * guardan la versión que regía en ese momento.
+ *
+ * ────────────────────────────────────────────────────────────────────────
+ * NO DISPARA NINGUNA RE-ACEPTACIÓN, Y ES A PROPÓSITO
+ * ────────────────────────────────────────────────────────────────────────
+ *
+ * Los perfiles creados antes conservan su `"2026-10"` y así se quedan. Lo que
+ * prueba el registro es que esa persona aceptó el texto que regía cuando
+ * entró, no el de hoy; pedirle una aceptación nueva en cada corrección de
+ * redacción sería trabarle el login por algo que no cambia lo que acordó.
+ *
+ * La inscripción a un torneo es otra cosa y pide la casilla SIEMPRE, sin
+ * mirar esta constante: ahí se acepta por torneo, no por usuario. El
+ * comentario anterior decía que esta constante «obliga a volver a
+ * aceptarlos», y nunca fue así.
  */
-export const VERSION_TERMINOS = "2026-10";
+export const VERSION_TERMINOS = "2026-11";
+
+/**
+ * Lo mismo para `reglamento-torneos.html`, que es otro documento y se corrige
+ * por su cuenta.
+ *
+ * Al inscribirse se guardan las DOS, porque el jugador acepta los dos textos
+ * en la misma casilla. Si mañana se corrige uno solo, el asiento tiene que
+ * poder decir qué par había delante cuando pagó la entrada.
+ */
+export const VERSION_REGLAMENTO_TORNEOS = "2026-11";
+
+/**
+ * La aceptación, armada en un solo lugar.
+ *
+ * Los caminos que crean un perfil escriben este mismo objeto, y
+ * `firestore.rules` exige sus dos campos exactos —ni uno más, ni uno menos—,
+ * así que armarlo a mano en cada archivo era la próxima divergencia esperando
+ * turno. Misma razón por la que existe `saldoDeRegistro()`.
+ *
+ * Lleva reloj, que es lo único impuro de este archivo. El del navegador
+ * alcanza: lo que se registra es cuándo dijo que sí, no un hecho que haya que
+ * defender al milisegundo. Donde sí importa —la inscripción a un torneo— la
+ * fecha la pone el servidor con `marcaDeTiempo()`, y de ahí que esta función
+ * no se use allá.
+ */
+export function aceptacionTerminos() {
+  return { version: VERSION_TERMINOS, aceptado: new Date().toISOString() };
+}
+
 export const LEYENDAS_POR_REFERIDO = 25;
 
 /**
