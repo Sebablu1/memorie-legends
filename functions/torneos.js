@@ -56,6 +56,13 @@ import {
   MINIMO_PARA_TORNEO,
 } from "./reglas/configuracion.js";
 
+// Las dos versiones de texto que quedan asentadas al inscribirse. Salen de
+// acá y no del navegador: ver la nota larga en `inscribir`.
+import {
+  VERSION_TERMINOS,
+  VERSION_REGLAMENTO_TORNEOS,
+} from "./reglas/economia.js";
+
 /**
  * La clave del cobro de una inscripción. La usan el cobro y las dos
  * devoluciones, que tienen que nombrar ESE cobro para deshacerlo.
@@ -300,6 +307,40 @@ export function crearTorneos({
         // poder mostrar quién se anotó primero.
         orden: inscriptos,
         inscriptoEn: marcaDeTiempo(),
+
+        /**
+         * Qué textos regían cuando esta entrada se cobró.
+         *
+         * ──────────────────────────────────────────────────────────────────
+         * LO PONE EL SERVIDOR, Y EL CLIENTE NO MANDA NADA
+         * ──────────────────────────────────────────────────────────────────
+         *
+         * El jugador marca una casilla antes de que se abra esta transacción,
+         * pero esa casilla no viaja: no serviría de nada. Un `acepto: true`
+         * mandado desde el navegador lo escribe cualquiera desde la consola, y
+         * el servidor no tiene forma de comprobar que la pantalla se mostró.
+         * Como prueba vale cero, y como validación es puro costo.
+         *
+         * Peor sería aceptar la VERSIÓN desde el cliente: alcanzaría con
+         * mandar una vieja para quedar registrado habiendo aceptado un texto
+         * más flojo que el que estaba publicado. Saliendo de acá, eso no
+         * existe.
+         *
+         * Lo que esto afirma es verificable y es lo único que hace falta:
+         * cuando se cobró esta entrada, los textos publicados eran estos dos,
+         * y la fecha la puso el reloj del servidor. El documento es de sólo
+         * lectura para el navegador —`torneos/{id}` y todo lo que cuelga de él
+         * están en `allow write: if false`—, así que nadie lo puede retocar
+         * después.
+         *
+         * Se guardan las DOS versiones porque son dos documentos que se
+         * corrigen por separado, y la casilla acepta los dos juntos.
+         */
+        aceptacion: {
+          terminos: VERSION_TERMINOS,
+          reglamentoTorneos: VERSION_REGLAMENTO_TORNEOS,
+          fecha: marcaDeTiempo(),
+        },
       });
 
       tx.set(

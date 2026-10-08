@@ -256,3 +256,113 @@
   text-align: left;
   margin: 0;
 }
+
+/* ------------------------------------- cuadro de inscripción a un torneo */
+/*
+ * Reemplaza al `window.confirm` que había antes. El marcado lo arma
+ * `cartelera-torneos.js`; acá sólo está cómo se ve.
+ *
+ * Es un `<dialog>` nativo: el fondo, el foco atrapado adentro y el cierre con
+ * Escape los da el navegador. Sin librería y sin JavaScript para nada de eso.
+ */
+.cuadro-torneo {
+  /* El navegador centra un `<dialog>` modal con `margin: auto`, pero
+     `app.css` abre con `* { margin: 0 }` y se lo lleva puesto: sin esta
+     línea el cuadro aparece pegado arriba a la izquierda. Se vio en
+     pantalla, no se dedujo. */
+  margin: auto;
+  max-width: 420px;
+  width: calc(100% - 32px);
+  padding: 22px;
+  border: 1px solid var(--borde-suave);
+  border-radius: 14px;
+  background: var(--panel-alto);
+  color: var(--texto);
+}
+
+.cuadro-torneo::backdrop {
+  background: rgba(0, 0, 0, 0.66);
+}
+
+.cuadro-torneo h3 {
+  margin: 0 0 12px;
+  color: var(--oro-claro);
+  font-size: 1.05rem;
+  /* Un nombre de torneo largo se corta, no estira el cuadro. */
+  overflow-wrap: anywhere;
+}
+
+.cuadro-torneo p {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.cuadro-torneo .ct-nota {
+  color: var(--texto-tenue);
+  font-size: 0.82rem;
+}
+
+.cuadro-torneo .ct-acepto {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 16px 0 18px;
+  font-size: 0.82rem;
+  color: var(--texto-tenue);
+  line-height: 1.4;
+  text-align: left;
+}
+
+.cuadro-torneo .ct-acepto input {
+  width: auto;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.cuadro-torneo .ct-acepto span {
+  min-width: 0;
+  flex: 1;
+}
+
+.cuadro-torneo .ct-acepto a {
+  color: var(--oro);
+}
+
+.cuadro-torneo .ct-botones {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+/*
+ * En el teléfono los dos no entran en una fila: con el relleno de `.accion`
+ * suman unos 325px y adentro del cuadro hay 299. Envolvían, y quedaban dos
+ * botones sueltos alineados a la derecha, uno debajo del otro.
+ *
+ * Apilados a lo ancho se leen como lo que son. `column-reverse` deja arriba
+ * el de inscribirse, que es el principal, sin cambiar el orden del marcado:
+ * en el HTML Cancelar va primero, que es lo que conviene para quien navega
+ * con teclado.
+ */
+@media (max-width: 420px) {
+  .cuadro-torneo .ct-botones {
+    flex-direction: column-reverse;
+  }
+
+  .cuadro-torneo .ct-botones button {
+    width: 100%;
+  }
+}
+
+/*
+ * Los dos botones no llevan estilo propio, y es a propósito.
+ *
+ * Son `.accion` y `.accion.sobria`, que es el par primario/secundario que
+ * `app.css` ya define para todo el sitio —el dorado acuñado y el de cuero y
+ * bronce—, con sus 44px de alto táctil y su estado deshabilitado en
+ * `button.accion:disabled`. El primer intento les puso padding, radio y
+ * `font: inherit` acá: lo único que logró fue pelearse con `app.css` y dejar
+ * la letra en peso 400 en vez de 800. Se vio en pantalla.
+ */

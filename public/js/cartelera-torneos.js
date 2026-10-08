@@ -111,6 +111,107 @@ function dibujar() {
   seccion.hidden = false;
 }
 
+/**
+ * El cuadro de inscripción, armado una sola vez y guardado acá.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ DEJÓ DE SER UN `window.confirm`
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque ahora hay que aceptar dos textos, y un `confirm` nativo no puede
+ * tener un enlace adentro. Pedirle a alguien que acepte el Reglamento de
+ * Torneos sin poder abrirlo sería pedirle que acepte a ciegas.
+ *
+ * Reemplaza al `confirm` y no se suma a él: dos puertas seguidas para un solo
+ * botón enseñan a atravesarlas sin leer, que es lo contrario de lo que esto
+ * busca. Dice lo mismo que decía el `confirm` —cuánto cuesta, cuándo empieza,
+ * qué pasa si no se llena— más la casilla.
+ *
+ * Se arma en JavaScript y no en `lobby.html` para que el cuadro y la lógica
+ * que lo abre vivan juntos; es el único lugar que lo usa.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA CASILLA ES UNA CORTESÍA, COMO LO ERA LA PREGUNTA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Igual que el `confirm` que reemplaza (ver la nota de arriba del archivo):
+ * quien se la saltee desde la consola igual paga la entrada, porque el cobro
+ * está en el servidor. Y la aceptación que queda asentada tampoco sale de
+ * acá: la escribe `inscribir`, con las versiones que el servidor tiene
+ * publicadas y su propio reloj. Esto es la pantalla, no la prueba.
+ */
+let cuadro = null;
+
+function armarCuadro() {
+  const d = document.createElement("dialog");
+  d.className = "cuadro-torneo";
+  d.innerHTML = `
+    <form method="dialog">
+      <h3 id="ctNombre"></h3>
+      <p id="ctCosto"></p>
+      <p id="ctFecha" hidden></p>
+      <p class="ct-nota">Si el torneo no llega a cuatro jugadores, se cancela y se te devuelve todo.</p>
+      <label class="ct-acepto">
+        <input type="checkbox" id="ctAcepto" aria-required="true" />
+        <span>Acepto los <a href="/terminos.html" target="_blank" rel="noopener">Términos y Condiciones</a> y el <a href="/reglamento-torneos.html" target="_blank" rel="noopener">Reglamento de Torneos</a>.</span>
+      </label>
+      <div class="ct-botones">
+        <button type="submit" value="no" class="accion sobria">Cancelar</button>
+        <button type="submit" value="si" id="ctSi" class="accion" disabled>Inscribirme</button>
+      </div>
+    </form>
+  `;
+
+  // Mientras la casilla no esté marcada, el botón no sirve. Es más claro que
+  // dejarlo activo y contestar con un error después de apretarlo.
+  const casilla = d.querySelector("#ctAcepto");
+  const si = d.querySelector("#ctSi");
+  casilla.addEventListener("change", () => {
+    si.disabled = !casilla.checked;
+  });
+
+  // Un `<dialog>` no se cierra al tocar afuera; hay que pedirlo. El click cae
+  // en el propio `dialog` sólo cuando fue sobre el fondo: lo de adentro está
+  // en el `<form>`. Cierra sin inscribir, igual que Escape, que ya lo hace
+  // solo y deja `returnValue` vacío.
+  d.addEventListener("click", (e) => {
+    if (e.target === d) d.close("no");
+  });
+
+  document.body.appendChild(d);
+  return d;
+}
+
+/** Abre el cuadro y resuelve `true` sólo si se aceptó y se apretó Inscribirme. */
+function preguntar({ nombre, entrada, empieza }) {
+  const d = (cuadro ??= armarCuadro());
+
+  d.querySelector("#ctNombre").textContent = nombre;
+  d.querySelector("#ctCosto").textContent =
+    `Anotarte cuesta ${numero(entrada)} Leyendas y se cobra ahora.`;
+
+  const fecha = d.querySelector("#ctFecha");
+  fecha.textContent = empieza ? `Empieza el ${empieza}.` : "";
+  fecha.hidden = !empieza;
+
+  // Se pide SIEMPRE y sin marcar de antemano. No se mira si esta persona ya
+  // aceptó la versión vigente: acá se acepta por torneo y no por usuario, y
+  // el torneo al que se anota hoy no existía cuando se registró.
+  const casilla = d.querySelector("#ctAcepto");
+  casilla.checked = false;
+  d.querySelector("#ctSi").disabled = true;
+
+  return new Promise((resolver) => {
+    const alCerrar = () => {
+      d.removeEventListener("close", alCerrar);
+      resolver(d.returnValue === "si" && casilla.checked);
+    };
+    d.addEventListener("close", alCerrar);
+    d.returnValue = "";
+    d.showModal();
+  });
+}
+
 async function anotarse(boton) {
   const entrada = Number(boton.dataset.entrada);
   const nombre = boton.dataset.nombre;
@@ -118,11 +219,7 @@ async function anotarse(boton) {
 
   // La fecha va ANTES de cobrar, no después. Es la mitad de lo que la
   // persona está comprando: de nada le sirve el torneo si no puede estar.
-  const seguro = window.confirm(
-    `Anotarte a «${nombre}» cuesta ${numero(entrada)} Leyendas y se cobra ahora.\n\n` +
-      (empieza ? `Empieza el ${empieza}.\n\n` : "") +
-      `Si el torneo no llega a cuatro jugadores, se cancela y se te devuelve todo.`,
-  );
+  const seguro = await preguntar({ nombre, entrada, empieza });
   if (!seguro) return;
 
   const textoPrevio = boton.textContent;
