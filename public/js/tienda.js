@@ -52,8 +52,11 @@ function dibujarPaquetes(lista) {
   $("paquetes").innerHTML = packs
     .map((p) => {
       const total = leyendasDePaquete(p);
+      // `leyendasBase` ya no se muestra por separado: la tarjeta dice el TOTAL
+      // arriba y abajo cuántas de ésas son la bonificación. Decía
+      // «300 + 50 de regalo», que era el desglose del precio pero se leía como
+      // un premio por comprar.
       const regalo = Number(p.leyendasRegalo) || 0;
-      const base = Number(p.leyendasBase) || 0;
       const cuantos = Array.isArray(p.itemsExclusivos) ? p.itemsExclusivos.length : 0;
 
       return `
@@ -62,7 +65,7 @@ function dibujarPaquetes(lista) {
       <h2>${escapar(p.nombre)}</h2>
       <div class="cantidad">${total.toLocaleString("es-UY")}<small>Leyendas</small></div>
       ${regalo
-        ? `<div class="bonus">${base.toLocaleString("es-UY")} + ${regalo.toLocaleString("es-UY")} de regalo</div>`
+        ? `<div class="bonus">Incluye ${regalo.toLocaleString("es-UY")} Leyendas adicionales</div>`
         : '<div class="bonus">&nbsp;</div>'}
       ${cuantos
         ? `<div class="bonus exclusivos">✨ ${cuantos} ${cuantos === 1 ? "artículo exclusivo" : "artículos exclusivos"}</div>`

@@ -105,7 +105,7 @@ console.log("\n=== 1. Los paquetes dan Leyendas, y nada más ===");
     if (!p) continue;
     ok(p.precioUYU === esperado.precioUYU, `  ${id} cuesta ${esperado.precioUYU}`, p.precioUYU);
     ok(p.leyendasBase === esperado.leyendasBase, `  y da ${esperado.leyendasBase} de base`, p.leyendasBase);
-    ok(p.leyendasRegalo === esperado.leyendasRegalo, `  más ${esperado.leyendasRegalo} de regalo`, p.leyendasRegalo);
+    ok(p.leyendasRegalo === esperado.leyendasRegalo, `  más ${esperado.leyendasRegalo} de bonificación`, p.leyendasRegalo);
     ok(p.itemsExclusivos.length === esperado.items, `  y trae ${esperado.items} artículos`, p.itemsExclusivos.length);
   }
 
