@@ -73,6 +73,12 @@ const dom = {
   avisoNombres: $("avisoNombres"),
   listaNombres: $("listaNombres"),
   btnListarUsuarios: $("btnListarUsuarios"),
+  ajusteUid: $("ajusteUid"),
+  ajusteDelta: $("ajusteDelta"),
+  ajusteBolsillo: $("ajusteBolsillo"),
+  ajusteMotivo: $("ajusteMotivo"),
+  btnAjustarSaldo: $("btnAjustarSaldo"),
+  avisoAjuste: $("avisoAjuste"),
   avisoUsuarios: $("avisoUsuarios"),
   listaUsuarios: $("listaUsuarios"),
   partidas: $("partidas"),
@@ -96,6 +102,7 @@ const limpiarCerradas = httpsCallable(funciones, "limpiarSalasCerradasAdmin");
 const sembrarCatalogo = httpsCallable(funciones, "sembrarCatalogoAdmin");
 const revisarNombres = httpsCallable(funciones, "revisarNombresAdmin");
 const listarUsuarios = httpsCallable(funciones, "listarUsuariosAdmin");
+const ajustarSaldo = httpsCallable(funciones, "ajustarLeyendasAdmin");
 const eliminarUsuario = httpsCallable(funciones, "eliminarUsuarioAdmin");
 const listarReportes = httpsCallable(funciones, "listarReportesAdmin");
 const resolverReporte = httpsCallable(funciones, "resolverReporteAdmin");
@@ -789,6 +796,58 @@ No tiene saldo ni partidas, así que se borra del todo. No se puede deshacer.`
 }
 
 dom.btnListarUsuarios.addEventListener("click", verCuentas);
+
+// ------------------------------------------------------- ajustar saldo
+
+/**
+ * Ajusta el saldo de alguien a mano.
+ *
+ * Acá NO se valida nada que importe: lo que el servidor acepta lo decide
+ * `EsquemaAjustarLeyendas`, y quién puede pedirlo, `administradores.exigir`.
+ * Lo de este lado es cortesía — evitar el viaje cuando falta un campo — y la
+ * confirmación, que existe porque esto escribe sobre el saldo de alguien y no
+ * se puede deshacer.
+ */
+async function ajustar() {
+  const uid = dom.ajusteUid.value.trim();
+  const delta = Number(dom.ajusteDelta.value);
+  const bolsillo = dom.ajusteBolsillo.value;
+  const motivo = dom.ajusteMotivo.value.trim();
+
+  if (!uid || !motivo || !Number.isInteger(delta) || delta === 0) {
+    decir(dom.avisoAjuste, "Faltan datos: uid, un número entero distinto de cero, y el motivo.", "mal");
+    return;
+  }
+
+  const verbo = delta > 0 ? "acreditar" : "quitar";
+  const cuantas = Math.abs(delta).toLocaleString("es-UY");
+  const cual = bolsillo === "ganado" ? "ganadas" : "compradas";
+  if (!window.confirm(`Vas a ${verbo} ${cuantas} Leyendas ${cual} a ${uid}.\n\nQueda asentado y no se puede deshacer.`)) {
+    return;
+  }
+
+  dom.btnAjustarSaldo.disabled = true;
+  decir(dom.avisoAjuste, "Ajustando…");
+  try {
+    const { data } = await ajustarSaldo({ uid, delta, bolsillo, motivo });
+    decir(
+      dom.avisoAjuste,
+      `Listo. Saldo: ${data.saldo} (${data.ganado} ganadas · ${data.comprado} compradas).`,
+      "bien",
+    );
+    // Se limpian el monto y el motivo, no el uid: lo más común es hacer dos
+    // ajustes seguidos sobre la misma persona.
+    dom.ajusteDelta.value = "";
+    dom.ajusteMotivo.value = "";
+  } catch (error) {
+    decir(dom.avisoAjuste, error?.message ?? "No pudimos ajustar el saldo.", "mal");
+    console.error(error);
+  } finally {
+    dom.btnAjustarSaldo.disabled = false;
+  }
+}
+
+dom.btnAjustarSaldo.addEventListener("click", ajustar);
 
 // ------------------------------------------------------------ reportes
 

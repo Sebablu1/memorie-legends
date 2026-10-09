@@ -151,6 +151,9 @@ console.log("\n=== Las de plata están apretadas ===");
     "comprarItem",
     "comprarPack",
     "inscribirseATorneo",
+    // El ajuste a mano del panel escribe DIRECTAMENTE sobre el saldo de
+    // alguien: es la que más tiene que estar acá de todas.
+    "ajustarLeyendasAdmin",
     // Las dos del panel que le sacan un artículo a alguien: devuelven lo
     // que esa persona pagó, así que mueven saldo. Que sólo las pueda tocar
     // un administrador no las exime — el techo en memoria se pierde al

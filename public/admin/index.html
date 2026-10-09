@@ -411,6 +411,53 @@
         <div class="lista" id="listaUsuarios"></div>
       </section>
 
+      <!-- Ajustar un saldo a mano. Hasta ahora esto se hacía con
+           `herramientas/ajustar-leyendas.mjs`, desde una terminal y con el
+           repositorio a mano. La herramienta se queda —toma los bolsillos en
+           absoluto y muestra el plan antes de aplicar—; esto es para el caso
+           corriente: devolverle Leyendas a alguien que se quedó sin partida. -->
+      <section>
+        <h2>Ajustar saldo</h2>
+        <p class="nota">
+          Escribe un movimiento en el <b>libro mayor</b>, con tu uid y el
+          motivo. No se puede deshacer: para corregir un ajuste se hace otro
+          en sentido contrario, igual que en cualquier libro.
+        </p>
+        <p class="nota">
+          El <b>bolsillo</b> no es un detalle. Las <b>ganadas</b> habilitan
+          torneos y mesas públicas; las <b>compradas</b> no. Acreditar en el
+          bolsillo equivocado le da —o le quita— a alguien el acceso a los
+          torneos sin que se note.
+        </p>
+        <div class="campos-item">
+          <label>
+            <span>uid del jugador</span>
+            <input id="ajusteUid" type="text" autocomplete="off" placeholder="el uid, no el correo" />
+          </label>
+          <label>
+            <span>Leyendas (negativo para quitar)</span>
+            <input id="ajusteDelta" type="number" step="1" placeholder="200 o -200" />
+          </label>
+          <label>
+            <span>Bolsillo</span>
+            <select id="ajusteBolsillo">
+              <option value="ganado">Ganadas (habilitan torneos)</option>
+              <option value="comprado">Compradas</option>
+            </select>
+          </label>
+          <label class="ancho">
+            <span>Motivo</span>
+            <input id="ajusteMotivo" type="text" maxlength="200" placeholder="por qué se ajusta" />
+          </label>
+        </div>
+        <div class="acciones">
+          <button class="btn" id="btnAjustarSaldo" type="button">
+            Ajustar saldo
+          </button>
+        </div>
+        <div class="aviso" id="avisoAjuste"></div>
+      </section>
+
       <!-- Reportes. Bandeja de entrada, no policía: acá no se suspende a
            nadie, se lee lo que denunciaron y se marca qué se hizo. -->
       <section>

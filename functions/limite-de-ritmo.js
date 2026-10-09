@@ -158,6 +158,11 @@ export const LIMITES_DE_PLATA = {
   // saldo y se cuenta acá. El borrado forzado hace una desposesión por
   // poseedor, y por eso tiene su propio techo, más bajo todavía: es la
   // operación más destructiva del panel.
+  // Ajustar el saldo a mano desde el panel. Mismo techo que las otras dos del
+  // panel que mueven plata: el contador en memoria se pierde al reciclarse la
+  // instancia, y ésta escribe directamente sobre el saldo de alguien.
+  ajustarLeyendasAdmin: 10,
+
   desposeerItemAdmin: 10,
   forzarBorrarItemAdmin: 3,
 };

@@ -126,6 +126,7 @@ import {
   EsquemaItemAdmin,
   EsquemaActivarItem,
   EsquemaDesposeer,
+  EsquemaAjustarLeyendas,
   EsquemaRevancha,
   EsquemaCrearSalaPrivada,
   EsquemaUnirseConCodigo,
@@ -2490,6 +2491,103 @@ export const acreditarReferido = llamable(async (data, context) => {
       throw new HttpsError("already-exists", "Ese referido ya fue acreditado.");
     }
     return { leyendas: LEYENDAS_POR_REFERIDO, saldo: r.saldo };
+  });
+});
+
+// ------------------------------------------- ajuste de saldo a mano
+
+/**
+ * Corrige el saldo de alguien desde el panel.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ EXISTE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Hasta ahora esto se hacía con `herramientas/ajustar-leyendas.mjs`, desde una
+ * terminal y con credenciales de administrador en la máquina de alguien. Es
+ * una herramienta buena y se queda —toma los bolsillos en absoluto, muestra el
+ * plan antes de aplicar y vuelve a leer después de escribir—, pero obliga a
+ * tener el repositorio a mano para devolverle 200 Leyendas a quien se quedó
+ * sin partida.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * PASA POR LA MISMA PUERTA QUE TODO LO DEMÁS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `moverLeyendas` y nada más. No se escribe `credits` por afuera ni acá ni en
+ * ningún lado: es lo que hace que el libro mayor sirva, y lo comprueba
+ * `pruebas/abandono.mjs` recorriendo los módulos económicos.
+ *
+ * El motivo sale de `bolsillo` y no de un parámetro libre, porque los dos
+ * motivos de ajuste son exactamente uno por bolsillo y `REPARTO_POR_MOTIVO`
+ * los tiene mapeados. Mandar un motivo arbitrario desde el navegador sería
+ * dejar que el cliente elija el reparto.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * QUÉ QUEDA ESCRITO, Y POR QUÉ ASÍ
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * El asiento tiene una sola ranura de texto libre, `referencia`, y hay dos
+ * cosas que guardar: quién lo hizo y por qué. Van las dos, con el uid del
+ * administrador PRIMERO para poder buscar por él:
+ *
+ *     admin:<uid del administrador> — <motivo escrito a mano>
+ *
+ * Sin idempotencia a propósito. Un ajuste repetido es una decisión repetida,
+ * no un reintento de red: si alguien aprieta dos veces, se asientan dos
+ * movimientos y los dos se ven. Una clave de idempotencia haría que el segundo
+ * desapareciera en silencio, que es peor.
+ */
+export const ajustarLeyendasAdmin = llamable(async (data, context) => {
+  // Dos uid, y conviene no confundirlos: `uid` es quien pide —el
+  // administrador, a quien se le cuenta el ritmo— y `aQuien` es la persona
+  // cuyo saldo se toca.
+  const uid = exigirSesion(context, "ajustarLeyendasAdmin");
+  await administradores.exigir(context);
+  await limite.exigirRitmoDePlata(uid, "ajustarLeyendasAdmin");
+
+  const { uid: aQuien, delta, bolsillo, motivo } = validar(
+    EsquemaAjustarLeyendas,
+    data,
+    errorHttp,
+  );
+
+  if (aQuien === uid) {
+    throw new HttpsError(
+      "invalid-argument",
+      "No podés ajustarte el saldo a vos mismo.",
+    );
+  }
+
+  // Que exista. Sin esto se puede asentar un movimiento sobre un uid
+  // inventado, que es exactamente el agujero que tenía `acreditarReferido`.
+  const perfil = await db.collection(USUARIOS).doc(aQuien).get();
+  if (!perfil.exists) {
+    throw new HttpsError("not-found", "Ese jugador no existe.");
+  }
+
+  const motivoDelAsiento =
+    bolsillo === "comprado"
+      ? MOTIVOS.AJUSTE_ADMIN_COMPRADO
+      : MOTIVOS.AJUSTE_ADMIN_GANADO;
+
+  return db.runTransaction(async (tx) => {
+    const r = await moverLeyendas(tx, {
+      uid: aQuien,
+      delta,
+      motivo: motivoDelAsiento,
+      referencia: `admin:${uid} — ${motivo}`,
+    });
+
+    logger.info("Ajuste de saldo desde el panel", {
+      administrador: uid,
+      jugador: aQuien,
+      delta,
+      bolsillo,
+      saldoNuevo: r.saldo,
+    });
+
+    return { saldo: r.saldo, comprado: r.comprado, ganado: r.ganado };
   });
 });
 

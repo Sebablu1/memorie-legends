@@ -320,6 +320,30 @@ export const EsquemaDesposeer = z.object({
   uid: z.string().trim().min(1).max(128),
 });
 
+/**
+ * Ajustar el saldo de alguien desde el panel.
+ *
+ * `bolsillo` no estaba en el pedido y hace falta igual: `moverLeyendas` no
+ * acepta un movimiento sin saber de qué bolsillo sale o a cuál entra, y los
+ * dos motivos de ajuste son justamente uno por bolsillo. Adivinarlo sería
+ * decidir en silencio si esas Leyendas habilitan torneos —las ganadas sí, las
+ * compradas no—, que es la diferencia que sostiene el reglamento.
+ *
+ * El techo de 100.000 por movimiento no es una regla de negocio: es que un
+ * cero de más tipeado a mano no pueda romper la economía de un saque. Para
+ * más que eso, dos movimientos y dos decisiones.
+ */
+export const EsquemaAjustarLeyendas = z.object({
+  uid: z.string().trim().min(1).max(128),
+  delta: z.coerce
+    .number()
+    .int("El ajuste tiene que ser un número entero de Leyendas.")
+    .refine((n) => n !== 0, "Un ajuste de cero no mueve nada.")
+    .refine((n) => Math.abs(n) <= 100_000, "El ajuste no puede pasar de 100.000 Leyendas."),
+  bolsillo: z.enum(["ganado", "comprado"]),
+  motivo: z.string().trim().min(3).max(200),
+});
+
 // -------------------------------------------------------------- torneos
 
 /**
