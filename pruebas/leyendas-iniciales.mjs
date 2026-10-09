@@ -297,5 +297,39 @@ console.log("\n=== 4. El valor es el que se acordó ===");
   ok(LEYENDAS_REGISTRO === 100, "la bienvenida son 100 Leyendas", LEYENDAS_REGISTRO);
 }
 
+// =====================================================================
+console.log("\n=== 5. Y la portada no promete otro número ===");
+// =====================================================================
+
+{
+  /**
+   * La cuarta copia del número, y la única que lee alguien que todavía no
+   * entró.
+   *
+   * `index.html` dice «viene con 100 Leyendas de bienvenida» en el párrafo que
+   * invita a crearse la cuenta. Es un literal suelto: las comprobaciones de
+   * arriba miran el código y `firestore.rules`, y ninguna mira el HTML. Si
+   * mañana `LEYENDAS_REGISTRO` cambia, la portada sigue prometiendo el número
+   * viejo y no falla nada — sólo que a quien se registre le aparece otro saldo
+   * del que fue a buscar, que es la clase de diferencia que termina en un
+   * reclamo.
+   *
+   * Se busca la frase entera y no un «100» suelto: la portada tiene otros
+   * números —el límite de puntos, los precios— y cazar el primero que aparezca
+   * daría una prueba que falla cuando se agrega un párrafo.
+   */
+  const portada = leer("public/index.html");
+  const m = portada.match(/(\d+)\s+Leyendas de bienvenida/);
+
+  ok(Boolean(m), "la portada sigue prometiendo Leyendas de bienvenida",
+     m ? m[0] : "no se encontró la frase");
+
+  if (m) {
+    ok(Number(m[1]) === LEYENDAS_REGISTRO,
+       "y promete exactamente las que se acreditan",
+       { portada: Number(m[1]), constante: LEYENDAS_REGISTRO });
+  }
+}
+
 console.log(fallos ? `\n❌ ${fallos} fallos` : "\n✅ TODO OK");
 process.exit(fallos ? 1 : 0);
