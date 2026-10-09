@@ -105,6 +105,7 @@ export const SUITES = [
   "ventana-tras-poder.mjs",
   "reglamento.mjs",
   "tiempos.mjs",
+  "tiempos-en-prosa.mjs",
   "link-corto.mjs",
   "sitio.mjs",
   "css-incrustado.mjs",
