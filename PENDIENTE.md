@@ -71,6 +71,17 @@ Buscar: `git log --oneline --all --grep="§N"`.
 - **Por qué igual conviene:** el trámite ante la URCDP sigue abierto (§19), y
   esa enumeración es justo lo que se mira.
 
+### §48 — `entregar-a-rival.spec.js` falla en dos pruebas
+
+- **Estado:** los tests de las líneas 211 y 233 fallan. La mesa dice «No era
+  esa: te comés una carta» donde debería decir «le acertaste».
+- **Preexistente:** se corrió en worktrees contra `6a386dd`, `01be9d6` y
+  `5b47670` y falla igual en los tres. No lo trajeron las etapas de reflejos.
+- **Es de ENTRENAMIENTO**, no de red: la escena no pasa por el servidor.
+- **Y `npm test` no lo ve.** Las 84 suites de Node están verdes mientras estas
+  dos llevan rojas desde antes. Cuidado con leer «84/84» como «todo verde».
+- **Revisar aparte, en su propio commit.**
+
 ### §45 — PITR y protección de borrado en producción
 
 - **Estado:** la base `southamerica` tiene `POINT_IN_TIME_RECOVERY_DISABLED` y
