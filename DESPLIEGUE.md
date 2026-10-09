@@ -17,17 +17,50 @@ alguien puede haber editado las reglas desde la consola web, o el último
 `firebase deploy --only firestore:rules` puede haberse hecho desde otra copia
 del repositorio, o puede no haberse hecho nunca.
 
-Ni el CLI de Firebase ni ninguna herramienta instalada en este entorno pueden
-leer el ruleset activo:
+El CLI de Firebase sigue sin poder leerlas: `firebase firestore:*` sólo expone
+`delete`, `bulkdelete`, `indexes`, `locations`, `operations`, `databases` y
+`backups`. No hay nada ahí para leer reglas.
 
-- `firebase firestore:*` sólo expone `delete`, `bulkdelete`, `indexes`,
-  `locations`, `operations`, `databases` y `backups`. No hay nada para leer
-  reglas.
-- La API que sí lo permite (`firebaserules.googleapis.com`) necesita `gcloud`
-  para obtener un token, y `gcloud` no está instalado.
+**Pero ya se pueden leer**, y eso cambió desde que se escribió esto. Acá decía
+que la API que lo permite —`firebaserules.googleapis.com`— necesita `gcloud` y
+que `gcloud` no estaba instalado. Hoy **sí lo está** (SDK 585.0.0, autenticado
+con la cuenta de soporte), así que la comprobación dejó de ser a mano. Ver
+*Traer las reglas vivas* más abajo.
 
-Así que **mientras no se compruebe a mano, hay que asumir que pueden diferir.**
-No tratar "está en el repositorio" como "está aplicado".
+Mientras no se compruebe, sigue valiendo lo de siempre: **hay que asumir que
+pueden diferir.** No tratar "está en el repositorio" como "está aplicado".
+
+### Traer las reglas vivas
+
+```bash
+T=$(gcloud auth print-access-token)
+curl -s -H "Authorization: Bearer $T" -H "X-Goog-User-Project: memorie-legends" "https://firebaserules.googleapis.com/v1/projects/memorie-legends/releases"
+```
+
+`X-Goog-User-Project` es **imprescindible**: sin esa cabecera la API contesta
+403 por falta de proyecto de cuota, y el mensaje habla de credenciales por
+omisión, que manda a buscar el problema donde no está. Se pasa por cabecera y
+no con `gcloud auth application-default set-quota-project` para no tocar la
+configuración local de nadie.
+
+Eso devuelve tres *releases*, y conviene no confundirlas:
+
+| Release | Qué es |
+|---|---|
+| `cloud.firestore/southamerica` | **la que importa**: la base que usa el juego |
+| `cloud.firestore` | la base `(default)`, en Iowa, con los datos viejos |
+| `firebase.storage` | las reglas de Storage |
+
+Con el `rulesetName` que trae la que interese, el contenido sale de:
+
+```bash
+curl -s -H "Authorization: Bearer $T" -H "X-Goog-User-Project: memorie-legends" "https://firebaserules.googleapis.com/v1/<rulesetName>"
+```
+
+El fuente viene en `source.files[0].content`, y se compara con `diff` contra
+`firestore.rules`.
+
+**Comprobado el 9 de octubre de 2026: idénticas, byte por byte.**
 
 ### Cómo comprobarlo en Firebase Console
 
@@ -63,8 +96,8 @@ Calculada sobre el archivo sin comentarios ni espacios sobrantes, para poder
 citarla en una revisión:
 
 ```
-sha256 (16 primeros) : 1c0029088e89f6fa
-líneas               : 259
+sha256 (16 primeros) : f9620b972e7379b1
+líneas               : 394
 ```
 
 Se recalcula así:
