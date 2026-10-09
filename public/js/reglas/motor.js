@@ -469,7 +469,25 @@ const rellenarMazo = (estado) => {
  * tendrían la misma consecuencia y acertar dejaría de valer la pena.
  */
 export function intentarDescarte(estado, indiceJugador, posicion) {
-  if (estado.fase !== "descarte" || !estado.ventanaDescarte) return estado;
+  /*
+   * MANDA LA VENTANA, NO LA FASE.
+   *
+   * Decía `estado.fase !== "descarte" || !estado.ventanaDescarte`, y la
+   * primera mitad era redundante: las CUATRO escrituras que abren una ventana
+   * ponen `fase: "descarte"` en la misma línea, y `cerrarVentanaDescarte` la
+   * anula al mismo tiempo que cambia la fase. O sea que hoy
+   * `ventanaDescarte != null` equivale a `fase === "descarte"`, siempre.
+   *
+   * Se saca la mitad de la fase para que en RED los reflejos sigan valiendo
+   * mientras el siguiente jugador juega su turno: allá la ventana ya no se
+   * cierra por tiempo sino con el tiro del que sigue, así que fase y ventana
+   * dejan de ir juntas.
+   *
+   * En ENTRENAMIENTO no se nota: las dos condiciones siguen yendo juntas
+   * porque nadie adelanta la fase. Lo comprueban las 84 suites, que quedaron
+   * verdes con este cambio solo.
+   */
+  if (!estado.ventanaDescarte) return estado;
 
   /**
    * La ventana corta que sigue a un poder es de quien lo usó, y de nadie más.
@@ -738,7 +756,8 @@ export const conoceUnaQueEntra = (estado, actor) => {
  * muda, que era el defecto que hacía parecer un bug a lo que era una regla.
  */
 export function motivoDeRechazoDescarte(estado, indiceJugador, posicion) {
-  if (estado.fase !== "descarte" || !estado.ventanaDescarte) return "La ventana ya cerró.";
+  // Manda la ventana, no la fase: ver la nota en `intentarDescarte`.
+  if (!estado.ventanaDescarte) return "La ventana ya cerró.";
 
   const { soloPara, soloAtaques } = estado.ventanaDescarte;
   if (soloPara != null && soloPara !== indiceJugador) return "Esta ventana no es tuya.";
@@ -935,7 +954,8 @@ export function cartasExpuestas(intentos = []) {
  * vuelve a comprobarlo todo al aplicar.
  */
 export function evaluarAtaque(estado, actor, objetivo, posicion) {
-  if (estado.fase !== "descarte" || !estado.ventanaDescarte) return "sinDerecho";
+  // Manda la ventana, no la fase: ver la nota en `intentarDescarte`.
+  if (!estado.ventanaDescarte) return "sinDerecho";
   const { soloPara } = estado.ventanaDescarte;
   if (soloPara != null && actor !== soloPara) return "sinDerecho";
   if (!puedeAtacarEn(estado, actor, objetivo, posicion)) return "sinDerecho";
@@ -963,7 +983,8 @@ export function evaluarAtaque(estado, actor, objetivo, posicion) {
 export function intentarDescarteRival(
   estado, actor, objetivo, posicionObjetivo, posicionEntrega,
 ) {
-  if (estado.fase !== "descarte" || !estado.ventanaDescarte) return estado;
+  // Manda la ventana, no la fase: ver la nota en `intentarDescarte`.
+  if (!estado.ventanaDescarte) return estado;
 
   /**
    * La ventana que sigue a un poder es de quien lo usó, y de nadie más.
@@ -1096,10 +1117,49 @@ export function intentarDescarteRival(
  * olvide, el entrenamiento y las partidas por Leyendas terminarían las
  * rondas con reglas distintas.
  */
+/**
+ * Devuelve el turno SIN cerrar la ventana de reflejos.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * PARA QUÉ EXISTE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Sólo la usa RED, y es la mitad que le faltaba a la relajación de las
+ * guardas. En red la ventana ya no se cierra por tiempo: queda abierta hasta
+ * que el jugador en turno tira. Para que ese jugador PUEDA tirar, la fase
+ * tiene que volver a la suya —`turno` o `postLevantada`— mientras la ventana
+ * sigue ahí.
+ *
+ * Es lo mismo que hace `cerrarVentanaDescarte` con la fase, y nada de lo que
+ * hace con la ventana: no la anula, no mira si alguien se quedó sin cartas y
+ * no resuelve ningún corte. Esas tres cosas pasan en otro momento.
+ *
+ * Entrenamiento no la llama nunca. Allá la fase y la ventana siguen yendo
+ * juntas, que es lo que las suites comprueban.
+ */
+export const seguirConLaVentanaAbierta = (estado) => {
+  if (estado.fase !== "descarte" || !estado.ventanaDescarte) return estado;
+  return { ...estado, fase: estado.ventanaDescarte.volverA ?? "turno" };
+};
+
 export const cerrarVentanaDescarte = (estado) => {
   const cerrada = {
     ...estado,
-    fase: estado.ventanaDescarte?.volverA ?? "turno",
+    /*
+     * Si la fase YA se adelantó, no se la pisa.
+     *
+     * Pasa sólo en red, con `seguirConLaVentanaAbierta`: el siguiente jugador
+     * puede estar en `levantada` con una carta en la mano, y devolverlo a
+     * `turno` se la borraría.
+     *
+     * La condición pide ventana ABIERTA además de fase adelantada, y eso lo
+     * enseñó `turnos-y-entrega.mjs`: cerrar una ventana que no existe desde
+     * `mirar` tiene que seguir devolviendo a `turno`, que es la reparación de
+     * siempre. Mirar sólo la fase rompía ese caso.
+     */
+    fase: estado.ventanaDescarte && estado.fase !== "descarte"
+      ? estado.fase
+      : (estado.ventanaDescarte?.volverA ?? "turno"),
     ventanaDescarte: null,
   };
 

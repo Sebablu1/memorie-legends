@@ -39,7 +39,13 @@ export const HUECO = null;
 export const MS_REVELACION = 2000;
 
 export function revelacionesDe(estado) {
-  if (estado.fase !== "descarte") return [];
+  // Manda la ventana, no la fase: la misma relajación que en `motor.js`, y
+  // por el mismo motivo. En red la fase se adelanta para que el siguiente
+  // pueda jugar mientras los reflejos siguen abiertos; si esto mirara la
+  // fase, lo que alguien acaba de descartar dejaría de verse justo cuando
+  // más importa que se vea. Sin ventana no hay nada que revelar, así que la
+  // condición que queda es la única que hacía falta.
+  if (!estado.ventanaDescarte) return [];
   // La misma lista que usa la mesa de entrenamiento: ver `cartasExpuestas`.
   return cartasExpuestas(estado.ventanaDescarte?.intentos ?? []);
 }
