@@ -17,7 +17,12 @@
  */
 
 import { crearMotorEnRed, MS_SIN_SENALES, MS_MIRADA_TOTAL } from "../functions/partida-red.js";
-import { MS_VENTANA, MS_GRACIA, msDeLaDecision } from "../public/js/reglas/red.js";
+import {
+  MS_VENTANA,
+  MS_GRACIA,
+  msDeLaDecision,
+  decisionQueVence,
+} from "../public/js/reglas/red.js";
 import { MS_REVELACION } from "../public/js/reglas/vista.js";
 
 /** Cuándo vence una ventana. Su duración ya no es fija: abre con la
@@ -265,9 +270,31 @@ console.log("\n=== 5. Dos clientes saltando al mismo jugador a la vez ===");
 
 // ==================================================================== 6
 
-console.log("\n=== 6. Las tres fases rescatables se desatascan ===");
+console.log("\n=== 6. Las fases CON plazo se destraban solas ===");
 {
-  for (const fase of ["levantada", "poder", "postLevantada"]) {
+  /*
+   * ───────────────────────────────────────────────────────────────────────
+   * POR QUÉ ESTO SE PARTIÓ EN DOS
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Era un solo bloque que recorría `levantada`, `poder` y `postLevantada`
+   * afirmando que las tres necesitan que el otro jugador las rescate a mano.
+   * De las tres, hoy sólo es cierto para `postLevantada`.
+   *
+   * Y pasaba igual, porque NUNCA adelantaba el reloj más allá del plazo: iba
+   * directo de «el orquestador no puede hacer nada» a `saltarAusente`, sin
+   * darle al servidor la oportunidad de resolver. O sea que las dos primeras
+   * fases se probaban en un instante en el que todavía no había vencido nada,
+   * y de ahí se concluía que no tenían reloj.
+   *
+   * Un test que pasa porque no ejerce el caso no está defendiendo el caso. Si
+   * mañana alguien le saca el plazo a `levantada`, aquel bloque seguía verde.
+   *
+   * Acá se ejerce: se adelanta el reloj hasta el borde, se comprueba que un
+   * milisegundo antes no pasa nada, y se comprueba que al vencer el servidor
+   * resuelve SOLO, sin que nadie rescate.
+   */
+  for (const fase of ["levantada", "poder"]) {
     reloj = 500000;
     const { db, red } = montar();
     await llevarA(db, red, fase, "ana");
@@ -280,22 +307,85 @@ console.log("\n=== 6. Las tres fases rescatables se desatascan ===");
     ok(recalculo.valor?.hizo === "recalcularPlazo",
        `${fase}: el primer golpe repone el plazo`, recalculo.valor?.hizo);
 
-    // Ya con el plazo al día: sin nadie que la rescate, estas fases no tienen
-    // reloj y el orquestador no puede hacer nada. Eso dejaba la partida colgada.
-    const golpe = await capturar(() => red.avanzarPartida({ codigo: CODIGO }));
-    ok(golpe.valor?.hizo === null,
-       `${fase}: el orquestador solo no puede (motivo "${golpe.valor?.motivo}")`);
+    // El plazo sale del motor. Son distintos —la levantada decide en 5 s y la
+    // caja del poder en 10— y escribirlos acá sería el error que ya costó seis
+    // suites en rojo.
+    const dura = msDeLaDecision(fase);
+    const alVencer = decisionQueVence(fase);
 
-    reloj += MS_SIN_SENALES + 1000;
+    // Que TENGA algo que hacer al vencer, antes de comparar contra eso. Sin
+    // esta línea, el día que alguien le saque la fila a esta fase el motor
+    // devolvería `null`, el orquestador tampoco haría nada, y la comparación
+    // de abajo sería `null === null`: verde, con el plazo perdido. Es el
+    // espejo de la que afirma lo contrario para `postLevantada`.
+    ok(alVencer !== null, `${fase}: el motor tiene qué hacer al vencer`, alVencer);
+
+    // Un milisegundo antes: la partida está quieta y nadie pide nada. Es el
+    // instante que el bloque viejo confundía con «esta fase no tiene reloj».
+    reloj += dura - 1;
     await red.latir({ uid: "beto", codigo: CODIGO });
-    ok(elClienteLlamaria(vista(db, "beto"), "beto") === true,
-       `${fase}: el cliente de beto detecta que hay que rescatar`);
 
-    const r = await capturar(() => red.saltarAusente({ codigo: CODIGO }));
-    ok(r.valor && !r.error, `${fase}: el rescate funciona`, r.error?.message);
+    const temprano = await capturar(() => red.avanzarPartida({ codigo: CODIGO }));
+    ok(temprano.valor?.hizo === null,
+       `${fase}: un milisegundo antes del plazo, nada`, temprano.valor?.hizo);
+    ok(elClienteLlamaria(vista(db, "beto"), "beto") === false,
+       `${fase}: y el cliente de beto todavía no pide rescate`);
+
+    // Al vencer, el servidor resuelve por su cuenta. Sin `saltarAusente`.
+    reloj += 1;
+    const golpe = await capturar(() => red.avanzarPartida({ codigo: CODIGO }));
+    ok(golpe.valor?.hizo === alVencer,
+       `${fase}: al vencer el plazo, el servidor hace "${alVencer}"`, golpe.valor?.hizo);
     ok(partida(db).estado.fase !== fase,
-       `${fase}: la partida avanza a "${partida(db).estado.fase}"`);
+       `${fase}: y la partida sale de la fase, a "${partida(db).estado.fase}"`);
+
+    // Y se destraba ANTES de que a nadie se le ocurra rescatar: por eso el
+    // rescate manual no llega a entrar en juego en estas dos.
+    ok(dura < MS_SIN_SENALES,
+       `${fase}: el plazo (${dura} ms) vence antes que la ausencia (${MS_SIN_SENALES} ms)`);
   }
+}
+
+// =================================================================== 6b
+
+console.log("\n=== 6b. postLevantada NO tiene plazo: hace falta el rescate ===");
+{
+  /*
+   * La que de verdad se cuelga. Cortar o seguir son dos jugadas distintas y el
+   * servidor no elige por nadie, así que no hay plazo que la resuelva: sin el
+   * otro jugador, la mesa se queda ahí.
+   *
+   * Este bloque es el de antes, con una sola fase en vez de tres.
+   */
+  const fase = "postLevantada";
+
+  reloj = 500000;
+  const { db, red } = montar();
+  await llevarA(db, red, fase, "ana");
+  await red.latir({ uid: "ana", codigo: CODIGO });
+
+  const recalculo = await capturar(() => red.avanzarPartida({ codigo: CODIGO }));
+  ok(recalculo.valor?.hizo === "recalcularPlazo",
+     `${fase}: el primer golpe repone el plazo`, recalculo.valor?.hizo);
+
+  // Y acá sí: no hay nada que vencer, así que el orquestador no puede hacer
+  // nada por más que pase el tiempo. Eso dejaba la partida colgada.
+  ok(decisionQueVence(fase) === null,
+     `${fase}: el motor no tiene qué hacer al vencer`, decisionQueVence(fase));
+
+  const golpe = await capturar(() => red.avanzarPartida({ codigo: CODIGO }));
+  ok(golpe.valor?.hizo === null,
+     `${fase}: el orquestador solo no puede (motivo "${golpe.valor?.motivo}")`);
+
+  reloj += MS_SIN_SENALES + 1000;
+  await red.latir({ uid: "beto", codigo: CODIGO });
+  ok(elClienteLlamaria(vista(db, "beto"), "beto") === true,
+     `${fase}: el cliente de beto detecta que hay que rescatar`);
+
+  const r = await capturar(() => red.saltarAusente({ codigo: CODIGO }));
+  ok(r.valor && !r.error, `${fase}: el rescate funciona`, r.error?.message);
+  ok(partida(db).estado.fase !== fase,
+     `${fase}: la partida avanza a "${partida(db).estado.fase}"`);
 }
 
 // ==================================================================== 7
