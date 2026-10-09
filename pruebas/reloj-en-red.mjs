@@ -1,5 +1,5 @@
 /**
- * Los diez segundos para decidir, contra el servidor.
+ * El plazo para decidir, contra el servidor.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * QUÉ SE PRUEBA ACÁ Y QUÉ NO
@@ -23,7 +23,20 @@
  */
 
 import { crearMotorEnRed, MS_TURNO } from "../functions/partida-red.js";
-import { MS_PARA_DECIDIR } from "../public/js/reglas/red.js";
+/*
+ * `msDeLaDecision` y no `MS_PARA_DECIDIR` a secas.
+ *
+ * Las tres fases NO duran lo mismo desde `6897faa`: la levantada decide en 5 s
+ * y la caja del poder en 10. Este archivo comparaba las tres contra
+ * `MS_PARA_DECIDIR`, así que aprobaba la levantada y reprobaba las otras dos
+ * —y los avances de reloj de las secciones 4 y 5 se quedaban cortos, con lo
+ * que nada vencía y fallaba todo lo que venía después.
+ *
+ * Leer del repartidor en vez de una constante es lo que impide que esto se
+ * repita: si mañana cambia un plazo, o se agrega una fase, las pruebas lo
+ * siguen solas.
+ */
+import { msDeLaDecision } from "../public/js/reglas/red.js";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -122,7 +135,7 @@ async function enFase(db, red, faseDestino, extra = {}, quien = "ana") {
 const CARTA = { numero: 5, palo: "corazon", id: "c5" };
 
 // =====================================================================
-console.log("\n=== 1. Las tres fases tienen plazo, y dura diez segundos ===");
+console.log("\n=== 1. Las tres fases tienen plazo, y dura lo que diga la fase ===");
 // =====================================================================
 
 {
@@ -142,12 +155,14 @@ console.log("\n=== 1. Las tres fases tienen plazo, y dura diez segundos ===");
     const p = plazo(db);
     ok(p?.fase === faseDestino, `${faseDestino}: hay plazo atado a la fase`, p?.fase);
     ok(p?.que === esperado, `  y al vencer: ${esperado}`, p?.que);
-    ok(p?.hasta === reloj + MS_PARA_DECIDIR, "  que vence a los 10 s", p && p.hasta - reloj);
+    const dura = msDeLaDecision(faseDestino);
+    ok(p?.hasta === reloj + dura,
+       `  que vence a los ${dura / 1000} s`, p && p.hasta - reloj);
   }
 }
 
 // =====================================================================
-console.log("\n=== 2. Levantar tarde en el turno igual da diez segundos ===");
+console.log("\n=== 2. Levantar tarde en el turno igual da el plazo entero ===");
 // =====================================================================
 
 {
@@ -158,26 +173,45 @@ console.log("\n=== 2. Levantar tarde en el turno igual da diez segundos ===");
    * turno, quien levanta sobre la hora perdería la carta casi al instante.
    * Lo que se comprueba es que el plazo arranca CUANDO LEVANTA.
    */
-  ok(MS_TURNO < MS_PARA_DECIDIR,
-     `el turno (${MS_TURNO}) dura menos que la decisión (${MS_PARA_DECIDIR})`);
+  /*
+   * La guarda de la escena, no una regla de diseño.
+   *
+   * Decía `MS_TURNO < MS_PARA_DECIDIR`, y era cierto cuando decidir duraba
+   * 10 s contra un turno de 8. Hoy la levantada decide en 5 y el turno dura 8,
+   * así que la comparación se dio vuelta — pero la escena sigue siendo válida,
+   * porque lo que se prueba no es cuál de los dos es más largo: es que el
+   * plazo NO hereda lo que sobra del turno.
+   *
+   * Lo que de verdad hace falta para que la prueba signifique algo es que el
+   * plazo pase del final del turno. Con un segundo de turno restante, eso es
+   * esto.
+   */
+  const RESTO_DE_TURNO = 1000;
+  const dura = msDeLaDecision("levantada");
+
+  ok(dura > RESTO_DE_TURNO,
+     `decidir (${dura} ms) pasa del resto del turno (${RESTO_DE_TURNO} ms)`);
 
   reloj = 500000;
   const { db, red } = montar();
 
   // Se entra en `levantada` con el reloj ya avanzado 7 de los 8 segundos del
   // turno: queda un segundo de turno.
-  reloj += MS_TURNO - 1000;
+  reloj += MS_TURNO - RESTO_DE_TURNO;
   await enFase(db, red, "levantada", { levantada: CARTA });
 
   const p = plazo(db);
-  ok(p?.hasta === reloj + MS_PARA_DECIDIR,
-     "el plazo son 10 s desde que levantó, no lo que sobraba del turno",
+  ok(p?.hasta === reloj + dura,
+     `el plazo son ${dura / 1000} s desde que levantó, no lo que sobraba del turno`,
      p && p.hasta - reloj);
 
-  // Y un golpe a los 5 segundos no lo vence.
-  reloj += 5000;
+  // Y un golpe UN MILISEGUNDO antes no lo vence. Era un número fijo de 5 s,
+  // que dejó de estar adentro del plazo el día que el plazo pasó a durar 5.
+  // Contra el borde se prueba lo mismo y además dónde está la raya.
+  reloj += dura - 1;
   const r = await red.avanzarPartida({ codigo: CODIGO });
-  ok(r.hizo === null && r.motivo === "todavia_no", "a los 5 s todavía no pasa nada", r);
+  ok(r.hizo === null && r.motivo === "todavia_no",
+     "un milisegundo antes del vencimiento no pasa nada", r);
   ok(fase(db) === "levantada", "  y sigue con la carta en la mano", fase(db));
 }
 
@@ -192,7 +226,7 @@ console.log("\n=== 3. Al vencer con la carta levantada, se tira ===");
 
   const antes = partida(db).estado.descarte.length;
 
-  reloj += MS_PARA_DECIDIR;
+  reloj += msDeLaDecision("levantada");
   await red.avanzarPartida({ codigo: CODIGO });
 
   ok(partida(db).estado.levantada === null, "ya no tiene la carta en la mano");
@@ -233,7 +267,7 @@ console.log("\n=== 4. Al vencer con un poder, se salta: no se juega por nadie ==
 
   const turnoAntes = enTurno(db);
 
-  reloj += MS_PARA_DECIDIR;
+  reloj += msDeLaDecision("poder");
   await red.avanzarPartida({ codigo: CODIGO });
 
   ok(partida(db).estado.poderPendiente === null, "el poder quedó sin usar");
@@ -267,7 +301,7 @@ console.log("\n=== 5. El 10 a medio resolver tampoco cambia por él ===");
   const miCarta = partida(db).estado.jugadores[0].mano[0];
   const suCarta = partida(db).estado.jugadores[1].mano[0];
 
-  reloj += MS_PARA_DECIDIR;
+  reloj += msDeLaDecision("cambioConVista");
   await red.avanzarPartida({ codigo: CODIGO });
 
   ok(partida(db).estado.cambioPendiente === null, "el cambio quedó resuelto");

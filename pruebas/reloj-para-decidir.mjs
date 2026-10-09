@@ -1,5 +1,5 @@
 /**
- * Los diez segundos para decidir: la tabla, antes que el reloj.
+ * El plazo para decidir: la tabla, antes que el reloj.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * QUÉ SE PRUEBA ACÁ Y QUÉ NO
@@ -24,6 +24,8 @@
 
 import {
   MS_PARA_DECIDIR,
+  MS_PARA_USAR_PODER,
+  msDeLaDecision,
   AL_VENCER_LA_DECISION,
   decisionQueVence,
   esperaUnaDecision,
@@ -39,11 +41,32 @@ const ok = (c, m, x) => {
 };
 
 // =====================================================================
-console.log("\n=== 1. Diez segundos, y uno solo ===");
+console.log("\n=== 1. Dos plazos, cada uno en un solo lugar ===");
 // =====================================================================
 
 {
-  ok(MS_PARA_DECIDIR === 10_000, "son diez segundos", MS_PARA_DECIDIR);
+  /*
+   * Acá decía `MS_PARA_DECIDIR === 10_000`, y se quedó viejo: desde `6897faa`
+   * la levantada decide en 5 s y la caja del poder en 10, y el repartidor que
+   * elige entre las dos es `msDeLaDecision`.
+   *
+   * No se reemplaza por `=== 5_000`, que sería el mismo número a mano un año
+   * más joven. Lo que se fija es la RELACIÓN, que es la decisión que se tomó:
+   * resolver un poder da más tiempo que decidir qué hacer con la levantada,
+   * porque en el poder hay que elegir sobre la mesa y en la levantada la
+   * jugada ya está en la mano. Esto agarra el día que alguien invierta los dos
+   * sin querer, que es el error que un número suelto no vería.
+   */
+  ok(msDeLaDecision("levantada") === MS_PARA_DECIDIR,
+     "la levantada usa el plazo corto",
+     { reparte: msDeLaDecision("levantada"), constante: MS_PARA_DECIDIR });
+
+  ok(msDeLaDecision("poder") === MS_PARA_USAR_PODER,
+     "y el poder, el largo",
+     { reparte: msDeLaDecision("poder"), constante: MS_PARA_USAR_PODER });
+
+  ok(MS_PARA_USAR_PODER > MS_PARA_DECIDIR,
+     `resolver un poder (${MS_PARA_USAR_PODER} ms) da más tiempo que decidir la levantada (${MS_PARA_DECIDIR} ms)`);
 
   /**
    * Configurable quiere decir UN lugar, no un número suelto por archivo.
@@ -51,8 +74,11 @@ console.log("\n=== 1. Diez segundos, y uno solo ===");
    * Es lo que se pidió y es lo que evita el problema clásico: el plazo dice
    * diez y el cartel dice ocho, porque alguien cambió uno de los dos.
    */
-  ok(Number.isInteger(MS_PARA_DECIDIR), "y es un entero de milisegundos");
-  ok(MS_PARA_DECIDIR > 0, "positivo, o el plazo vencería antes de empezar");
+  for (const [nombre, ms] of [["decidir", MS_PARA_DECIDIR],
+                              ["usar el poder", MS_PARA_USAR_PODER]]) {
+    ok(Number.isInteger(ms), `${nombre}: es un entero de milisegundos`, ms);
+    ok(ms > 0, `${nombre}: positivo, o el plazo vencería antes de empezar`, ms);
+  }
 }
 
 // =====================================================================

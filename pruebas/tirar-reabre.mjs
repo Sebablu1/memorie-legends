@@ -363,13 +363,21 @@ console.log("\n=== 5. En red: tirar abre una ventana NUEVA ===");
     ok(Boolean(p.ventana) && !p.ventana.cerrada, "con una ventana de red abierta");
     ok(p.ventana.id !== primera.id, "que NO es la de la ronda", [p.ventana.id, primera.id]);
     ok(p.ventana.abiertaEn === reloj, "abierta en el instante del tiro", p.ventana.abiertaEn - reloj);
-    // Dura lo de una reapertura, que es MENOS que la de la ronda: la de la
-    // ronda cubre además la mirada (MS_MIRADA_TOTAL + MS_VENTANA) y da cinco segundos
-    // para buscar en cuatro manos; acá la mesa ya está mirando la muestra.
+    // Dura lo de una reapertura y NO lo de la ronda. Son dos ventanas
+    // distintas: la de la ronda cubre además la mirada
+    // (MS_MIRADA_TOTAL + MS_VENTANA); ésta se abre con la mesa ya mirando la
+    // muestra.
     ok(p.ventana.duracionMs === MS_VENTANA_REAPERTURA,
        "y dura lo de una reapertura, no lo de la ronda",
        [p.ventana.duracionMs, MS_VENTANA_REAPERTURA, MS_VENTANA]);
-    ok(p.ventana.duracionMs < MS_VENTANA, "que es estrictamente más corta");
+    // Decía `< MS_VENTANA`, dando por hecho que la reapertura era la más
+    // corta. Dejó de ser cierto cuando `f5749a5` bajó el descarte de la ronda
+    // a 2 s y la reapertura quedó en 3. Lo que esta línea tenía que atrapar
+    // —que la reapertura use la ventana equivocada— se atrapa igual pidiendo
+    // que sean distintas, y sin depender de cuál es más larga.
+    ok(p.ventana.duracionMs !== MS_VENTANA,
+       "y no es la de la ronda disfrazada",
+       [p.ventana.duracionMs, MS_VENTANA]);
     ok(p.plazo.que === "cerrarVentana", "con su plazo de cierre", p.plazo.que);
 
     // Un intento con el windowId viejo no se cuela.

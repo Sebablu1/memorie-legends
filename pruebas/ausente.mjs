@@ -17,7 +17,7 @@
  */
 
 import { crearMotorEnRed, MS_SIN_SENALES, MS_MIRADA_TOTAL } from "../functions/partida-red.js";
-import { MS_VENTANA, MS_GRACIA } from "../public/js/reglas/red.js";
+import { MS_VENTANA, MS_GRACIA, msDeLaDecision } from "../public/js/reglas/red.js";
 import { MS_REVELACION } from "../public/js/reglas/vista.js";
 
 /** Cuándo vence una ventana. Su duración ya no es fija: abre con la
@@ -265,7 +265,7 @@ console.log("\n=== 5. Dos clientes saltando al mismo jugador a la vez ===");
 
 // ==================================================================== 6
 
-console.log("\n=== 6. Las tres fases sin reloj se desatascan ===");
+console.log("\n=== 6. Las tres fases rescatables se desatascan ===");
 {
   for (const fase of ["levantada", "poder", "postLevantada"]) {
     reloj = 500000;
@@ -316,7 +316,7 @@ console.log("\n=== 7. Las fases normales no cambian ===");
     await red.latir({ uid: "beto", codigo: CODIGO });
 
     ok(elClienteLlamaria(vista(db, "beto"), "beto") === false,
-       `${fase}: el cliente NO pide rescate (no es fase sin reloj)`);
+       `${fase}: el cliente NO pide rescate (no es fase rescatable)`);
   }
 
   // Y en `turno`, que sí tiene reloj, `saltarAusente` sigue funcionando como
@@ -339,7 +339,7 @@ console.log("\n=== 8. Reproducción: se va el jugador activo, sigue el otro ==="
   const { db, red } = montar();
   await red.repartir({ yaSentados: true, codigo: CODIGO, jugadores: DOS, nombres: DOS });
 
-  // Se juega hasta una fase sin reloj, por el camino normal.
+  // Se juega hasta la levantada, por el camino normal.
   reloj += MS_MIRADA_TOTAL + 1;
   await red.avanzarPartida({ codigo: CODIGO });   // cierra la mirada
   await red.avanzarPartida({ codigo: CODIGO });   // abre la ventana
@@ -352,31 +352,58 @@ console.log("\n=== 8. Reproducción: se va el jugador activo, sigue el otro ==="
   const enTurno = DOS[partida(db).estado.indiceTurno];
   const otro = DOS.find((u) => u !== enTurno);
   await red.accionDeTurno({ uid: enTurno, codigo: CODIGO, accion: "levantar", clientActionId: "L1" });
-  ok(partida(db).estado.fase === "levantada", `${enTurno} levanta → fase sin reloj`);
+  ok(partida(db).estado.fase === "levantada", `${enTurno} levanta`);
+
+  /*
+   * ───────────────────────────────────────────────────────────────────────
+   * ESTA ESCENA CAMBIÓ, Y EL CAMBIO ES LA MEJORA
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Se escribió cuando `levantada` era una fase SIN reloj: el que se iba con
+   * la carta en la mano dejaba la mesa colgada hasta que el otro juntara los
+   * 15 s de ausencia y lo rescatara a mano. Eso es lo que reproducía.
+   *
+   * Desde `6897faa` la levantada tiene plazo, y al vencer el servidor tira la
+   * carta —es la única jugada posible con una carta levantada—. O sea que el
+   * caso que esta prueba reproducía ya no llega a pasar: se arregla solo, y
+   * mucho antes.
+   *
+   * Lo que no se arregla solo es `postLevantada`, la decisión de cortar: ahí
+   * hay dos jugadas posibles y el servidor no elige por nadie. Ahí sigue
+   * haciendo falta el rescate, y ahí se prueba ahora.
+   *
+   * La cola de la prueba —que la partida CONTINÚA, que el turno pasa, que el
+   * que quedó puede jugar— es la misma, porque es lo que de verdad defiende.
+   */
 
   // Se cierra su navegador: deja de latir y de golpear.
   const versionAlIrse = partida(db).version;
-  reloj += 5000;
+  const plazoLevantada = msDeLaDecision("levantada");
+
+  // Un milisegundo antes de vencer, nada se mueve.
+  reloj += plazoLevantada - 1;
   await red.latir({ uid: otro, codigo: CODIGO });
   let golpe = await capturar(() => red.avanzarPartida({ codigo: CODIGO }));
-  ok(golpe.valor?.hizo === null, "a los 5 s la partida sigue trabada, como debe ser");
+  ok(golpe.valor?.hizo === null, "justo antes del plazo la partida sigue quieta");
   ok(elClienteLlamaria(vista(db, otro), otro) === false, "y el otro todavía no rescata");
 
-  // Pasan los 15 segundos.
-  reloj += MS_SIN_SENALES;
-  await red.latir({ uid: otro, codigo: CODIGO });
-  ok((partida(db).ausentes ?? []).includes(enTurno), `${enTurno} queda marcado ausente`);
-  ok(elClienteLlamaria(vista(db, otro), otro) === true, `${otro} detecta que hay que rescatar`);
+  // Al vencer, el servidor tira por él. No es jugar por otro: con una carta
+  // levantada no hay segunda jugada posible.
+  reloj += 1;
+  golpe = await capturar(() => red.avanzarPartida({ codigo: CODIGO }));
+  ok(golpe.valor?.hizo === "descartarPorTiempo",
+     "al vencer el plazo, el servidor le tira la carta", golpe.valor?.hizo);
 
-  const rescate = await capturar(() => red.saltarAusente({ codigo: CODIGO }));
-  ok(rescate.valor?.salteado === enTurno, "se lo saltea", rescate.error?.message);
-
-  // Tirarle la carta al ausente cambia la muestra, y eso reabre los reflejos
-  // para el que sigue jugando. El turno pasa cuando esa ventana se cierra.
+  // Tirar cambia la muestra, y eso reabre los reflejos para el que sigue
+  // jugando. El turno pasa cuando esa ventana se cierra.
   ok(partida(db).estado.fase === "descarte",
-     "se le tira la carta y la mesa recupera sus reflejos", partida(db).estado.fase);
+     "y la mesa recupera sus reflejos", partida(db).estado.fase);
 
+  // La ventana de red se abre en el golpe siguiente, no en el mismo que tira:
+  // igual que al cerrar la mirada, arriba.
+  await red.avanzarPartida({ codigo: CODIGO });
   const v2 = partida(db).ventana;
+  ok(Boolean(v2), "con su ventana de reflejos abierta", v2);
   reloj = v2.abiertaEn + v2.duracionMs + v2.graciaMs + 1;
   await red.avanzarPartida({ codigo: CODIGO });   // cierra y resuelve
   reloj += MS_REVELACION;
@@ -384,9 +411,21 @@ console.log("\n=== 8. Reproducción: se va el jugador activo, sigue el otro ==="
   ok(partida(db).estado.fase === "postLevantada",
      "cerrada la ventana, queda su decisión de cortar", partida(db).estado.fase);
 
-  // El ausente sigue sin dar señales, así que un segundo rescate pasa el turno.
-  const segundo = await capturar(() => red.saltarAusente({ codigo: CODIGO }));
-  ok(segundo.valor?.salteado === enTurno, "un segundo rescate lo saltea", segundo.error?.message);
+  // Y ACÁ sí se traba: cortar o seguir son dos jugadas, y el servidor no
+  // elige por nadie.
+  const trabado = await capturar(() => red.avanzarPartida({ codigo: CODIGO }));
+  ok(trabado.valor?.hizo === null,
+     "acá la partida sí queda trabada: el servidor no decide por él",
+     trabado.valor?.hizo);
+
+  // Pasan los 15 segundos sin señales.
+  reloj += MS_SIN_SENALES + 1000;
+  await red.latir({ uid: otro, codigo: CODIGO });
+  ok((partida(db).ausentes ?? []).includes(enTurno), `${enTurno} queda marcado ausente`);
+  ok(elClienteLlamaria(vista(db, otro), otro) === true, `${otro} detecta que hay que rescatar`);
+
+  const rescate = await capturar(() => red.saltarAusente({ codigo: CODIGO }));
+  ok(rescate.valor?.salteado === enTurno, "se lo saltea", rescate.error?.message);
 
   const despues = partida(db);
   ok(despues.estado.fase === "turno", "la partida CONTINÚA", despues.estado.fase);

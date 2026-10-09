@@ -399,19 +399,31 @@ console.log("\n=== Los tiempos coinciden entre modos ===");
      { total: motor.MS_MIRADA_TOTAL, elegir: motor.MS_ELEGIR_MIRADA, ver: motor.MS_MIRAR });
 
   ok(red.MS_VENTANA_TOTAL === motor.MS_MIRADA_TOTAL + red.MS_VENTANA,
-     "la ventana de la ronda cubre la mirada entera MÁS los cinco de descarte",
+     "la ventana de la ronda cubre la mirada entera MÁS la de descarte",
      { total: red.MS_VENTANA_TOTAL, mirada: motor.MS_MIRADA_TOTAL, ventana: red.MS_VENTANA });
 
   ok(red.MS_VENTANA_REAPERTURA === motor.MS_REAPERTURA,
      "y la de las reaperturas, que es la otra",
      { motor: motor.MS_REAPERTURA, red: red.MS_VENTANA_REAPERTURA });
 
-  // Son dos a propósito: en la de la ronda se viene de memorizar una sola
-  // carta y hay que buscar en cuatro manos; en las reaperturas la mesa ya está
-  // mirando la muestra. Que la de la ronda sea la más larga es la regla.
-  ok(motor.MS_REAPERTURA < motor.MS_DESCARTE,
-     "la reapertura es más corta que la de la ronda",
-     { reapertura: motor.MS_REAPERTURA, ronda: motor.MS_DESCARTE });
+  /*
+   * Acá había una regla de orden: «que la de la ronda sea la más larga», con
+   * el argumento de que en la ronda se viene de memorizar una sola carta y hay
+   * que buscar en cuatro manos, mientras que en una reapertura la mesa ya está
+   * mirando la muestra.
+   *
+   * Dejó de ser cierta y no por descuido: `f5749a5` bajó el descarte de la
+   * ronda a 2 s y la reapertura quedó en 3, y así es como se juega hoy en red
+   * y en entrenamiento. El orden quedó al revés del que decía la regla.
+   *
+   * Se saca la comparación en vez de darla vuelta, porque darla vuelta sería
+   * inventarle un motivo nuevo a un número que nadie eligió por ese motivo. Lo
+   * que sigue defendiendo esto son las dos cosas que sí importan y que están
+   * arriba y abajo: que cada ventana salga de su constante, y que ninguna baje
+   * del piso de reacción.
+   *
+   * Si el orden importaba, es una decisión de juego y no de pruebas.
+   */
 
   // Y un piso para las dos: por debajo de esto no alcanza para reaccionar y
   // que el pedido llegue. El tiempo de reacción humano ronda los 250 ms y la
