@@ -133,8 +133,7 @@ async function llevarA(db, red, fase, quien = "ana") {
   const estado = { ...p.estado, fase, indiceTurno: i };
   if (fase === "levantada") estado.levantada = { ...estado.mazo[0], visible: true };
   if (fase === "poder") {
-    estado.poderPendiente = { tipo: "mirarРropiaX", numero: 7, indiceJugador: i };
-    estado.poderPendiente.tipo = "mirarPropia";
+    estado.poderPendiente = { tipo: "mirarPropia", numero: 7, indiceJugador: i };
   }
   const usadas = new Set(estado.levantada ? [estado.levantada.id] : []);
   await db.runTransaction(async (tx) => {
