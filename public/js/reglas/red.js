@@ -515,6 +515,24 @@ export function resolverVentana(estado, ventana, indiceDe, intentarDescarte, int
   for (const intento of orden) {
     const indice = indiceDe(intento.uid);
     if (indice == null || indice < 0) continue;
+
+    /*
+     * Ya se aplicó al llegar: acá no se vuelve a tocar. (Etapa 1/3)
+     *
+     * Desde que el descarte sobre la mano propia se aplica en el momento en
+     * que llega el pedido, estos intentos ya movieron el estado. Volver a
+     * pasarlos por el motor sería descartar dos veces la misma carta, o cobrar
+     * dos castigos por un error.
+     *
+     * Se deja constancia igual, con `aplicado: true`, para que el orden que se
+     * devuelve siga describiendo todo lo que pasó en la ventana y no sólo lo
+     * que quedó pendiente.
+     */
+    if (intento.aplicadoAlLlegar) {
+      aplicados.push({ ...intento, indice, aplicado: true, resultado: intento.resultado ?? null });
+      continue;
+    }
+
     const antes = siguiente;
 
     // Sobre la mano de otro va por el camino del poder, que valida la

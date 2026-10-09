@@ -686,10 +686,24 @@ console.log("\n=== 11. Lo que se expone se ve, y después se tapa ===");
     clientActionId: "mal-1", declarado: 700, latencia: 40, incertidumbre: 20,
   });
 
-  // Mientras la ventana sigue abierta nadie ve nada: los intentos no se
-  // resuelven hasta cerrarla.
-  ok(!JSON.stringify(mira.ultima).includes(`"${equivocada.id}"`),
-     "durante la ventana, beto todavía no ve la carta de ana");
+  /*
+   * Y beto lo ve EN EL MOMENTO. (Etapa 1/3)
+   *
+   * Acá se afirmaba lo contrario —«durante la ventana nadie ve nada: los
+   * intentos no se resuelven hasta cerrarla»— y era cierto mientras todo se
+   * aplicaba junto al cerrar.
+   *
+   * Es justamente lo que se vino a cambiar: el descarte sobre la mano propia
+   * se aplica cuando llega, así que la carta se mueve y la mesa la ve. La
+   * aserción no se afloja, se da vuelta: antes defendía que NO se viera,
+   * ahora defiende que SÍ, que es la mitad visible del cambio.
+   *
+   * Lo que sigue oculto es quién intentó qué: `resumenDeVentana` no publica
+   * los intentos. Lo que se ve es el efecto —una carta que se movió—, no la
+   * carrera.
+   */
+  ok(JSON.stringify(mira.ultima).includes(`"${equivocada.id}"`),
+     "beto ve la carta de ana en el momento, sin esperar al cierre");
 
   reloj = vence(v) + 1;
   await red.avanzarPartida({ codigo: CODIGO });

@@ -966,9 +966,83 @@ export function crearMotorEnRed({
         return { anotado: true, duplicado: true, version: partida.version, ...delAtaque };
       }
 
+      /**
+       * El descarte sobre la mano PROPIA se aplica acá, al llegar. (Etapa 1/3)
+       *
+       * ─────────────────────────────────────────────────────────────────────
+       * QUÉ CAMBIÓ
+       * ─────────────────────────────────────────────────────────────────────
+       *
+       * Antes esto sólo ANOTABA el intento y todo se aplicaba junto al cerrar
+       * la ventana, ordenado por tiempo efectivo. Ese ordenamiento existía
+       * para que no ganara el de mejor internet en un empate de milisegundos.
+       *
+       * Se cambió a propósito, con el costo asumido: si dos tocan casi juntos,
+       * gana el que llegó primero al servidor. A cambio, el descarte se ve en
+       * la mesa en el momento en que ocurre, que es la mitad de lo que hace
+       * que esto se sienta un juego de reflejos y no un formulario.
+       *
+       * Las transacciones de Firestore se serializan sobre el documento de la
+       * partida, así que «el orden de llegada» es un orden real y no una
+       * carrera: dos descartes simultáneos se aplican uno después del otro,
+       * nunca encima.
+       *
+       * ─────────────────────────────────────────────────────────────────────
+       * POR QUÉ SÓLO LA MANO PROPIA, POR AHORA
+       * ─────────────────────────────────────────────────────────────────────
+       *
+       * Porque `motor.intentarDescarte(estado, indice, posicion)` es una sola
+       * llamada y no necesita nada más. El ataque a un rival sí: hoy
+       * `intentarDescarteRival` aplica ataque Y entrega en la misma llamada, y
+       * la entrega se elige DESPUÉS de saber que acertó. Partir eso en dos
+       * pasos es la etapa 2; hasta entonces el ataque sigue resolviéndose al
+       * cerrar, por `resolverVentana`.
+       *
+       * `aplicadoAlLlegar` es lo que evita que se aplique dos veces: lo lee
+       * `resolverVentana` para saltearlo.
+       */
+      let estadoNuevo = partida.estado;
+      let ventanaNueva = resultado.ventana;
+
+      if (!contraRival) {
+        const despues = motor.intentarDescarte(partida.estado, indice, posicion);
+
+        /*
+         * Sólo se marca como aplicado si el motor REALMENTE lo tomó.
+         *
+         * Descartar vale en dos fases —`mirar` y `descarte`, ver `FASE_DE`—
+         * pero `motor.intentarDescarte` exige `fase === "descarte"` con la
+         * ventana abierta. Un toque durante la mirada vuelve con el estado
+         * intacto, y ésos tienen que seguir esperando al cierre como siempre.
+         *
+         * Marcarlos igual los habría hecho desaparecer: `resolverVentana` los
+         * saltearía por creerlos aplicados, y nunca se habrían aplicado.
+         */
+        if (despues !== partida.estado) {
+          estadoNuevo = despues;
+
+          // El resultado lo escribe el motor en su propia ventana. Se copia al
+          // intento porque al cerrar ya no se va a volver a mirar ahí.
+          const ultimo = despues.ventanaDescarte?.intentos?.at(-1);
+          const anotado = ventanaNueva.intentos[clientActionId];
+          ventanaNueva = {
+            ...ventanaNueva,
+            intentos: {
+              ...ventanaNueva.intentos,
+              [clientActionId]: {
+                ...anotado,
+                aplicadoAlLlegar: true,
+                resultado: ultimo?.resultado ?? null,
+              },
+            },
+          };
+        }
+      }
+
       const siguiente = {
         ...partida,
-        ventana: resultado.ventana,
+        estado: estadoNuevo,
+        ventana: ventanaNueva,
         // La señal de vida fue la llegada del pedido.
         latidos: { ...partida.latidos, [uid]: llegada },
         version: partida.version + 1,
