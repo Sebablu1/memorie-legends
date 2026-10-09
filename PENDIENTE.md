@@ -61,6 +61,25 @@ Buscar: `git log --oneline --all --grep="§N"`.
 
 ## 🟡 Ingeniería (sin urgencia)
 
+### §44 — Privacidad: nombrar Analytics (y Sentry cuando exista)
+
+- **Estado:** `privacidad.html` §11 enumera «Firebase Authentication, Firestore
+  e infraestructura de Google/Firebase». Desde `03b86ad` hay también Firebase
+  Analytics, y habrá un servicio de errores.
+- **No queda falsa:** §11 ya contempla proveedores de «seguridad, análisis,
+  comunicación y pago». Es la enumeración de lo *actual* la que envejeció.
+- **Por qué igual conviene:** el trámite ante la URCDP sigue abierto (§19), y
+  esa enumeración es justo lo que se mira.
+
+### §45 — PITR y protección de borrado en producción
+
+- **Estado:** la base `southamerica` tiene `POINT_IN_TIME_RECOVERY_DISABLED` y
+  `DELETE_PROTECTION_DISABLED`. La retención de versiones es de **una hora**.
+- **Qué significa hoy:** no hay respaldo de la base viva. El único export del
+  bucket `memorie-legends-backup` es del 5/10 y es de la base `(default)`,
+  tomado durante la mudanza.
+- **Antes de cobrar:** el libro mayor de Leyendas vive en `movimientos`.
+
 ### §10 — Velocidad en red (Fase 3, 4, 0b)
 
 - **Lo hecho:** Fase 0a (descarte perdido) y CORS `maxAge: 3600` (7/10).
@@ -175,7 +194,6 @@ Buscar: `git log --oneline --all --grep="§N"`.
 
 - `herramientas/sondear-webhook.mjs:86` sigue con URL vieja de v1 por defecto.
 - 2 herramientas usan `lib/firestore` (frágil).
-- Reglas de `southamerica` no verificadas contra el repo.
 - Índices de la base nueva no verificados.
 
 ---
