@@ -75,6 +75,21 @@ onAuthStateChanged(auth, (usuario) => {
   }
 });
 
+/**
+ * La analítica, encendida desde acá y sin `await`.
+ *
+ * Va en el núcleo porque es el punto más hondo por el que pasa toda página
+ * que use Firebase, igual que App Check vive en `firebase.js` por pasar por
+ * ahí todo lo que habla con el servidor.
+ *
+ * Sin `await` y con el error tragado: medir no es una dependencia del juego.
+ * Un bloqueador corta `firebase-analytics.js` y lo único que tiene que pasar
+ * es que no se mida. Ver la nota larga en `analitica.js`.
+ */
+import("./analitica.js")
+  .then((m) => m.encenderAnalitica(app))
+  .catch(() => {});
+
 const googleProvider = new GoogleAuthProvider();
 
 // El correo de CONTACTO, el que se le muestra a la gente. La cuenta con la que

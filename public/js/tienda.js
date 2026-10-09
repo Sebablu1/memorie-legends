@@ -1,6 +1,9 @@
 import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
 import { PAQUETES, leyendasDePaquete, precioPorLeyenda, paquetesVisibles, MONEDA } from "./reglas/economia.js";
 import { listarPacks, crearOrdenDeCompra, ErrorDeServidor } from "./servidor.js";
+
+// Medir no puede romper lo que se mide. Ver `analitica.js`.
+import { anotar } from "./analitica.js";
 import { montarPersonalizacion } from "./personalizacion.js";
 
 const $ = (id) => document.getElementById(id);
@@ -148,6 +151,19 @@ async function comprarPaquete(paqueteId, boton) {
   try {
     const r = await crearOrdenDeCompra(paqueteId);
     if (!r?.urlCheckout) throw new Error("El servidor no devolvió un checkout.");
+
+    /*
+     * `begin_checkout` y NO `purchase`, y la diferencia importa.
+     *
+     * Acá el navegador se va a Mercado Pago y no vuelve a enterarse de nada:
+     * quien confirma el pago es `webhookPago`, en el servidor. Mandar
+     * `purchase` desde este punto contaría como vendida toda orden empezada,
+     * incluida la que se abandona en el checkout.
+     *
+     * La compra confirmada sólo la puede anotar el servidor, con el protocolo
+     * de medición de GA4 desde `webhookPago`. Está anotado como pendiente.
+     */
+    anotar("begin_checkout", { paquete: paqueteId });
 
     avisarPaquetes("Te llevamos al pago…", "bien");
     window.location.href = r.urlCheckout;

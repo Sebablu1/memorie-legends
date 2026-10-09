@@ -14,6 +14,10 @@ import {
 
 import { hay as hayCodigoPendiente } from "./codigo-pendiente.js";
 
+// Medir no puede romper lo que se mide: `anotar` traga sus propios errores y
+// no hace nada si la analítica no cargó. Ver `analitica.js`.
+import { anotar } from "./analitica.js";
+
 import {
   necesitaSegundoPaso,
   opcionesDeSegundoPaso,
@@ -336,6 +340,7 @@ googleBtn?.addEventListener("click", async () => {
 
   try {
     await signInWithPopup(auth, googleProvider);
+    anotar("login", { method: "google" });
     // No se redirige acá: lo hace `onAuthStateChanged`, que es el único que
     // sabe si el perfil quedó creado. Redirigir en los dos lados llevaba al
     // panel antes de que existiera el documento del jugador.
@@ -365,6 +370,7 @@ formulario?.addEventListener("submit", async (evento) => {
 
   try {
     await signInWithEmailAndPassword(auth, correo, clave);
+    anotar("login", { method: "password" });
     mostrarVelo("Iniciando sesión…");
   } catch (error) {
     if (boton) boton.disabled = false;

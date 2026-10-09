@@ -23,6 +23,9 @@ import {
 // tener cuenta todavía.
 import { hay as hayCodigoPendiente } from "./codigo-pendiente.js";
 
+// Medir no puede romper lo que se mide. Ver `analitica.js`.
+import { anotar } from "./analitica.js";
+
 const form = document.getElementById("registerForm");
 const mensaje = document.getElementById("mensaje");
 const boton = form.querySelector('button[type="submit"]');
@@ -108,6 +111,7 @@ form.addEventListener("submit", async (e) => {
     });
 
     console.log("✅ Usuario guardado en Firestore");
+    anotar("sign_up", { method: "password" });
 
     // 3. Guardar en localStorage lo que sirve para identificar, y nada más.
     // El saldo vive en Firestore: acá sería un valor editable por el jugador.
@@ -269,6 +273,10 @@ botonGoogle?.addEventListener("click", async () => {
  */
 async function crearPerfilYEntrar(user) {
   const { nueva, nombre } = await crearPerfilSiFalta(user);
+
+  // El mismo botón sirve para nacer y para volver, así que el evento sale
+  // de lo que pasó y no de dónde se apretó.
+  anotar(nueva ? "sign_up" : "login", { method: "google" });
 
   // Sólo lo que sirve para identificar. El saldo vive en Firestore: acá
   // sería un número que cualquiera edita desde la consola del navegador.

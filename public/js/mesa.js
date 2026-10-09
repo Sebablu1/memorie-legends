@@ -66,6 +66,9 @@ import {
   RETRATO_INICIAL,
 } from "./modulos/retratos.js";
 import { esRutaDelSitio } from "./reglas/catalogo.js";
+
+// Medir no puede romper lo que se mide. Ver `analitica.js`.
+import { anotar } from "./analitica.js";
 import { caraDeCarta, imagenCarta, PALOS, NUMEROS } from "./reglas/baraja.js";
 import { guardarVestuario, vestuarioGuardado } from "./modulos/vestuario.js";
 import { LIMITE_ELIMINACION, puntosMano } from "./reglas/puntaje.js";
@@ -3787,6 +3790,16 @@ async function mostrarFinRonda() {
 
   if (estado.fase === "finPartida") {
     const ganaste = estado.ganador?.id === estado.jugadores[YO].id;
+
+    // La partida terminada, una vez y acá: es el único lugar del archivo
+    // donde se abre el cuadro del final. `anotar` no puede tirar ni
+    // demorar nada — ver `analitica.js`.
+    anotar("partida_jugada", {
+      modo: enRed() ? "red" : "entrenamiento",
+      jugadores: estado.jugadores?.length ?? 0,
+      gano: ganaste,
+    });
+
     abrirModal(`
       <div class="corona">${ganaste ? "🏆" : "🃏"}</div>
       <h2>${ganaste ? "¡Ganaste!" : `${estado.ganador?.nombre ?? "Nadie"} gana la partida`}</h2>
