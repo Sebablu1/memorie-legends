@@ -38,7 +38,6 @@ import {
   MS_VENTANA_TOTAL,
   crearVentana,
   registrarIntento,
-  resolverVentana,
   venceEn,
   yaVencio,
   entregasPendientes,
@@ -1004,8 +1003,30 @@ export function crearMotorEnRed({
       let estadoNuevo = partida.estado;
       let ventanaNueva = resultado.ventana;
 
-      if (!contraRival) {
-        const despues = motor.intentarDescarte(partida.estado, indice, posicion);
+      /*
+       * El ataque ERRADO también se aplica al llegar. (Etapa 2/3)
+       *
+       * Un error no necesita nada más: la carta del rival se queda donde
+       * está y el atacante se lleva su castigo. Es una sola llamada al motor,
+       * igual que el descarte propio.
+       *
+       * El ACIERTO no, y no es por prudencia: no se puede. La regla dice que
+       * la carta a entregar se elige DESPUÉS de saber que acertó, así que
+       * todavía no existe. Aplicarlo igual dejaría un hueco en la mano del
+       * rival, y un hueco se lee como «tiene una carta menos» — hasta por
+       * `quienSeQuedoSinCartas`, que dispara el corte automático. Se habría
+       * cortado la ronda por una carta que estaba en camino.
+       *
+       * Así que el acierto espera su entrega y se aplica entero cuando ésta
+       * llega, en `entregarCarta`. Si no llega a tiempo, lo aplica
+       * `cerrarVentana` con una carta al azar, que es lo que la regla dice.
+       */
+      const aplicarAhora = !contraRival || evaluado === "error";
+
+      if (aplicarAhora) {
+        const despues = contraRival
+          ? motor.intentarDescarteRival(partida.estado, indice, indiceObjetivo, posicion, null)
+          : motor.intentarDescarte(partida.estado, indice, posicion);
 
         /*
          * Sólo se marca como aplicado si el motor REALMENTE lo tomó.
@@ -1093,11 +1114,43 @@ export function crearMotorEnRed({
         throw error("invalid-argument", "Elegí una carta tuya para entregar.");
       }
 
+      /*
+       * Y ACÁ se aplica el ataque entero. (Etapa 2/3)
+       *
+       * Antes esto sólo anotaba la carta elegida y todo se resolvía al cerrar
+       * la ventana. Ahora el acierto se completa en el momento en que llega su
+       * entrega: se va la carta del rival, entra la que se dio, y la mesa lo
+       * ve sin esperar nada.
+       *
+       * Es una sola llamada al motor porque el ataque acertado ES la
+       * transferencia: separarlo en dos escrituras dejaría a la mano del rival
+       * con un hueco, y un hueco se lee como una carta menos.
+       */
+      const objetivo = partida.jugadores.indexOf(intento.objetivo ?? uid);
+      const estadoNuevo = motor.intentarDescarteRival(
+        partida.estado, indice, objetivo, intento.posicion, posicionEntrega,
+      );
+
+      if (estadoNuevo === partida.estado) {
+        throw error("failed-precondition", "Esa entrega ya no es posible.");
+      }
+
+      const ultimo = estadoNuevo.ventanaDescarte?.intentos?.at(-1);
+
       const siguiente = {
         ...partida,
+        estado: estadoNuevo,
         ventana: {
           ...ventana,
-          intentos: { ...ventana.intentos, [clientActionId]: { ...intento, posicionEntrega } },
+          intentos: {
+            ...ventana.intentos,
+            [clientActionId]: {
+              ...intento,
+              posicionEntrega,
+              aplicadoAlLlegar: true,
+              resultado: ultimo?.resultado ?? null,
+            },
+          },
         },
         latidos: { ...partida.latidos, [uid]: llegada },
         version: partida.version + 1,
@@ -1127,6 +1180,63 @@ export function crearMotorEnRed({
    * (el primer cliente que ve que venció), y por eso tiene que aguantar que
    * la pidan los cuatro a la vez: la transacción deja pasar una sola.
    */
+
+  /**
+   * Aplica lo que todavía no se aplicó, y devuelve el parte de todo.
+   *
+   * Lo usan los dos cierres de ventana: el callable `cerrarVentana` y el
+   * plazo del mismo nombre en `transicion`. Son el mismo cierre por dos
+   * puertas, y antes cada uno llamaba a `resolverVentana` con los mismos
+   * cinco argumentos.
+   */
+  function aplicarPendientes(estadoInicial, ventana, indiceDe) {
+    /*
+     * Al cerrar ya no queda casi nada que resolver. (Etapa 2/3)
+     *
+     * Acá se llamaba a `resolverVentana`, que ordenaba TODOS los intentos
+     * por tiempo efectivo —con su empate técnico de 60 ms— y los aplicaba en
+     * ese orden. Desde la etapa 1 el descarte propio se aplica al llegar, y
+     * desde ésta también el ataque errado y el acertado con su entrega.
+     *
+     * Lo único que puede quedar pendiente es un acierto cuya entrega nunca
+     * llegó. Para ésos la regla ya estaba escrita: la carta sale al azar, y
+     * la elige el motor cuando se le pasa `posicionEntrega` sin número.
+     *
+     * Se recorren en el orden en que se anotaron, que es el de llegada. Ya
+     * no hay nada que ordenar: `ordenarIntentos`, `esEmpateTecnico`,
+     * `favorecido` y `MS_EMPATE_TECNICO` se fueron con este cambio.
+     */
+    let estado = estadoInicial;
+    const orden = [];
+
+    for (const intento of Object.values(ventana.intentos ?? {})) {
+      const indice = indiceDe(intento.uid);
+      if (indice == null || indice < 0) continue;
+
+      if (intento.aplicadoAlLlegar) {
+        orden.push({ ...intento, indice, aplicado: true, resultado: intento.resultado ?? null });
+        continue;
+      }
+
+      const antes = estado;
+      const objetivo = indiceDe(intento.objetivo ?? intento.uid);
+
+      estado = objetivo != null && objetivo >= 0 && objetivo !== indice
+        ? motor.intentarDescarteRival(estado, indice, objetivo, intento.posicion, intento.posicionEntrega)
+        : motor.intentarDescarte(estado, indice, intento.posicion);
+
+      const ultimo = estado.ventanaDescarte?.intentos?.at(-1);
+      orden.push({
+        ...intento,
+        indice,
+        aplicado: estado !== antes,
+        resultado: estado !== antes ? (ultimo?.resultado ?? null) : null,
+      });
+    }
+
+    return { estado, orden };
+  }
+
   async function cerrarVentana({ codigo, forzar = false }) {
     return db.runTransaction(async (tx) => {
       const snap = await tx.get(refPartida(codigo));
@@ -1145,13 +1255,7 @@ export function crearMotorEnRed({
         return i < 0 ? null : i;
       };
 
-      const { estado, orden } = resolverVentana(
-        partida.estado,
-        partida.ventana,
-        indiceDe,
-        motor.intentarDescarte,
-        motor.intentarDescarteRival,
-      );
+      const { estado, orden } = aplicarPendientes(partida.estado, partida.ventana, indiceDe);
 
       // La fase sigue en `descarte` los dos segundos de la revelación; el
       // plazo `cerrarRevelacion` la termina. Ver `plazoDe`.
@@ -1545,10 +1649,7 @@ export function crearMotorEnRed({
           const i = partida.jugadores.indexOf(u);
           return i < 0 ? null : i;
         };
-        const { estado, orden } = resolverVentana(
-          partida.estado, partida.ventana, indiceDe, motor.intentarDescarte,
-          motor.intentarDescarteRival,
-        );
+        const { estado, orden } = aplicarPendientes(partida.estado, partida.ventana, indiceDe);
         // NO se cierra la fase todavía. Los intentos ya están aplicados, y las
         // cartas que se expusieron sólo viajan mientras la fase sea
         // `descarte`: cerrar acá las escondería antes de que nadie las viera.

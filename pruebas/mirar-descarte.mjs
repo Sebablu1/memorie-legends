@@ -31,7 +31,7 @@
  */
 
 import { crearMotorEnRed, MS_MIRADA_TOTAL } from "../functions/partida-red.js";
-import { MS_VENTANA, MS_GRACIA, MS_EMPATE_TECNICO } from "../public/js/reglas/red.js";
+import { MS_VENTANA, MS_GRACIA } from "../public/js/reglas/red.js";
 import { MS_REVELACION } from "../public/js/reglas/vista.js";
 
 let fallos = 0;

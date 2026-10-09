@@ -98,48 +98,16 @@ console.log("\n=== Mentir sobre el propio reloj no sirve ===");
   }
 }
 
-// ================================== 6. resolución de simultaneidad
-
-console.log("\n=== 6. Empate técnico ===");
-{
-  const ventana = (id, tiempos) => ({
-    id, abiertaEn: 0, duracionMs: 5000, graciaMs: 2000, cerrada: false,
-    intentos: Object.fromEntries(tiempos.map(([uid, efectivo], i) =>
-      [`a${i}`, { clientActionId: `a${i}`, uid, posicion: 0, efectivo }])),
-  });
-
-  const claro = R.ordenarIntentos(ventana("v1", [["ana", 900], ["beto", 400]]));
-  ok(claro[0].uid === "beto", "500 ms de diferencia se resuelve por tiempo", claro.map((i) => i.uid));
-
-  // 20 ms de diferencia está por debajo de lo que el reloj puede medir.
-  const empate = ventana("v1", [["ana", 1000], ["beto", 1020]]);
-  ok(R.esEmpateTecnico(Object.values(empate.intentos)[0], Object.values(empate.intentos)[1]),
-     "20 ms se considera empate técnico");
-
-  const a = R.ordenarIntentos(empate).map((i) => i.uid);
-  const b = R.ordenarIntentos(empate).map((i) => i.uid);
-  ok(JSON.stringify(a) === JSON.stringify(b), "el desempate es determinista: mismo resultado", a);
-
-  // Y el orden de llegada NO influye: los mismos datos en otro orden dan igual.
-  const alReves = ventana("v1", [["beto", 1020], ["ana", 1000]]);
-  const c = R.ordenarIntentos(alReves).map((i) => i.uid);
-  ok(JSON.stringify(a.slice().sort()) === JSON.stringify(c.slice().sort()), "mismos participantes");
-  ok(a[0] === c[0], "y el mismo ganador, sin importar el orden de llegada", { a, c });
-
-  // No favorece siempre al mismo: en ventanas distintas gana uno u otro.
-  const ganadores = {};
-  for (let i = 0; i < 2000; i++) {
-    const g = R.ordenarIntentos(ventana(`v${i}`, [["ana", 1000], ["beto", 1010]]))[0].uid;
-    ganadores[g] = (ganadores[g] ?? 0) + 1;
-  }
-  const proporcion = ganadores.ana / 2000;
-  ok(proporcion > 0.45 && proporcion < 0.55,
-     `reparte parejo entre los dos (ana ganó ${(proporcion * 100).toFixed(1)}%)`, ganadores);
-
-  // Y no se puede preparar: el peso depende del windowId, que da el servidor.
-  ok(R.favorecido("v1", "ana") !== R.favorecido("v2", "ana"),
-     "el mismo jugador tiene distinto peso en cada ventana");
-}
+// ================================== 6. (se fue con el empate técnico)
+//
+// Acá vivía la sección del empate técnico: `ordenarIntentos`,
+// `esEmpateTecnico` y `favorecido`, con dos mil sorteos comprobando que
+// repartiera parejo entre los dos y que no se pudiera preparar de antemano.
+//
+// Se fue entera cuando los descartes pasaron a aplicarse AL LLEGAR: sin un
+// cierre donde juntar y ordenar, no hay simultaneidad que resolver. El orden
+// es el de llegada al servidor, y eso se prueba de punta a punta en
+// `red-e2e.mjs`, sección 5, con la aserción dada vuelta a propósito.
 
 // ============================================= 2/3/4. registro de intentos
 
@@ -294,34 +262,60 @@ console.log("\n=== Las reglas A/B/C no cambian ===");
     },
   };
 
+  /*
+   * Se aplican EN ORDEN DE LLEGADA, a mano. (Etapa 2/3)
+   *
+   * Acá se llamaba a `R.resolverVentana`, que ordenaba por tiempo efectivo.
+   * Esa función se fue: desde que cada descarte se aplica al llegar, el orden
+   * es el de llegada al servidor y no hay nada que ordenar después.
+   *
+   * Lo que esta sección prueba NO cambió, y es lo que dice su título: las
+   * reglas A/B/C del motor —el primer acierto se salva, el acierto tarde
+   * conserva su carta y suma castigo, el error suma castigo— siguen siendo las
+   * mismas. Lo que cambió es QUIÉN ocupa cada papel: antes el de mejor
+   * reacción, ahora el de mejor llegada.
+   */
   const indiceDe = (uid) => ["ana", "beto", "caro"].indexOf(uid);
-  const { estado: final, orden } = R.resolverVentana(estado, ventana, indiceDe, motor.intentarDescarte);
+
+  const porLlegada = Object.values(ventana.intentos).sort((x, y) => x.llegada - y.llegada);
+  let final = estado;
+  const orden = porLlegada.map((intento) => {
+    const antes = final;
+    final = motor.intentarDescarte(final, indiceDe(intento.uid), intento.posicion);
+    const ultimo = final.ventanaDescarte?.intentos?.at(-1);
+    return { ...intento, aplicado: final !== antes, resultado: ultimo?.resultado ?? null };
+  });
+
   const cuenta = (i) => final.jugadores[i].mano.filter(Boolean).length;
 
-  ok(orden.map((o) => o.uid).join(",") === "ana,beto,caro",
-     "se aplican por reacción, no por llegada", orden.map((o) => o.uid));
-  ok(orden[0].resultado === "primero", "A: primer acierto");
-  ok(cuenta(0) === 3, "A queda con 3: se sacó la carta", cuenta(0));
+  ok(orden.map((o) => o.uid).join(",") === "beto,ana,caro",
+     "se aplican por llegada al servidor", orden.map((o) => o.uid));
+
+  ok(orden[0].resultado === "primero", "B: primer acierto, por haber llegado antes");
+  ok(cuenta(1) === 3, "B queda con 3: se sacó la carta", cuenta(1));
+
   /**
-   * B acierta segundo, y sólo el primero se salva.
+   * A acierta segundo, y sólo el primero se salva.
    *
-   * Antes acá decía que la carta de B se iba al descarte y quedaba neto cero.
-   * La regla cambió: el acierto tarde conserva la carta Y recibe una de
-   * castigo, así que la muestra no crece con una carta que nadie ganó. Ver
-   * `pruebas/descarte.mjs`, que lo prueba sobre el motor.
+   * El acierto tarde conserva la carta Y recibe una de castigo, así que la
+   * muestra no crece con una carta que nadie ganó. Lo prueba sobre el motor
+   * `pruebas/descarte.mjs`; acá sólo se comprueba que la regla siga rigiendo
+   * cuando los intentos entran de a uno.
    */
-  ok(orden[1].resultado === "tarde", "B: segundo acierto");
-  ok(cuenta(1) === 5, "B queda con 5: conserva la suya y suma la de castigo", cuenta(1));
-  ok(final.jugadores[1].mano[0] !== null, "la de B NO se fue al descarte");
+  ok(orden[1].resultado === "tarde", "A: segundo acierto");
+  ok(cuenta(0) === 5, "A queda con 5: conserva la suya y suma la de castigo", cuenta(0));
+  ok(final.jugadores[0].mano[0] !== null, "la de A NO se fue al descarte");
+
   ok(orden[2].resultado === "error", "C: error");
   ok(cuenta(2) === 5, "C queda con 5", cuenta(2));
   ok(final.jugadores[2].mano[0]?.id === "Oro-3", "C conserva su carta en su posición");
   ok(!("infoPublica" in final), "infoPublica no volvió");
 
-  // Beto llegó primero al servidor. Si se hubiera resuelto por llegada,
-  // habría sido él el que se salvaba.
-  ok(ventana.intentos.b1.llegada < ventana.intentos.a1.llegada && orden[0].uid === "ana",
-     "el de mejor conexión NO se lleva el premio por llegar antes");
+  // Y acá está el costo, escrito: A reaccionó antes —efectivo 800 contra
+  // 1200— y aun así se salva B, que llegó antes al servidor. Era al revés, y
+  // se cambió a sabiendas.
+  ok(ventana.intentos.a1.efectivo < ventana.intentos.b1.efectivo && orden[0].uid === "beto",
+     "el de mejor conexión SÍ se lleva el premio: es el costo aceptado");
 }
 
 // ============================== Firestore de mentira, con concurrencia

@@ -23,7 +23,9 @@
  * jugador honesto con esa misma conexión.
  *
  * Lo que queda sin resolver después de eso es el empate técnico, y ahí hace
- * falta una regla determinista. Está más abajo, en `favorecido`.
+ * falta una regla determinista. La hubo —`favorecido`, un sorteo sembrado con
+ * el id de la ventana— y se fue cuando los descartes pasaron a aplicarse al
+ * llegar: sin un cierre donde juntar y ordenar, no hay empate que romper.
  *
  * Módulo puro: ni Firestore ni DOM. Lo usan el navegador (para estimar su
  * desfase y armar el intento) y el servidor (que es el que decide).
@@ -86,14 +88,6 @@ export const MS_GRACIA = 2000;
  */
 export const MS_GRACIA_ENTREGA = 2000;
 
-/**
- * Diferencia por debajo de la cual dos reacciones no se pueden distinguir.
- *
- * Es del orden de la incertidumbre que deja una sincronización de reloj sobre
- * una conexión doméstica. Pretender resolver por debajo de esto sería fingir
- * una precisión que no existe.
- */
-export const MS_EMPATE_TECNICO = 60;
 
 /** Tope de lo que se acepta como latencia de un solo sentido. */
 export const MS_LATENCIA_MAXIMA = 1500;
@@ -225,64 +219,8 @@ export function tiempoEfectivo({ declarado, llegada, latencia, incertidumbre }) 
 
 // ------------------------------------------------------------- desempate
 
-/**
- * Mezcla determinista de una cadena (FNV-1a de 32 bits).
- * Sirve en el navegador y en Node sin depender de crypto.
- */
-function mezclar(texto) {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < texto.length; i++) {
-    h ^= texto.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return h >>> 0;
-}
 
-/**
- * Peso de desempate de un jugador en una ventana concreta.
- *
- * Cuando dos reacciones caen dentro del margen de incertidumbre, no hay forma
- * honesta de decir cuál fue primero: la diferencia está por debajo de lo que
- * el reloj puede medir. Hay que elegir, y toda elección es arbitraria; lo que
- * NO puede ser es sesgada ni manipulable.
- *
- *   - Ordenar por uid favorecería siempre al mismo jugador.
- *   - Usar el clientActionId dejaría que alguien lo eligiera a propósito
- *     hasta encontrar uno que gane.
- *
- * Por eso se mezcla el uid con el `windowId`, que genera el servidor y nadie
- * conoce antes de que la ventana se abra. Es reproducible —dos veces la misma
- * ventana da el mismo resultado, y por eso se puede probar—, imposible de
- * preparar de antemano, y a lo largo de muchas ventanas favorece a cada uno
- * por igual.
- */
-export const favorecido = (windowId, uid) => mezclar(`${windowId}|${uid}`);
 
-/**
- * Ordena los intentos como se van a aplicar.
- *
- * Primero por tiempo efectivo. Si dos caen dentro de `MS_EMPATE_TECNICO`,
- * decide el sorteo determinista. El orden resultante es estable: dos
- * ejecuciones sobre los mismos datos dan exactamente la misma secuencia,
- * que es lo que permite reproducir una ronda para auditarla.
- */
-export function ordenarIntentos(ventana, margenMs = MS_EMPATE_TECNICO) {
-  return Object.values(ventana.intentos).slice().sort((a, b) => {
-    if (Math.abs(a.efectivo - b.efectivo) >= margenMs) return a.efectivo - b.efectivo;
-    const pa = favorecido(ventana.id, a.uid);
-    const pb = favorecido(ventana.id, b.uid);
-    if (pa !== pb) return pa - pb;
-    // Dos pesos iguales es astronómicamente improbable, pero el orden tiene
-    // que quedar definido igual: nunca "depende".
-    return a.uid < b.uid ? -1 : a.uid > b.uid ? 1 : 0;
-  });
-}
-
-/** ¿Estos dos intentos empataron técnicamente? */
-export const esEmpateTecnico = (a, b, margenMs = MS_EMPATE_TECNICO) =>
-  Math.abs(a.efectivo - b.efectivo) < margenMs;
-
-// --------------------------------------------------- poderes: elegibles
 
 /**
  * Qué cartas puede tocar quien está usando un poder.
@@ -495,68 +433,6 @@ export function registrarIntento(
   };
 }
 
-/**
- * Resuelve la ventana entera aplicando el motor en el orden calculado.
- *
- * Acá NO se reimplementan las reglas A/B/C. El motor local ya las tiene, y
- * duplicarlas sería garantizar que en algún momento diverjan. Esta capa sólo
- * decide EN QUÉ ORDEN se aplican; el primero de la lista es el que se salva.
- *
- * @param estado        estado completo del motor, en fase "descarte"
- * @param ventana       la ventana con sus intentos
- * @param indiceDe      uid → índice del jugador en el motor
- * @param intentarDescarte  la función del motor, inyectada para no acoplar
- */
-export function resolverVentana(estado, ventana, indiceDe, intentarDescarte, intentarRival) {
-  const orden = ordenarIntentos(ventana);
-  let siguiente = estado;
-  const aplicados = [];
-
-  for (const intento of orden) {
-    const indice = indiceDe(intento.uid);
-    if (indice == null || indice < 0) continue;
-
-    /*
-     * Ya se aplicó al llegar: acá no se vuelve a tocar. (Etapa 1/3)
-     *
-     * Desde que el descarte sobre la mano propia se aplica en el momento en
-     * que llega el pedido, estos intentos ya movieron el estado. Volver a
-     * pasarlos por el motor sería descartar dos veces la misma carta, o cobrar
-     * dos castigos por un error.
-     *
-     * Se deja constancia igual, con `aplicado: true`, para que el orden que se
-     * devuelve siga describiendo todo lo que pasó en la ventana y no sólo lo
-     * que quedó pendiente.
-     */
-    if (intento.aplicadoAlLlegar) {
-      aplicados.push({ ...intento, indice, aplicado: true, resultado: intento.resultado ?? null });
-      continue;
-    }
-
-    const antes = siguiente;
-
-    // Sobre la mano de otro va por el camino del poder, que valida la
-    // autorización y puede terminar en transferencia. Sobre la propia, el
-    // descarte de siempre.
-    const objetivo = indiceDe(intento.objetivo ?? intento.uid);
-    if (intentarRival && objetivo != null && objetivo >= 0 && objetivo !== indice) {
-      siguiente = intentarRival(siguiente, indice, objetivo, intento.posicion, intento.posicionEntrega);
-    } else {
-      siguiente = intentarDescarte(siguiente, indice, intento.posicion);
-    }
-    // Si el motor no cambió nada (posición ya vacía, por ejemplo) no se
-    // inventa un resultado: se deja constancia de que no se aplicó.
-    const ultimo = siguiente.ventanaDescarte?.intentos?.at(-1);
-    aplicados.push({
-      ...intento,
-      indice,
-      aplicado: siguiente !== antes,
-      resultado: siguiente !== antes ? (ultimo?.resultado ?? null) : null,
-    });
-  }
-
-  return { estado: siguiente, orden: aplicados };
-}
 // ------------------------------------------------ el reloj para decidir
 
 /**

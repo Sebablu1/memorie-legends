@@ -308,11 +308,33 @@ console.log("\n=== 5. La ventana de reflejos, de punta a punta ===");
   ok(!JSON.stringify(A.vista).includes("b-descarta"), "A no se entera de que B intentó");
   ok(!JSON.stringify(B.vista).includes("a-descarta"), "ni B de que intentó A");
 
+  /*
+   * Y GANA B, el que llegó primero al servidor. (Etapa 2/3)
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * ESTA ASERCIÓN ESTABA AL REVÉS, Y SE DIO VUELTA A PROPÓSITO
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Decía «gana A, que reaccionó antes aunque su pedido llegó casi 200 ms
+   * después», y era la joya del protocolo: el servidor juntaba los intentos,
+   * los ordenaba por tiempo efectivo y le daba la carta a quien de verdad
+   * había reaccionado primero, no a quien tenía mejor conexión.
+   *
+   * Se sacó, y es el costo explícito de aplicar cada descarte al llegar. Sin
+   * un momento de cierre donde juntar y ordenar, el orden es el de llegada.
+   * Los dos números de arriba siguen midiéndose y siguen siendo ciertos —el
+   * efectivo de A sigue siendo menor— pero ya no deciden quién gana: sólo
+   * deciden si un intento llegó a tiempo.
+   *
+   * La aserción no se borra ni se afloja. Se invierte, para que quede
+   * escrito qué se eligió y para que el día que alguien quiera volver atrás
+   * vea exactamente dónde está la decisión.
+   */
   reloj = trasLaGracia(db);
   const cierre = await red.cerrarVentana({ codigo: CODIGO });
   const orden = cierre.orden.map((o) => o.uid);
-  ok(orden[0] === "ana",
-     "y gana A, que reaccionó antes aunque su pedido llegó casi 200 ms después", orden);
+  ok(orden[0] === "beto",
+     "y gana B, que llegó primero al servidor, aunque A reaccionó antes", orden);
   ok(A.vista.fase === "descarte" && B.vista.fase === "descarte",
      "los dos siguen en descarte durante la revelación", [A.vista.fase, B.vista.fase]);
 
