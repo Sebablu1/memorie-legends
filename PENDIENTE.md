@@ -82,56 +82,33 @@ Buscar: `git log --oneline --all --grep="§N"`.
   llevan rojas desde antes. Cuidado con leer «85/85» como «todo verde».
 - **Revisar aparte, en su propio commit.**
 
-### §53 — El poder 9 no hace su transición visual en red
+### §53 — ~~El poder 9 no hace su transición visual en red~~ ARREGLADO
 
-**Síntoma:** usar el 9 (`cambioCiego`) en red intercambia las cartas pero no
-dibuja nada. En entrenamiento sí se ve.
+**Arreglado en `7c2a77a`.** Se deja anotado porque el diagnóstico tiene dos
+cosas que conviene no perder.
 
-**No lo trajo la etapa 3, y conviene saberlo:** `pedirPoderEnRed` se escribió
-el 5/10 (`3a6d62c`) y se tocó por última vez el 7/10 (`ce4d41b`), las dos antes
-de la etapa 3a. La etapa 3 no tocó esa función ni `efectoCambio` — se verificó
-con `git diff 642d468 HEAD -- public/js/mesa.js`. Está roto desde que se armó
-el modal de poderes en red; recién ahora se jugó un 9.
+**No lo trajo la etapa 3**, aunque lo parecía. `pedirPoderEnRed` se escribió el
+5/10 (`3a6d62c`) y se tocó por última vez el 7/10 (`ce4d41b`), las dos antes de
+la etapa 3a, y la etapa 3 no tocó esa función ni `efectoCambio`. Tampoco era el
+patrón de `23022d2` —ahí había una guarda que miraba la fase, acá la llamada no
+existía— ni pasaba por los ocho lugares de `reflejosAbiertos()`: los poderes
+entran por el modal. Estuvo roto desde que se armó el modal de poderes en red.
 
-**Tampoco es el patrón del bug de «cambiar por una mía»** (`23022d2`). Ése era
-una guarda que miraba la fase cuando la fase había dejado de distinguir. Acá no
-hay ninguna guarda: la llamada no existe. Y no pasa por ninguno de los ocho
-lugares de `reflejosAbiertos()` — los poderes entran por el modal
-(`[data-objetivo]` → `pedirPoderEnRed`), no por `clicEnCartaDeRed`.
+**La regla quedó igualada con la del 10:** las CARTAS se le muestran a quien
+corresponda —al que usa el 10, a nadie en el 9— y QUE HUBO INTERCAMBIO, con sus
+dos posiciones, lo ven los cuatro. El motor anota `tipo: "cambioCiego"` con
+actor, objetivo y posiciones, nunca las cartas, y el efecto sale del registro
+—un solo camino para los cuatro navegadores— en vez de `pedirPoderEnRed`, que
+lo haría ver sólo al que usó el poder.
 
-**La causa, en dos mitades.** En red el 9 no se dibuja para NADIE:
+No publicó nada nuevo: la frase del registro ya decía las dos posiciones
+(«cambió su 1 por la 2 de Beto») y viaja desde siempre.
 
-1. **Para quien lo usa**, el último bloque de `pedirPoderEnRed` es
-   `if (r?.revelada?.propia || r?.revelada?.rival)` y dentro llama a
-   `efectoCambio("cambioConVista", …)`. El 9 es a ciegas: el servidor no
-   devuelve `revelada`, la condición es falsa y no se llama a nada. La rama del
-   `cambioCiego` no existe en red. En entrenamiento sí: `mesa.js:3763`.
-2. **Para los otros tres**, `anunciarRegistro` tiene rama para
-   `tipo === "resolvioElDiez"` y ninguna para el 9. Y aunque la tuviera, no
-   tendría con qué dibujar: el motor anota el 9 como **texto plano, sin `tipo`
-   ni posiciones** (`motor.js:1654`), al contrario del 10, que anota
-   `miroParaCambiar` y `resolvioElDiez` con las dos posiciones.
-
-**Reproducido** en un spec de navegador, que no se dejó en el árbol para no
-dejar la suite en rojo: fase `poder` con `poderPendiente` de tipo
-`cambioCiego`, se elige carta propia y ajena, el pedido `poderCambio` SALE —
-así que el poder se aplica— y `.carta.efecto-ciego` da **0 donde tendría que
-dar 2**. El spec queda listo para el commit del arreglo.
-
-**Dos formas de arreglarlo, y la segunda es una decisión, no un detalle:**
-
-- **(a) Sólo cliente.** Agregar la rama del `cambioCiego` a
-  `pedirPoderEnRed`. Tiene las dos posiciones a mano. Lo ve quien usó el
-  poder; los otros tres siguen sin ver nada. Es chico y no toca el motor.
-- **(b) Paridad con el 10.** Además, que el motor anote el 9 con `tipo` y
-  posiciones, y agregar la rama en `anunciarRegistro`. Lo ven los cuatro.
-  Toca el motor —aunque no una regla ni un reloj: es un evento de registro, y
-  el precedente está en el 10— y **publica a los cuatro qué posiciones se
-  intercambiaron**. Para el 10 ya se publican, y en una mesa real el
-  intercambio se ve, así que es coherente; pero es información y la decisión
-  es del dueño. Ojo con `filtraciones.mjs`: el registro viaja en la vista.
-
-**Sin arreglar todavía, por pedido.** Diagnóstico solamente.
+**Lo que este bug enseñó, y vale para la próxima:** `registro` viajaba vacío en
+TODOS los specs de red, así que el camino de los efectos de poderes no se
+ejecutaba en ninguna prueba de navegador. Es el mismo hueco de forma que los
+dobles vacíos de §51: un campo que ningún spec puebla es un camino que ninguna
+prueba recorre. Ahora se puede guionar por paso.
 
 ### §50 — La línea de base de las pruebas, y cómo leerla
 
