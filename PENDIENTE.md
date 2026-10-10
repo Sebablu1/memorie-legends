@@ -2,7 +2,7 @@
 
 Lo abierto, en 3 minutos de lectura. Lo cerrado vive en `HISTORIA.md`.
 
-Última revisión: 7 de octubre de 2026.
+Última revisión: 10 de octubre de 2026.
 
 Los commits con `§N` en el mensaje cierran la sección N.
 Buscar: `git log --oneline --all --grep="§N"`.
@@ -78,9 +78,81 @@ Buscar: `git log --oneline --all --grep="§N"`.
 - **Preexistente:** se corrió en worktrees contra `6a386dd`, `01be9d6` y
   `5b47670` y falla igual en los tres. No lo trajeron las etapas de reflejos.
 - **Es de ENTRENAMIENTO**, no de red: la escena no pasa por el servidor.
-- **Y `npm test` no lo ve.** Las 84 suites de Node están verdes mientras estas
-  dos llevan rojas desde antes. Cuidado con leer «84/84» como «todo verde».
+- **Y `npm test` no lo ve.** Las suites de Node están verdes mientras estas dos
+  llevan rojas desde antes. Cuidado con leer «85/85» como «todo verde».
 - **Revisar aparte, en su propio commit.**
+
+### §50 — La línea de base de las pruebas, y cómo leerla
+
+Las dos suites miden cosas distintas y ninguna incluye a la otra. Los números
+de referencia, al 10 de octubre de 2026:
+
+| Suite | Comando | Verde es |
+|---|---|---|
+| Node | `npm test` | **85 de 85** |
+| Navegador | `npx playwright test` | **460 pasan, 2 fallan** (§48) |
+
+- **Correr los 65 archivos, no un recorte.** La etapa 3c se validó con los
+  archivos de la mesa en red y bajó `MS_PASO_AUTOMATICO` de 20 s a 10 sin ver
+  que `carteles.spec.js` —que es de entrenamiento— afirmaba los 20. Lo
+  denunció en la corrida completa, dos días después.
+- **Son 23 minutos.** Conviene lanzarla en segundo plano y seguir trabajando,
+  no saltearla.
+- **El «92 pasan, 2 fallan» que anduvo dando vueltas no reconcilia** con nada
+  medible: los archivos que montan la mesa en red son 14 con 104 pruebas, y
+  los dos rojos de §48 están en un spec de entrenamiento. Se descartó.
+
+### §51 — Lo que la etapa 3 dejó abierto
+
+Nada de esto bloquea el despliegue. Se anota porque son consecuencias de
+sacarle el cronómetro a los reflejos, y ninguna se ve leyendo el código: se ven
+jugando.
+
+**Reglas, por orden de cuánto cambian una mano:**
+
+1. **El que tira puede cortar en el acto y anular los reflejos de su propia
+   muestra.** Antes los 2 s de ventana retenían la fase en `descarte`, así que
+   no llegaba a `postLevantada` hasta que vencía. Ahora `tirar` devuelve la
+   fase enseguida y puede cortar sin que nadie haya podido reaccionar. Le
+   conviene al que teme que le descarten una carta. La ventana se cierra con el
+   corte, que es lo correcto —la ronda terminó— pero la garantía estratégica se
+   perdió.
+2. **Un toque hecho durante la MIRADA se resuelve en el próximo tiro, no al
+   terminar la mirada.** El motor no lo acepta cuando llega —todavía no hay
+   ventana suya— y queda pendiente. Resolverlo en `terminarMirada`, que es el
+   primer instante posible, sería más justo: quien tocó en la mirada reaccionó
+   antes Y llegó antes, así que el orden de llegada debería favorecerlo. Hoy
+   pierde contra alguien que tocó después. Está escrito, con la aserción dada
+   vuelta a propósito, en `mirar-descarte.mjs` §5.
+3. **Con un acierto esperando su carta, el toque en una carta propia es la
+   entrega, no el cambio** — y eso ahora dura todo el turno en vez de los 2 s
+   de la fase. Es coherente (se debe una carta y se paga primero) y se
+   resuelve solo en 5 s, pero es un cambio de comportamiento.
+4. **`MS_PASO_AUTOMATICO` 20 s → 10 s también cambió ENTRENAMIENTO.** El motivo
+   —que la decisión ahora contiene la ventana en vez de seguirla— vale sólo en
+   red. Allá la ventana sí se cierra a los 2 s, así que esos 10 s volvieron a
+   ser tiempo propio. Se aceptó para no bifurcar los tiempos por modo.
+
+**Limpieza, sin urgencia:**
+
+5. **Constantes huérfanas de la ventana en red:** `duracionMs`, `graciaMs`,
+   `MS_GRACIA`, `venceEn` y `yaVencio` sólo siguen vivas por
+   `cerrarVentana({ forzar: false })`, que desde `5dcb189` no llama nadie en
+   producción — sólo las suites. `resumenDeVentana` además publica
+   `duracionMs` y `graciaMs` a clientes que ya no los miran. Sacarlos arrastra
+   la fila «Gracia de red para un toque» del reglamento, que hoy dice «ya no se
+   aplica».
+6. **`abrirVentanaDescarte` sigue expuesta** como callable, con su envoltorio
+   muerto en `public/js/partida-red.js` — la misma forma que la que se borró en
+   `5dcb189`. No es explotable (es idempotente y exige fase `descarte`), pero
+   es superficie que nadie usa.
+7. **Trece mocks de e2e declaran `cerrarVentanaDescarte`**, que ya no existe.
+   Línea muerta en los fixtures; se dejó para no tocar trece specs justo antes
+   de medir la línea de base.
+8. **Cuatro specs montan las dos mesas** —`ausente`, `marco-y-titulo`,
+   `ojo-del-poder`, `reloj-para-decidir`— y `cadena-de-turno.mjs` no puede
+   atribuir sus clics a un modo. Partirlos le daría más de dónde agarrarse al
+   cerrojo.
 
 ### §45 — PITR y protección de borrado en producción
 
