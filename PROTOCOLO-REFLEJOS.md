@@ -4,44 +4,94 @@ Este documento es la autoridad sobre cómo se decide quién gana un descarte.
 Si el código y este texto no coinciden, uno de los dos está mal y hay que
 arreglarlo, no elegir.
 
-## El problema que resuelve
+## El problema, y de qué lado se decidió quedarse
 
 La forma obvia de resolverlo en red es: gana el primer pedido que llega al
-servidor. Es simple, es imposible de discutir… y arruina el juego. Con 40 ms
-de conexión contra 180 ms, el de la fibra gana **siempre**, incluso cuando el
-otro reaccionó antes de verdad. Deja de ser un juego de reflejos y pasa a ser
-uno de proveedor de internet.
+servidor. Es simple, es imposible de discutir… y tiene un costo real. Con 40 ms
+de conexión contra 180 ms, el de la fibra gana más seguido, incluso cuando el
+otro reaccionó antes de verdad.
 
-Así que el servidor no resuelve al recibir. **Junta y después ordena.**
+Durante un tiempo este protocolo eligió la otra opción: el servidor **juntaba
+y después ordenaba** todos los intentos por tiempo de reacción corregido, con
+un empate técnico para lo que el reloj no podía distinguir. Era más justo en el
+caso que medía, y acá está por qué se dio marcha atrás.
+
+**Ordenar exige un momento en el que se ordena.** Ese momento era el cierre de
+la ventana, y el cierre exigía un cronómetro: dos segundos en los que lo único
+que podía pasar era esperar. El jugador tocaba su carta y no pasaba nada —ni
+la carta se movía, ni se sabía si había acertado— hasta que el reloj terminaba.
+Jugado, eso no se siente un juego de reflejos; se siente un formulario que se
+envía. Y la mesa quedaba detenida en cada muestra, con los cuatro mirando una
+barra vaciarse.
+
+Así que se cambió, con el costo asumido y escrito:
+
+> **Cada descarte se aplica en el instante en que llega al servidor.** Si dos
+> tocan casi juntos, gana el que llegó primero.
+
+Lo que se gana a cambio no es sólo que se vea en el momento. Al no haber nada
+que juntar, la ventana no necesita cerrarse por tiempo — y sin cronómetro
+nadie corre contra un reloj: se reacciona cuando se cae en la cuenta, con el
+turno entero del siguiente por delante en vez de dos segundos. El borde que la
+precisión protegía casi desaparece, porque los milisegundos dejan de ser el
+terreno donde se juega.
+
+`tiempoEfectivo` **no se fue** y sigue midiendo reacción, no conexión. Ya no
+decide nada; es el registro de cuándo reaccionó cada uno, que es lo que hay que
+poder mirar cuando alguien pregunta por qué perdió una mano.
 
 ## Cuándo empieza y cuándo termina una ventana
 
-La abre el servidor, con su propio reloj, cuando la partida entra en fase de
-descarte:
+La abre el servidor, con su propio reloj, cuando cae una muestra nueva:
 
 ```
 ventana = {
   id           "v_<aleatorio>"   generado por el servidor, impredecible
   abiertaEn    <epoch ms>        reloj del SERVIDOR, nunca el del cliente
-  duracionMs   5000              lo que dura la ventana de reflejos
-  graciaMs     2000              margen extra sólo para LLEGADAS
   cerrada      false
+  resueltaEn   <epoch ms>        cuándo se cerró, si se cerró
   intentos     { <clientActionId>: {...} }
 }
 ```
 
-Hay dos límites distintos y conviene no confundirlos:
+**La ventana no vence.** Vive mientras viva la muestra, y la cierra el jugador
+en turno cuando la cambia: al tirar, al cambiar una carta de su mano por la
+levantada, o al cortar —que termina la ronda y con ella cualquier reflejo—.
 
-| | Hasta | Qué pasa después |
+Y lo que **no** la cierra importa tanto como lo que sí:
+
+| Jugada | ¿Cierra? | Por qué |
 |---|---|---|
-| **Reacción** válida | `abiertaEn + 5000` | tocar después no cuenta, por rápida que sea la conexión |
-| **Llegada** aceptada | `abiertaEn + 5000 + 2000` | un pedido que llega después se descarta |
+| `tirar` | **sí** | hay muestra nueva, y se abre otra ventana en el acto |
+| `cambiar` | **sí** | la carta que sale de la mano queda de muestra |
+| `cortar` | **sí** | la ronda terminó: no queda a qué reaccionar |
+| `pasar` | no | la muestra sigue siendo la misma |
+| `mirar`, `levantar`, los poderes | no | no tocan el descarte |
 
-La gracia existe porque un jugador que tocó en el milisegundo 4990 con 300 ms
-de latencia llega al servidor en el 5290. Su reacción fue a tiempo; su paquete
-no. Sin la gracia se perdería una jugada legítima.
+Que `pasar` no cierre no es un descuido: es la regla. **Una ventana puede
+atravesar varios turnos**, y no hay techo porque no hace falta — en algún
+momento alguien tira, y ése es el límite.
+
+El único límite que queda para un intento es que su ventana sea **la vigente**
+y esté **abierta**. Eso es todo lo que mira `aceptaLlegadas`.
+
+La gracia de 2 ms para llegadas tardías también se fue, y tampoco es un olvido.
+Existía porque un toque en el milisegundo 4990 con 300 ms de latencia llegaba
+en el 5290, y sin margen se perdía una jugada legítima. Pero ahora el cierre y
+el cambio de muestra son el **mismo instante**: no queda un «después» en el que
+un reflejo tardío pueda aplicarse bien, porque `intentarDescarte` vuelve a
+comparar la carta contra la muestra y la evaluaría contra la nueva — el que
+reaccionó bien se comería un castigo por haber acertado. Darle margen sería
+peor que no dárselo.
 
 Abrir la ventana dos veces devuelve la misma: es idempotente.
+
+### En entrenamiento no es así
+
+Allá la ventana **sí** dura 2 segundos (`MS_DESCARTE`) y se cierra sola. Es
+correcto que difieran: del otro lado no hay nadie a quien esperar ni ninguna
+latencia que compensar, y un cronómetro es lo que le da forma al ejercicio.
+Las reglas del descarte —A, B y C— son las mismas y salen del mismo motor.
 
 ## Cómo se sincroniza el reloj
 
@@ -82,7 +132,8 @@ declaraciones de una parte interesada.
 
 ## El tiempo efectivo
 
-Es **la única autoridad** para ordenar los reflejos.
+Ya no ordena nada: es el **registro** de cuándo reaccionó cada uno. Se calcula
+igual que siempre y se guarda con el intento.
 
 ```
 llegada  = ahoraDelServidor − ventana.abiertaEn
@@ -130,44 +181,41 @@ que la red le había quitado, que es precisamente lo que se quería lograr.
 Lo que sí queda es un margen de manipulación igual a la incertidumbre de
 sincronización. Es irreducible: no se puede distinguir a alguien que afina su
 tiempo dentro del error de medición de alguien que simplemente tiene ese
-error. Por eso ese margen se declara empate técnico y se resuelve aparte.
+error. Ya no cambia quién gana —el orden es el de llegada— pero sí cambia el
+número que queda anotado, y conviene saber que ese número tiene ese margen.
 
-## Empate técnico
+## Acá vivía el empate técnico
 
-Dos reacciones que difieren en menos de **60 ms** no se pueden distinguir: la
-diferencia está por debajo de lo que el reloj mide. Pretender resolver por
-debajo de eso sería fingir una precisión que no existe.
+Se fue, y con él todo lo que lo rodeaba: `ordenarIntentos`, `esEmpateTecnico`,
+`favorecido`, `MS_EMPATE_TECNICO` y el sorteo `FNV-1a(windowId + "|" + uid)`.
 
-Hay que elegir igual, y toda elección es arbitraria. Lo que no puede ser es
-**sesgada** ni **manipulable**:
+Resolvían un problema que ya no existe. Dos reacciones que difieren en menos de
+60 ms no se pueden distinguir, así que había que elegir sin sesgo y sin que
+nadie pudiera prepararlo: el `windowId` lo generaba el servidor y nadie lo
+conocía antes, y sobre 2000 ventanas el reparto entre dos jugadores daba 50,0 %.
+Funcionaba. Lo que desapareció es la **simultaneidad**: sin un cierre donde
+juntar los intentos, no hay dos reacciones que comparar — hay una que llegó y
+después otra.
 
-- Ordenar por uid favorecería siempre al mismo jugador.
-- Usar el `clientActionId` dejaría que alguien lo eligiera a propósito hasta
-  encontrar uno que gane.
+Queda escrito porque la pregunta «¿y qué pasa si dos tocan a la vez?» se va a
+volver a hacer, y la respuesta corta es: no hay «a la vez». Las transacciones
+de Firestore se serializan sobre el documento de la partida, así que dos
+descartes simultáneos se aplican uno después del otro, nunca encima. «El orden
+de llegada» es un orden real, no una carrera.
 
-La regla es: gana el menor `FNV-1a(windowId + "|" + uid)`.
+## Cómo se aplican las acciones
 
-El `windowId` lo genera el servidor y nadie lo conoce antes de que la ventana
-se abra, así que no se puede preparar. Es reproducible —la misma ventana da
-siempre el mismo resultado, y por eso se puede probar y auditar— y a lo largo
-de muchas ventanas favorece a cada jugador por igual: medido sobre 2000
-ventanas, el reparto entre dos jugadores da 50,0 %.
+**Al llegar**, una por una:
 
-Si dos pesos fueran iguales (astronómicamente improbable) desempata el uid,
-para que el orden nunca quede indefinido.
+1. Se anota el intento en la ventana, con su `efectivo`.
+2. Se aplica al motor en el acto, con la misma función `intentarDescarte` que
+   usa la mesa local.
+3. Se pregunta si alguien se quedó sin cartas. Si sí, la ronda se corta ahí
+   mismo: en una mesa real, si alguien se queda sin cartas la mano se termina,
+   no se espera.
 
-## Cómo se ordenan las acciones al cerrar
-
-Al cerrar la ventana:
-
-1. Se ordenan todos los intentos por `efectivo` ascendente.
-2. Los que caen dentro de los 60 ms se ordenan por el sorteo determinista.
-3. Se aplican **en ese orden** al motor, uno por uno, con la misma función
-   `intentarDescarte` que usa la mesa local.
-
-El paso 3 es deliberado: las reglas A/B/C **no se reimplementan** en la capa
-de red. Duplicarlas sería garantizar que en algún momento diverjan. Esta capa
-sólo decide el orden; el primero de la lista es el que se salva.
+El paso 2 es deliberado: las reglas A/B/C **no se reimplementan** en la capa de
+red. Duplicarlas sería garantizar que en algún momento diverjan.
 
 Las reglas quedan idénticas:
 
@@ -177,31 +225,60 @@ Las reglas quedan idénticas:
 | **B** acierto posterior | la carta se va igual, pero recibe una | 0 neto |
 | **C** error | conserva su carta y recibe una | +1 carta |
 
-Las revelaciones siguen siendo efímeras: duran lo que dura la ventana y no
-queda ningún registro permanente. `infoPublica` no vuelve.
+### Lo único que todavía espera
+
+Un ataque **acertado** a la carta de un rival. La regla dice que la carta a
+entregar se elige DESPUÉS de saber que acertó, así que en ese momento todavía
+no existe: el intento queda pendiente y se completa cuando llega la entrega.
+Hay dos formas de que termine, y las dos están en el reglamento:
+
+- el dueño elige dentro de sus 5 segundos (`MS_PARA_ENTREGAR`, más la gracia
+  del viaje), o
+- se le acaba el tiempo y **la carta sale al azar**.
+
+Y hay una tercera, que es nueva: **el tiro del jugador en turno le corta el
+tiempo**. Si tira antes de que el otro elija, la entrega se resuelve al azar en
+ese instante. Tiene que ser así y no al revés: la entrega se aplica contra la
+muestra, y resolverla después del tiro la evaluaría contra la muestra nueva —
+el acierto se convertiría en error.
+
+Las revelaciones siguen siendo efímeras: una carta expuesta se ve **2 segundos
+reales** (`MS_REVELACION`), contados desde que el descarte se aplicó. El motor
+no los mide —sigue determinista y sin relojes—: el orquestador sella la hora de
+cada intento, filtra la vista antes de mandarla, y vuelve a publicar al
+cumplirse el plazo para que la carta desaparezca aunque en la mesa no pase nada
+más. No queda ningún registro permanente; `infoPublica` no vuelve.
 
 Cerrar la ventana es **idempotente**: lo primero que se mira es si ya estaba
-cerrada. Puede pedirlo cualquier cliente que vea que venció, y los cuatro
-pueden pedirlo a la vez; la transacción deja pasar una sola. Y no se puede
-cerrar antes de tiempo: si no, cualquiera la cortaría en el instante en que
-le conviene, justo después de descartar.
+cerrada. Ya no lo puede pedir ningún cliente —la callable
+`cerrarVentanaDescarte` se borró— y el motivo es exactamente el que este
+párrafo decía antes al revés: sin cronómetro, «ya venció» dejó de querer decir
+nada, y cualquiera habría podido cortarla en el instante que le conviniera,
+justo después de descartar.
 
 ## Acciones tardías
 
+La tabla se acortó, y es la mitad del cambio: dejaron de existir las tres
+primeras filas, que eran las que medían tiempo.
+
 | Caso | Qué pasa |
 |---|---|
-| Llega después de la gracia | rechazada, `fuera_de_tiempo` |
-| Llega en la gracia, reaccionó a tiempo | **aceptada**, con su tiempo real |
-| Llega en la gracia, reaccionó tarde | rechazada: el efectivo supera los 5000 |
-| Llega antes de que la ventana abra | rechazada |
+| Reaccionó tarde, o llegó tarde | **aceptada**: no hay techo de tiempo |
+| Llega antes de que la ventana abra | rechazada, `fuera_de_tiempo` |
 | Menciona otra ventana | rechazada, `ventana_distinta` |
 | La ventana ya se cerró | rechazada, `ventana_cerrada` |
+| Ya jugó su tiro sobre su propia mano | rechazada, `ya_intento` |
 
-Hay un caso que conviene entender porque parece un error y no lo es: quien
-declara **poca** latencia y llega **muy** tarde se perjudica. Si dice tener
-400 ms pero su paquete tardó 1400, el piso lo empuja hacia adelante y puede
-quedar fuera de la ventana. Es correcto: el servidor no puede creerle un
-tiempo que su propia llegada desmiente.
+«Tarde» ya no quiere decir nada mientras la ventana esté abierta: un reflejo en
+el segundo 11, con el del turno todavía pensando, vale igual que el del primer
+segundo. Lo que cierra la puerta es la ventana, no el reloj.
+
+Lo que **sí** sigue existiendo es la corrección del tiempo declarado, y
+conviene entenderla porque parece un error y no lo es: quien declara **poca**
+latencia y llega **muy** tarde se perjudica. Si dice tener 400 ms pero su
+paquete tardó 1400, el piso lo empuja hacia adelante. Antes eso lo podía dejar
+fuera de la ventana; ahora sólo le empeora el número anotado. El servidor no
+puede creerle un tiempo que su propia llegada desmiente.
 
 ## Acciones duplicadas
 

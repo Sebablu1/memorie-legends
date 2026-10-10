@@ -154,7 +154,15 @@ console.log("\n=== 1. El plazo existe y dura 20 segundos ===");
    * implementación: es cuánto tiempo tiene alguien para la decisión más cara
    * de la ronda, y cambiarlo sin querer —o «redondearlo»— cambia el juego.
    */
-  ok(MS_PASO_AUTOMATICO === 20000, "son 20 segundos", MS_PASO_AUTOMATICO);
+  /*
+   * Y son DIEZ, no veinte. (Etapa 3c/3)
+   *
+   * El motivo largo está en `motor.js`, donde vive la constante: con los
+   * reflejos sin reloj, la decisión ya no sigue a la ventana sino que la
+   * contiene, así que estos segundos dejaron de ser tiempo en el que los
+   * otros tres no pueden hacer nada.
+   */
+  ok(MS_PASO_AUTOMATICO === 10000, "son 10 segundos", MS_PASO_AUTOMATICO);
   ok(MS_PASO_AUTOMATICO === DEL_MOTOR,
      "y el servidor usa la MISMA constante que la mesa de entrenamiento");
 
@@ -172,7 +180,8 @@ console.log("\n=== 1. El plazo existe y dura 20 segundos ===");
   const p = plazo(db);
   ok(p?.que === "pasarPorTiempo", "hay un plazo para pasar por tiempo", p);
   ok(p?.fase === "postLevantada", "atado a la fase", p?.fase);
-  ok(p?.hasta === reloj + MS_PASO_AUTOMATICO, "que vence a los 20 s", p?.hasta - reloj);
+  ok(p?.hasta === reloj + MS_PASO_AUTOMATICO,
+     "que vence cuando dice la constante", p?.hasta - reloj);
 }
 
 // ==================================================================== 2
@@ -203,21 +212,33 @@ console.log("\n=== 3. Latir NO renueva el plazo ===");
   await enPostLevantada(db, red, "ana");
   const vence = plazo(db).hasta;
 
-  for (let i = 0; i < 15; i++) {
-    reloj += 1000;
+  /*
+   * Los latidos se reparten en la PRIMERA MITAD del plazo, y el número sale
+   * de la constante. (Etapa 3c/3)
+   *
+   * Estaban escritos a mano: quince de 1000 ms y después `MS_PASO_AUTOMATICO
+   * - 15000`. Con veinte segundos cerraba; con diez, esa resta es NEGATIVA y
+   * el reloj iría para atrás. Que la prueba siguiera pasando fue casualidad
+   * —los quince más los menos cinco daban los diez justos— y una casualidad
+   * no es una prueba.
+   */
+  const mitad = MS_PASO_AUTOMATICO / 2;
+  const cada = mitad / 5;
+  for (let i = 0; i < 5; i++) {
+    reloj += cada;
     await red.latir({ uid: "ana", codigo: CODIGO });
     await red.latir({ uid: "beto", codigo: CODIGO });
   }
 
   ok(plazo(db).hasta === vence,
-     "quince latidos repartidos en 15 s no corren el vencimiento", plazo(db).hasta - vence);
+     "latir repetido durante media espera no corre el vencimiento", plazo(db).hasta - vence);
 
-  // Los 5 s que le faltaban al plazo original. Si latir lo hubiera renovado,
-  // acá todavía faltarían 15 y este golpe no haría nada.
-  reloj += MS_PASO_AUTOMATICO - 15000;
+  // Lo que le faltaba al plazo original. Si latir lo hubiera renovado, acá
+  // todavía faltaría media espera y este golpe no haría nada.
+  reloj += mitad;
   const r = await red.avanzarPartida({ codigo: CODIGO });
   ok(r.hizo === "pasarPorTiempo",
-     "y a los 20 s del arranque pasa, contados desde que entró en la fase", r);
+     "y al cumplirse pasa, contado desde que entró en la fase", r);
 }
 
 // ==================================================================== 4

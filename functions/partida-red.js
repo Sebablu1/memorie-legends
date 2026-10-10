@@ -38,7 +38,6 @@ import {
   MS_VENTANA_TOTAL,
   crearVentana,
   registrarIntento,
-  venceEn,
   yaVencio,
   entregasPendientes,
   MS_GRACIA_ENTREGA,

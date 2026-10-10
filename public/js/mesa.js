@@ -622,13 +622,21 @@ async function heVuelto() {
  *
  *   - `MS_TURNO` (8 s) — levantar del mazo. Si se agota, se pierde la
  *     levantada y el turno pasa al siguiente.
- *   - `MS_PARA_DECIDIR` (10 s) — qué hacer con la carta que ya se tiene en la
- *     mano: tirarla, cambiarla, usar el poder.
- *   - `MS_PASO_AUTOMATICO` (20 s) — cortar o pasar. Es el más largo porque es
- *     la decisión que más se piensa, y perderla por apuro se paga en puntos.
+ *   - `MS_PARA_DECIDIR` (5 s) — qué hacer con la carta que ya se tiene en la
+ *     mano: tirarla, cambiarla, usar el poder. Decía 10, y son 10 los de la
+ *     caja del poder: desde `6897faa` las dos no duran lo mismo y hay una
+ *     función, `msDeLaDecision(fase)`, justamente porque son dos.
+ *   - `MS_PASO_AUTOMATICO` (10 s) — cortar o pasar.
  *
- * Ya no queda ninguna acción sin reloj: una mesa donde alguien puede no hacer
- * nada indefinidamente es una mesa que los otros tres abandonan.
+ * Y uno que se fue: la ventana de reflejos EN RED no tiene reloj. (Etapa 3)
+ * Dura lo que dure la muestra y la cierra el jugador en turno al cambiarla.
+ * En entrenamiento sigue durando `MS_DESCARTE`, que son 2 s, y la barra la
+ * dibuja `faseDescarte` con su propio temporizador.
+ *
+ * Ninguna acción queda sin reloj POR DESCUIDO: una mesa donde alguien puede
+ * no hacer nada indefinidamente es una mesa que los otros tres abandonan. La
+ * de los reflejos no tiene reloj a propósito, y no deja a nadie esperando —el
+ * que tiene el turno puede jugar con ella abierta—.
  *
  * `MS_TURNO` se importa del motor —ver la nota que tiene allá— en vez de
  * declararse acá, que es como estaba y como se separan las copias.
@@ -1259,15 +1267,64 @@ function avisarSiMeToca() {
   cartel(cual, { tuyo: true });
 }
 
-/** Marca como pulsables sólo las cartas que la fase actual permite tocar. */
+/**
+ * ¿Están abiertos los reflejos?
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA MITAD DEL CLIENTE QUE FALTABA (Etapa 3c/3)
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * En red manda la VENTANA, no la fase. Es la misma relajación que la etapa 3a
+ * llevó al motor y la 3b al orquestador, y acá es la pieza sin la cual el
+ * resto no sirve para nada: la ventana queda abierta mientras el siguiente
+ * juega su turno, así que la fase ya es `turno` —o `levantada`, o `poder`—
+ * mientras los cuatro todavía pueden reaccionar. Preguntar por la fase dejaba
+ * la mesa SIN REFLEJOS: en la práctica, los dos o tres golpes que la fase
+ * tarda en salir de `descarte` al principio de la ronda, y nada después de un
+ * tiro, porque ahí la fase ni pasa por `descarte`.
+ *
+ * En ENTRENAMIENTO se sigue preguntando por la fase, y no es una excepción
+ * sino lo mismo dicho de la otra forma: allá la fase y la ventana van juntas
+ * —`ventanaDescarte != null` si y sólo si `fase === "descarte"`— porque nada
+ * adelanta la fase con la ventana abierta. Se escribe la pregunta de cada modo
+ * en vez de inventar una ventana de mentira en `comoEstado`, para que la
+ * asimetría se vea en vez de esconderse en el adaptador.
+ */
+function reflejosAbiertos(vista = miVista) {
+  if (!enRed()) return estado.fase === "descarte";
+  const v = vista?.ventana;
+  if (!v || v.cerrada) return false;
+  /*
+   * Y que YA HAYA ABIERTO, que no es lo mismo que existir.
+   *
+   * La ventana de la ronda la crea `repartir`, antes de la cuenta regresiva,
+   * con `abiertaEn` en el FUTURO. En esos cuatro segundos existe, no está
+   * cerrada, y la mirada todavía no empezó: sin esta línea las cartas se
+   * ofrecían durante la cuenta, el jugador las tocaba y el servidor le
+   * contestaba que no —rechaza igual, así que nadie miraba de más, pero la
+   * mesa le estaba mintiendo—. Lo encontró `primera-ronda-en-red.spec.js`.
+   *
+   * Es la misma condición que `aceptaLlegadas` del lado del servidor, con el
+   * mismo reloj: el del servidor, sincronizado, nunca el de la máquina.
+   */
+  return v.abiertaEn == null || v.abiertaEn <= Red.ahoraDelServidor();
+}
+
+/**
+ * Marca como pulsables sólo las cartas que se pueden tocar ahora.
+ *
+ * Decía «las que la fase actual permite tocar», y ya no es la fase la que lo
+ * decide en los tres sitios de abajo: es `reflejosAbiertos`. (Etapa 3c/3)
+ */
 function marcarCartasJugables() {
   const miMano = document.querySelector(`.jugador[data-jugador="${YO}"] .mano`);
   if (!miMano) return;
 
   // La carta que ya mandé en esta ventana queda resaltada. Es la única señal
-  // que tiene el jugador de que su toque salió: en red el resultado no se
-  // sabe hasta que la ventana cierra, hasta siete segundos después.
-  if (posicionEnviada != null && estado.fase === "descarte") {
+  // que tiene el jugador de que su toque salió. En red ya no espera ningún
+  // cierre: el resultado llega enseguida, porque el descarte se aplica al
+  // llegar. La marca igual hace falta para el viaje de ida y vuelta.
+  if (posicionEnviada != null && reflejosAbiertos()) {
     miMano
       .querySelector(`.carta[data-posicion="${posicionEnviada}"]`)
       ?.classList.add("seleccionada");
@@ -1278,7 +1335,10 @@ function marcarCartasJugables() {
     (estado.fase === "mirar" &&
       estado.jugadores[YO].posicionMirada == null &&
       !miradaTodaviaCerrada(miVista) && !enCuentaRegresiva) ||
-    estado.fase === "descarte" ||
+    // Decía `estado.fase === "descarte"`. Ver `reflejosAbiertos`: con la
+    // ventana abierta y la fase en el turno del siguiente, mis cartas tienen
+    // que seguir estando tocables. (Etapa 3c/3)
+    reflejosAbiertos() ||
     (estado.fase === "levantada" && miTurno);
 
   /**
@@ -1289,7 +1349,7 @@ function marcarCartasJugables() {
    * sigue si se mueve, así que se marca exactamente dónde está. La lista es
    * la misma en los dos modos: ver `quePosicionesPuedoAtacar`.
    */
-  if (estado.fase === "descarte") {
+  if (reflejosAbiertos()) {
     for (const { objetivo, posicion } of quePosicionesPuedoAtacar()) {
       document
         .querySelector(
@@ -2812,12 +2872,25 @@ let manejadorDescarte = null;
  * vez.
  *
  * Se apaga en las dos transiciones que cierran una ventana, una por modo: al
- * abrir la de entrenamiento, y al salir de `descarte` en red. No alcanza con
+ * abrir la de entrenamiento, y al cambiar de ventana en red. No alcanza con
  * borrar la clase del DOM: `dibujar()` reconstruye los asientos enteros en
  * cada pasada y `marcarCartasJugables` la vuelve a poner, porque el dato
  * seguía ahí.
  */
 let posicionEnviada = null;
+
+/**
+ * De qué ventana es la carta que se mandó. (Etapa 3c/3)
+ *
+ * Hace falta desde que la fase dejó de marcar el límite. La marca vale para
+ * UNA ventana, y entre una y la siguiente no queda ningún instante sin
+ * ventana: el mismo tiro que cierra una abre la otra. Sin el id, la carta
+ * marcada sobrevivía a la muestra para la que se había tocado.
+ *
+ * En entrenamiento queda en `null` y no se usa: allá el límite lo sigue
+ * poniendo la fase, y `faseDescarte` apaga `posicionEnviada` al abrir.
+ */
+let ventanaDeLoEnviado = null;
 
 /**
  * Un acierto sobre la carta de un rival que espera la carta propia a entregar.
@@ -2862,6 +2935,8 @@ function olvidarAtaque() {
 /** Deja marcada la carta que salió hacia el servidor. */
 function marcarEnviada(posicion) {
   posicionEnviada = posicion;
+  // En red se recuerda a qué ventana pertenece: ver `ventanaDeLoEnviado`.
+  ventanaDeLoEnviado = enRed() ? (miVista?.ventana?.id ?? null) : null;
   dibujar();
 }
 
@@ -4089,6 +4164,31 @@ function pistaDeRed(vista) {
   const miTurno = vista.indiceTurno === vista.yo;
   const quien = vista.jugadores[vista.indiceTurno]?.nombre ?? "alguien";
 
+  /**
+   * EL AVISO DE QUE LOS REFLEJOS SIGUEN ABIERTOS. (Etapa 3c/3)
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * POR QUÉ ES UN AVISO PERMANENTE Y NO UNO QUE SE APRENDE
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Lo que cambió no es una pantalla, es una regla, y una regla que la mesa no
+   * muestra en ninguna otra parte. Antes el cronómetro de reflejos ERA el
+   * aviso: la barra bajando decía «ahora, y hasta que esto se vacíe». Esa
+   * barra se fue en la etapa 3b —medía un tiempo que ya nadie mide— y si no
+   * se dice nada, lo único que el jugador ve es que le toca a otro. No tiene
+   * cómo saber que sus cartas siguen tocables.
+   *
+   * Así que va pegado a la pista de la fase, y mientras la ventana esté
+   * abierta. Un `pistaSiAprende` —que se muestra dos veces y se calla— sería
+   * suficiente para enseñar la mecánica, pero no para lo otro que esta línea
+   * hace: decir hasta CUÁNDO. El límite ya no es un número que se pueda
+   * aprender de memoria, es un acontecimiento, y cambia en cada mano.
+   */
+  const conReflejos = (texto) =>
+    reflejosAbiertos(vista)
+      ? `${texto} — <b>Reflejos abiertos</b>, sin reloj: hasta que se tire.`
+      : texto;
+
   switch (vista.fase) {
     case "mirar":
       // Sólo números: los nombres no hacen falta para saber que falta alguien.
@@ -4101,13 +4201,14 @@ function pistaDeRed(vista) {
       }
       return "Tocá <b>una</b> carta tuya para memorizarla.";
     case "descarte":
-      return "<b>¡Reflejos!</b> Tocá una carta que creas igual a la muestra.";
+      return "<b>¡Reflejos!</b> Tocá una carta que creas igual a la muestra. " +
+             "Sin reloj: tenés hasta que el de turno tire.";
     case "turno":
-      return miTurno
+      return conReflejos(miTurno
         ? "Es tu turno. <b>Levantá</b> del mazo."
-        : `Juega <b>${quien}</b>.`;
+        : `Juega <b>${quien}</b>.`);
     case "levantada": {
-      if (!miTurno) return `<b>${quien}</b> está decidiendo.`;
+      if (!miTurno) return conReflejos(`<b>${quien}</b> está decidiendo.`);
       /**
        * Con una carta de poder en la mano, la pista dice QUÉ se pierde.
        *
@@ -4123,19 +4224,19 @@ function pistaDeRed(vista) {
        * saber que es un poder, y así tiene que seguir siendo.
        */
       const poder = PODERES[vista.levantada?.numero];
-      return poder
+      return conReflejos(poder
         ? `Levantaste un <b>${vista.levantada.numero}</b>. <b>Tirala</b> para usar el poder, ` +
             "o tocá una de tus cartas para <b>cambiarla</b> (perdés el poder)."
-        : "Cambiala por una tuya, o tirala.";
+        : "Cambiala por una tuya, o tirala.");
     }
     case "poder":
-      return miTurno
+      return conReflejos(miTurno
         ? "Levantaste un poder."
-        : `<b>${quien}</b> tiene un poder.`;
+        : `<b>${quien}</b> tiene un poder.`);
     case "postLevantada":
-      return miTurno
+      return conReflejos(miTurno
         ? "Podés <b>cortar</b> o <b>pasar</b>."
-        : `<b>${quien}</b> decide si corta.`;
+        : `<b>${quien}</b> decide si corta.`);
     case "finRonda":
       return `Ronda ${vista.ronda} terminada.`;
     case "finPartida":
@@ -4149,26 +4250,29 @@ function pistaDeRed(vista) {
 /**
  * Revelaciones ya mostradas, para no volver a destaparlas.
  *
- * El servidor mantiene la fase en `descarte` durante los dos segundos, así
- * que en ese lapso pueden llegar varias vistas con la misma revelación. Sin
- * esta marca, cada una rearmaría el temporizador y la carta se quedaría
- * destapada mientras siguieran llegando.
+ * Una carta expuesta viaja en varias vistas seguidas —la ventana queda
+ * abierta y la mesa publica cada vez que alguien hace algo— y sin esta marca
+ * cada una rearmaría el temporizador: la carta se quedaría destapada mientras
+ * siguieran llegando vistas.
  */
 const yaRevelado = new Set();
 
 /**
  * Destapa lo que el servidor expuso, y lo tapa a los dos segundos.
  *
- * El servidor no puede tapar por reloj —el motor es determinista y no lo
- * mira—, así que expone las cartas mientras dura la revelación y es cada
- * mesa la que las tapa. Que después el servidor cierre la fase es la segunda
- * red: aunque este temporizador no llegara a correr, la vista siguiente ya
- * viene tapada.
+ * El motor no puede tapar por reloj —es determinista y no mira ninguno— así
+ * que expone la carta y cada mesa la tapa. La segunda red es el orquestador,
+ * que desde la etapa 3b sella la hora de cada intento, filtra la vista por
+ * ella y vuelve a publicar al cumplirse los dos segundos: aunque este
+ * temporizador no llegara a correr, la vista siguiente ya viene tapada.
  */
 function mostrarRevelaciones(vista) {
-  if (vista.fase !== "descarte") {
-    // Fuera de la fase no hay nada expuesto, y las marcas de la ventana
-    // anterior ya no sirven para nada.
+  // Decía `vista.fase !== "descarte"`, y con la ventana viva durante el turno
+  // del siguiente eso tapaba lo expuesto antes de que nadie lo viera.
+  // (Etapa 3c/3)
+  if (!reflejosAbiertos(vista)) {
+    // Sin ventana abierta no hay nada expuesto, y las marcas de la anterior
+    // ya no sirven para nada.
     yaRevelado.clear();
     return;
   }
@@ -4468,12 +4572,19 @@ function mostrarMiradas(vista) {
 /**
  * Pinta lo que publicó el servidor. Nada más.
  *
- * Acá NO se cierra ninguna ventana por reloj propio. El servidor guarda el
- * plazo de cada una y la cierra cuando vence; `mantenerEnMarcha` sólo le
- * golpea la puerta cada 900 ms para preguntarle. Un temporizador del navegador
- * con un número fijo no puede saber cuánto dura la ventana que está mirando:
- * la de la ronda vence a los 9 s y la que reabre tirar a los 5, y cerrar antes
- * de tiempo se come la gracia y pierde jugadas legítimas que venían en camino.
+ * Acá NO se cierra ninguna ventana, y ahora menos que antes. (Etapa 3c/3)
+ *
+ * Decía que el servidor guarda el plazo de cada ventana y la cierra al vencer,
+ * y que un temporizador del navegador con un número fijo no podía saber cuánto
+ * duraba la que estaba mirando —9 s la de la ronda, 5 la que reabría tirar—.
+ * Esos números ya no existen: la ventana no vence. La cierra el jugador en
+ * turno cuando cambia la muestra, y hasta entonces dura lo que dure.
+ *
+ * Así que el motivo cambió y la conclusión es la misma, más fuerte: no hay
+ * ningún número que esta mesa pudiera usar para cerrar nada. Lo que sí sigue
+ * golpeando `mantenerEnMarcha` cada 900 ms son los plazos que quedan —el
+ * turno, las decisiones, tapar lo expuesto— y los mira el servidor con su
+ * reloj, no éste.
  */
 function pintarVista(vista) {
   miVista = vista;
@@ -4485,14 +4596,28 @@ function pintarVista(vista) {
   // Si la fase dejó de ser la del poder —porque se resolvió, o porque a un
   // ausente se lo saltearon— la elección en curso ya no tiene sentido.
 
-  // Y lo mismo con la carta que se mandó a descartar: vale mientras dure SU
-  // ventana. Entre una ventana y la siguiente la fase pasa por turno o por
-  // postLevantada, así que salir de `descarte` es el momento exacto.
-  if (vista.fase !== "descarte" && posicionEnviada != null)
+  /*
+   * Y lo mismo con la carta que se mandó a descartar: vale mientras dure SU
+   * ventana. (Etapa 3c/3)
+   *
+   * Decía `vista.fase !== "descarte"`, con el razonamiento de que entre una
+   * ventana y la siguiente la fase pasa por `turno` o `postLevantada`. Eso
+   * dejó de ser cierto: ahora la fase pasa por ahí CON la ventana abierta, así
+   * que la marca se borraba en el primer repintado y el jugador perdía la
+   * única señal de que su toque salió.
+   *
+   * Lo que marca el límite es la ventana, y hay que mirar su id además de si
+   * está abierta: entre una y otra no queda ningún momento sin ventana —la
+   * cierra el mismo tiro que abre la siguiente— así que preguntar sólo por
+   * `cerrada` no vería nunca el cambio.
+   */
+  if (posicionEnviada != null &&
+      (!reflejosAbiertos(vista) || vista.ventana?.id !== ventanaDeLoEnviado))
     posicionEnviada = null;
-  // Y el acierto que esperaba su carta, igual: resuelta la ventana, el
+  // Y el acierto que esperaba su carta, igual: cambiada la muestra, el
   // servidor ya eligió al azar. Sin esto la mesa quedaba apagada para siempre.
-  if (atacando && (vista.fase !== "descarte" || vista.ventana?.cerrada))
+  if (atacando &&
+      (!reflejosAbiertos(vista) || vista.ventana?.id !== atacando.ventana?.id))
     olvidarAtaque();
   estado = comoEstado(vista);
   // Antes de dibujar: si algo se expuso, tiene que verse en este mismo pintado.
@@ -5216,7 +5341,7 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
    * la entrega no llegaba nunca —el ataque al rival no salía jamás— y un
    * doble toque terminaba en un descarte propio que casi siempre fallaba.
    */
-  if (miVista.fase === "descarte" && atacando && indiceJugador === YO) {
+  if (reflejosAbiertos() && atacando && indiceJugador === YO) {
     const pendiente = atacando;
     olvidarAtaque();
     dibujar();
@@ -5235,7 +5360,7 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
     return;
   }
   // Con un acierto esperando su carta, lo demás de la ventana espera.
-  if (miVista.fase === "descarte" && atacando) return;
+  if (reflejosAbiertos() && atacando) return;
 
   // ---- Resto del código original (poderes, mirar, etc.) ----
   if (miVista.fase === "mirar" && indiceJugador === YO) {
@@ -5294,7 +5419,7 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
 
   // Una carta de un rival que conozco. Sólo ésa: la lista viene del servidor.
   if (
-    miVista.fase === "descarte" &&
+    reflejosAbiertos() &&
     indiceJugador !== YO &&
     puedoAtacarAhi(indiceJugador, posicion)
   ) {
@@ -5345,12 +5470,12 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
   }
 
   // Una carta ajena que no conozco: no hay intento, y se dice por qué.
-  if (miVista.fase === "descarte" && indiceJugador !== YO) {
+  if (reflejosAbiertos() && indiceJugador !== YO) {
     if (dobleClic) pista("⚠️ Esa carta no la conocés");
     return;
   }
 
-  if (miVista.fase === "descarte" && indiceJugador === YO) {
+  if (reflejosAbiertos() && indiceJugador === YO) {
     const ventana = miVista.ventana;
     if (!ventana || ventana.cerrada) return;
 

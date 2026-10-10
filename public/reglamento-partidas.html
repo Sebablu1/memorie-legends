@@ -199,8 +199,14 @@
         <li class="panel fase destacada" id="reflejos">
           <span class="numero">3</span>
           <div>
-            <h3>Descarte por reflejos · 2 segundos</h3>
-            <p>Todos pueden descartar a la vez, y acá se define media partida:</p>
+            <h3>Descarte por reflejos · hasta el tiro siguiente</h3>
+            <p>
+              Todos pueden descartar a la vez, y acá se define media partida. La ventana
+              <b>no tiene cronómetro</b>: se abre cuando cae la muestra y se cierra cuando
+              el jugador en turno tira. Pasar el turno no la cierra — mientras la muestra
+              siga ahí, los reflejos sobre ella siguen valiendo, aunque pasen varios turnos.
+            </p>
+            <p>Y lo que pasa es esto:</p>
             <ul class="lista">
               <li><b class="bueno">Acertás primero:</b> te sacás la carta de encima, sin castigo, y pasa a ser la muestra.</li>
               <li><b>Acertás tarde:</b> conservás tu carta y sumás una de castigo, y la que intentaste tirar queda a la vista de todos durante 2 segundos.</li>
@@ -211,6 +217,12 @@
               tenés <b>un intento por ventana</b> — el primero que mandás es el que cuenta,
               así que un roce no se cobra dos veces. La carta de castigo entra
               <b>boca abajo</b>: no la ve nadie, ni vos.
+            </p>
+            <p class="pie-nota">
+              Tu descarte se aplica <b>en el momento en que llega al servidor</b>, y la mesa
+              lo ve ahí mismo. Si dos tocan casi juntos, gana el que llegó primero.
+              <b>En entrenamiento</b> la ventana sí tiene reloj: dura 2 segundos, porque del
+              otro lado no hay nadie a quien esperar.
             </p>
           </div>
         </li>
@@ -224,12 +236,12 @@
               jugador levanta una carta y tiene 5 segundos para elegir:
             </p>
             <ul class="lista">
-              <li><b>Cambiarla</b> por una de las suyas, en cualquier posición. La que sale queda de muestra y abre una ventana de reflejos de 3 segundos.</li>
+              <li><b>Cambiarla</b> por una de las suyas, en cualquier posición. La que sale queda de muestra y abre una ventana de reflejos nueva, que cierra el tiro siguiente.</li>
               <li><b>Tirarla</b> directamente, sin cambiarla. Si es 7, 8, 9 o 10, se activa su poder.</li>
             </ul>
             <p class="pie-nota">
-              Si se te vencen los 8 segundos, se levanta por vos; si se vencen los 10, la
-              carta se tira.
+              Si se te vencen los 8 segundos, se levanta por vos; si se vencen los 5 de
+              decidir, la carta se tira.
             </p>
           </div>
         </li>
@@ -386,21 +398,28 @@
           <tbody>
             <tr><td>Elegir la carta de la mirada inicial</td><td class="num">5 s</td><td>Se abre la primera</td></tr>
             <tr><td>Ver la carta mirada</td><td class="num">2 s</td><td>Se tapa</td></tr>
-            <tr><td>Descarte por reflejos</td><td class="num">2 s</td><td>Se cierra la ventana</td></tr>
-            <tr><td>Gracia de red para un toque</td><td class="num">2 s</td><td>Se rechaza el intento</td></tr>
+            <tr><td>Descarte por reflejos</td><td class="num">2 s</td><td>Se cierra — <b>sólo en entrenamiento</b>: en Leyendas la cierra el tiro siguiente</td></tr>
+            <tr><td>Gracia de red para un toque</td><td class="num">2 s</td><td>Ya no se aplica: sin cronómetro no hay borde que cubrir</td></tr>
             <tr><td>Revelación por error o acierto tarde</td><td class="num">2 s</td><td>Se tapa</td></tr>
             <tr><td>Levantar del mazo</td><td class="num">8 s</td><td>Se levanta y se tira</td></tr>
             <tr><td>Decidir qué hacer con la levantada</td><td class="num">5 s</td><td>Se tira</td></tr>
             <tr><td>Resolver un poder</td><td class="num">10 s</td><td>Se saltea</td></tr>
-            <tr><td>Cortar o pasar</td><td class="num">20 s</td><td>Pasa, y quedás ausente</td></tr>
+            <tr><td>Cortar o pasar</td><td class="num">10 s</td><td>Pasa, y quedás ausente</td></tr>
             <tr><td>Elegir la carta que entregás tras un acierto</td><td class="num">5 s</td><td>La elige el azar</td></tr>
-            <tr><td>Ventana de reapertura al cambiar la muestra</td><td class="num">3 s</td><td>Se cierra</td></tr>
-            <tr><td>Ventana privada después de un poder</td><td class="num">3 s</td><td>Se cierra</td></tr>
+            <tr><td>Ventana de reapertura al cambiar la muestra</td><td class="num">3 s</td><td>Se cierra — <b>sólo en entrenamiento</b></td></tr>
+            <tr><td>Ventana privada después de un poder</td><td class="num">3 s</td><td>Se cierra — <b>sólo en entrenamiento</b></td></tr>
             <tr><td>Espera de jugadores en la primera ronda</td><td class="num">15 s</td><td>Arranca igual</td></tr>
             <tr><td>Cuenta regresiva antes de la primera mirada</td><td class="num">4 s</td><td>Empieza la mirada</td></tr>
           </tbody>
         </table>
-        <p class="pie-nota">Los mismos tiempos en entrenamiento y en partidas por Leyendas.</p>
+        <p class="pie-nota">
+          Los mismos tiempos en entrenamiento y en partidas por Leyendas, con una
+          excepción: la <b>ventana de reflejos</b>. En Leyendas no tiene reloj —vive
+          mientras viva la muestra y la cierra el tiro del jugador en turno—, así que las
+          filas marcadas valen sólo para el entrenamiento. Los números de la columna del
+          medio son los que están escritos en el código del juego, y una prueba
+          automática los compara fila por fila.
+        </p>
       </section>
 
       <!-- ------------------------------------------------- fin y IAs -->
