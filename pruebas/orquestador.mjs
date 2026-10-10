@@ -321,6 +321,81 @@ console.log("\n=== 3c. Nunca se abren dos ventanas ===");
   ok(otra.yaEstaba === true && otra.ventana.id === v.id, "abrirVentana devuelve la misma", otra.ventana.id === v.id);
 }
 
+// ============================== 3d. pasar NO cierra la ventana
+
+console.log("\n=== 3d. Pasar el turno NO cierra la ventana ===");
+{
+  /**
+   * LA REGLA CENTRAL DE LA ETAPA 3, QUE NO ESTABA PROBADA EN NINGÚN LADO.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * «Pasar el turno no cierra la ventana: la muestra sigue siendo la misma,
+   * así que los reflejos sobre ella siguen valiendo, aunque pasen varios
+   * turnos.» Es la decisión de la que cuelga todo el cambio, y se podía
+   * romper sin que nada hiciera ruido: metiendo `ACCIONES.PASAR` en
+   * `CIERRAN_LA_VENTANA` las 84 suites seguían verdes.
+   *
+   * No se puede probar en el navegador, y por eso vive acá: allá la ventana es
+   * lo que el propio test publica, así que «sigue abierta» sería comprobar el
+   * guión del test y no el juego. Lo que decide es el servidor.
+   *
+   * Se prueba en dos mitades, porque son dos cosas distintas:
+   *
+   *   1. que la ventana sea LA MISMA —el id, no sólo que haya alguna—;
+   *   2. que siga ACEPTANDO reflejos después del pase, que es para qué queda
+   *      abierta. La primera sin la segunda pasaría con una ventana abierta
+   *      pero inservible.
+   */
+  const { db, red } = await nueva();
+  const maestro = () => db.leer(`partidas/${CODIGO}`);
+
+  // Se llega a `postLevantada` jugando: la mano tira y queda decidiendo.
+  reloj += MS_MIRADA_TOTAL;
+  await red.avanzarPartida({ codigo: CODIGO });   // cerrar la mirada
+  await red.avanzarPartida({ codigo: CODIGO });   // arrancar el turno
+  const enTurno = CUATRO[maestro().estado.indiceTurno];
+  await red.accionDeTurno({ uid: enTurno, codigo: CODIGO, accion: "levantar", clientActionId: "l3d" });
+  await red.accionDeTurno({ uid: enTurno, codigo: CODIGO, accion: "tirar", clientActionId: "t3d" });
+
+  // El tiro abrió la ventana de ESTA muestra. Es la que tiene que sobrevivir.
+  const deLaMuestra = maestro().ventana;
+  const muestra = maestro().estado.descarte[0];
+  ok(deLaMuestra && !deLaMuestra.cerrada, "el tiro abre la ventana de su muestra");
+  ok(maestro().estado.fase === "postLevantada" || maestro().estado.fase === "poder",
+     "y el que tiró queda decidiendo", maestro().estado.fase);
+
+  // Si tiró un poder, lo saltea: lo que se prueba es el pase, no el poder.
+  if (maestro().estado.fase === "poder") {
+    await red.accionDeTurno({ uid: enTurno, codigo: CODIGO, accion: "saltarPoder", clientActionId: "sp3d" });
+  }
+
+  reloj += 1000;
+  await red.accionDeTurno({ uid: enTurno, codigo: CODIGO, accion: "pasar", clientActionId: "p3d" });
+
+  // 1. La MISMA ventana, no otra abierta en su lugar.
+  const trasPasar = maestro().ventana;
+  ok(trasPasar.id === deLaMuestra.id, "tras pasar, la ventana es la misma",
+     [trasPasar.id, deLaMuestra.id]);
+  ok(trasPasar.cerrada === false, "y sigue abierta", trasPasar.cerrada);
+  ok(trasPasar.abiertaEn === deLaMuestra.abiertaEn,
+     "con su hora de apertura original: no se reabrió", trasPasar.abiertaEn);
+  ok(maestro().estado.descarte[0]?.id === muestra.id,
+     "y la muestra no se movió", maestro().estado.descarte[0]?.id);
+  ok(maestro().estado.indiceTurno !== CUATRO.indexOf(enTurno),
+     "el turno sí pasó al siguiente", maestro().estado.indiceTurno);
+
+  // 2. Y sigue sirviendo: un reflejo entra DESPUÉS del pase.
+  const otro = CUATRO.find((u) => u !== enTurno);
+  reloj += 500;
+  const reflejo = await capturar(() => red.intentarDescarte({
+    uid: otro, codigo: CODIGO, windowId: trasPasar.id, posicion: 0,
+    clientActionId: "r3d", declarado: 1400, latencia: 40, incertidumbre: 20,
+  }));
+  ok(reflejo.valor?.anotado === true,
+     "y un reflejo del siguiente entra sobre la misma muestra", reflejo.error?.message);
+}
+
 // ============================================ 4. reconexión en ventana
 
 console.log("\n=== 4. Reconexión en plena ventana ===");
