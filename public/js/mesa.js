@@ -4184,10 +4184,23 @@ function pistaDeRed(vista) {
    * hace: decir hasta CUÁNDO. El límite ya no es un número que se pueda
    * aprender de memoria, es un acontecimiento, y cambia en cada mano.
    */
-  const conReflejos = (texto) =>
-    reflejosAbiertos(vista)
-      ? `${texto} — <b>Reflejos abiertos</b>, sin reloj: hasta que se tire.`
-      : texto;
+  const conReflejos = (texto) => {
+    if (!reflejosAbiertos(vista)) return texto;
+    /*
+     * En MI levantada el aviso se acota, y no es un detalle de redacción.
+     *
+     * Mi mano, en mi levantada, es para cambiar: el reflejo sobre lo propio
+     * espera (ver `clicEnCartaDeRed`). Si acá dijera «reflejos abiertos» a
+     * secas, el jugador tocaría su carta esperando descartarla y vería que
+     * se la cambia — exactamente la confusión que el arreglo del bug de 3c
+     * tiene que evitar, no heredar. Sobre las cartas de los demás sigue
+     * abierto, así que se dice eso.
+     */
+    const soloAjenas = vista.fase === "levantada" && miTurno;
+    return soloAjenas
+      ? `${texto} — <b>Reflejos abiertos</b> sobre las cartas de los demás.`
+      : `${texto} — <b>Reflejos abiertos</b>, sin reloj: hasta que se tire.`;
+  };
 
   switch (vista.fase) {
     case "mirar":
@@ -5475,7 +5488,51 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
     return;
   }
 
-  if (reflejosAbiertos() && indiceJugador === YO) {
+  /*
+   * MI PROPIA MANO, EN MI PROPIA `levantada`, ES PARA CAMBIAR.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * EL BUG QUE SE LLEVÓ «CAMBIAR POR UNA MÍA» EN RED
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * Esta rama y la del cambio —la última de la función— se reparten los toques
+   * sobre la mano propia, y durante años no se pisaron porque pedían fases
+   * distintas que nunca eran verdad a la vez: el descarte quería `descarte` y
+   * el cambio quiere `levantada`.
+   *
+   * La etapa 3c cambió la condición de acá por `reflejosAbiertos()`, y la 3b
+   * dejó la ventana abierta TAMBIÉN durante la levantada. Las dos pasaron a
+   * ser verdad al mismo tiempo, y como esta rama va primero se quedaba con el
+   * toque: un clic simple mostraba «tocá dos veces para descartar» —y sólo las
+   * dos primeras veces, por `pistaSiAprende`— y después nada. Ningún pedido al
+   * servidor, ningún error en consola. En entrenamiento seguía andando, porque
+   * allá la ventana sí se cierra antes de la levantada.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * POR QUÉ GANA EL CAMBIO, Y QUÉ CUESTA
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * El toque es genuinamente ambiguo: con la ventana abierta y una carta en la
+   * mano, tocar una propia puede querer decir «cambiala» o «descartala». No se
+   * puede resolver por simple contra doble, que sería lo elegante: un doble
+   * toque llega como DOS llamadas, la primera con `dobleClic` en falso, así
+   * que el primer toque de un descarte habría cambiado una carta — destruyendo
+   * la mano de alguien que quería lo otro.
+   *
+   * Así que en MI levantada la mano propia es para cambiar, y el reflejo sobre
+   * mi mano espera. Lo que cuesta: esos segundos no puedo descartarme una
+   * carta a mí mismo. Es poco y es coherente — tuve el turno entero del
+   * anterior para hacerlo, y soy yo el que está por cerrar la ventana al
+   * tirar; una vez que levanté, estoy en mi turno.
+   *
+   * Lo que NO cuesta: atacar la carta de un rival sigue andando (es otra rama,
+   * y no se pisa con nada), y en la levantada de OTRO mi mano sigue siendo
+   * mía para descartar, que es lo que la etapa 3 vino a habilitar.
+   */
+  const miManoEsParaCambiar =
+    miVista.fase === "levantada" && miVista.indiceTurno === YO;
+
+  if (reflejosAbiertos() && indiceJugador === YO && !miManoEsParaCambiar) {
     const ventana = miVista.ventana;
     if (!ventana || ventana.cerrada) return;
 

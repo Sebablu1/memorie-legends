@@ -113,7 +113,11 @@ const partidaFalsa = `
   export const tirarCarta = async () => {};
   export const cortar = async () => {};
   export const pasarTurno = async () => {};
-  export const cambiarCarta = async () => {};
+  // Anota, porque hasta ahora no: era un sello vacío, y ningún spec podía
+  // ver si la jugada salía. Por ese agujero pasó el bug de la etapa 3c.
+  export const cambiarCarta = async (codigo, posicion) => {
+    window.__pedidos.push({ nombre: "cambiarCarta", posicion });
+  };
   export const resolverCambio = async () => {};
   export const saltarPoder = async () => {};
   // Contesta como el servidor: si fue contra un rival, si acertó y hasta
@@ -145,7 +149,7 @@ const partidaFalsa = `
     indiceCortador: null, desempate: false, registro: [],
     cartasEnMazo: 20, cartasEnDescarte: 1,
     muestra: { id: "Copa-5", numero: 5, palo: "copa" },
-    levantada: null, poderPendiente: null, cambioPendiente: null,
+    levantada: paso.levantada ?? null, poderPendiente: null, cambioPendiente: null,
     /*
      * La ventana la decide el PASO, no la fase. (Etapa 3c/3)
      *
@@ -392,6 +396,67 @@ test("con la ventana abierta y el turno de otro, los reflejos siguen vivos", asy
 
 test("y el descarte de la propia mano también, fuera de la fase de descarte", async ({ page }) => {
   const errores = await abrirRed(page, [{ fase: "turno", indiceTurno: 2 }]);
+
+  await carta(page, 0, 1).dblclick();
+  await expect.poll(() => pedidos(page)).toEqual([
+    { nombre: "intentarDescarte", posicion: 1, rival: null },
+  ]);
+  expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
+});
+
+// =====================================================================
+// El bug que motivó el rollback de la etapa 3.
+// =====================================================================
+
+test("con la levantada en la mano, tocar una carta propia la CAMBIA", async ({ page }) => {
+  /**
+   * EL AGUJERO POR EL QUE SE FUE «CAMBIAR POR UNA MÍA» EN RED.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * `clicEnCartaDeRed` resuelve los toques en orden, y la rama del descarte
+   * propio está ANTES que la del cambio. Eso funcionaba porque las dos
+   * pedían fases distintas y nunca eran verdad a la vez: el descarte quería
+   * `descarte` y el cambio quiere `levantada`.
+   *
+   * La etapa 3c cambió la primera por «¿está abierta la ventana?», y desde la
+   * 3b la ventana está abierta TAMBIÉN durante la levantada. Así que la rama
+   * del descarte se quedaba con el toque, y el cambio dejaba de existir: con
+   * un toque simple salía la pista «tocá dos veces para descartar» —y sólo las
+   * dos primeras veces, por `pistaSiAprende`— y después, nada. Ningún pedido
+   * al servidor, ningún error en consola.
+   *
+   * Ningún spec lo vio porque el doble de `cambiarCarta` era un sello vacío
+   * que no anotaba nada. Ahora anota, y esta prueba mira el pedido.
+   */
+  const errores = await abrirRed(page, [
+    {
+      fase: "levantada",
+      indiceTurno: 0,
+      levantada: { id: "Oro-7", numero: 7, palo: "oro" },
+    },
+  ]);
+
+  await carta(page, 0, 2).click();
+  await expect.poll(() => pedidos(page)).toEqual([
+    { nombre: "cambiarCarta", posicion: 2 },
+  ]);
+  expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
+});
+
+test("y en la levantada de OTRO, la carta propia sigue siendo un reflejo", async ({ page }) => {
+  /*
+   * La otra mitad, para que el arreglo no se pase de largo: la excepción es
+   * sólo para MI levantada. Si el que decide es otro, mi mano sigue siendo
+   * mía para descartar — que es justamente lo que la etapa 3 vino a habilitar.
+   */
+  const errores = await abrirRed(page, [
+    {
+      fase: "levantada",
+      indiceTurno: 2,
+      levantada: { id: "Oro-7", numero: 7, palo: "oro" },
+    },
+  ]);
 
   await carta(page, 0, 1).dblclick();
   await expect.poll(() => pedidos(page)).toEqual([
