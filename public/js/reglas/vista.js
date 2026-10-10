@@ -38,7 +38,30 @@ export const HUECO = null;
  */
 export const MS_REVELACION = 2000;
 
-export function revelacionesDe(estado) {
+/**
+ * Las cartas que alguien erró y la mesa está viendo.
+ *
+ * `sigueExpuesta(indiceJugador, posicion)` es opcional y SÓLO la usa red.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ HACE FALTA UN FILTRO, Y POR QUÉ NO LO DECIDE EL MOTOR
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Errar expone tu carta a la mesa dos segundos: ése es el castigo. El motor
+ * no puede medirlos —tiene que seguir siendo determinista, sin relojes— así
+ * que expone mientras dure la ventana y cada cliente la tapa a los dos
+ * segundos. Mientras la ventana duraba 2 o 3 segundos eso alcanzaba.
+ *
+ * En red ya no: la ventana vive todo el turno del siguiente. La carta se
+ * seguiría viendo tapada en pantalla, pero el dato viajaría en la vista
+ * durante un turno entero en vez de dos segundos, y eso es justo lo que
+ * `filtraciones.mjs` existe para impedir.
+ *
+ * Así que el reloj lo pone quien lo tiene: el orquestador sella la hora de
+ * cada intento y pasa este filtro. El motor sigue sin mirar ningún reloj, y
+ * entrenamiento —que no pasa nada— sigue exponiendo como siempre.
+ */
+export function revelacionesDe(estado, sigueExpuesta = () => true) {
   // Manda la ventana, no la fase: la misma relajación que en `motor.js`, y
   // por el mismo motivo. En red la fase se adelanta para que el siguiente
   // pueda jugar mientras los reflejos siguen abiertos; si esto mirara la
@@ -47,12 +70,13 @@ export function revelacionesDe(estado) {
   // condición que queda es la única que hacía falta.
   if (!estado.ventanaDescarte) return [];
   // La misma lista que usa la mesa de entrenamiento: ver `cartasExpuestas`.
-  return cartasExpuestas(estado.ventanaDescarte?.intentos ?? []);
+  return cartasExpuestas(estado.ventanaDescarte?.intentos ?? [])
+    .filter((r) => sigueExpuesta(r.indiceJugador, r.posicion));
 }
 
-function posicionesReveladas(estado) {
+function posicionesReveladas(estado, sigueExpuesta) {
   const mapa = new Map();
-  for (const r of revelacionesDe(estado)) {
+  for (const r of revelacionesDe(estado, sigueExpuesta)) {
     mapa.set(`${r.indiceJugador}:${r.posicion}`, r.carta);
   }
   return mapa;
@@ -84,8 +108,8 @@ function redactarMano(mano, indiceDuenio, reveladas, rondaTerminada) {
  * @param estado      estado completo del motor
  * @param indiceQuienMira  a quién se le va a mandar
  */
-export function vistaDe(estado, indiceQuienMira) {
-  const reveladas = posicionesReveladas(estado);
+export function vistaDe(estado, indiceQuienMira, sigueExpuesta = () => true) {
+  const reveladas = posicionesReveladas(estado, sigueExpuesta);
   const rondaTerminada = estado.fase === "finRonda" || estado.fase === "finPartida";
 
   return {
@@ -105,7 +129,7 @@ export function vistaDe(estado, indiceQuienMira) {
 
     // Lo que la mesa está viendo en este instante. Se vacía solo al cerrarse
     // la ventana de descarte: no hay ningún registro permanente.
-    revelaciones: revelacionesDe(estado),
+    revelaciones: revelacionesDe(estado, sigueExpuesta),
 
     // Del mazo sólo se sabe cuántas cartas quedan. Su contenido y su ORDEN
     // son secretos: conocer el orden sería saber qué va a levantar cada uno.

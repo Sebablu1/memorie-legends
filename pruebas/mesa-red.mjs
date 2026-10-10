@@ -289,25 +289,40 @@ console.log("\n=== 3. Cuatro jugadores, una ronda completa ===");
      "cada uno conserva su tiempo de reacción",
      Object.values(anotados).map((x) => x.efectivo));
 
+  /*
+   * LAS CARTAS EXPUESTAS SE MIRAN ACÁ, NO AL CERRAR. (Etapa 3b/3)
+   *
+   * Antes la mesa veía lo expuesto después del cierre: los intentos se
+   * resolvían todos juntos al vencer la ventana, y la fase se quedaba en
+   * `descarte` dos segundos más para que se vieran.
+   *
+   * Ahora cada descarte se aplica AL LLEGAR, así que cada carta expuesta
+   * empieza a contar sus dos segundos en su propio instante. Al cerrar ya no
+   * hay nada nuevo que mostrar, y con el reloj puesto once segundos después
+   * no quedaría nada expuesto: no es que no se expusiera, es que ya pasó.
+   *
+   * El último en llegar es dani, en el 100590, así que acá los cuatro están
+   * dentro de sus dos segundos.
+   */
+  const expuestas = M.map((m) => (m.vista.revelaciones ?? []).length);
+  ok(expuestas.every((n) => n === expuestas[0] && n > 0),
+     "las cuatro mesas reciben las mismas revelaciones, ya durante la ventana",
+     expuestas);
+
   reloj = trasLaGracia(db);
   const cierre = await red.cerrarVentana({ codigo: CODIGO });
   ok(cierre.orden.length === 4, "se resuelven los cuatro", cierre.orden.length);
   ok(cierre.orden[0].uid === "ana", "en orden de reacción", cierre.orden.map((o) => o.uid));
   ok(cierre.orden.filter((o) => o.resultado === "primero").length <= 1, "a lo sumo uno se salva");
-  ok(M.every((m) => m.estado.fase === "descarte"),
-     "las cuatro mesas siguen en descarte, viendo lo que se expuso",
-     M.map((m) => m.estado.fase));
-
-  // Las cartas expuestas llegan a TODAS las mesas, no sólo a la de su dueño.
-  const expuestas = M.map((m) => (m.vista.revelaciones ?? []).length);
-  ok(expuestas.every((n) => n === expuestas[0] && n > 0),
-     "y las cuatro reciben las mismas revelaciones", expuestas);
-
-  reloj += MS_REVELACION;
-  await red.avanzarPartida({ codigo: CODIGO });
-  ok(M.every((m) => m.estado.fase === "turno"), "pasados los 2 s, la mesa avanza a los turnos");
   ok(M.every((m) => (m.vista.revelaciones ?? []).length === 0),
-     "y no queda ninguna revelación en pie");
+     "y pasados sus dos segundos no queda ninguna revelación en pie",
+     M.map((m) => (m.vista.revelaciones ?? []).length));
+
+  // La ventana cerrada ya no tapa la fase: el turno arranca en el golpe
+  // siguiente, con `seguirTurno`.
+  await red.avanzarPartida({ codigo: CODIGO });
+  ok(M.every((m) => m.estado.fase === "turno"), "y la mesa avanza a los turnos",
+     M.map((m) => m.estado.fase));
   ok(new Set(M.map((m) => m.vista.version)).size === 1, "los cuatro en la misma versión",
      M.map((m) => m.vista.version));
 

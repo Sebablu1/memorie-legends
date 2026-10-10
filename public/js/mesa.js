@@ -1725,10 +1725,19 @@ function relojDeLaFase() {
    * dibuja `faseDescarte` con su propio `correrTemporizador`. Por eso acá se
    * devuelve `null` sin red, para no dibujar dos barras.
    */
-  if (estado.fase === "descarte") {
-    if (!enRed()) return null;
-    return espejoDelPlazo("descarte");
-  }
+  /*
+   * En RED los reflejos ya no tienen cuenta regresiva. (Etapa 3b/3)
+   *
+   * Acá se espejaba el plazo de `descarte` del servidor, y ese plazo era el
+   * vencimiento de la ventana. Ya no existe: la ventana dura lo que dure la
+   * muestra, y la cierra el que tira. Una barra vaciándose mentiría sobre un
+   * tiempo que nadie está midiendo.
+   *
+   * En ENTRENAMIENTO no cambia nada: allá la barra la dibuja `faseDescarte`
+   * con su propio temporizador, y por eso acá se devolvía `null` igual — para
+   * no dibujar dos.
+   */
+  if (estado.fase === "descarte") return null;
 
   return null;
 }

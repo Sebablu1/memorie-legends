@@ -183,6 +183,42 @@ const EXIGEN_TURNO = new Set([
   ACCIONES.CORTAR, ACCIONES.PASAR,
 ]);
 
+/**
+ * Las jugadas que CIERRAN la ventana de reflejos. (Etapa 3b/3)
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * En red la ventana no vence por tiempo: vive mientras viva la MUESTRA. Así
+ * que la lista no se elige, se deduce — son las jugadas que dejan de haber
+ * muestra a la que reaccionar, y son exactamente tres:
+ *
+ *   - `tirar`, que pone otra carta arriba del descarte;
+ *   - `cambiar`, que pone arriba una carta de la mano (`cambiarCarta` llama a
+ *     `abrirReflejos` igual que `tirarCarta`: es el mismo cambio de muestra);
+ *   - `cortar`, que termina la ronda y con ella cualquier reflejo.
+ *
+ * Las dos primeras abren una ventana nueva en el acto; la tercera no abre
+ * ninguna.
+ *
+ * Y lo que NO está acá importa tanto como lo que está:
+ *
+ *   - `pasar` no cierra nada. La muestra sigue siendo la misma, así que los
+ *     reflejos sobre ella siguen valiendo y la ventana puede atravesar varios
+ *     turnos. Es la regla, no un efecto secundario.
+ *   - `mirar` y `levantar` tampoco, y esto fue un error real: cerrar en toda
+ *     jugada hacía que la primera mirada de la ronda cerrara la ventana que
+ *     `repartir` había abierto, y después nadie podía descartar en la mesa
+ *     entera. Lo encontró `mesa-red.mjs` con cuatro «Llegaste fuera de
+ *     tiempo».
+ *   - Los poderes mueven cartas de mano en mano, nunca el descarte.
+ */
+const CIERRAN_LA_VENTANA = new Set([
+  ACCIONES.TIRAR, ACCIONES.CAMBIAR, ACCIONES.CORTAR,
+]);
+
+/** Las fases en que la ronda ya terminó y no queda muestra viva. */
+const RONDA_TERMINADA = new Set(["finRonda", "finPartida"]);
+
 export function crearMotorEnRed({
   db, partidas, ahora, idAleatorio, marcaDeTiempo, error, semillaDe = semillaAleatoria,
   /**
@@ -230,6 +266,104 @@ export function crearMotorEnRed({
   // ------------------------------------------------------------ escritura
 
   /**
+   * Desde cuándo está expuesta cada carta errada. (Etapa 3b/3)
+   *
+   * Errar expone tu carta dos segundos. El motor no puede medirlos —no mira
+   * relojes, y así tiene que quedar— y hasta ahora no hacía falta: la ventana
+   * entera duraba eso. Con la ventana durando todo el turno del siguiente, el
+   * dato viajaría un turno completo, y de eso se ocupa esto.
+   *
+   * Devuelve un mapa `"duenio:posicion" → hora de pared`. Las dos puntas lo
+   * usan: `publicar`, para filtrar la vista, y `plazoDePartida`, para saber
+   * cuándo hay que volver a publicar.
+   *
+   * Qué está expuesto lo dice el MOTOR —es su lista de intentos la que lleva
+   * la carta— y cuándo lo dice la ventana de RED, que sella cada llegada. Se
+   * cruzan por el dueño de la carta y la posición, que en los dos lados son
+   * lo mismo: el dueño es el ATACADO (`objetivo` si lo hay, el propio jugador
+   * si no).
+   *
+   * Sin intento que la respalde no se expone. Toda carta expuesta viene de un
+   * intento, y todo intento pasó por `registrarIntento`: si no aparece, algo
+   * no cuadra, y lo prudente con una carta ajena es taparla.
+   */
+  function horasDeExposicion(partida) {
+    const { estado, jugadores, ventana } = partida;
+    const expuestas = new Set(
+      motor.cartasExpuestas(estado.ventanaDescarte?.intentos ?? [])
+        .map((r) => `${r.indiceJugador}:${r.posicion}`),
+    );
+    if (!expuestas.size) return new Map();
+
+    const horas = new Map();
+    for (const i of Object.values(ventana?.intentos ?? {})) {
+      const duenio = jugadores.indexOf(i.objetivo ?? i.uid);
+      if (duenio < 0) continue;
+      const clave = `${duenio}:${i.posicion}`;
+      if (!expuestas.has(clave)) continue;
+      /*
+       * Los 2 s cuentan desde que se APLICÓ, no desde que llegó.
+       *
+       * Casi siempre es el mismo instante: el reflejo se aplica al llegar.
+       * Pero un toque hecho durante la MIRADA no lo acepta el motor —todavía
+       * no hay ventana— y queda esperando a que alguien tire. Ése se expone
+       * cuando se aplica, varios segundos después, y anclarlo a su llegada lo
+       * habría dejado invisible desde el primer momento. Lo encontró
+       * `mirar-descarte.mjs`.
+       *
+       * `i.llegada` es RELATIVO a `abiertaEn` —son milisegundos desde que la
+       * ventana abrió, igual que `efectivo`— y acá hace falta la hora de
+       * pared, así que se le suma. Restarle un número relativo a `ahora()`
+       * daba diferencias de días y nada se veía nunca: lo encontró
+       * `mesa-red.mjs`, con cuatro revelaciones en cero.
+       */
+      const desde = i.aplicadoEn
+        ?? (i.aplicadoAlLlegar ? ventana.abiertaEn + i.llegada : ventana?.resueltaEn);
+      if (desde != null) horas.set(clave, desde);
+    }
+    return horas;
+  }
+
+  /**
+   * Cuándo hay que tapar la primera carta que se destape. (Etapa 3b/3)
+   *
+   * Sólo las que todavía están expuestas: una hora ya pasada no es un plazo.
+   * Eso es lo que impide que `taparExpuestas` se cumpla dos veces y vuelva a
+   * publicar para siempre.
+   */
+  function finDeExposicion(partida, t) {
+    const horas = [...horasDeExposicion(partida).values()]
+      .map((desde) => desde + MS_REVELACION)
+      .filter((hasta) => hasta > t);
+    return horas.length ? Math.min(...horas) : null;
+  }
+
+  /**
+   * Cuándo se le acaba el tiempo al primero que debe una carta. (Etapa 3b/3)
+   *
+   * Acertarle a un rival obliga a elegir qué carta se entrega, y para eso hay
+   * cinco segundos más la gracia: `entregaHasta`. Pasados, la carta sale al
+   * azar, que es lo que el reglamento dice.
+   *
+   * Ese plazo existía y no era un cronómetro de reflejos: era el cierre de la
+   * ventana el que lo esperaba, por `venceEn`. Al irse el cierre por tiempo
+   * se fue con él, y la entrega quedaba pendiente hasta que alguien tirara —
+   * un turno entero con la carta del rival todavía en su mano y la del
+   * atacante todavía en la suya, cuando la regla ya la había resuelto.
+   *
+   * A diferencia de la exposición, acá no hace falta filtrar las horas ya
+   * pasadas: cumplir el plazo RESUELVE la entrega, así que al golpe siguiente
+   * ya no está en la lista y no se puede cumplir dos veces.
+   */
+  function finDeEntregas(partida) {
+    if (!partida.ventana || partida.ventana.cerrada) return null;
+    const horas = entregasPendientes(partida.ventana)
+      .map((i) => i.entregaHasta)
+      .filter((hasta) => hasta != null);
+    return horas.length ? Math.min(...horas) : null;
+  }
+
+  /**
    * Escribe el estado maestro y, en la MISMA transacción, la vista recortada
    * de cada jugador. Que vayan juntas es lo que impide que alguien lea una
    * vista de una jugada y el estado de otra.
@@ -245,8 +379,15 @@ export function crearMotorEnRed({
       plazo: plazoDePartida(partida, partida.plazo, ahora()),
     };
 
+    const expuestaDesde = horasDeExposicion(partida);
+    const t = ahora();
+    const sigueExpuesta = (indiceJugador, posicion) => {
+      const desde = expuestaDesde.get(`${indiceJugador}:${posicion}`);
+      return desde != null && t - desde < MS_REVELACION;
+    };
+
     jugadores.forEach((uid, indice) => {
-      const vista = vistaDe(estado, indice);
+      const vista = vistaDe(estado, indice, sigueExpuesta);
       const fugas = filtracionesEn(vista, estado);
       if (fugas.length) {
         throw error("internal", `La vista de un jugador filtraba cartas: ${fugas.join("; ")}`);
@@ -344,12 +485,53 @@ export function crearMotorEnRed({
    * volvía a estar servida, así que en vez de acordarse en dos lugares se
    * pregunta en uno.
    */
-  const plazoDePartida = (partida, previo, t) =>
-    plazoDe(partida.estado, partida.ventana, previo, t, {
+  /**
+   * El plazo vigente: el de la fase, salvo que haya que tapar algo antes.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * POR QUÉ LA EXPOSICIÓN NECESITA UN PLAZO PROPIO (Etapa 3b/3)
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * La vista ya filtra cada carta expuesta por su hora, en `publicar`. Pero
+   * filtrar no alcanza, porque filtrar pasa AL PUBLICAR: si en esos dos
+   * segundos nadie publica nada, la última vista que el cliente recibió —con
+   * la carta adentro— sigue siendo la que tiene, y la carta se queda a la
+   * vista hasta la próxima publicación. Con los cuatro jugadores quietos, esa
+   * próxima publicación es el salto de turno: ocho segundos en vez de dos.
+   *
+   * Antes esto lo cubría `cerrarRevelacion`, que era un plazo de verdad. Se
+   * fue con los cronómetros de reflejos y hay que devolverlo, porque NO era
+   * uno de ellos: no cierra ninguna ventana, no resuelve ningún intento y no
+   * corta nada. Es la duración de un castigo de información, y es la que el
+   * reglamento publica.
+   *
+   * Son dos los plazos que ya no dependen de la fase —tapar lo expuesto y
+   * resolver la entrega que nadie eligió— y los dos son castigos con duración
+   * publicada, no cronómetros de reflejos.
+   *
+   * Gana el que vence primero. Un empate se lo queda la fase, que es la que
+   * mueve la mesa: tapar puede esperar un milisegundo, repartir no.
+   */
+  const plazoDePartida = (partida, previo, t) => {
+    const deLaFase = plazoDe(partida.estado, partida.ventana, previo, t, {
       cerrada: Boolean(partida.cerrada),
       ausenteEnTurno: turnoDeUnAusente(partida),
       esperandoDesde: partida.esperandoLlegadas ? partida.esperandoDesde : null,
     });
+
+    const sueltos = [
+      { que: "resolverEntregas", hasta: finDeEntregas(partida) },
+      { que: "taparExpuestas", hasta: finDeExposicion(partida, t) },
+    ].filter((x) => x.hasta != null).sort((a, b) => a.hasta - b.hasta);
+
+    const primero = sueltos[0];
+    if (!primero) return deLaFase;
+    if (deLaFase && deLaFase.hasta <= primero.hasta) return deLaFase;
+
+    const marca = `${primero.que}-${primero.hasta}`;
+    if (previo && previo.que === primero.que && previo.marca === marca) return previo;
+    return { fase: partida.estado.fase, marca, hasta: primero.hasta, que: primero.que };
+  };
 
   function plazoDe(
     estado, ventana, previo, ahoraMs,
@@ -383,27 +565,44 @@ export function crearMotorEnRed({
                      (ventana?.abiertaEn ?? ahoraMs) + MS_MIRADA_TOTAL, "cerrarMirada");
 
       case "descarte":
-        // Ventana ya resuelta: la mesa está viendo las cartas que se
-        // expusieron. La fase sigue siendo `descarte` a propósito, porque es
-        // la condición con la que `vistaDe` deja viajar esas cartas. Pasados
-        // los dos segundos se cierra de verdad y todo vuelve a taparse.
-        if (ventana?.cerrada) {
-          return nuevo("descarte", `revelacion-${ventana.id}`,
-                       ventana.resueltaEn + MS_REVELACION, "cerrarRevelacion");
-        }
-        // Sin ventana, lo que corresponde es abrirla, y ya.
+        /*
+         * LOS REFLEJOS YA NO TIENEN RELOJ. (Etapa 3b/3)
+         *
+         * Acá vivían los dos cronómetros que se fueron:
+         *
+         *   - `cerrarVentana`, que vencía a los 2 s de la ronda o a los 3 de
+         *     una reapertura. Ahora la ventana dura lo que dure la MUESTRA: la
+         *     cierra el que tira, en `accionDeTurno`. Pasar el turno NO la
+         *     cierra, porque la muestra sigue siendo la misma.
+         *
+         *   - `cerrarRevelacion`, que mantenía la fase en `descarte` dos
+         *     segundos más para que se vieran las cartas expuestas. Con los
+         *     descartes aplicándose al llegar no hay nada que revelar después:
+         *     se vio cuando pasó.
+         *
+         * Lo único que queda es abrir la ventana si todavía no existe. Y en
+         * cuanto existe, `seguirConLaVentanaAbierta` devuelve el turno, así
+         * que esta rama deja de visitarse: el plazo pasa a ser el del turno,
+         * que es externo a los reflejos y no se tocó.
+         */
         if (!ventana) {
           return nuevo("descarte", `abrir-r${estado.ronda}`, ahoraMs, "abrirVentana");
         }
-        {
-          // Un ataque acertado que espera su carta estira el cierre. La marca
-          // cambia con él: si no, `nuevo()` conservaría el vencimiento de
-          // antes y la ventana se resolvería sin la carta.
-          const marca = entregasPendientes(ventana).length
-            ? `${ventana.id}-entrega-${venceEn(ventana)}`
-            : ventana.id;
-          return nuevo("descarte", marca, venceEn(ventana), "cerrarVentana");
-        }
+        /*
+         * Con la ventana abierta, el turno arranca YA.
+         *
+         * Vence en `ahoraMs`, igual que el plazo del ausente en turno: el
+         * golpe siguiente lo encuentra vencido, y la mesa golpea varias veces
+         * por segundo.
+         *
+         * Va por acá y no sólo en los sitios que abren la ventana, porque hay
+         * un camino que no pasa por ninguno: la ventana de la RONDA la crea
+         * `repartir`, antes de la mirada. Cuando la mirada termina, la fase
+         * entra en `descarte` con la ventana YA creada, así que `abrirVentana`
+         * no dispara nunca. Sin esta rama la mesa se queda ahí para siempre, y
+         * eso lo encontró `barrido.mjs`.
+         */
+        return nuevo("descarte", `seguir-${ventana.id}`, ahoraMs, "seguirTurno");
 
       case "turno":
         /**
@@ -598,14 +797,84 @@ export function crearMotorEnRed({
     crearVentana({ id: `v_${idAleatorio()}`, abiertaEn: t, duracionMs: MS_VENTANA_TOTAL });
 
   /**
-   * ¿El motor acaba de abrir una ventana de reflejos que la red todavía no
-   * tiene? Pasa al tirar una carta: la muestra cambia y la mesa vuelve a
-   * reaccionar, pero la ventana de la ronda ya se cerró.
+   * ACÁ ESTABA `reabreDescarte`. (Etapa 3b/3)
+   *
+   * Preguntaba si el motor había abierto una ventana que la red no tenía, y
+   * la segunda mitad de la pregunta era «y la de la red ya se cerró». Eso era
+   * cierto porque la ventana se cerraba por su propio reloj a los 2 s, mucho
+   * antes de que nadie pudiera tirar. Sin reloj es siempre falso: la vieja
+   * sigue abierta, y no se abriría nunca ninguna nueva.
+   *
+   * Lo reemplazan las dos funciones de abajo, que además hacen lo que aquélla
+   * no hacía: resolver lo que la ventana vieja dejó pendiente.
    */
-  const reabreDescarte = (partida, estado) =>
-    estado.fase === "descarte" &&
-    Boolean(estado.ventanaDescarte) &&
-    (!partida.ventana || partida.ventana.cerrada);
+
+  /**
+   * Lo que la ventana abierta deja resuelto ANTES de cambiar la muestra.
+   *
+   * Devuelve `null` si no hay ventana abierta. Se llama antes de tirar y no
+   * después, y eso no es un detalle de orden: `intentarDescarteRival` vuelve a
+   * comparar la carta contra la muestra, así que un acierto pendiente
+   * resuelto después del tiro se convertiría en error contra una muestra que
+   * ya cambió.
+   */
+  function antesDeCambiarLaMuestra(partida, t) {
+    if (!partida.ventana || partida.ventana.cerrada) return null;
+    const indiceDe = (u) => {
+      const i = partida.jugadores.indexOf(u);
+      return i < 0 ? null : i;
+    };
+    return cerrarReflejos(partida.estado, partida.ventana, indiceDe, t);
+  }
+
+  /**
+   * La ventana y la fase que quedan después de una jugada que cambia la muestra.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * TRES CAMINOS, UNA SOLA REGLA
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * Son tres los lugares donde la muestra cambia, y dos de ellos los juega el
+   * SERVIDOR por alguien que no está:
+   *
+   *   - `accionDeTurno`, cuando alguien tira o cambia una carta;
+   *   - `descartarPorTiempo`, cuando se le acaban los diez segundos de la
+   *     levantada;
+   *   - `saltarAusente`, cuando lleva quince segundos sin dar señales.
+   *
+   * Los dos últimos no tocaban la ventana y funcionaban igual, de rebote: la
+   * vieja ya se había cerrado por su reloj y `abrirVentana` creaba la
+   * siguiente en el golpe de después. Sin ese reloj dejaron de funcionar, y en
+   * silencio — que es lo peor que podían hacer: la ventana vieja seguía
+   * abierta sobre una muestra que ya no estaba, así que un reflejo con su id
+   * se evaluaba contra la nueva y el que acertaba se comía un castigo.
+   *
+   * `abreReflejos` se lee del MOTOR, no de la acción: si abrió su ventana de
+   * descarte, hay muestra nueva. Y si no abrió ninguna —porque la jugada
+   * terminó la ronda— la vieja queda cerrada, porque ya no hay a qué
+   * reaccionar.
+   */
+  function trasCambiarLaMuestra(partida, resuelto, estado, t) {
+    const abreReflejos = estado.fase === "descarte" && Boolean(estado.ventanaDescarte);
+    if (!abreReflejos) {
+      return { estado, ventana: resuelto?.ventana ?? partida.ventana };
+    }
+    return {
+      /*
+       * Y con la ventana abierta, la fase vuelve al turno.
+       *
+       * Es la pieza que trajo 3a. Sin esto la mesa se traba: la ventana no se
+       * cierra por tiempo, y mientras la fase sea `descarte` el siguiente no
+       * puede levantar, así que nadie llegaría nunca a tirar para cerrarla.
+       */
+      estado: motor.seguirConLaVentanaAbierta(estado),
+      ventana: crearVentana({
+        id: `v_${idAleatorio()}`,
+        abiertaEn: t,
+        duracionMs: duracionDeVentana(estado),
+      }),
+    };
+  }
 
   /**
    * Cuánto dura la ventana que corresponde abrir ahora.
@@ -627,7 +896,27 @@ export function crearMotorEnRed({
   function exigirFase(partida, accion) {
     const esperada = FASE_DE[accion];
     if (!esperada) throw error("invalid-argument", "Acción desconocida.");
-    // Casi todas las acciones valen en una sola fase; descartar vale en dos.
+
+    /*
+     * Descartar lo autoriza la VENTANA, no la fase. (Etapa 3b/3)
+     *
+     * Es la misma regla que 3a llevó al motor, y acá tiene que valer igual:
+     * en red la ventana queda abierta mientras el siguiente juega su turno,
+     * así que exigir `fase === "descarte"` rechazaría todos los reflejos con
+     * un «la partida está en "turno"».
+     *
+     * El motor sigue teniendo la última palabra: `intentarDescarte` comprueba
+     * la ventana por su cuenta y no aplica nada sin ella.
+     */
+    if (accion === ACCIONES.DESCARTAR) {
+      // La mirada sigue valiendo aparte: ahí todavía NO hay ventana —la abre
+      // `terminarMirada`— y descartar durante la mirada es legal desde
+      // siempre. Pedir sólo la ventana rompía ese caso, y lo encontraron
+      // `mirar-descarte.mjs` y `llegada-sellada.mjs`.
+      if (partida.estado.fase === "mirar" || partida.estado.ventanaDescarte) return;
+      throw error("failed-precondition", "La ventana de descarte ya se cerró.");
+    }
+
     const validas = Array.isArray(esperada) ? esperada : [esperada];
     if (!validas.includes(partida.estado.fase)) {
       throw error(
@@ -790,12 +1079,24 @@ export function crearMotorEnRed({
       const snap = await tx.get(refPartida(codigo));
       const partida = exigirPartida(snap, codigo);
 
-      if (partida.estado.fase !== "descarte") {
-        throw error("failed-precondition", "La partida no está en fase de descarte.");
-      }
-      // Idempotente: si ya hay una ventana abierta, se devuelve esa.
+      /*
+       * Primero lo idempotente, después la fase. (Etapa 3b/3)
+       *
+       * El orden estaba al revés y dejó de servir: con una ventana que vive
+       * mientras vive la muestra, la fase ya está en el turno del siguiente
+       * mientras los reflejos siguen abiertos. Preguntar por la fase antes
+       * contestaba «la partida no está en fase de descarte» a quien pedía una
+       * ventana que estaba ahí, abierta. Lo encontró `orquestador.mjs`.
+       *
+       * La guarda de fase se queda, y se queda para lo único que le toca:
+       * CREAR una ventana donde no hay. Eso sólo tiene sentido con una
+       * muestra recién puesta, que es lo que la fase `descarte` significa.
+       */
       if (partida.ventana && !partida.ventana.cerrada) {
         return { ventana: resumenDeVentana(partida.ventana), yaEstaba: true };
+      }
+      if (partida.estado.fase !== "descarte") {
+        throw error("failed-precondition", "La partida no está en fase de descarte.");
       }
 
       const ventana = crearVentana({
@@ -1021,11 +1322,29 @@ export function crearMotorEnRed({
        * llega, en `entregarCarta`. Si no llega a tiempo, lo aplica
        * `cerrarVentana` con una carta al azar, que es lo que la regla dice.
        */
-      const aplicarAhora = !contraRival || evaluado === "error";
+      /*
+       * Y EL ACIERTO QUE YA TRAE SU ENTREGA, TAMBIÉN. (Etapa 3b/3)
+       *
+       * El párrafo de arriba dice por qué el acierto espera: la carta a
+       * entregar todavía no existe. Cuando SÍ existe —el camino viejo, donde
+       * la mesa mandaba `posicionEntrega` junto con el ataque— no hay nada que
+       * esperar y no hay hueco que dejar: la llamada al motor está completa.
+       *
+       * Antes no se notaba, porque el cierre por tiempo llegaba a los 2 s y
+       * lo resolvía. Sin cronómetro, ese acierto se quedaba pendiente hasta
+       * que alguien tirara, y entretanto la carta del rival seguía en su mano
+       * y el atacante con la suya. Una pestaña vieja jugaba a otro juego.
+       */
+      const entregaYaElegida = contraRival && Number.isInteger(posicionEntrega);
+      const aplicarAhora = !contraRival || evaluado === "error" || entregaYaElegida;
 
       if (aplicarAhora) {
         const despues = contraRival
-          ? motor.intentarDescarteRival(partida.estado, indice, indiceObjetivo, posicion, null)
+          ? motor.intentarDescarteRival(
+              partida.estado, indice, indiceObjetivo, posicion,
+              // En el error no se entrega nada; en el acierto, la que eligió.
+              evaluado === "error" ? null : posicionEntrega,
+            )
           : motor.intentarDescarte(partida.estado, indice, posicion);
 
         /*
@@ -1053,11 +1372,37 @@ export function crearMotorEnRed({
               [clientActionId]: {
                 ...anotado,
                 aplicadoAlLlegar: true,
+                // Acá sí: aplicado en el instante sellado de la llegada. Es de
+                // esta hora que cuentan los 2 s de exposición de una errada.
+                aplicadoEn: llegada,
                 resultado: ultimo?.resultado ?? null,
               },
             },
           };
         }
+      }
+
+      /*
+       * ¿Alguien se quedó sin cartas? Se corta YA. (Etapa 3b/3)
+       *
+       * Antes esto lo miraba `cerrarVentanaDescarte`, al cerrar la ventana por
+       * tiempo. Ahora la ventana dura lo que dure la muestra, así que esperar
+       * al cierre dejaría la ronda terminando DESPUÉS de que el siguiente ya
+       * levantó, decidió y tiró — con jugadas hechas sobre una ronda que ya no
+       * debería existir.
+       *
+       * En una mesa real, si alguien se queda sin cartas la mano se termina
+       * ahí. Así que se pregunta en cada reflejo aplicado, que es el único
+       * momento en que la cuenta de cartas de alguien puede bajar.
+       *
+       * `cerrarVentanaDescarte` hace las dos cosas que hacen falta: cierra la
+       * ventana del motor y resuelve el corte. La fase ya está adelantada, y
+       * desde 3a no la pisa.
+       */
+      const cortaAhora = motor.quienSeQuedoSinCartas(estadoNuevo) != null;
+      if (cortaAhora) {
+        estadoNuevo = motor.cerrarVentanaDescarte(estadoNuevo);
+        ventanaNueva = { ...ventanaNueva, cerrada: true, resueltaEn: llegada };
       }
 
       const siguiente = {
@@ -1137,17 +1482,28 @@ export function crearMotorEnRed({
 
       const ultimo = estadoNuevo.ventanaDescarte?.intentos?.at(-1);
 
+      // El mismo corte que en `intentarDescarte`, por el mismo motivo: una
+      // entrega acertada le saca una carta al rival, así que es el otro
+      // momento en que alguien puede quedarse sin ninguna.
+      let conCorte = estadoNuevo;
+      let ventanaFinal = ventana;
+      if (motor.quienSeQuedoSinCartas(estadoNuevo) != null) {
+        conCorte = motor.cerrarVentanaDescarte(estadoNuevo);
+        ventanaFinal = { ...ventana, cerrada: true, resueltaEn: llegada };
+      }
+
       const siguiente = {
         ...partida,
-        estado: estadoNuevo,
+        estado: conCorte,
         ventana: {
-          ...ventana,
+          ...ventanaFinal,
           intentos: {
             ...ventana.intentos,
             [clientActionId]: {
               ...intento,
               posicionEntrega,
               aplicadoAlLlegar: true,
+              aplicadoEn: llegada,
               resultado: ultimo?.resultado ?? null,
             },
           },
@@ -1155,8 +1511,6 @@ export function crearMotorEnRed({
         latidos: { ...partida.latidos, [uid]: llegada },
         version: partida.version + 1,
       };
-      // Publicar recalcula el plazo: sin entregas pendientes, la ventana
-      // vuelve a vencer cuando vencía, y si eso ya pasó, cierra al golpe.
       publicar(tx, codigo, siguiente);
       return { entregada: true, duplicado: false, version: siguiente.version };
     });
@@ -1189,7 +1543,7 @@ export function crearMotorEnRed({
    * puertas, y antes cada uno llamaba a `resolverVentana` con los mismos
    * cinco argumentos.
    */
-  function aplicarPendientes(estadoInicial, ventana, indiceDe) {
+  function aplicarPendientes(estadoInicial, ventana, indiceDe, t) {
     /*
      * Al cerrar ya no queda casi nada que resolver. (Etapa 2/3)
      *
@@ -1206,8 +1560,26 @@ export function crearMotorEnRed({
      * no hay nada que ordenar: `ordenarIntentos`, `esEmpateTecnico`,
      * `favorecido` y `MS_EMPATE_TECNICO` se fueron con este cambio.
      */
+    /*
+     * Y DEVUELVE LA VENTANA MARCADA. (Etapa 3b/3)
+     *
+     * Hasta ahora el único que llamaba a esto era el cierre, y el cierre
+     * ponía `cerrada: true`: nadie volvía a pasar por acá, así que daba igual
+     * que los intentos quedaran sin marcar.
+     *
+     * Ya no. `resolverEntregas` resuelve lo pendiente SIN cerrar la ventana
+     * —la muestra no cambió— y si los intentos quedaran sin marcar seguirían
+     * figurando como pendientes: el plazo se recalcularía igual, el golpe
+     * siguiente volvería a cumplirlo, y la entrega se aplicaría una y otra
+     * vez. Una carta por golpe, y la mesa golpea varias veces por segundo.
+     *
+     * Se marcan con lo mismo que usa `intentarDescarte`: `aplicadoAlLlegar`
+     * más el `resultado` que escribió el motor. `entregasPendientes` mira esa
+     * marca, así que un intento ya aplicado deja de contar como pendiente.
+     */
     let estado = estadoInicial;
     const orden = [];
+    const intentos = { ...(ventana.intentos ?? {}) };
 
     for (const intento of Object.values(ventana.intentos ?? {})) {
       const indice = indiceDe(intento.uid);
@@ -1226,15 +1598,47 @@ export function crearMotorEnRed({
         : motor.intentarDescarte(estado, indice, intento.posicion);
 
       const ultimo = estado.ventanaDescarte?.intentos?.at(-1);
-      orden.push({
-        ...intento,
-        indice,
-        aplicado: estado !== antes,
-        resultado: estado !== antes ? (ultimo?.resultado ?? null) : null,
-      });
+      const resultado = estado !== antes ? (ultimo?.resultado ?? null) : null;
+      orden.push({ ...intento, indice, aplicado: estado !== antes, resultado });
+
+      if (estado !== antes) {
+        intentos[intento.clientActionId] = {
+          ...intento,
+          aplicadoAlLlegar: true,
+          resultado,
+          // La hora REAL de la aplicación, que acá no es la de la llegada:
+          // este intento esperaba. De ella cuentan los 2 s de exposición.
+          aplicadoEn: t,
+        };
+      }
     }
 
-    return { estado, orden };
+    return { estado, orden, intentos };
+  }
+
+  /**
+   * El cierre completo de una ventana de reflejos: lo pendiente y el corte.
+   *
+   * Es el único cierre, y lo usan las dos puertas que quedan: la jugada que
+   * cambia la muestra (`accionDeTurno`) y el callable `cerrarVentana`. Antes
+   * eran dos cuerpos parecidos y uno de los dos se olvidaba del corte.
+   *
+   * El corte va acá por lo mismo que va en `intentarDescarte`: una entrega
+   * resuelta al azar saca una carta de la mano del que acertó, y ésa puede ser
+   * su última. Quedarse sin cartas corta la ronda, se vacíe la mano cuando se
+   * vacíe. `cerrarVentanaDescarte` hace las dos cosas —cierra la ventana del
+   * motor y resuelve el corte— y desde 3a no pisa la fase si ya se adelantó.
+   */
+  function cerrarReflejos(estadoInicial, ventana, indiceDe, t) {
+    const { estado, orden, intentos } = aplicarPendientes(estadoInicial, ventana, indiceDe, t);
+    const cortado = motor.quienSeQuedoSinCartas(estado) != null
+      ? motor.cerrarVentanaDescarte(estado)
+      : estado;
+    return {
+      estado: cortado,
+      orden,
+      ventana: { ...ventana, intentos, cerrada: true, resueltaEn: t },
+    };
   }
 
   async function cerrarVentana({ codigo, forzar = false }) {
@@ -1255,14 +1659,17 @@ export function crearMotorEnRed({
         return i < 0 ? null : i;
       };
 
-      const { estado, orden } = aplicarPendientes(partida.estado, partida.ventana, indiceDe);
+      const { estado, orden, ventana } = cerrarReflejos(
+        partida.estado, partida.ventana, indiceDe, ahora(),
+      );
 
-      // La fase sigue en `descarte` los dos segundos de la revelación; el
-      // plazo `cerrarRevelacion` la termina. Ver `plazoDe`.
+      // La fase NO se toca. Puede seguir en `descarte` —si nadie tiró
+      // todavía— o estar ya en el turno del siguiente: cerrar la ventana no
+      // es avanzar la mesa. Lo único que la avanza es `seguirTurno`.
       const siguiente = {
         ...partida,
         estado,
-        ventana: { ...partida.ventana, cerrada: true, resueltaEn: ahora() },
+        ventana,
         version: partida.version + 1,
       };
 
@@ -1354,8 +1761,59 @@ export function crearMotorEnRed({
 
       exigirPosiciones(partida, indice, accion, { posicion, objetivo });
 
-      const estado = aplicar(partida.estado, indice, accion, { posicion, objetivo });
-      if (estado === partida.estado) {
+      /*
+       * LO QUE QUEDABA DE LA VENTANA ANTERIOR SE RESUELVE ANTES. (Etapa 3b/3)
+       *
+       * La ventana de reflejos ya no vence sola: dura lo que dure la MUESTRA.
+       * Quien la cierra es el que cambia la muestra —o el que corta—, y la
+       * lista exacta está en `CIERRAN_LA_VENTANA`.
+       *
+       * Lo único que puede quedarle pendiente es un acierto cuya entrega nunca
+       * llegó, y se resuelve ACÁ, ANTES de aplicar la jugada. El orden importa
+       * y no es un detalle: `intentarDescarteRival` vuelve a comparar la carta
+       * contra la muestra, así que si la jugada fuera primero, un acierto
+       * válido se convertiría en error contra una muestra que ya cambió.
+       *
+       * Y se resuelve SÓLO si esta jugada cierra. Una mirada o un levantar no
+       * tocan la ventana, así que la entrega sigue pendiente con su propio
+       * plazo: adelantarla sería tirar la carta al azar antes de que al dueño
+       * se le acabara el tiempo de elegirla.
+       */
+      const resuelto = CIERRAN_LA_VENTANA.has(accion)
+        ? antesDeCambiarLaMuestra(partida, ahora())
+        : null;
+      const base = resuelto ? resuelto.estado : partida.estado;
+
+      /*
+       * Si al resolver lo pendiente se cortó la ronda, la jugada no pasa.
+       *
+       * La entrega que se resuelve al azar puede dejar sin cartas al que
+       * acertó —es la jugada ganadora: te quedás sin mano atacando—, y eso
+       * corta la ronda en el acto. La mano se terminó ANTES de este tiro, así
+       * que aplicarlo sería jugar sobre una ronda que ya no existe.
+       *
+       * No se contesta con un error porque no hay nada que el jugador hiciera
+       * mal, y porque el corte hay que publicarlo: en una transacción no se
+       * puede escribir y fallar a la vez. Se publica el corte y se le dice que
+       * su jugada no entró.
+       */
+      if (resuelto && RONDA_TERMINADA.has(base.fase)) {
+        const cortada = {
+          ...partida,
+          estado: base,
+          ventana: resuelto.ventana,
+          latidos: { ...partida.latidos, [uid]: ahora() },
+          version: partida.version + 1,
+        };
+        publicar(tx, codigo, cortada);
+        return {
+          duplicado: false, aplicada: false, motivo: "ronda_cortada",
+          version: cortada.version, fase: base.fase,
+        };
+      }
+
+      const estado = aplicar(base, indice, accion, { posicion, objetivo });
+      if (estado === base) {
         throw error("failed-precondition", "Esa jugada no cambia nada.");
       }
 
@@ -1367,19 +1825,7 @@ export function crearMotorEnRed({
 
       const siguiente = {
         ...partida,
-        estado,
-        // Tirar una carta cambia la muestra y el motor vuelve a abrir una
-        // ventana de reflejos. Necesita la SUYA en la red: la de la ronda ya
-        // está cerrada, y su plazo de revelación —vencido hace rato— cerraría
-        // esta al primer golpe. Dura MS_VENTANA a secas: acá no hay mirada que
-        // cubrir, así que no lleva el agregado de MS_MIRAR.
-        ventana: reabreDescarte(partida, estado)
-          ? crearVentana({
-              id: `v_${idAleatorio()}`,
-              abiertaEn: ahora(),
-              duracionMs: duracionDeVentana(estado),
-            })
-          : partida.ventana,
+        ...trasCambiarLaMuestra(partida, resuelto, estado, ahora()),
         latidos: { ...partida.latidos, [uid]: ahora() },
         // Se recuerdan las últimas jugadas para poder reconocer un reintento.
         aplicadas: recortar({ ...(partida.aplicadas ?? {}), [clientActionId]: true }),
@@ -1641,33 +2087,75 @@ export function crearMotorEnRed({
           abiertaEn: t,
           duracionMs: duracionDeVentana(partida.estado),
         });
-        return { ...partida, ventana };
+        // Y con la ventana abierta, el turno arranca. (Etapa 3b/3)
+        //
+        // Es la ventana de la RONDA, la que sigue a la mirada inicial. Sin
+        // esto la mesa quedaría esperando un cierre por tiempo que ya no
+        // existe: nadie podría levantar, así que nadie llegaría a tirar, y la
+        // única cosa que cierra la ventana no pasaría nunca.
+        return { ...partida, ventana, estado: motor.seguirConLaVentanaAbierta(partida.estado) };
       }
 
-      case "cerrarVentana": {
+      /*
+       * ACÁ VIVÍAN `cerrarVentana` Y `cerrarRevelacion`. (Etapa 3b/3)
+       *
+       * Las dos eran transiciones por RELOJ y las dos se fueron con los
+       * cronómetros de reflejos: `plazoDe` ya no puede devolver ninguna de
+       * esas marcas, así que los casos quedaban inalcanzables.
+       *
+       * Lo que hacía cada una no se perdió, cambió de puerta:
+       *
+       *   - el cierre con sus pendientes es `cerrarReflejos`, y lo llama el
+       *     que cambia la muestra;
+       *   - la revelación de dos segundos ya no necesita mantener ninguna
+       *     fase: la vista filtra cada carta expuesta por su propia hora, en
+       *     `sigueExpuesta`.
+       */
+
+      /*
+       * Se acabaron los dos segundos de una carta expuesta: se republica.
+       *
+       * No cambia NADA del estado, y eso es todo lo que tiene que hacer:
+       * `publicar` vuelve a filtrar las vistas con la hora de ahora, y la
+       * carta ya no pasa el filtro. Ver `plazoDePartida`.
+       */
+      case "taparExpuestas":
+        return { ...partida };
+
+      /*
+       * Se le acabó el tiempo de elegir: la carta sale al azar.
+       *
+       * Resuelve lo pendiente y NO cierra la ventana — la muestra sigue
+       * siendo la misma, así que los reflejos sobre ella siguen valiendo. La
+       * elige el motor cuando se le pasa `posicionEntrega` sin número, y eso
+       * es lo que `aplicarPendientes` le pasa.
+       *
+       * El corte va acá por lo mismo que en `cerrarReflejos`: la carta que
+       * sale al azar puede ser la última del que acertó. Si corta, la ronda
+       * terminó y la ventana se cierra con ella.
+       */
+      case "resolverEntregas": {
         const indiceDe = (u) => {
           const i = partida.jugadores.indexOf(u);
           return i < 0 ? null : i;
         };
-        const { estado, orden } = aplicarPendientes(partida.estado, partida.ventana, indiceDe);
-        // NO se cierra la fase todavía. Los intentos ya están aplicados, y las
-        // cartas que se expusieron sólo viajan mientras la fase sea
-        // `descarte`: cerrar acá las escondería antes de que nadie las viera.
-        return {
-          ...partida,
-          estado,
-          ventana: { ...partida.ventana, cerrada: true, resueltaEn: t },
-          extra: { orden: orden.map((o) => ({ uid: o.uid, posicion: o.posicion, resultado: o.resultado })) },
-        };
+        const { estado, intentos } = aplicarPendientes(partida.estado, partida.ventana, indiceDe, t);
+        const ventana = { ...partida.ventana, intentos };
+        if (motor.quienSeQuedoSinCartas(estado) != null) {
+          return {
+            ...partida,
+            estado: motor.cerrarVentanaDescarte(estado),
+            ventana: { ...ventana, cerrada: true, resueltaEn: t },
+          };
+        }
+        return { ...partida, estado, ventana };
       }
 
-      // Se acabaron los dos segundos: se tapa todo y arranca el turno.
-      case "cerrarRevelacion":
-        return {
-          ...partida,
-          estado: motor.cerrarVentanaDescarte(partida.estado),
-          ventana: null,
-        };
+      // El turno arranca con la ventana de reflejos todavía abierta. Ver la
+      // rama `descarte` de `plazoDe`. Es idempotente: si la fase ya se
+      // adelantó, `seguirConLaVentanaAbierta` devuelve el mismo estado.
+      case "seguirTurno":
+        return { ...partida, estado: motor.seguirConLaVentanaAbierta(partida.estado) };
 
       case "saltarTurno":
         return { ...partida, estado: motor.saltarTurno(partida.estado) };
@@ -1726,8 +2214,21 @@ export function crearMotorEnRed({
        * Queda anotado como automático en el registro —ver `tirarCarta`— para
        * que después se pueda explicar.
        */
-      case "descartarPorTiempo":
-        return { ...partida, estado: motor.tirarCarta(partida.estado, { porTiempo: true }) };
+      case "descartarPorTiempo": {
+        /*
+         * Y la ventana cambia con la muestra, igual que si hubiera tirado él.
+         *
+         * Esta línea era sólo `estado: motor.tirarCarta(...)`, sin tocar la
+         * ventana, y alcanzaba: a los diez segundos la de los reflejos ya se
+         * había cerrado por su propio reloj. Ver `trasCambiarLaMuestra`.
+         */
+        const resuelto = antesDeCambiarLaMuestra(partida, t);
+        const base = resuelto ? resuelto.estado : partida.estado;
+        // Si al resolver lo pendiente se cortó la ronda, `tirarCarta` no hace
+        // nada —exige fase `levantada`— y lo que se publica es el corte.
+        const tirado = motor.tirarCarta(base, { porTiempo: true });
+        return { ...partida, ...trasCambiarLaMuestra(partida, resuelto, tirado, t) };
+      }
 
       /**
        * Se acabaron los diez segundos con un poder pendiente: se salta.
@@ -1866,34 +2367,45 @@ export function crearMotorEnRed({
       // sin cambiar cartas y sin cortar—, que es también lo que hacen esos
       // relojes al vencer.
       const estado = partida.estado;
+
+      /*
+       * Tirarle la carta al ausente CAMBIA LA MUESTRA. (Etapa 3b/3)
+       *
+       * Así que esa rama pasa por el mismo camino que cualquier tiro: se
+       * resuelve lo que la ventana vieja dejó pendiente, y después se le abre
+       * una nueva con la hora del tiro. Sólo esa rama: saltar el turno, saltar
+       * el poder y pasar no tocan el descarte, y la ventana que haya abierta
+       * sigue valiendo porque la muestra no se movió.
+       *
+       * Antes esto lo hacía `reabreDescarte` y no resolvía nada: la vieja ya
+       * se había cerrado por su reloj, así que no tenía qué resolver.
+       */
+      const cambiaLaMuestra = estado.fase === "levantada";
+      const resuelto = cambiaLaMuestra ? antesDeCambiarLaMuestra(partida, t) : null;
+      const base = resuelto ? resuelto.estado : estado;
+
       let avanzado;
-      switch (estado.fase) {
-        case "turno": avanzado = motor.saltarTurno(estado); break;
-        // Se le tira la carta al ausente. Eso cambia la muestra y reabre los
-        // reflejos, así que acá NO se pasa el turno: la mesa reacciona, la
-        // ventana se cierra sola y la partida queda en `postLevantada`, donde
-        // un segundo rescate —el ausente sigue en silencio— pasa el turno.
-        // Encadenar `pasarTurno` acá no haría nada: desde `descarte` no avanza.
-        case "levantada": avanzado = motor.tirarCarta(estado); break;
-        case "poder": avanzado = motor.saltarPoder(estado); break;
-        case "postLevantada": avanzado = motor.pasarTurno(estado); break;
+      switch (base.fase) {
+        case "turno": avanzado = motor.saltarTurno(base); break;
+        // Se le tira la carta al ausente. Eso reabre los reflejos, así que
+        // acá NO se pasa el turno: la mesa reacciona, el que tiró queda en
+        // `postLevantada`, y un segundo rescate —el ausente sigue en
+        // silencio— pasa el turno.
+        case "levantada": avanzado = motor.tirarCarta(base); break;
+        case "poder": avanzado = motor.saltarPoder(base); break;
+        case "postLevantada": avanzado = motor.pasarTurno(base); break;
+        // Resolver lo pendiente puede haber cortado la ronda: la entrega que
+        // sale al azar deja sin cartas al que acertó. No queda nada que
+        // saltar, y lo que hay que hacer es publicar ese corte.
+        case "finRonda":
+        case "finPartida": avanzado = base; break;
         default:
           throw error("failed-precondition", "No hay nada que saltar en esta fase.");
       }
 
       const siguiente = {
         ...partida,
-        estado: avanzado,
-        // Tirarle la carta al ausente reabre los reflejos, igual que si la
-        // hubiera tirado él. La ventana se crea acá y no en el golpe siguiente
-        // para que `abiertaEn` sea el momento del tiro y no el del golpe.
-        ventana: reabreDescarte(partida, avanzado)
-          ? crearVentana({
-              id: `v_${idAleatorio()}`,
-              abiertaEn: ahora(),
-              duracionMs: duracionDeVentana(avanzado),
-            })
-          : partida.ventana,
+        ...trasCambiarLaMuestra(partida, resuelto, avanzado, t),
         version: partida.version + 1,
       };
       publicar(tx, codigo, siguiente);
