@@ -809,6 +809,17 @@ export function crearMotorEnRed({
    */
 
   /**
+   * uid → índice en la mesa, o `null` si no juega.
+   *
+   * Estaba copiada en cuatro sitios con el mismo cuerpo. Se unifica ahora
+   * porque los dos lugares nuevos la necesitaban y habrían sido seis.
+   */
+  const indiceDeEn = (partida) => (uid) => {
+    const i = partida.jugadores.indexOf(uid);
+    return i < 0 ? null : i;
+  };
+
+  /**
    * Lo que la ventana abierta deja resuelto ANTES de cambiar la muestra.
    *
    * Devuelve `null` si no hay ventana abierta. Se llama antes de tirar y no
@@ -819,11 +830,7 @@ export function crearMotorEnRed({
    */
   function antesDeCambiarLaMuestra(partida, t) {
     if (!partida.ventana || partida.ventana.cerrada) return null;
-    const indiceDe = (u) => {
-      const i = partida.jugadores.indexOf(u);
-      return i < 0 ? null : i;
-    };
-    return cerrarReflejos(partida.estado, partida.ventana, indiceDe, t);
+    return cerrarReflejos(partida.estado, partida.ventana, indiceDeEn(partida), t);
   }
 
   /**
@@ -1640,6 +1647,33 @@ export function crearMotorEnRed({
     };
   }
 
+  /**
+   * Resuelve lo pendiente SIN cerrar la ventana.
+   *
+   * La diferencia con `cerrarReflejos` es una sola y es la que importa: acá la
+   * ventana sigue abierta, porque la muestra no cambió. Lo usan los dos
+   * momentos en que hay pendientes que ya se pueden aplicar y la mano sigue:
+   *
+   *   - el final de la MIRADA, donde los toques que el motor no pudo aceptar
+   *     —todavía no existía su ventana— recién ahora se pueden aplicar;
+   *   - el vencimiento de una ENTREGA que nadie eligió, que sale al azar.
+   *
+   * El corte va acá por lo mismo que en los otros tres sitios: aplicar un
+   * reflejo puede dejar a alguien sin cartas, y entonces la mano se termina.
+   * Si corta, la ventana se cierra con ella: ya no hay a qué reaccionar.
+   */
+  function resolverPendientes(partida, indiceDe, t) {
+    const { estado, intentos } = aplicarPendientes(partida.estado, partida.ventana, indiceDe, t);
+    const ventana = { ...partida.ventana, intentos };
+    if (motor.quienSeQuedoSinCartas(estado) != null) {
+      return {
+        estado: motor.cerrarVentanaDescarte(estado),
+        ventana: { ...ventana, cerrada: true, resueltaEn: t },
+      };
+    }
+    return { estado, ventana };
+  }
+
   async function cerrarVentana({ codigo, forzar = false }) {
     return db.runTransaction(async (tx) => {
       const snap = await tx.get(refPartida(codigo));
@@ -1653,13 +1687,8 @@ export function crearMotorEnRed({
         throw error("failed-precondition", "La ventana todavía no terminó.");
       }
 
-      const indiceDe = (u) => {
-        const i = partida.jugadores.indexOf(u);
-        return i < 0 ? null : i;
-      };
-
       const { estado, orden, ventana } = cerrarReflejos(
-        partida.estado, partida.ventana, indiceDe, ahora(),
+        partida.estado, partida.ventana, indiceDeEn(partida), ahora(),
       );
 
       // La fase NO se toca. Puede seguir en `descarte` —si nadie tiró
@@ -1710,9 +1739,16 @@ export function crearMotorEnRed({
       if (t < partida.ventana.abiertaEn + MS_MIRADA_TOTAL) {
         throw error("failed-precondition", "La mirada todavía no venció.");
       }
-      const siguiente = {
+      // Y lo que se tocó durante la mirada se aplica acá mismo, igual que por
+      // la otra puerta. El motivo largo está en `transicion`, caso
+      // `cerrarMirada`: es el primer instante en que se puede.
+      const conLaVentanaAbierta = {
         ...partida,
         estado: motor.terminarMirada(partida.estado),
+      };
+      const siguiente = {
+        ...conLaVentanaAbierta,
+        ...resolverPendientes(conLaVentanaAbierta, indiceDeEn(partida), t),
         version: partida.version + 1,
       };
       publicar(tx, codigo, siguiente);
@@ -2077,8 +2113,41 @@ export function crearMotorEnRed({
         if (!partida.esperandoLlegadas) return null;
         return abrirPrimeraRonda(partida, t);
 
-      case "cerrarMirada":
-        return { ...partida, estado: motor.terminarMirada(partida.estado) };
+      /*
+       * Y LO QUE SE TOCÓ DURANTE LA MIRADA SE APLICA ACÁ MISMO.
+       *
+       * ───────────────────────────────────────────────────────────────────
+       * POR QUÉ NO PODÍA ESPERAR AL TIRO SIGUIENTE
+       * ───────────────────────────────────────────────────────────────────
+       *
+       * Un toque hecho durante la mirada queda pendiente: el motor no lo
+       * acepta en el momento porque su ventana todavía no existe —la abre
+       * `terminarMirada`, dos líneas más abajo—. Hasta ahora se resolvía en el
+       * cierre, o sea en el tiro del jugador en turno.
+       *
+       * Eso le daba la mano a quien tocó DESPUÉS. El que toca ya en la fase de
+       * reflejos se aplica al llegar y se lleva el «primero»; el de la mirada
+       * se aplicaba al final y se llevaba el «tarde». O sea que reaccionar
+       * antes y llegar antes perdía contra reaccionar después, que es lo
+       * contrario de lo que el orden de llegada promete.
+       *
+       * Acá es el PRIMER instante en que se pueden aplicar, así que es donde
+       * van. Y es seguro porque la muestra no puede haber cambiado: en `mirar`
+       * las únicas acciones que existen son mirar y descartar, el motor
+       * rechaza los descartes mientras no haya ventana, y `rellenarMazo`
+       * conserva la muestra. Nada mueve la pila entre un momento y el otro.
+       *
+       * Si dos tocaron durante la mirada, se aplican en el orden en que
+       * llegaron al servidor: `aplicarPendientes` recorre `intentos` en orden
+       * de inserción.
+       */
+      case "cerrarMirada": {
+        const conLaVentanaAbierta = { ...partida, estado: motor.terminarMirada(partida.estado) };
+        return {
+          ...conLaVentanaAbierta,
+          ...resolverPendientes(conLaVentanaAbierta, indiceDeEn(partida), t),
+        };
+      }
 
       case "abrirVentana": {
         const ventana = crearVentana({
@@ -2133,22 +2202,8 @@ export function crearMotorEnRed({
        * sale al azar puede ser la última del que acertó. Si corta, la ronda
        * terminó y la ventana se cierra con ella.
        */
-      case "resolverEntregas": {
-        const indiceDe = (u) => {
-          const i = partida.jugadores.indexOf(u);
-          return i < 0 ? null : i;
-        };
-        const { estado, intentos } = aplicarPendientes(partida.estado, partida.ventana, indiceDe, t);
-        const ventana = { ...partida.ventana, intentos };
-        if (motor.quienSeQuedoSinCartas(estado) != null) {
-          return {
-            ...partida,
-            estado: motor.cerrarVentanaDescarte(estado),
-            ventana: { ...ventana, cerrada: true, resueltaEn: t },
-          };
-        }
-        return { ...partida, estado, ventana };
-      }
+      case "resolverEntregas":
+        return { ...partida, ...resolverPendientes(partida, indiceDeEn(partida), t) };
 
       // El turno arranca con la ventana de reflejos todavía abierta. Ver la
       // rama `descarte` de `plazoDe`. Es idempotente: si la fase ya se

@@ -237,7 +237,7 @@ console.log("\n=== 3. Una sola ventana, de la mirada al cierre ===");
 
 // ============================== 4. el intento de la mirada se resuelve
 
-console.log("\n=== 4. Lo tocado durante la mirada se resuelve al cerrar ===");
+console.log("\n=== 4. Lo tocado durante la mirada se aplica al terminar la mirada ===");
 {
   const { db, red } = await nueva();
   const v = partida(db).ventana;
@@ -253,22 +253,29 @@ console.log("\n=== 4. Lo tocado durante la mirada se resuelve al cerrar ===");
   const cartasAntes = manoAna.filter(Boolean).length;
 
   /*
-   * Se cierra la ventana A MANO. (Etapa 3b/3)
+   * Y SE APLICA AL TERMINAR LA MIRADA, SIN QUE NADIE CIERRE NADA. (§51, ítem 2)
    *
-   * Antes acá se adelantaba el reloj y la ventana se cerraba sola. Ya no: en
-   * red dura lo que dure la muestra y la cierra el que tira. Lo que esta
-   * sección prueba no es QUIÉN la cierra sino QUÉ pasa con un toque hecho
-   * durante la mirada —el motor no lo acepta todavía, así que queda
-   * pendiente—, y eso se ve igual cerrándola con el callable.
+   * Esta sección pasó por tres formas, y conviene saberlo porque el nombre
+   * «al cerrar» quedó dando vueltas:
+   *
+   *   1. la ventana vencía sola por reloj y ahí se resolvía;
+   *   2. la etapa 3b le sacó el cronómetro, así que había que cerrarla a mano
+   *      con el callable para poder observar lo mismo;
+   *   3. y ahora no hace falta cerrar nada: el pendiente se aplica cuando la
+   *      mirada termina, que es el primer instante en que el motor lo acepta.
+   *
+   * Un solo golpe basta —el que cumple el plazo `cerrarMirada`— y la ventana
+   * queda ABIERTA después, que es lo que se comprueba acá abajo.
    */
   reloj = v.abiertaEn + MS_MIRADA_TOTAL;
   await red.avanzarPartida({ codigo: CODIGO });
-  const cierre = await red.cerrarVentana({ codigo: CODIGO, forzar: true });
-  ok(cierre.yaEstaba === false, "la ventana se cierra cuando se la cierra", cierre);
 
-  const aplicado = cierre.orden.find((o) => o.uid === "ana");
-  ok(aplicado?.resultado === "error",
-     "el intento hecho en la MIRADA se aplicó como error", aplicado);
+  const deAna = partida(db).ventana.intentos["error-en-mirar"];
+  ok(deAna?.aplicadoAlLlegar === true,
+     "el intento hecho en la MIRADA ya está aplicado", deAna?.aplicadoAlLlegar);
+  ok(deAna?.resultado === "error", "y se aplicó como error", deAna?.resultado);
+  ok(partida(db).ventana.cerrada === false,
+     "y la ventana sigue abierta: nadie la cerró", partida(db).ventana.cerrada);
 
   const despues = partida(db).estado.jugadores[0].mano;
   ok(despues.filter(Boolean).length === cartasAntes + 1,
@@ -315,26 +322,35 @@ console.log("\n=== 5. Gana el que llegó antes, y el tiempo de reacción queda a
   const v = partida(db).ventana;
 
   /*
-   * ACÁ SE PROBABA LO CONTRARIO, Y SE DA VUELTA A PROPÓSITO. (Etapa 3b/3)
+   * ESTA SECCIÓN SE DIO VUELTA DOS VECES, Y VOLVIÓ A DONDE EMPEZÓ.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
    *
    * Ana reacciona DURANTE LA MIRADA (ms 300) con una conexión mala: su pedido
-   * llega en el 1400. Beto reacciona mucho después, ya en el descarte (ms
-   * 3000), pero con fibra.
+   * llega en el 1400. Beto reacciona mucho después, ya en el descarte, pero
+   * con fibra. Gana ana, y conviene saber por qué gana hoy, porque no es por
+   * lo que ganaba antes.
    *
-   * Antes ganaba ana: al cerrar se ordenaba todo por tiempo efectivo, y el
-   * suyo era menor. Ese orden se fue en la etapa 2 con el empate técnico, y
-   * con él la simultaneidad: ahora cada descarte se aplica cuando llega, así
-   * que el orden es el de llegada al servidor y no queda nada que ordenar.
+   *   1. Al principio ganaba por el TIEMPO EFECTIVO: al cerrar la ventana se
+   *      ordenaba todo por reacción corregida y la suya era menor.
+   *   2. La etapa 2 se llevó ese orden —y el empate técnico— porque cada
+   *      descarte pasó a aplicarse al llegar. El toque de ana, que es de la
+   *      mirada, quedaba pendiente hasta el tiro siguiente, así que empezó a
+   *      PERDER contra beto. Quedó escrito acá, dado vuelta, como el costo
+   *      asumido de la decisión.
+   *   3. Y resultó un costo que no hacía falta pagar (§51, ítem 2). Los
+   *      pendientes de la mirada se aplican al TERMINAR LA MIRADA, que es el
+   *      primer instante en que el motor puede aceptarlos. Ana vuelve a
+   *      ganar, y ahora por el motivo más simple de los tres: tocó antes y
+   *      llegó antes, así que el orden de llegada la pone primera.
    *
-   * Y el de ana no llega a tiempo de aplicarse: su toque es de la MIRADA,
-   * cuando el motor todavía no acepta descartes —no hay ventana suya— así que
-   * queda pendiente y se aplica al cerrar. Beto, que tocó más tarde pero con
-   * la ventana abierta, se lo lleva.
+   * O sea que la aserción volvió a su forma original por un camino distinto.
+   * Se deja la historia escrita porque la próxima vez que alguien lea «gana
+   * ana» va a querer saber si es por reacción o por llegada, y la respuesta
+   * cambió dos veces.
    *
-   * Es el costo que se aceptó al tomar la decisión, y queda escrito acá en
-   * vez de en un comentario: si dos tocan casi juntos, gana el que llegó
-   * primero al servidor. Lo que NO se perdió es `efectivo`, que sigue
-   * midiendo reacción y sigue anotado. Es lo último que se comprueba.
+   * Lo que NO decide nada pero sigue anotado es `efectivo`: se comprueba al
+   * final, porque es el único registro de cuándo reaccionó cada uno.
    */
   reloj = v.abiertaEn + 1400;
   const lenta = await capturar(() => red.intentarDescarte({
@@ -363,19 +379,19 @@ console.log("\n=== 5. Gana el que llegó antes, y el tiempo de reacción queda a
   }));
   ok(rapida.valor?.anotado === true, "beto descarta ya en el descarte", rapida.error?.message);
 
-  // El de beto ya se aplicó al llegar: no espera ningún cierre.
-  const deBeto = partida(db).ventana.intentos["beto-rapido"];
-  ok(deBeto?.aplicadoAlLlegar === true, "el de beto se aplicó al llegar", deBeto);
-  ok(deBeto?.resultado === "primero", "y se lleva el 'primero'", deBeto?.resultado);
-
-  // El de ana sigue pendiente: lo tocó cuando no había ventana del motor.
+  // El de ana ya está aplicado: se resolvió al terminar la mirada, antes de
+  // que beto tocara. Y se llevó el «primero», que es el premio por llegar.
   const deAna = partida(db).ventana.intentos["ana-lenta"];
-  ok(!deAna?.aplicadoAlLlegar, "el de ana quedó pendiente", deAna?.aplicadoAlLlegar);
+  ok(deAna?.aplicadoAlLlegar === true,
+     "el de ana se aplicó al terminar la mirada", deAna?.aplicadoAlLlegar);
+  ok(deAna?.resultado === "primero",
+     "y se lleva el 'primero': tocó antes y llegó antes", deAna?.resultado);
 
-  const cierre = await red.cerrarVentana({ codigo: CODIGO, forzar: true });
-  const porUid = Object.fromEntries(cierre.orden.map((o) => [o.uid, o]));
-  ok(porUid.ana?.resultado === "tarde",
-     "y al cerrar se aplica tarde, aunque reaccionó antes", porUid.ana);
+  // Y el de beto, que llegó después sobre la misma muestra, se come su castigo.
+  const deBeto = partida(db).ventana.intentos["beto-rapido"];
+  ok(deBeto?.aplicadoAlLlegar === true, "el de beto se aplicó al llegar", deBeto?.aplicadoAlLlegar);
+  ok(deBeto?.resultado === "tarde",
+     "pero llega tarde: ana ya se había llevado la muestra", deBeto?.resultado);
 
   // Lo que el cambio NO se llevó: `efectivo` sigue midiendo REACCIÓN y no
   // conexión, y el de ana sigue siendo el menor de los dos. Ya no decide
