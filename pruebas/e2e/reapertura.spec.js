@@ -25,7 +25,7 @@ test("tirar cambia la muestra y abre la ventana corta", async ({ page }) => {
   await esperarMiTurno(page);
 
   await page.locator(SEL.levantar).click();
-  await esperarPista(page, /cambiarla|poder/i);
+  await esperarPista(page, /cambiala|poder/i);
 
   const muestraAntes = await numeroDeLaMuestra(page);
   await tirarLaLevantada(page);
@@ -52,7 +52,7 @@ test("cerrada la ventana, el turno vuelve al que tiró", async ({ page }) => {
   await esperarMiTurno(page);
 
   await page.locator(SEL.levantar).click();
-  await esperarPista(page, /cambiarla|poder/i);
+  await esperarPista(page, /cambiala|poder/i);
   await tirarLaLevantada(page);
   await esperarReloj(page, /Descarte/i);
 
@@ -73,7 +73,7 @@ test("cambiar una carta propia también abre la ventana", async ({ page }) => {
   await esperarMiTurno(page);
 
   await page.locator(SEL.levantar).click();
-  await esperarPista(page, /cambiarla|poder/i);
+  await esperarPista(page, /cambiala|poder/i);
 
   const muestraAntes = await numeroDeLaMuestra(page);
 

@@ -195,7 +195,7 @@ test.describe("con animaciones", () => {
     // termina ahí mismo, sin esperar a que jueguen las tres IA.
     await esperarMiTurno(page);
     await page.locator(SEL.levantar).click();
-    await esperarPista(page, /cambiarla|poder/i);
+    await esperarPista(page, /cambiala|poder/i);
     await tirarLaLevantada(page);
 
     expect(await llegarADecidirCorte(page), "se llega a la decisión de corte").toBe(true);

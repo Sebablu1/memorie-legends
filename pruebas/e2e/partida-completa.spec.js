@@ -34,7 +34,7 @@ test("una ronda entera sin un solo error de consola", async ({ page }) => {
   // Un turno completo: levantar, tirar, aguantar la ventana, resolver el
   // poder si lo hay, y pasar.
   await page.locator(SEL.levantar).click();
-  await esperarPista(page, /cambiarla|poder/i);
+  await esperarPista(page, /cambiala|poder/i);
   await tirarLaLevantada(page);
 
   expect(await llegarADecidirCorte(page), "se llega a la decisión de corte").toBe(true);

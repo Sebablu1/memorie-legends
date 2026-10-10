@@ -39,7 +39,7 @@ async function mesaConPoderEnMano(page, { soloMirar = false } = {}) {
     await elegirCartaParaMirar(page);
     await esperarMiTurno(page);
     await page.locator(SEL.levantar).click();
-    await esperarPista(page, /cambiarla|poder/i);
+    await esperarPista(page, /cambiala|poder/i);
 
     const modal = page.locator('[data-accion="usar-poder"]');
     if (!(await modal.isVisible().catch(() => false))) continue;

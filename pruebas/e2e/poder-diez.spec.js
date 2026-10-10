@@ -33,7 +33,7 @@ async function mesaConDiez(page) {
     await elegirCartaParaMirar(page);
     await esperarMiTurno(page);
     await page.locator(SEL.levantar).click();
-    await esperarPista(page, /cambiarla|poder/i);
+    await esperarPista(page, /cambiala|poder/i);
     const usar = page.locator('[data-accion="usar-poder"]');
     if (!(await usar.isVisible().catch(() => false))) continue;
     if (/\b10\b/.test(await page.locator("#modal h2").innerText())) return semilla;

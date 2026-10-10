@@ -283,7 +283,7 @@ test.describe("B — la cuenta regresiva es la del servidor", () => {
 
     await page.clock.runFor(200);
     await expect(cuenta(page), "la cuenta sigue después de abrir").toBeHidden();
-    await expect(pista(page)).toContainText("Tocá una carta");
+    await expect(pista(page)).toContainText(/Mirá una carta/);
   });
 
   test("quien llega con la cuenta empezada entra en su paso", async ({ page }) => {
@@ -300,7 +300,7 @@ test.describe("B — la cuenta regresiva es la del servidor", () => {
     // abierta, y tiene que poder jugarse.
     await abrirRed(page, [{ abreEn: -500 }]);
 
-    await expect(pista(page)).toContainText("Tocá una carta");
+    await expect(pista(page)).toContainText(/Mirá una carta/);
     await expect(cuenta(page)).toBeHidden();
     await expect(misJugables(page)).toHaveCount(4);
   });

@@ -151,7 +151,9 @@ test("durante la cuenta regresiva, tocar una carta no dice nada", async ({ brows
   const mias = page.locator('.jugador[data-jugador="0"] .mano > .carta');
   await mias.first().click();
   await mias.nth(1).click();
-  await expect(page.locator("#pista")).toContainText(/ya miraste/i);
+  // §55 acortó el aviso a «⚠️ Una carta por ronda.», así que se mira esa
+  // parte — la misma que filtra el `expect` de arriba, en esta misma prueba.
+  await expect(page.locator("#pista")).toContainText(/carta por ronda/i);
 
   await ctx.close();
 });

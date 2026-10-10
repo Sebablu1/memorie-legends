@@ -4232,7 +4232,9 @@ function pistaDeRed(vista) {
     case "mirar":
       if (vista.esperando) {
         const { llegaron, total } = vista.esperando;
-        return `Esperando jugadores (${Number(llegaron)}/${Number(total)})…`;
+        // «a los jugadores», como estaba. Lo acorté por mi cuenta en §55 y no
+        // hacía falta: mide 32 caracteres y entra de sobra en los 38.
+        return `Esperando a los jugadores (${Number(llegaron)}/${Number(total)})…`;
       }
       if (miradaTodaviaCerrada(vista)) return "Preparate: vas a mirar una carta tuya.";
       return "Mirá una carta tuya para memorizarla.";
