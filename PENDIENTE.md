@@ -185,6 +185,32 @@ por ancho, así que ocho letras anchas seguidas —`MMMMMMMM`, `WWWWWWWW`— sig
 partiendo la pista. No es un nombre de castellano y el síntoma es el que la
 mesa ya tenía. La salida barata es §57.
 
+### §56 — Unificar el estilo de las pistas entre los dos modos
+
+Entrenamiento usa MAYÚSCULAS para las fases —`LEVANTAR`, `CORTAR O PASAR`,
+`MIRÁ TU CARTA`— y red usa frases: `Levantá del mazo.`, `Podés cortar o pasar.`
+Las dos formas son cortas, así que no es un problema de espacio: es que el
+mismo juego habla de dos maneras según el modo.
+
+Quedó fuera de §55 a propósito, para no mezclar «acortar» con «unificar» en un
+commit. Al hacerlo conviene decidir cuál de los dos estilos gana, y mi apuesta
+es el de red: una frase dice qué hacer, una palabra en mayúsculas sólo nombra
+la fase.
+
+Ojo: `carteles.spec.js`, `ausente.spec.js` y `reloj-para-decidir.spec.js`
+afirman textos de entrenamiento, así que hay aserciones que se mueven.
+
+### §57 — Un tope al largo del nombre, al registrarse
+
+`esquemas.js:124` acepta nombres de hasta **40 caracteres** y no mira el ancho.
+Con eso, cualquier plantilla de la pista se parte, y el recorte de `nombreCorto`
+sólo tapa el caso medio (§55).
+
+Es el lugar barato para cerrarlo de raíz: un tope más corto donde el nombre
+entra, en vez de recortes en cada lugar donde se dibuja. Hay que mirar también
+qué hace el lobby y el ranking con un nombre largo — la mesa no es el único
+lado que lo muestra.
+
 ### §50 — La línea de base de las pruebas, y cómo leerla
 
 Las dos suites miden cosas distintas y ninguna incluye a la otra. Los números
