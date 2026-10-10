@@ -38,6 +38,11 @@
  */
 
 import { test, expect } from "@playwright/test";
+// Los selectores de los cuatro botones de jugada salen de un solo lugar.
+import { SEL } from "./mesa.js";
+// Los dos segundos de la exposición salen de las reglas, no de un número
+// escrito acá: si cambian, esta prueba lo dice en vez de medir otra cosa.
+import { MS_REVELACION } from "../../public/js/reglas/vista.js";
 
 const js = (body) => ({ status: 200, contentType: "text/javascript; charset=utf-8", body });
 
@@ -109,17 +114,30 @@ const partidaFalsa = `
   export const latir = async () => {};
   export const accion = anotar("accion");
   export const mirar = anotar("mirar");
-  export const levantar = async () => {};
-  export const tirarCarta = async () => {};
-  export const cortar = async () => {};
-  export const pasarTurno = async () => {};
-  // Anota, porque hasta ahora no: era un sello vacío, y ningún spec podía
-  // ver si la jugada salía. Por ese agujero pasó el bug de la etapa 3c.
+  /*
+   * LOS CINCO QUE ERAN SELLOS VACÍOS, Y AHORA ANOTAN.
+   *
+   * Estaban escritos como funciones vacías, los cinco. Aunque un spec apretara
+   * el botón, no tenía con qué ver si la jugada salía — y por ese agujero pasó
+   * el bug de la etapa 3c, que se llevó «cambiar por una mía» sin que ninguna
+   * prueba se moviera. Ahora cadena-de-turno.mjs falla si alguno vuelve a
+   * quedar vacío en un spec que sí aprieta su botón.
+   *
+   * Sin acentos graves acá: este comentario vive dentro de un template
+   * literal, y uno solo lo termina a la mitad.
+   */
+  const anotarJugada = (nombre) => async () => {
+    window.__pedidos.push({ nombre });
+  };
+  export const levantar = anotarJugada("levantar");
+  export const tirarCarta = anotarJugada("tirarCarta");
+  export const cortar = anotarJugada("cortar");
+  export const pasarTurno = anotarJugada("pasarTurno");
+  export const saltarPoder = anotarJugada("saltarPoder");
   export const cambiarCarta = async (codigo, posicion) => {
     window.__pedidos.push({ nombre: "cambiarCarta", posicion });
   };
   export const resolverCambio = async () => {};
-  export const saltarPoder = async () => {};
   // Contesta como el servidor: si fue contra un rival, si acertó y hasta
   // cuándo espera la carta. El cliente de verdad agrega el identificador.
   export const intentarDescarte = async (codigo, ventana, posicion, tocadoEn, rival) => {
@@ -148,8 +166,10 @@ const partidaFalsa = `
     yo: 0, indiceMano: 0, indiceTurno: paso.indiceTurno ?? 2, turnosRonda: 1,
     indiceCortador: null, desempate: false, registro: [],
     cartasEnMazo: 20, cartasEnDescarte: 1,
-    muestra: { id: "Copa-5", numero: 5, palo: "copa" },
-    levantada: paso.levantada ?? null, poderPendiente: null, cambioPendiente: null,
+    muestra: paso.muestra ?? { id: "Copa-5", numero: 5, palo: "copa" },
+    levantada: paso.levantada ?? null,
+    poderPendiente: paso.poderPendiente ?? null,
+    cambioPendiente: null,
     /*
      * La ventana la decide el PASO, no la fase. (Etapa 3c/3)
      *
@@ -177,7 +197,9 @@ const partidaFalsa = `
     plazo: null,
     puedeAtacarEn: paso.puedeAtacarEn ?? [],
     puedeAtacar: [...new Set((paso.puedeAtacarEn ?? []).map((p) => p.objetivo))],
-    revelaciones: [],
+    // Lo que la mesa está viendo destapado. Ningún spec lo publicaba, así que
+    // el camino entero de mostrarRevelaciones estaba sin cubrir.
+    revelaciones: paso.revelaciones ?? [],
     ausentes: [], ausentesPorTiempo: [],
     jugadores: ["Ana", "Beto", "Caro", "Dani"].map((nombre, i) => ({
       id: IDS[i], nombre,
@@ -462,5 +484,243 @@ test("y en la levantada de OTRO, la carta propia sigue siendo un reflejo", async
   await expect.poll(() => pedidos(page)).toEqual([
     { nombre: "intentarDescarte", posicion: 1, rival: null },
   ]);
+  expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
+});
+
+// =====================================================================
+// LA CADENA DE TURNO EN RED.
+//
+// Ningún spec de red apretaba nunca Levantar, Tirar, Cortar ni Pasar — lo
+// contó `cadena-de-turno.mjs`, que falla si alguno queda en cero. Ahí vivía el
+// bug de la etapa 3c: la cadena entera estaba sin cubrir, y el que se rompió
+// fue el eslabón del medio.
+// =====================================================================
+
+/*
+ * NO hay un ayudante que envuelva los cuatro botones, y no es por descuido.
+ *
+ * Lo había, y `cadena-de-turno.mjs` dejó de ver los clics: busca
+ * `locator(SEL.<boton>).click()` en una sola expresión, a propósito, porque un
+ * cerrojo que acepta cualquier indirección no puede afirmar nada. Dos palabras
+ * más por línea a cambio de que la cobertura sea legible desde afuera es un
+ * cambio bueno.
+ */
+const mias = (page) =>
+  page.locator('.jugador[data-jugador="0"] .carta[data-posicion].jugable');
+
+test("la cadena entera: levantar del mazo y cambiar por una mía", async ({ page }) => {
+  /**
+   * El caso que estaba roto en producción, de punta a punta.
+   *
+   * Las pruebas de más arriba entran a `levantada` por una vista escrita a
+   * mano. Ésta llega apretando el botón, que es lo que hace un jugador, y así
+   * cubre los tres eslabones: que el botón esté habilitado en `turno`, que el
+   * clic mande la jugada, y que con la vista nueva el toque en una carta
+   * propia salga como cambio.
+   */
+  const SIETE = { id: "Oro-7", numero: 7, palo: "oro", puntos: 7 };
+  const errores = await abrirRed(page, [
+    { fase: "turno", indiceTurno: 0 },
+    { fase: "levantada", indiceTurno: 0, levantada: SIETE, despues: 300 },
+    // La que entregué queda de muestra: es lo único de este cambio que la mesa
+    // puede VER, porque las cartas propias viajan tapadas.
+    {
+      fase: "postLevantada",
+      indiceTurno: 0,
+      muestra: { id: "Copa-11", numero: 11, palo: "copa", puntos: 11 },
+      despues: 900,
+    },
+  ]);
+
+  await expect(page.locator(SEL.levantar), "el botón no está habilitado en turno")
+    .toBeEnabled();
+  await page.locator(SEL.levantar).click();
+  await expect.poll(() => pedidos(page)).toEqual([{ nombre: "levantar" }]);
+
+  // Llega la vista con la carta en la mano.
+  await page.clock.runFor(400);
+  await expect(page.locator(SEL.tirar)).toBeEnabled();
+
+  await carta(page, 0, 2).click();
+  await expect.poll(() => pedidos(page)).toEqual([
+    { nombre: "levantar" },
+    { nombre: "cambiarCarta", posicion: 2 },
+  ]);
+
+  // Y la mesa dibuja la muestra nueva cuando el servidor la publica. Esto
+  // prueba el DIBUJADO, no la regla: que la carta se mueva es del motor, y lo
+  // prueban `descarte.mjs` y `tirar-reabre.mjs`.
+  await page.clock.runFor(700);
+  await expect(page.locator("#muestraCarta .carta")).toHaveCount(1);
+  // La CARA, no la primera imagen que aparezca: `dibujarCarta` pone dorso y
+  // cara en el mismo nodo, así que `#muestraCarta img` son dos y el modo
+  // estricto de Playwright se queja — con razón, porque una es el dorso.
+  await expect(page.locator("#muestraCarta .carta .cara img"))
+    .toHaveAttribute("src", /11/);
+
+  expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
+});
+
+test("pasar el turno deja los reflejos vivos para el siguiente", async ({ page }) => {
+  /**
+   * La mitad de cliente de «pasar no cierra la ventana».
+   *
+   * La otra mitad —que el SERVIDOR no la cierre— vive en
+   * `pruebas/orquestador.mjs`, sección 3d, y tiene que vivir ahí: acá la
+   * ventana es lo que este test publica, así que comprobar que «sigue
+   * abierta» sería leer el propio guión. Lo que sí es de acá: que con esa
+   * ventana todavía abierta y el turno ya en otro, la mesa siga ofreciendo
+   * las cartas y el descarte salga.
+   *
+   * La ventana es la MISMA en los dos pasos —`v1`— a propósito: si cambiara
+   * de id sería la escena de un tiro, no de un pase.
+   */
+  const errores = await abrirRed(page, [
+    { fase: "postLevantada", indiceTurno: 0 },
+    { fase: "turno", indiceTurno: 1, despues: 300 },
+  ]);
+
+  await expect(page.locator(SEL.pasar)).toBeEnabled();
+  await expect(page.locator(SEL.cortar), "cortar también, que es la otra salida")
+    .toBeEnabled();
+  await page.locator(SEL.pasar).click();
+  await expect.poll(() => pedidos(page)).toEqual([{ nombre: "pasarTurno" }]);
+
+  await page.clock.runFor(400);
+  await expect(page.locator(SEL.pasar), "pasado el turno ya no decido yo").toBeDisabled();
+
+  // Y los reflejos siguen ahí, sobre la misma muestra.
+  await expect(mias(page), "la mesa dejó de ofrecer mis cartas").toHaveCount(4);
+  await carta(page, 0, 1).dblclick();
+  await expect.poll(() => pedidos(page)).toEqual([
+    { nombre: "pasarTurno" },
+    { nombre: "intentarDescarte", posicion: 1, rival: null },
+  ]);
+
+  expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
+});
+
+test("tirar un poder: se resuelve, y la ventana queda abierta detrás", async ({ page }) => {
+  /**
+   * EL VELO TAPA LA MESA, Y ESO ES UN HALLAZGO, NO UN DETALLE.
+   *
+   * La etapa 3 dice que la ventana queda abierta para los cuatro mientras el
+   * poder se resuelve. Del lado del servidor es cierto —`partida-completa.mjs`
+   * §4 lo prueba— pero del lado de quien TIRÓ no se puede usar: el modal del
+   * poder se abre sobre `.velo`, que es `position: fixed; inset: 0` con fondo
+   * al 86 %, así que le tapa la mesa entera. Hasta que resuelva el poder no
+   * puede tocar ninguna carta.
+   *
+   * Los otros tres sí pueden: el modal es sólo del dueño del poder. Y el
+   * bloqueo dura lo que él quiera, con techo en `MS_PARA_USAR_PODER`.
+   *
+   * Así que esta prueba NO afirma que el dueño pueda reaccionar con el modal
+   * abierto —sería falso— sino lo que de verdad pasa: el poder se ofrece, se
+   * resuelve, y recién ahí la mesa vuelve a estar a mano, con la ventana que
+   * el tiro abrió todavía viva.
+   */
+  const OCHO = { id: "Oro-8", numero: 8, palo: "oro", puntos: 8 };
+  const errores = await abrirRed(page, [
+    { fase: "levantada", indiceTurno: 0, levantada: OCHO },
+    {
+      fase: "poder",
+      indiceTurno: 0,
+      muestra: OCHO,
+      poderPendiente: { tipo: "mirarRival", numero: 8, indiceJugador: 0 },
+      // Ventana NUEVA: el tiro cerró la de la muestra anterior y abrió ésta.
+      ventana: "v2",
+      despues: 300,
+    },
+    { fase: "postLevantada", indiceTurno: 0, muestra: OCHO, ventana: "v2", despues: 900 },
+  ]);
+
+  // Con un poder en la mano el botón lo dice.
+  await expect(page.locator(SEL.tirar)).toHaveClass(/con-poder/);
+  await page.locator(SEL.tirar).click();
+  await expect.poll(() => pedidos(page)).toEqual([{ nombre: "tirarCarta" }]);
+
+  // Llega la fase del poder: el modal se abre y tapa la mesa.
+  await page.clock.runFor(400);
+  await expect(page.locator('[data-accion="red-elegir-objetivo"]')).toBeVisible();
+  await expect(page.locator("#velo"), "el velo no está tapando la mesa")
+    .toHaveClass(/abierto/);
+
+  // No usarlo: la jugada sale y el modal se va.
+  await page.locator('[data-accion="red-saltar-poder"]').click();
+  await expect.poll(() => pedidos(page)).toEqual([
+    { nombre: "tirarCarta" },
+    { nombre: "saltarPoder" },
+  ]);
+
+  // Y con la mesa de vuelta a la vista, los reflejos del tiro siguen ahí.
+  await page.clock.runFor(700);
+  await expect(page.locator("#velo")).not.toHaveClass(/abierto/);
+  await expect(mias(page), "la ventana del tiro no quedó viva").toHaveCount(4);
+
+  expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
+});
+
+test("cortar en red cierra la ronda, y es un clic, no un botón habilitado", async ({ page }) => {
+  /*
+   * El cuarto eslabón, y el que casi se queda afuera otra vez.
+   *
+   * La prueba del pase comprobaba `toBeEnabled()` sobre cortar y seguía de
+   * largo. Eso es lo mismo que hacía `fin-de-ronda-en-red.spec.js` con
+   * levantar, y es la clase de cobertura que dejó pasar el bug de la etapa 3c:
+   * dice que el botón se dibuja, no que la jugada salga. `cadena-de-turno.mjs`
+   * no lo cuenta a propósito, y por eso cortar seguía en cero.
+   */
+  const errores = await abrirRed(page, [
+    { fase: "postLevantada", indiceTurno: 0 },
+    { fase: "finRonda", indiceTurno: 0, despues: 300 },
+  ]);
+
+  await page.locator(SEL.cortar).click();
+  await expect.poll(() => pedidos(page)).toEqual([{ nombre: "cortar" }]);
+
+  // Y con la ronda cerrada ya no se decide nada.
+  await page.clock.runFor(400);
+  await expect(page.locator(SEL.cortar)).toBeDisabled();
+  await expect(page.locator(SEL.pasar)).toBeDisabled();
+
+  expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
+});
+
+test("la carta errada se ve destapada, y con el turno en otro", async ({ page }) => {
+  /**
+   * EL CASTIGO DE INFORMACIÓN, DEL LADO DEL CLIENTE.
+   *
+   * Errar un descarte expone tu carta a la mesa dos segundos. El servidor la
+   * manda en `revelaciones` y cada mesa la tapa con su propio reloj — eso es
+   * `mostrarRevelaciones`, y era uno de los ocho lugares que la etapa 3c
+   * cambió de «¿la fase es descarte?» a «¿está abierta la ventana?».
+   *
+   * No tenía ninguna prueba de navegador: NINGÚN spec publicaba
+   * `revelaciones`, así que el campo viajaba vacío siempre y la función no se
+   * ejecutaba nunca. Con el código de antes de 3c esta prueba falla, porque la
+   * fase acá es `turno` y aquella versión limpiaba todo fuera de `descarte` —
+   * que es justamente el caso nuevo: la ventana sigue abierta mientras juega
+   * el siguiente, así que lo expuesto tiene que verse igual.
+   *
+   * La carta es de BETO, no mía: lo que se prueba es que la mesa muestra lo
+   * que el servidor expuso de otro, que es para qué existe el castigo.
+   */
+  const ERRADA = { id: "Espada-3", numero: 3, palo: "espada", puntos: 3 };
+  const errores = await abrirRed(page, [
+    {
+      fase: "turno",
+      indiceTurno: 2,
+      revelaciones: [{ indiceJugador: 1, posicion: 2, carta: ERRADA }],
+    },
+  ]);
+
+  const suya = carta(page, 1, 2);
+  await expect(suya, "la mesa no destapó la carta expuesta").toHaveClass(/visible/);
+  await expect(suya.locator(".cara img")).toHaveAttribute("src", /3/);
+
+  // Y a los dos segundos se tapa sola, sin que llegue ninguna vista nueva.
+  await page.clock.runFor(MS_REVELACION + 100);
+  await expect(suya, "la carta se quedó destapada").not.toHaveClass(/visible/);
+
   expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
 });
