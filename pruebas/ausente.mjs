@@ -483,22 +483,26 @@ console.log("\n=== 8. Reproducción: se va el jugador activo, sigue el otro ==="
   ok(golpe.valor?.hizo === "descartarPorTiempo",
      "al vencer el plazo, el servidor le tira la carta", golpe.valor?.hizo);
 
-  // Tirar cambia la muestra, y eso reabre los reflejos para el que sigue
-  // jugando. El turno pasa cuando esa ventana se cierra.
-  ok(partida(db).estado.fase === "descarte",
-     "y la mesa recupera sus reflejos", partida(db).estado.fase);
-
-  // La ventana de red se abre en el golpe siguiente, no en el mismo que tira:
-  // igual que al cerrar la mirada, arriba.
-  await red.avanzarPartida({ codigo: CODIGO });
-  const v2 = partida(db).ventana;
-  ok(Boolean(v2), "con su ventana de reflejos abierta", v2);
-  reloj = v2.abiertaEn + v2.duracionMs + v2.graciaMs + 1;
-  await red.avanzarPartida({ codigo: CODIGO });   // cierra y resuelve
-  reloj += MS_REVELACION;
-  await red.avanzarPartida({ codigo: CODIGO });   // tapa lo expuesto
+  /*
+   * TIRAR ABRE LA VENTANA EN EL ACTO, Y LA FASE NO ESPERA. (Etapa 3b/3)
+   *
+   * Acá se pedía fase `descarte`, después un golpe para que la ventana de red
+   * se abriera, después el vencimiento de esa ventana y después la revelación
+   * — cuatro pasos hasta llegar a `postLevantada`.
+   *
+   * Ahora el tiro hace todo en la misma transacción: resuelve lo que la
+   * ventana vieja dejara pendiente, abre la nueva con `abiertaEn` en el
+   * instante del tiro, y devuelve la fase a la decisión del que tiró. La
+   * ventana queda abierta MIENTRAS él decide, que es el cambio entero: los
+   * otros tres no tienen dos segundos para reaccionar, tienen hasta que
+   * alguien vuelva a cambiar la muestra.
+   */
   ok(partida(db).estado.fase === "postLevantada",
-     "cerrada la ventana, queda su decisión de cortar", partida(db).estado.fase);
+     "y le queda su decisión de cortar", partida(db).estado.fase);
+  const v2 = partida(db).ventana;
+  ok(Boolean(v2) && !v2.cerrada,
+     "con los reflejos de la mesa abiertos, en el mismo golpe", v2);
+  ok(v2.abiertaEn === reloj, "y abiertos en el instante del tiro", v2.abiertaEn - reloj);
 
   // Y ACÁ sí se traba: cortar o seguir son dos jugadas, y el servidor no
   // elige por nadie.

@@ -79,19 +79,43 @@ export const MS_REAPERTURA = 3000;
  * Fueron treinta segundos, con el argumento de que era «tiempo de sobra para
  * decidir y poco para quedarse mirando la pared». La primera mitad resultó
  * cierta y la segunda no: en la mesa, treinta segundos es un rato en el que no
- * pasa nada y los demás miran. Veinte siguen alcanzando para pensarlo —no es
- * una cuenta, es elegir entre dos— y no dejan la partida detenida.
+ * pasa nada y los demás miran. Después fueron veinte por lo mismo.
  *
- * Diez, que es lo que dura decidir qué hacer con la carta levantada, sí es
- * poco: aquello es seguir jugando y esto es apostar la ronda entera.
+ * ─────────────────────────────────────────────────────────────────────────
+ * Y AHORA SON DIEZ, CONTRA LO QUE DECÍA ESTE COMENTARIO (Etapa 3c/3)
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Acá estaba escrito que diez era poco: «aquello es seguir jugando y esto es
+ * apostar la ronda entera». El argumento no era malo, y lo que cambió no es
+ * la decisión sino lo que pasa alrededor mientras se toma.
+ *
+ * Antes la secuencia era: se tira, dos segundos de reflejos para los cuatro,
+ * se cierra la ventana, y RECIÉN ahí arrancaban los veinte de decidir. Esos
+ * veinte eran tiempo en el que nadie podía hacer nada: los reflejos ya habían
+ * pasado y la muestra no podía cambiar. Veinte segundos de tres personas
+ * mirando.
+ *
+ * Con los reflejos sin reloj, la decisión ya no sigue a la ventana: la
+ * CONTIENE. La ventana se abre con el tiro y no se cierra hasta el tiro
+ * siguiente, así que estos segundos son segundos en que los otros tres pueden
+ * reaccionar sobre la muestra que acaba de caer. Dejaron de ser tiempo muerto,
+ * y lo que hacía falta cubrir con veinte lo cubre el propio cambio.
+ *
+ * Lo que queda es el techo para que la mesa no se cuelgue, y para eso diez
+ * alcanzan. Quien de verdad esté decidiendo tiene además toda la ventana
+ * abierta antes de que este plazo importe.
  *
  * Vale para los DOS modos, porque es literalmente la misma constante:
  * `partida-red.js` la reexporta desde acá en vez de escribir su propio número.
+ * En entrenamiento el cambio se nota más que en red —allá la ventana sí se
+ * cierra a los 2 s y estos diez vuelven a ser tiempo propio—, y se acepta: es
+ * el mismo juego y los tiempos no se bifurcan por modo salvo que haya un
+ * motivo, como lo hubo con la ventana.
  *
  * Al vencerse se PASA, nunca se corta. Pasar es lo que no arriesga nada de
  * quien no contestó: cortar por él podría eliminarlo.
  */
-export const MS_PASO_AUTOMATICO = 20000;
+export const MS_PASO_AUTOMATICO = 10000;
 
 /**
  * Lo que espera la mesa a que alguien levante antes de saltarle el turno.
@@ -438,7 +462,23 @@ export const terminarMirada = (estado) =>
       ),
       ventanaDescarte: { huboPrimero: false, intentos: [] },
     },
-    "Fase de descarte: 5 segundos",
+    /*
+     * Esta línea decía «Fase de descarte: 5 segundos». (Etapa 3c/3)
+     *
+     * Mentía dos veces, y la segunda es la que importa. El número estuvo mal
+     * desde que la ventana se acortó a 2 s —`MS_DESCARTE`— y nadie lo notó
+     * porque el registro no se compara con nada. Y ahora además no hay
+     * ningún número que ponerle: en red la ventana no tiene reloj, y en
+     * entrenamiento dura `MS_DESCARTE`. Son dos duraciones distintas para la
+     * misma línea de un motor que no sabe —ni tiene que saber— en qué modo
+     * está corriendo.
+     *
+     * Así que no dice cuánto. Lo que un número en el registro nunca pudo
+     * hacer, además, es servir de cronómetro: para eso está la barra de la
+     * mesa, que en entrenamiento la dibuja `faseDescarte` y en red no se
+     * dibuja porque no hay nada que medir.
+     */
+    "Fase de descarte: busquen la muestra en su mano",
   );
 
 // ------------------------------------------------------ descarte simultáneo
@@ -469,7 +509,25 @@ const rellenarMazo = (estado) => {
  * tendrían la misma consecuencia y acertar dejaría de valer la pena.
  */
 export function intentarDescarte(estado, indiceJugador, posicion) {
-  if (estado.fase !== "descarte" || !estado.ventanaDescarte) return estado;
+  /*
+   * MANDA LA VENTANA, NO LA FASE.
+   *
+   * Decía `estado.fase !== "descarte" || !estado.ventanaDescarte`, y la
+   * primera mitad era redundante: las CUATRO escrituras que abren una ventana
+   * ponen `fase: "descarte"` en la misma línea, y `cerrarVentanaDescarte` la
+   * anula al mismo tiempo que cambia la fase. O sea que hoy
+   * `ventanaDescarte != null` equivale a `fase === "descarte"`, siempre.
+   *
+   * Se saca la mitad de la fase para que en RED los reflejos sigan valiendo
+   * mientras el siguiente jugador juega su turno: allá la ventana ya no se
+   * cierra por tiempo sino con el tiro del que sigue, así que fase y ventana
+   * dejan de ir juntas.
+   *
+   * En ENTRENAMIENTO no se nota: las dos condiciones siguen yendo juntas
+   * porque nadie adelanta la fase. Lo comprueban las 84 suites, que quedaron
+   * verdes con este cambio solo.
+   */
+  if (!estado.ventanaDescarte) return estado;
 
   /**
    * La ventana corta que sigue a un poder es de quien lo usó, y de nadie más.
@@ -738,7 +796,8 @@ export const conoceUnaQueEntra = (estado, actor) => {
  * muda, que era el defecto que hacía parecer un bug a lo que era una regla.
  */
 export function motivoDeRechazoDescarte(estado, indiceJugador, posicion) {
-  if (estado.fase !== "descarte" || !estado.ventanaDescarte) return "La ventana ya cerró.";
+  // Manda la ventana, no la fase: ver la nota en `intentarDescarte`.
+  if (!estado.ventanaDescarte) return "La ventana ya cerró.";
 
   const { soloPara, soloAtaques } = estado.ventanaDescarte;
   if (soloPara != null && soloPara !== indiceJugador) return "Esta ventana no es tuya.";
@@ -935,7 +994,8 @@ export function cartasExpuestas(intentos = []) {
  * vuelve a comprobarlo todo al aplicar.
  */
 export function evaluarAtaque(estado, actor, objetivo, posicion) {
-  if (estado.fase !== "descarte" || !estado.ventanaDescarte) return "sinDerecho";
+  // Manda la ventana, no la fase: ver la nota en `intentarDescarte`.
+  if (!estado.ventanaDescarte) return "sinDerecho";
   const { soloPara } = estado.ventanaDescarte;
   if (soloPara != null && actor !== soloPara) return "sinDerecho";
   if (!puedeAtacarEn(estado, actor, objetivo, posicion)) return "sinDerecho";
@@ -963,7 +1023,8 @@ export function evaluarAtaque(estado, actor, objetivo, posicion) {
 export function intentarDescarteRival(
   estado, actor, objetivo, posicionObjetivo, posicionEntrega,
 ) {
-  if (estado.fase !== "descarte" || !estado.ventanaDescarte) return estado;
+  // Manda la ventana, no la fase: ver la nota en `intentarDescarte`.
+  if (!estado.ventanaDescarte) return estado;
 
   /**
    * La ventana que sigue a un poder es de quien lo usó, y de nadie más.
@@ -1096,10 +1157,49 @@ export function intentarDescarteRival(
  * olvide, el entrenamiento y las partidas por Leyendas terminarían las
  * rondas con reglas distintas.
  */
+/**
+ * Devuelve el turno SIN cerrar la ventana de reflejos.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * PARA QUÉ EXISTE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Sólo la usa RED, y es la mitad que le faltaba a la relajación de las
+ * guardas. En red la ventana ya no se cierra por tiempo: queda abierta hasta
+ * que el jugador en turno tira. Para que ese jugador PUEDA tirar, la fase
+ * tiene que volver a la suya —`turno` o `postLevantada`— mientras la ventana
+ * sigue ahí.
+ *
+ * Es lo mismo que hace `cerrarVentanaDescarte` con la fase, y nada de lo que
+ * hace con la ventana: no la anula, no mira si alguien se quedó sin cartas y
+ * no resuelve ningún corte. Esas tres cosas pasan en otro momento.
+ *
+ * Entrenamiento no la llama nunca. Allá la fase y la ventana siguen yendo
+ * juntas, que es lo que las suites comprueban.
+ */
+export const seguirConLaVentanaAbierta = (estado) => {
+  if (estado.fase !== "descarte" || !estado.ventanaDescarte) return estado;
+  return { ...estado, fase: estado.ventanaDescarte.volverA ?? "turno" };
+};
+
 export const cerrarVentanaDescarte = (estado) => {
   const cerrada = {
     ...estado,
-    fase: estado.ventanaDescarte?.volverA ?? "turno",
+    /*
+     * Si la fase YA se adelantó, no se la pisa.
+     *
+     * Pasa sólo en red, con `seguirConLaVentanaAbierta`: el siguiente jugador
+     * puede estar en `levantada` con una carta en la mano, y devolverlo a
+     * `turno` se la borraría.
+     *
+     * La condición pide ventana ABIERTA además de fase adelantada, y eso lo
+     * enseñó `turnos-y-entrega.mjs`: cerrar una ventana que no existe desde
+     * `mirar` tiene que seguir devolviendo a `turno`, que es la reparación de
+     * siempre. Mirar sólo la fase rompía ese caso.
+     */
+    fase: estado.ventanaDescarte && estado.fase !== "descarte"
+      ? estado.fase
+      : (estado.ventanaDescarte?.volverA ?? "turno"),
     ventanaDescarte: null,
   };
 

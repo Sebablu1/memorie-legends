@@ -153,21 +153,45 @@ console.log("\n=== 1. La mirada se cierra y la ventana se abre solas ===");
   ok(v && !v.cerrada, "la ventana sigue abierta");
   ok(v.id === vInicial.id, "y es la MISMA que la de la mirada", [v.id, vInicial.id]);
   ok(v.abiertaEn === 1000000, "conserva su hora de apertura original", v.abiertaEn);
-  ok(plazo(db).que === "cerrarVentana", "ahora sí hay plazo para cerrarla", plazo(db).que);
-  ok(plazo(db).hasta === vence(v), "que vence pasada la gracia", plazo(db).hasta - v.abiertaEn);
+  /*
+   * Y EL PLAZO QUE SIGUE NO ES CERRARLA. (Etapa 3b/3)
+   *
+   * Era `cerrarVentana`, vencido al final de la ventana más la gracia. Ahora
+   * no hay ningún reloj de reflejos: el único plazo que queda en `descarte`
+   * es arrancar el turno CON la ventana abierta, y vence ya.
+   */
+  ok(plazo(db).que === "seguirTurno", "el plazo que sigue arranca el turno", plazo(db).que);
+  ok(plazo(db).hasta === reloj, "y vence ya, sin esperar nada", plazo(db).hasta - reloj);
 }
 
 // ================================================ 2. cierre automático
 
-console.log("\n=== 2. La ventana se cierra sola y resuelve A/B/C ===");
+console.log("\n=== 2. La ventana NO se cierra sola: la cierra el que tira ===");
 {
+  /*
+   * ESTA SECCIÓN PROBABA LO CONTRARIO. (Etapa 3b/3)
+   *
+   * Probaba que la ventana vencía sola: ni a mitad, ni al terminar la
+   * duración —faltaba la gracia—, y recién pasada la gracia se cerraba y
+   * resolvía los intentos en orden de reacción, con dos segundos más de
+   * revelación detrás.
+   *
+   * De eso no queda nada y es a propósito: en red la fase de reflejos no
+   * tiene cronómetro. Lo que se prueba ahora es lo que la reemplaza, que son
+   * dos cosas distintas:
+   *
+   *   - que el tiempo NO la cierre, por mucho que pase;
+   *   - que la cierre el tiro del jugador en turno, que es lo que cambia la
+   *     muestra, y que en el mismo acto abra la siguiente.
+   */
   const { db, red } = await nueva();
   reloj += MS_MIRADA_TOTAL;
   await red.avanzarPartida({ codigo: CODIGO });
-  await red.avanzarPartida({ codigo: CODIGO });
   const { id: ventanaId, abiertaEn } = db.leer(`partidas/${CODIGO}`).ventana;
 
-  // Tres reaccionan en momentos distintos.
+  // Tres reaccionan en momentos distintos. Se aplican al llegar, así que no
+  // queda nada que resolver después: lo que se mira es que el intento quede
+  // anotado y con su tiempo.
   for (const [i, uid] of CUATRO.slice(0, 3).entries()) {
     const reacciona = 300 + i * 200;
     reloj = abiertaEn + reacciona + 40;
@@ -176,55 +200,72 @@ console.log("\n=== 2. La ventana se cierra sola y resuelve A/B/C ===");
       clientActionId: `d${i}`, declarado: reacciona, latencia: 40, incertidumbre: 20,
     }));
   }
+  const anotados = Object.values(db.leer(`partidas/${CODIGO}`).ventana.intentos);
+  ok(anotados.length === 3, "los tres quedan anotados", anotados.length);
+  ok(anotados.map((x) => x.efectivo).join(",") === "300,500,700",
+     "cada uno con su tiempo de reacción", anotados.map((x) => x.efectivo));
 
-  // A mitad de ventana todavía no se cierra.
-  reloj = abiertaEn + MS_VENTANA - 1;
-  const aMitad = await red.avanzarPartida({ codigo: CODIGO });
-  ok(aMitad.hizo === null, "en plena ventana no se cierra", aMitad.motivo);
+  // Mucho después del viejo vencimiento —ventana más gracia— sigue abierta.
+  reloj = abiertaEn + MS_VENTANA + MS_GRACIA + 60000;
+  const tarde = await red.avanzarPartida({ codigo: CODIGO });
+  ok(db.leer(`partidas/${CODIGO}`).ventana.cerrada === false,
+     "un minuto después la ventana sigue abierta", db.leer(`partidas/${CODIGO}`).ventana.cerrada);
+  ok(tarde.hizo !== "cerrarVentana", "y ningún plazo la cerró", tarde.hizo);
 
-  // Ni al terminar la duración: falta la gracia para los paquetes lentos.
-  reloj = abiertaEn + MS_VENTANA + 1;
-  const enGracia = await red.avanzarPartida({ codigo: CODIGO });
-  ok(enGracia.hizo === null, "durante la gracia tampoco, para no perder llegadas lentas", enGracia.motivo);
+  // Un reflejo que reacciona en el segundo 60 entra igual: lo único que se le
+  // pide es que la ventana sea la vigente y esté abierta.
+  const dani = await capturar(() => red.intentarDescarte({
+    uid: "dani", codigo: CODIGO, windowId: ventanaId, posicion: 3,
+    clientActionId: "d-tarde", declarado: 60000, latencia: 40, incertidumbre: 20,
+  }));
+  ok(dani.valor?.anotado === true, "y uno nuevo se acepta, sin techo de tiempo",
+     dani.error?.message);
 
-  reloj = vence(db.leer(`partidas/${CODIGO}`).ventana) + 1;
-  const cierre = await red.avanzarPartida({ codigo: CODIGO });
-  ok(cierre.hizo === "cerrarVentana", "pasada la gracia, se cierra sola", cierre.hizo);
-  ok(cierre.orden.length === 3, "y resuelve los tres intentos", cierre.orden?.length);
-  ok(cierre.orden[0].uid === "ana", "en orden de reacción", cierre.orden.map((o) => o.uid));
-  ok(fase(db) === "descarte", "la fase se queda en descarte los 2 s de la revelación", fase(db));
-  ok(db.leer(`partidas/${CODIGO}`).ventana.cerrada === true, "la ventana queda cerrada");
-  ok(plazo(db).que === "cerrarRevelacion", "con un plazo para taparlas", plazo(db).que);
+  // Ahora sí: el del turno levanta y tira. Eso cambia la muestra.
+  reloj += 10;
+  await red.avanzarPartida({ codigo: CODIGO });       // seguirTurno
+  const enTurno = CUATRO[db.leer(`partidas/${CODIGO}`).estado.indiceTurno];
+  await red.accionDeTurno({ uid: enTurno, codigo: CODIGO, accion: "levantar", clientActionId: "lev" });
+  await red.accionDeTurno({ uid: enTurno, codigo: CODIGO, accion: "tirar", clientActionId: "tir" });
 
-  reloj += MS_REVELACION;
-  const tapar = await red.avanzarPartida({ codigo: CODIGO });
-  ok(tapar.hizo === "cerrarRevelacion", "que vence y las tapa", tapar.hizo);
-  ok(fase(db) === "turno", "y ahí sí la partida pasa a los turnos", fase(db));
-  ok(db.leer(`partidas/${CODIGO}`).ventana === null, "y la ventana se retira");
+  const despues = db.leer(`partidas/${CODIGO}`).ventana;
+  ok(despues.id !== ventanaId, "el tiro abre una ventana nueva", [despues.id, ventanaId]);
+  ok(despues.cerrada === false, "abierta, con la muestra recién puesta");
+  ok(despues.abiertaEn === reloj, "y abierta en el instante del tiro", despues.abiertaEn - reloj);
+
+  // La vieja no vuelve: un reflejo con su id ya no entra.
+  const vieja = await capturar(() => red.intentarDescarte({
+    uid: "caro", codigo: CODIGO, windowId: ventanaId, posicion: 2,
+    clientActionId: "d-vieja", declarado: 100, latencia: 40, incertidumbre: 20,
+  }));
+  ok(vieja.error != null, "y la ventana vieja ya no acepta nada", vieja.valor);
 }
 
 // ======================================= 3. dos cierres simultáneos
 
 console.log("\n=== 3. Los cuatro golpean a la vez ===");
 {
+  /*
+   * El golpe simultáneo que se prueba acá ya no es el cierre de la ventana
+   * —no existe—, sino el arranque del turno con la ventana abierta. Es la
+   * misma garantía: cuatro clientes golpeando a la vez avanzan la mesa UNA
+   * vez, no cuatro.
+   */
   const { db, red } = await nueva();
   reloj += MS_MIRADA_TOTAL;
   await red.avanzarPartida({ codigo: CODIGO });
-  await red.avanzarPartida({ codigo: CODIGO });
-  const v = db.leer(`partidas/${CODIGO}`).ventana;
-  reloj = vence(v) + 1;
+  ok(fase(db) === "descarte", "la mesa queda en descarte, con su ventana", fase(db));
 
   const golpes = await Promise.all(CUATRO.map(() => capturar(() => red.avanzarPartida({ codigo: CODIGO }))));
-  const cerraron = golpes.filter((g) => g.valor?.hizo === "cerrarVentana");
-  ok(cerraron.length === 1, "una sola llamada cierra la ventana", cerraron.length);
-  ok(fase(db) === "descarte", "y la fase avanzó una sola vez", fase(db));
-  reloj += MS_REVELACION;
-  await red.avanzarPartida({ codigo: CODIGO });
-  ok(fase(db) === "turno", "pasada la revelación, empieza el turno", fase(db));
+  const avanzaron = golpes.filter((g) => g.valor?.hizo === "seguirTurno");
+  ok(avanzaron.length === 1, "una sola llamada arranca el turno", avanzaron.length);
+  ok(fase(db) === "turno", "y la fase avanzó una sola vez", fase(db));
+  ok(db.leer(`partidas/${CODIGO}`).ventana.cerrada === false,
+     "con la ventana de reflejos todavía abierta");
   ok(db.leer(`partidas/${CODIGO}`).estado.turnosRonda === 0, "sin turnos de más", db.leer(`partidas/${CODIGO}`).estado.turnosRonda);
 
-  // Y las que no cerraron no rompieron nada: dijeron que no había qué hacer.
-  const otras = golpes.filter((g) => g.valor?.hizo !== "cerrarVentana");
+  // Y las que no avanzaron no rompieron nada: dijeron que no había qué hacer.
+  const otras = golpes.filter((g) => g.valor?.hizo !== "seguirTurno");
   ok(otras.every((g) => g.valor && !g.error), "las otras tres contestan sin error",
      otras.map((g) => g.error?.message ?? g.valor?.motivo));
 }
@@ -236,7 +277,20 @@ console.log("\n=== 3b. Cuatro golpes simultáneos sobre la mirada ===");
   const golpes = await Promise.all(CUATRO.map(() => capturar(() => red.avanzarPartida({ codigo: CODIGO }))));
   const cerraron = golpes.filter((g) => g.valor?.hizo === "cerrarMirada");
   ok(cerraron.length === 1, "una sola cierra la mirada", cerraron.length);
-  ok(fase(db) === "descarte", "y se avanzó una sola fase", fase(db));
+
+  /*
+   * Y a lo sumo otro arranca el turno. (Etapa 3b/3)
+   *
+   * Acá se pedía que la fase quedara en `descarte`. Dejó de ser cierto, y no
+   * por un error: cerrada la mirada, el plazo que sigue —`seguirTurno`—
+   * vence en el acto, así que uno de los otros tres golpes del mismo lote lo
+   * cumple. Son dos plazos distintos cumplidos una vez cada uno, que es
+   * exactamente lo que esta sección existe para comprobar.
+   */
+  const arrancaron = golpes.filter((g) => g.valor?.hizo === "seguirTurno");
+  ok(arrancaron.length <= 1, "y a lo sumo uno arranca el turno", arrancaron.length);
+  ok(db.leer(`partidas/${CODIGO}`).estado.turnosRonda === 0,
+     "sin turnos de más", db.leer(`partidas/${CODIGO}`).estado.turnosRonda);
   ok(db.leer(`partidas/${CODIGO}`).estado.ronda === 1, "sin saltarse de ronda");
 }
 
@@ -289,14 +343,24 @@ console.log("\n=== 4. Reconexión en plena ventana ===");
     clientActionId: "b1", declarado: 900, latencia: 60, incertidumbre: 30,
   }));
   ok(E.vistas.length === vistasAlCaer, "desconectado no recibe nada");
+  const plazoAlCaer = db.leer(`partidas/${CODIGO}`).plazo;
 
   // Vuelve. La ventana es la misma: reconectarse no la reinicia.
   reloj = v.abiertaEn + 2000;
   const E2 = espectador(db, "ana");
   ok(E2.ultima.ventana.id === v.id, "al volver encuentra la MISMA ventana", E2.ultima.ventana.id === v.id);
   ok(E2.ultima.ventana.abiertaEn === v.abiertaEn, "con su hora de apertura original");
-  ok(db.leer(`partidas/${CODIGO}`).plazo.hasta === vence(v),
-     "y el plazo de cierre no se corrió");
+  /*
+   * Y EL PLAZO TAMPOCO SE MUEVE. (Etapa 3b/3)
+   *
+   * Acá se comparaba con `vence(v)`, el vencimiento de la ventana. Ya no hay
+   * tal cosa: el plazo vigente es el del turno del siguiente, que corre
+   * mientras los reflejos siguen abiertos. La garantía que importa es la
+   * misma de antes —reconectarse no corre ningún reloj— así que se compara
+   * contra el plazo que había, sea cual sea.
+   */
+  ok(JSON.stringify(db.leer(`partidas/${CODIGO}`).plazo) === JSON.stringify(plazoAlCaer),
+     "y el plazo no se corrió por reconectarse", db.leer(`partidas/${CODIGO}`).plazo);
 
   // Y todavía puede descartar, si le queda tiempo de reacción.
   const suyo = await capturar(() => red.intentarDescarte({
@@ -317,13 +381,10 @@ console.log("\n=== 5. El reloj de turno ===");
 {
   const { db, red } = await nueva();
   reloj += MS_MIRADA_TOTAL;
-  await red.avanzarPartida({ codigo: CODIGO });
-  await red.avanzarPartida({ codigo: CODIGO });
-  const v = db.leer(`partidas/${CODIGO}`).ventana;
-  reloj = vence(v) + 1;
-  await red.avanzarPartida({ codigo: CODIGO });
-  reloj += MS_REVELACION;
-  await red.avanzarPartida({ codigo: CODIGO });
+  await red.avanzarPartida({ codigo: CODIGO });   // cerrar la mirada
+  // Y el turno arranca en el golpe siguiente, con la ventana abierta: ya no
+  // hay que esperar a que venza ni a que pase la revelación. (Etapa 3b/3)
+  await red.avanzarPartida({ codigo: CODIGO });   // seguirTurno
 
   ok(fase(db) === "turno", "empieza el turno", fase(db));
   const deQuien = db.leer(`partidas/${CODIGO}`).estado.indiceTurno;
@@ -705,13 +766,24 @@ console.log("\n=== 11. Lo que se expone se ve, y después se tapa ===");
   ok(JSON.stringify(mira.ultima).includes(`"${equivocada.id}"`),
      "beto ve la carta de ana en el momento, sin esperar al cierre");
 
-  reloj = vence(v) + 1;
-  await red.avanzarPartida({ codigo: CODIGO });
+  /*
+   * LA EXPOSICIÓN DURA DOS SEGUNDOS, Y NO ESPERA NINGÚN CIERRE. (Etapa 3b/3)
+   *
+   * Acá se adelantaba el reloj hasta que la ventana vencía y se comprobaba
+   * que la fase se quedara en `descarte` para que la carta se viera. Las dos
+   * cosas se fueron: la ventana no vence y la fase ya está en el turno del
+   * siguiente.
+   *
+   * Lo que queda es más simple y es la regla: la carta se destapa cuando el
+   * descarte se APLICA, y se tapa dos segundos después, los mida quien los
+   * mida. Se comprueba justo antes del borde.
+   */
+  reloj += MS_REVELACION - 1;
+  await red.latir({ uid: "caro", codigo: CODIGO });
 
   const durante = mira.ultima;
-  ok(durante.fase === "descarte", "cerrada la ventana, la fase se queda en descarte", durante.fase);
   ok(durante.jugadores[0].mano[pos]?.id === equivocada.id,
-     "y beto SÍ ve la carta que ana descartó mal, en su posición",
+     "a un milisegundo del borde, beto todavía la ve en su posición",
      durante.jugadores[0].mano[pos]);
   ok((durante.revelaciones ?? []).some((r) => r.carta?.id === equivocada.id),
      "que además viaja en el campo de revelaciones");
@@ -725,11 +797,13 @@ console.log("\n=== 11. Lo que se expone se ve, y después se tapa ===");
   ok(durante.jugadores[0].mano[castigo]?.oculta === true,
      "y la de castigo también", durante.jugadores[0].mano[castigo]);
 
-  reloj += MS_REVELACION;
-  await red.avanzarPartida({ codigo: CODIGO });
+  // Y el servidor republica por su cuenta al vencer la exposición: no hace
+  // falta que pase nada más en la mesa. Ver `taparExpuestas` en `plazoDe`.
+  reloj += 1;
+  const tapo = await red.avanzarPartida({ codigo: CODIGO });
+  ok(tapo.hizo === "taparExpuestas", "el servidor tapa solo al vencer los 2 s", tapo.hizo);
 
   const despues = mira.ultima;
-  ok(despues.fase === "turno", "pasados los 2 segundos empieza el turno", despues.fase);
   ok(!JSON.stringify(despues).includes(`"${equivocada.id}"`),
      "y la carta desaparece de la vista: no queda ninguna marca");
   ok((despues.revelaciones ?? []).length === 0, "sin revelaciones en pie");

@@ -153,11 +153,40 @@ export function crearVentana({ id, abiertaEn, duracionMs = MS_VENTANA, graciaMs 
   };
 }
 
-/** ¿Todavía se aceptan LLEGADAS en esta ventana? */
+/**
+ * ¿Todavía se aceptan LLEGADAS en esta ventana?
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA GRACIA DE 2 s SE FUE, Y NO ES UN OLVIDO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Decía `ahora <= abiertaEn + duracionMs + graciaMs`. La ventana vencía sola
+ * a los 2 o 3 segundos, y los 2 de gracia existían para el paquete que salió
+ * a tiempo y llegó tarde: tocar en el milisegundo 4990 con 300 ms de latencia
+ * llegaba en el 5290, y sin el margen se perdía una jugada legítima.
+ *
+ * En red la ventana ya no vence sola: dura lo que dure la MUESTRA. La cierra
+ * el que tira, porque tirar la cambia. Y ahí está el problema del margen: el
+ * cierre y el cambio de muestra son el MISMO instante, así que no queda un
+ * «después» en el que un reflejo tardío pueda aplicarse bien.
+ * `intentarDescarte` vuelve a comparar la carta contra `cima(descarte)`, así
+ * que un pedido de la muestra vieja se evaluaría contra la nueva — y el que
+ * reaccionó bien se comería un castigo por haber acertado.
+ *
+ * Darle margen igual sería peor que no dárselo. Y el borde que cubría casi
+ * desaparece: sin cronómetro nadie corre contra un reloj, la gente reacciona
+ * cuando se da cuenta y tiene el turno entero del siguiente en vez de dos
+ * segundos. Si algún día molesta, se agrega; no es irreversible.
+ *
+ * `duracionMs` y `graciaMs` siguen en el objeto —la mesa los lee para
+ * dibujar, y `MS_GRACIA_ENTREGA` es otra cosa— pero acá ya no deciden nada.
+ *
+ * Esto es SÓLO de red: `aceptaLlegadas` tiene un único uso,
+ * `registrarIntento`, y a ésa la llama sólo el orquestador. `mesa.js` no
+ * nombra ninguna de las dos.
+ */
 export const aceptaLlegadas = (ventana, ahora) =>
-  !ventana.cerrada &&
-  ahora >= ventana.abiertaEn &&
-  ahora <= ventana.abiertaEn + ventana.duracionMs + ventana.graciaMs;
+  !ventana.cerrada && ahora >= ventana.abiertaEn;
 
 /**
  * Los ataques acertados que todavía esperan que su dueño elija la carta.
@@ -168,7 +197,11 @@ export const aceptaLlegadas = (ventana, ahora) =>
  */
 export const entregasPendientes = (ventana) =>
   Object.values(ventana?.intentos ?? {}).filter(
-    (i) => i.esperaEntrega && i.posicionEntrega == null,
+    // `aplicadoAlLlegar` es lo que hace que un acierto ya resuelto deje de
+    // contar. Hace falta desde que la entrega tiene su propio plazo y no la
+    // espera el cierre: sin esto, el plazo se volvía a calcular después de
+    // cumplirse y la carta salía al azar una vez por golpe. (Etapa 3b/3)
+    (i) => i.esperaEntrega && i.posicionEntrega == null && !i.aplicadoAlLlegar,
   );
 
 /**
@@ -391,11 +424,27 @@ export function registrarIntento(
     incertidumbre: intento.incertidumbre,
   });
 
-  // La LLEGADA puede caer en la gracia; la REACCIÓN, no. Quien tocó después
-  // de que la ventana terminó no descarta, por rápida que sea su conexión.
-  if (efectivo > ventana.duracionMs) {
-    return { ok: false, motivo: RECHAZO_INTENTO.FUERA_DE_TIEMPO };
-  }
+  /*
+   * ACÁ ESTABA EL ÚLTIMO CRONÓMETRO DE REFLEJOS. (Etapa 3b/3)
+   *
+   * Decía `if (efectivo > ventana.duracionMs) → fuera de tiempo`, y era la
+   * otra mitad de la gracia: la LLEGADA podía caer en el margen, la REACCIÓN
+   * no. Con una ventana que vencía a los 2 s era la regla; sin cronómetro es
+   * un techo que ya no mide nada.
+   *
+   * Es el único de los relojes de reflejos que no estaba en `plazoDe`, y por
+   * eso sobrevivió a la primera pasada: un descarte legítimo hecho en el
+   * segundo 5 de una ventana abierta volvía con «Llegaste fuera de tiempo».
+   *
+   * `efectivo` se sigue calculando y se sigue guardando. No decide nada —el
+   * orden es el de llegada desde la etapa 2— pero es el único registro de
+   * CUÁNDO reaccionó cada uno, y eso es lo que se mira cuando alguien
+   * pregunta por qué perdió una mano.
+   *
+   * Lo que sigue cerrando la puerta es `aceptaLlegadas`: la ventana del
+   * intento tiene que ser la vigente y no estar cerrada. Y la cierra el que
+   * cambia la muestra. Ver `CIERRAN_LA_VENTANA` en `partida-red.js`.
+   */
 
   return {
     ok: true,

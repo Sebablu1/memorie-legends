@@ -359,7 +359,20 @@ console.log("\n=== 5. En red: tirar abre una ventana NUEVA ===");
     await red.accionDeTurno({ uid: enTurno, codigo: C, accion: "tirar", clientActionId: "T1" });
 
     const p = partida();
-    ok(p.estado.fase === "descarte", "tirar deja la partida en reflejos", p.estado.fase);
+    /*
+     * La fase vuelve al TURNO, con los reflejos abiertos. (Etapa 3b/3)
+     *
+     * Acá se esperaba `descarte`, y era cierto mientras la ventana se cerraba
+     * por tiempo: la mesa se quedaba en reflejos esos dos o tres segundos.
+     *
+     * Ahora la ventana no vence sola, así que si la fase se quedara en
+     * `descarte` el siguiente no podría levantar — y como sólo el tiro del
+     * siguiente cierra la ventana, nadie llegaría nunca a cerrarla. La mesa
+     * se trabaría para siempre. Por eso `seguirConLaVentanaAbierta` devuelve
+     * el turno a su dueño en el mismo golpe, con la ventana abierta detrás.
+     */
+    ok(p.estado.fase !== "descarte", "tirar devuelve el turno, no deja la mesa en reflejos", p.estado.fase);
+    ok(Boolean(p.estado.ventanaDescarte), "pero la ventana del motor queda ABIERTA");
     ok(Boolean(p.ventana) && !p.ventana.cerrada, "con una ventana de red abierta");
     ok(p.ventana.id !== primera.id, "que NO es la de la ronda", [p.ventana.id, primera.id]);
     ok(p.ventana.abiertaEn === reloj, "abierta en el instante del tiro", p.ventana.abiertaEn - reloj);
@@ -378,7 +391,10 @@ console.log("\n=== 5. En red: tirar abre una ventana NUEVA ===");
     ok(p.ventana.duracionMs !== MS_VENTANA,
        "y no es la de la ronda disfrazada",
        [p.ventana.duracionMs, MS_VENTANA]);
-    ok(p.plazo.que === "cerrarVentana", "con su plazo de cierre", p.plazo.que);
+    // El plazo ya no es el de cerrar la ventana —no hay— sino el de quien
+    // tiene el turno. Es un reloj EXTERNO a los reflejos, de los que se
+    // conservan.
+    ok(p.plazo.que !== "cerrarVentana", "y el plazo ya no es cerrar la ventana", p.plazo.que);
 
     // Un intento con el windowId viejo no se cuela.
     const viejo = await (async () => { try {
@@ -459,7 +475,11 @@ console.log("\n=== 5. En red: tirar abre una ventana NUEVA ===");
 
     await red.accionDeTurno({ uid: enTurnoAhora, codigo: C, accion: "tirar", clientActionId: "T8" });
     const tras = partida();
-    ok(tras.estado.fase === "descarte",
+    // Lo que importa sigue siendo el ORDEN: primero los reflejos de todos,
+    // después el poder del que tiró. Lo dice `volverA`, abajo. Lo que cambió
+    // es que la fase ya no se queda en `descarte` esperando un reloj: vuelve
+    // al poder enseguida, con los reflejos abiertos detrás.
+    ok(Boolean(tras.estado.ventanaDescarte),
        "en red, tirar un poder abre reflejos primero", tras.estado.fase);
     ok(tras.estado.ventanaDescarte?.volverA === "poder",
        "con la ventana apuntando al poder", tras.estado.ventanaDescarte?.volverA);
