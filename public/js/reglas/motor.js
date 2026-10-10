@@ -446,6 +446,18 @@ export function cartasMiradasEn(linea) {
         ...enPosicion(linea.objetivo, linea.posicionRival),
       ];
 
+    /*
+     * El 9 lleva las mismas dos posiciones que el 10 y NO pinta ningún ojo.
+     *
+     * Cae en el `default` igual, así que esta rama no cambia nada de lo que
+     * la función hace: está escrita para que se vea que es a propósito. Un
+     * ojo dice «alguien vio esta carta», y el 9 es a ciegas — nadie la vio,
+     * ni el que usó el poder. Sin este caso, el día que alguien compare el 9
+     * con el 10 va a pensar que el ojo se olvidó.
+     */
+    case "cambioCiego":
+      return [];
+
     default:
       return [];
   }
@@ -1632,13 +1644,14 @@ export function usarPoderCambio(estado, posicionPropia, indiceRival, posicionRiv
   manoRival[posicionRival] = mia;
 
   /**
-   * El 9 no le muestra nada a nadie, y no anota nada. No hace falta.
+   * El 9 no le muestra nada a nadie, pero el intercambio SÍ se ve.
    *
    * Lo que se sabía era de las CARTAS, y las cartas sólo cambiaron de lugar.
    * Si el que lo usa conocía la suya —la miró al empezar la ronda, o con un
    * 7— ahora la conoce en la mano del rival, y puede descartársela. Si la
    * víctima conocía la que le sacaron, la conoce en la mano del que usó el
-   * poder. Y lo mismo cualquier otro que las conociera.
+   * poder. Y lo mismo cualquier otro que las conociera. Nada de eso se anota:
+   * sale solo de los conocimientos.
    */
   const supo = conociaLaQueLeSacaron(estado, indiceRival, suya);
 
@@ -1651,9 +1664,42 @@ export function usarPoderCambio(estado, posicionPropia, indiceRival, posicionRiv
     ),
   };
 
+  /**
+   * LO QUE SÍ SE ANOTA: QUE HUBO CAMBIO, Y DÓNDE. NUNCA LAS CARTAS.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Acá no iba el tercer argumento, con el razonamiento de que «el 9 no anota
+   * nada, no hace falta». Era cierto para la mesa local, donde el que usa el
+   * poder tiene las dos posiciones en la mano y dibuja el intercambio con
+   * ellas. En RED no: los otros tres sólo tienen el registro, y sin tipo ni
+   * posiciones no había con qué dibujar nada. El 9 no se veía en ningún
+   * navegador (§53).
+   *
+   * La regla, igualada con la del 10: el 10 muestra las cartas sólo a quien lo
+   * usa, el 9 a nadie — y en los dos, los cuatro ven QUE hubo intercambio y
+   * ENTRE QUÉ POSICIONES. En una mesa de verdad el movimiento de las manos se
+   * ve; lo que no se ve son las caras de las cartas.
+   *
+   * No publica nada nuevo, y conviene saberlo antes de preocuparse: la FRASE
+   * ya decía las dos posiciones —«cambió su 1 por la 2 de Beto»— y viaja en el
+   * registro desde siempre. Esto las pone donde se pueden leer sin partir una
+   * cadena de texto.
+   *
+   * Y no lleva las cartas, que es la única parte que importa de verdad.
+   * `cartasMiradasEn` tampoco le pinta un ojo: un ojo dice «alguien vio esto»,
+   * y acá nadie vio nada.
+   */
   const conElCambio = anotar(
     cambiado,
     `${estado.jugadores[yo].nombre} cambió su ${posicionPropia} por la ${posicionRival} de ${estado.jugadores[indiceRival].nombre}`,
+    {
+      tipo: "cambioCiego",
+      actor: yo,
+      objetivo: indiceRival,
+      posicionPropia,
+      posicionRival,
+    },
   );
 
   return {

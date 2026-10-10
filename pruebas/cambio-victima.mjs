@@ -96,6 +96,56 @@ console.log("\n=== 1. El 9: cada uno sigue la carta que conocía ===");
      "si X conocía la que dio, la sigue en la mano de Y", M.posicionesAtacablesDe(xSabia.estado, 0));
 }
 
+// ====================== 1b. lo que el 9 anota, y lo que NO anota
+
+console.log("\n=== 1b. El 9 anota el intercambio, nunca las cartas ===");
+{
+  /**
+   * LA LÍNEA DE REGISTRO DEL 9, QUE NO EXISTÍA. (§53)
+   *
+   * El 9 anotaba una frase y nada más, con el razonamiento de que «no hace
+   * falta». Para la mesa local era cierto: el que usa el poder tiene las dos
+   * posiciones en la mano y dibuja el intercambio con ellas. En red los otros
+   * tres sólo tienen el registro, así que sin tipo ni posiciones no había con
+   * qué dibujar — y el 9 no se veía en ningún navegador.
+   *
+   * La regla es la del 10: las CARTAS se las muestra sólo a quien corresponda
+   * —al que usa el 10, a nadie en el 9— y QUE HUBO INTERCAMBIO, con sus dos
+   * posiciones, lo ven los cuatro. En una mesa de verdad el movimiento de las
+   * manos se ve; las caras de las cartas, no.
+   *
+   * Así que se prueban las dos mitades, y la segunda es la que importa.
+   */
+  const s = miro(conPoder("cambioCiego", 9), 1, 1);
+  const mia = s.jugadores[0].mano[0];
+  const suya = s.jugadores[1].mano[1];
+  const r = M.usarPoderCambio(s, 0, 1, 1);
+
+  const linea = r.estado.registro.find((l) => l.tipo === "cambioCiego");
+  ok(Boolean(linea), "el 9 deja una línea con su tipo", linea);
+  ok(linea?.actor === 0 && linea?.objetivo === 1,
+     "que dice quién y a quién", [linea?.actor, linea?.objetivo]);
+  ok(linea?.posicionPropia === 0 && linea?.posicionRival === 1,
+     "y entre qué posiciones fue el intercambio",
+     [linea?.posicionPropia, linea?.posicionRival]);
+
+  // Y NUNCA las cartas. Se mira la línea entera serializada: un campo nuevo
+  // con una carta adentro caería acá aunque nadie lo hubiera pedido.
+  const comoTexto = JSON.stringify(linea);
+  ok(!comoTexto.includes(mia.id) && !comoTexto.includes(suya.id),
+     "y ninguna de las dos cartas viaja en la línea", comoTexto);
+
+  // Ni un ojo: un ojo dice «alguien vio esto», y el 9 es a ciegas.
+  ok(M.cartasMiradasEn(linea).length === 0,
+     "el 9 no pinta ningún ojo: nadie vio nada", M.cartasMiradasEn(linea));
+
+  // El 10, en cambio, sí marca las dos que miró. La asimetría es la regla.
+  const diez = M.usarPoderCambio(conPoder("cambioConVista", 10), 0, 1, 1);
+  const suya10 = diez.estado.registro.find((l) => l.tipo === "miroParaCambiar");
+  ok(M.cartasMiradasEn(suya10).length === 2,
+     "y el 10 sí, porque quien lo usa las ve", M.cartasMiradasEn(suya10));
+}
+
 // ============================================== 2. sin saber, no hay nada
 
 console.log("\n=== 2. Si la víctima no sabía qué tenía, no gana nada ===");

@@ -164,7 +164,10 @@ const partidaFalsa = `
     fase: paso.fase ?? "descarte",
     ronda: 1,
     yo: 0, indiceMano: 0, indiceTurno: paso.indiceTurno ?? 2, turnosRonda: 1,
-    indiceCortador: null, desempate: false, registro: [],
+    indiceCortador: null, desempate: false,
+    // El registro, que es de donde la mesa saca los efectos de los poderes.
+    // Viajaba siempre vacío, así que ese camino no se ejecutaba nunca.
+    registro: paso.registro ?? [],
     cartasEnMazo: 20, cartasEnDescarte: 1,
     muestra: paso.muestra ?? { id: "Copa-5", numero: 5, palo: "copa" },
     levantada: paso.levantada ?? null,
@@ -766,4 +769,83 @@ test("si el temporizador llega tarde, el modo entrega se corta por la fecha", as
     .not.toContain("entregarCarta");
   expect(salieron, "y tampoco salió como descarte: el toque se perdió")
     .toContain("intentarDescarte");
+});
+
+test("el 9 en red dibuja el intercambio, sin mostrar ninguna carta", async ({ page }) => {
+  /**
+   * EL BUG DEL PODER 9. (§53)
+   *
+   * El 9 intercambiaba las cartas y no dibujaba nada, en ningún navegador.
+   *
+   * La única llamada a `efectoCambio` del lado de red vivía dentro del
+   * `if (r?.revelada…)` de `pedirPoderEnRed`, con el tipo escrito a mano como
+   * `cambioConVista`. El 9 es a ciegas: el servidor no devuelve `revelada`, la
+   * condición era falsa, y no se llamaba a nada. Para los otros tres era peor
+   * todavía: el motor anotaba el 9 como texto plano, sin tipo ni posiciones,
+   * así que no había con qué dibujar aunque la rama hubiera existido.
+   *
+   * No lo trajo la etapa 3 — estuvo roto desde que se armó el modal de poderes
+   * en red, y recién ahora alguien jugó un 9.
+   *
+   * Lo que se comprueba acá es la REGLA, no la animación: el intercambio se ve
+   * —dos posiciones marcadas— y las cartas no. El efecto llega por el
+   * registro, que es un solo camino para los cuatro navegadores.
+   */
+  const NUEVE = { id: "Oro-9", numero: 9, palo: "oro", puntos: 9 };
+  const errores = await abrirRed(page, [
+    {
+      fase: "poder",
+      indiceTurno: 0,
+      muestra: NUEVE,
+      poderPendiente: { tipo: "cambioCiego", numero: 9, indiceJugador: 0 },
+    },
+    // La vista que el servidor publica después del cambio, con su línea de
+    // registro. Es de ahí de donde sale el efecto.
+    {
+      fase: "postLevantada",
+      indiceTurno: 0,
+      muestra: NUEVE,
+      registro: [{
+        texto: "Ana cambió su 1 por la 2 de Beto",
+        tipo: "cambioCiego",
+        actor: 0,
+        objetivo: 1,
+        posicionPropia: 1,
+        posicionRival: 2,
+      }],
+      despues: 600,
+    },
+  ]);
+
+  await page.locator('[data-accion="red-elegir-objetivo"]').click();
+  await page.locator('#modal [data-objetivo="0"][data-pos="1"]').click();
+  await page.locator('#modal [data-objetivo="1"][data-pos="2"]').click();
+
+  await expect.poll(() => pedidos(page)).toEqual([
+    { nombre: "accion", args: ["poderCambio", { posicion: 1, objetivo: { indice: 1, posicion: 2 } }] },
+  ]);
+
+  // Llega la vista con la línea del registro, y ahí se dibuja.
+  await page.clock.runFor(700);
+  await expect(page.locator(".carta.efecto-ciego"), "el 9 no dibujó el intercambio")
+    .toHaveCount(2);
+  await expect(carta(page, 0, 1)).toHaveClass(/efecto-ciego/);
+  await expect(carta(page, 1, 2)).toHaveClass(/efecto-ciego/);
+
+  /*
+   * Y NO se destapa ninguna carta de MANO, ni se pinta un ojo: el 9 es a
+   * ciegas.
+   *
+   * El selector lleva `.jugador` adelante porque `.carta.visible` a secas
+   * también engancha la muestra, que está boca arriba por definición — el
+   * primer intento de esta prueba falló por eso, no por el juego.
+   */
+  await expect(
+    page.locator(".jugador .carta.visible"),
+    "se destapó una carta de mano en un cambio a ciegas",
+  ).toHaveCount(0);
+  await expect(page.locator(".carta.efecto-vista"), "se usó el efecto del 10")
+    .toHaveCount(0);
+
+  expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
 });

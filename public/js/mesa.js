@@ -4557,6 +4557,35 @@ function mostrarMiradas(vista) {
       marcarManoMirada(linea.objetivo);
       continue;
     }
+    /*
+     * EL 9: EL INTERCAMBIO SE VE, LAS CARTAS NO. (§53)
+     *
+     * Va acá y no en `pedirPoderEnRed` a propósito, aunque el que usó el poder
+     * tenga las dos posiciones a mano en ese momento. Si se dibujara allá, lo
+     * vería sólo él — y la regla es que los cuatro vean el intercambio, igual
+     * que con el 10. Desde el registro sale un solo camino para los cuatro
+     * navegadores, incluido el del que lo usó.
+     *
+     * Y no hay doble dibujado: `pedirPoderEnRed` sólo llama a `efectoCambio`
+     * dentro del `if (r?.revelada…)`, que es del 10. El 9 no entra ahí.
+     *
+     * Sin cartel, igual que en entrenamiento: el 9 no tiene desenlace que
+     * anunciar —cambió, y punto— así que alcanza con el sonido y la marca en
+     * las dos posiciones. El 10 sí lleva cartel porque puede terminar en «no
+     * cambió», y eso es información.
+     */
+    if (linea?.tipo === "cambioCiego") {
+      sonidos.whoosh();
+      efectoCambio(
+        "cambioCiego",
+        linea.actor,
+        linea.posicionPropia,
+        linea.objetivo,
+        linea.posicionRival,
+      );
+      continue;
+    }
+
     // Y cómo terminó el 10. Que la mesa se entere de si el cambio se hizo o no
     // es parte de la regla: si el rival cambió, alguien tiene una carta suya y
     // conviene saberlo; si NO cambió, eso también dice algo.
