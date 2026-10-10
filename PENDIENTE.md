@@ -82,6 +82,57 @@ Buscar: `git log --oneline --all --grep="§N"`.
   llevan rojas desde antes. Cuidado con leer «85/85» como «todo verde».
 - **Revisar aparte, en su propio commit.**
 
+### §53 — El poder 9 no hace su transición visual en red
+
+**Síntoma:** usar el 9 (`cambioCiego`) en red intercambia las cartas pero no
+dibuja nada. En entrenamiento sí se ve.
+
+**No lo trajo la etapa 3, y conviene saberlo:** `pedirPoderEnRed` se escribió
+el 5/10 (`3a6d62c`) y se tocó por última vez el 7/10 (`ce4d41b`), las dos antes
+de la etapa 3a. La etapa 3 no tocó esa función ni `efectoCambio` — se verificó
+con `git diff 642d468 HEAD -- public/js/mesa.js`. Está roto desde que se armó
+el modal de poderes en red; recién ahora se jugó un 9.
+
+**Tampoco es el patrón del bug de «cambiar por una mía»** (`23022d2`). Ése era
+una guarda que miraba la fase cuando la fase había dejado de distinguir. Acá no
+hay ninguna guarda: la llamada no existe. Y no pasa por ninguno de los ocho
+lugares de `reflejosAbiertos()` — los poderes entran por el modal
+(`[data-objetivo]` → `pedirPoderEnRed`), no por `clicEnCartaDeRed`.
+
+**La causa, en dos mitades.** En red el 9 no se dibuja para NADIE:
+
+1. **Para quien lo usa**, el último bloque de `pedirPoderEnRed` es
+   `if (r?.revelada?.propia || r?.revelada?.rival)` y dentro llama a
+   `efectoCambio("cambioConVista", …)`. El 9 es a ciegas: el servidor no
+   devuelve `revelada`, la condición es falsa y no se llama a nada. La rama del
+   `cambioCiego` no existe en red. En entrenamiento sí: `mesa.js:3763`.
+2. **Para los otros tres**, `anunciarRegistro` tiene rama para
+   `tipo === "resolvioElDiez"` y ninguna para el 9. Y aunque la tuviera, no
+   tendría con qué dibujar: el motor anota el 9 como **texto plano, sin `tipo`
+   ni posiciones** (`motor.js:1654`), al contrario del 10, que anota
+   `miroParaCambiar` y `resolvioElDiez` con las dos posiciones.
+
+**Reproducido** en un spec de navegador, que no se dejó en el árbol para no
+dejar la suite en rojo: fase `poder` con `poderPendiente` de tipo
+`cambioCiego`, se elige carta propia y ajena, el pedido `poderCambio` SALE —
+así que el poder se aplica— y `.carta.efecto-ciego` da **0 donde tendría que
+dar 2**. El spec queda listo para el commit del arreglo.
+
+**Dos formas de arreglarlo, y la segunda es una decisión, no un detalle:**
+
+- **(a) Sólo cliente.** Agregar la rama del `cambioCiego` a
+  `pedirPoderEnRed`. Tiene las dos posiciones a mano. Lo ve quien usó el
+  poder; los otros tres siguen sin ver nada. Es chico y no toca el motor.
+- **(b) Paridad con el 10.** Además, que el motor anote el 9 con `tipo` y
+  posiciones, y agregar la rama en `anunciarRegistro`. Lo ven los cuatro.
+  Toca el motor —aunque no una regla ni un reloj: es un evento de registro, y
+  el precedente está en el 10— y **publica a los cuatro qué posiciones se
+  intercambiaron**. Para el 10 ya se publican, y en una mesa real el
+  intercambio se ve, así que es coherente; pero es información y la decisión
+  es del dueño. Ojo con `filtraciones.mjs`: el registro viaja en la vista.
+
+**Sin arreglar todavía, por pedido.** Diagnóstico solamente.
+
 ### §50 — La línea de base de las pruebas, y cómo leerla
 
 Las dos suites miden cosas distintas y ninguna incluye a la otra. Los números
