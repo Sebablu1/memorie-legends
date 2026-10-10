@@ -59,6 +59,7 @@ export const LIMITES = {
   intentarDescarte: 90,
   accionDePartida: 90,
   abrirVentanaDescarte: 90,
+  cerrarVentanaDescarte: 90,
   cerrarMirada: 90,
   saltarAusente: 60,
   // «He vuelto». Lo aprieta un dedo, una vez por ausencia: un jugador no

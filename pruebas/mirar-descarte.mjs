@@ -107,6 +107,7 @@ async function nueva() {
 
 const partida = (db) => db.leer(`partidas/${CODIGO}`);
 const vista = (db, uid) => db.leer(`partidas/${CODIGO}/vistas/${uid}`);
+const vence = (v) => v.abiertaEn + v.duracionMs + v.graciaMs;
 
 /** Descarta la posición `pos`, declarando que reaccionó en `enMs`. */
 const tocar = (red, uid, v, pos, enMs, id) =>
@@ -252,19 +253,12 @@ console.log("\n=== 4. Lo tocado durante la mirada se resuelve al cerrar ===");
 
   const cartasAntes = manoAna.filter(Boolean).length;
 
-  /*
-   * Se cierra la ventana A MANO. (Etapa 3b/3)
-   *
-   * Antes acá se adelantaba el reloj y la ventana se cerraba sola. Ya no: en
-   * red dura lo que dure la muestra y la cierra el que tira. Lo que esta
-   * sección prueba no es QUIÉN la cierra sino QUÉ pasa con un toque hecho
-   * durante la mirada —el motor no lo acepta todavía, así que queda
-   * pendiente—, y eso se ve igual cerrándola con el callable.
-   */
+  // Se cierra todo.
   reloj = v.abiertaEn + MS_MIRADA_TOTAL;
   await red.avanzarPartida({ codigo: CODIGO });
-  const cierre = await red.cerrarVentana({ codigo: CODIGO, forzar: true });
-  ok(cierre.yaEstaba === false, "la ventana se cierra cuando se la cierra", cierre);
+  reloj = vence(v) + 1;
+  const cierre = await red.avanzarPartida({ codigo: CODIGO });
+  ok(cierre.hizo === "cerrarVentana", "la ventana se cierra sola", cierre.hizo);
 
   const aplicado = cierre.orden.find((o) => o.uid === "ana");
   ok(aplicado?.resultado === "error",
@@ -285,9 +279,9 @@ console.log("\n=== 4. Lo tocado durante la mirada se resuelve al cerrar ===");
      "y pasados los 2 s desaparece: no queda marca");
 }
 
-// ================================== 5. el orden es el de llegada
+// ================================== 5. el reloj sigue midiendo reacción
 
-console.log("\n=== 5. Gana el que llegó antes, y el tiempo de reacción queda anotado ===");
+console.log("\n=== 5. Sigue ganando el que reaccionó antes, no el que llegó antes ===");
 {
   const { db, red } = await nueva();
   const p0 = partida(db);
@@ -314,28 +308,10 @@ console.log("\n=== 5. Gana el que llegó antes, y el tiempo de reacción queda a
   });
   const v = partida(db).ventana;
 
-  /*
-   * ACÁ SE PROBABA LO CONTRARIO, Y SE DA VUELTA A PROPÓSITO. (Etapa 3b/3)
-   *
-   * Ana reacciona DURANTE LA MIRADA (ms 300) con una conexión mala: su pedido
-   * llega en el 1400. Beto reacciona mucho después, ya en el descarte (ms
-   * 3000), pero con fibra.
-   *
-   * Antes ganaba ana: al cerrar se ordenaba todo por tiempo efectivo, y el
-   * suyo era menor. Ese orden se fue en la etapa 2 con el empate técnico, y
-   * con él la simultaneidad: ahora cada descarte se aplica cuando llega, así
-   * que el orden es el de llegada al servidor y no queda nada que ordenar.
-   *
-   * Y el de ana no llega a tiempo de aplicarse: su toque es de la MIRADA,
-   * cuando el motor todavía no acepta descartes —no hay ventana suya— así que
-   * queda pendiente y se aplica al cerrar. Beto, que tocó más tarde pero con
-   * la ventana abierta, se lo lleva.
-   *
-   * Es el costo que se aceptó al tomar la decisión, y queda escrito acá en
-   * vez de en un comentario: si dos tocan casi juntos, gana el que llegó
-   * primero al servidor. Lo que NO se perdió es `efectivo`, que sigue
-   * midiendo reacción y sigue anotado. Es lo último que se comprueba.
-   */
+  // Ana reacciona DURANTE LA MIRADA (ms 300) con una conexión mala: su pedido
+  // llega en el 1400. Beto reacciona mucho después, ya en el descarte (ms
+  // 3000), pero con fibra. Por orden de llegada ganaría ana igual; lo que se
+  // prueba es que el tiempo efectivo la deja primera por REACCIÓN.
   reloj = v.abiertaEn + 1400;
   const lenta = await capturar(() => red.intentarDescarte({
     uid: "ana", codigo: CODIGO, windowId: v.id, posicion: 0,
@@ -343,43 +319,27 @@ console.log("\n=== 5. Gana el que llegó antes, y el tiempo de reacción queda a
   }));
   ok(lenta.valor?.anotado === true, "ana descarta durante la mirada", lenta.error?.message);
 
-  /*
-   * Y la mirada termina: de acá en adelante el motor SÍ acepta descartes.
-   *
-   * Hacía falta ponerlo. Beto tocaba en el ms 3000 con el comentario «ya en
-   * el descarte», y no era cierto: la ventana de la ronda abarca los 7 s de
-   * mirada más los 2 de descarte, así que el 3000 cae en plena mirada. Daba
-   * igual mientras los dos se resolvieran al cerrar; ahora es justamente la
-   * diferencia que se prueba.
-   */
-  reloj = v.abiertaEn + MS_MIRADA_TOTAL;
-  await red.cerrarMirada({ codigo: CODIGO });
-
-  reloj = v.abiertaEn + MS_MIRADA_TOTAL + 530;
+  reloj = v.abiertaEn + 3030;
   const rapida = await capturar(() => red.intentarDescarte({
     uid: "beto", codigo: CODIGO, windowId: v.id, posicion: 0,
-    clientActionId: "beto-rapido", declarado: MS_MIRADA_TOTAL + 500,
-    latencia: 30, incertidumbre: 15,
+    clientActionId: "beto-rapido", declarado: 3000, latencia: 30, incertidumbre: 15,
   }));
-  ok(rapida.valor?.anotado === true, "beto descarta ya en el descarte", rapida.error?.message);
+  ok(rapida.valor?.anotado === true, "beto descarta durante el descarte", rapida.error?.message);
 
-  // El de beto ya se aplicó al llegar: no espera ningún cierre.
-  const deBeto = partida(db).ventana.intentos["beto-rapido"];
-  ok(deBeto?.aplicadoAlLlegar === true, "el de beto se aplicó al llegar", deBeto);
-  ok(deBeto?.resultado === "primero", "y se lleva el 'primero'", deBeto?.resultado);
+  reloj = v.abiertaEn + MS_MIRADA_TOTAL;
+  await red.avanzarPartida({ codigo: CODIGO });
+  reloj = vence(v) + 1;
+  const cierre = await red.avanzarPartida({ codigo: CODIGO });
 
-  // El de ana sigue pendiente: lo tocó cuando no había ventana del motor.
-  const deAna = partida(db).ventana.intentos["ana-lenta"];
-  ok(!deAna?.aplicadoAlLlegar, "el de ana quedó pendiente", deAna?.aplicadoAlLlegar);
+  const orden = cierre.orden.map((o) => o.uid);
+  ok(orden[0] === "ana",
+     "gana ana, que reaccionó en la mirada, aunque su conexión es peor", orden);
+  ok(cierre.orden[0].resultado === "primero", "y se lleva el 'primero'", cierre.orden[0]);
+  ok(cierre.orden[1].resultado === "tarde",
+     "beto acierta pero llega tarde: se lleva su castigo", cierre.orden[1]);
 
-  const cierre = await red.cerrarVentana({ codigo: CODIGO, forzar: true });
-  const porUid = Object.fromEntries(cierre.orden.map((o) => [o.uid, o]));
-  ok(porUid.ana?.resultado === "tarde",
-     "y al cerrar se aplica tarde, aunque reaccionó antes", porUid.ana);
-
-  // Lo que el cambio NO se llevó: `efectivo` sigue midiendo REACCIÓN y no
-  // conexión, y el de ana sigue siendo el menor de los dos. Ya no decide
-  // quién gana; es el registro de cuándo reaccionó cada uno.
+  // La prueba de que el criterio es la reacción y no el reloj de pared: los
+  // dos tiempos efectivos conservan el orden en que REACCIONARON.
   const efectivos = Object.values(partida(db).ventana.intentos)
     .sort((a, b) => a.efectivo - b.efectivo).map((x) => [x.uid, x.efectivo]);
   ok(efectivos[0][0] === "ana" && efectivos[0][1] < efectivos[1][1],
@@ -388,34 +348,25 @@ console.log("\n=== 5. Gana el que llegó antes, y el tiempo de reacción queda a
 
 // ========================================= 6. fuera de la ventana, no
 
-console.log("\n=== 6. Lo que cierra la puerta es la ventana, no el reloj ===");
+console.log("\n=== 6. Fuera de la ventana se sigue rechazando ===");
 {
   const { db, red } = await nueva();
   const v = partida(db).ventana;
 
-  /*
-   * UNA REACCIÓN TARDÍA YA NO SE RECHAZA. (Etapa 3b/3)
-   *
-   * Acá se pedía «fuera de tiempo» para una reacción posterior al final de la
-   * ventana: lo tardío que se admitía era la LLEGADA, nunca la reacción. Era
-   * la regla mientras la ventana venciera a los 2 s.
-   *
-   * En red no vence: vive mientras viva la muestra. Una reacción en el
-   * segundo 11, con el del turno todavía pensando, es tan válida como la del
-   * primero. La aserción se da vuelta.
-   */
+  // Una reacción posterior al final del descarte no vale, por rápida que sea
+  // la conexión: lo que se acepta tarde es la LLEGADA, nunca la reacción.
   reloj = v.abiertaEn + v.duracionMs + 500;
   const tardio = await tocar(red, "ana", v, 0, v.duracionMs + 400, "tarde");
-  ok(tardio.valor?.anotado === true,
-     "reaccionar después del final nominal de la ventana vale", tardio.error?.message);
+  ok(/fuera de tiempo/i.test(tardio.error?.message ?? ""),
+     "reaccionar después del final de la ventana se rechaza", tardio.error?.message);
 
-  // Lo que SÍ cierra la puerta sigue siendo la ventana: cerrada, no entra
-  // nada. Es la única guarda que queda, y es la que importa.
+  // Y con la ventana ya cerrada, tampoco.
   reloj = v.abiertaEn + MS_MIRADA_TOTAL;
-  await red.cerrarMirada({ codigo: CODIGO });
-  await red.cerrarVentana({ codigo: CODIGO, forzar: true });
+  await red.avanzarPartida({ codigo: CODIGO });
+  reloj = vence(v) + 1;
+  await red.avanzarPartida({ codigo: CODIGO });
   const cerrada = await tocar(red, "beto", v, 0, 500, "post-cierre");
-  ok(Boolean(cerrada.error), "con la ventana cerrada, no", cerrada.error?.message);
+  ok(Boolean(cerrada.error), "con la ventana cerrada, tampoco", cerrada.error?.message);
 }
 
 // =========================== 7. un windowId viejo no cuela en otra ronda

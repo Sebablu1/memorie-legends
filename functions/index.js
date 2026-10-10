@@ -2327,38 +2327,13 @@ export const intentarDescarte = llamable(async (data, context) => {
   });
 });
 
-/*
- * ACÁ ESTABA `cerrarVentanaDescarte`, Y SE FUE PORQUE SE VOLVIÓ UN ARMA.
- *
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Cerraba la ventana de reflejos y aplicaba los intentos. La podía pedir
- * cualquiera, y eso era deliberado: la ventana vencía por tiempo, así que el
- * primer cliente que viera el vencimiento golpeaba y el servidor comprobaba
- * su propio reloj antes de hacer nada. Pedirla temprano no servía para nada.
- *
- * Al sacarle el cronómetro a los reflejos dejó de ser inofensiva. La ventana
- * ahora vive mientras viva la MUESTRA —la cierra el que la cambia— pero la
- * comprobación que esta callable hacía seguía siendo `yaVencio`, que mira
- * `duracionMs + graciaMs`: cuatro segundos después del tiro. O sea que
- * cualquier jugador podía esperar cuatro segundos y cerrarles la ventana a
- * los otros tres, justo cuando la regla nueva les daba el turno entero del
- * siguiente para reaccionar. Le servía al que tiene una carta que teme que le
- * descarten, y al que está en turno para dejar a los demás sin reflejos.
- *
- * No se reemplaza por nada porque no hacía falta para nada: ningún cliente la
- * llamaba. `mesa.js` importa `cerrarVentanaDescarte` del MOTOR, que es otra
- * función —cierra la ventana del estado y resuelve el corte— y la usa sólo
- * entrenamiento. El cierre en red lo hace el orquestador solo.
- *
- * `enRed.cerrarVentana` sigue existiendo del lado del servidor: es la que
- * llama el propio orquestador, y la que usan las suites para cerrar una
- * ventana a mano con `forzar: true`. Lo que se va es la puerta de afuera.
- *
- * OJO AL DESPLEGAR: `firebase deploy --only functions` BORRA la función
- * desplegada. Es lo que se quiere, y no rompe ninguna pestaña abierta porque
- * ninguna la llama.
- */
+/** Cierra la ventana y aplica los intentos en orden de reacción. */
+export const cerrarVentanaDescarte = llamable(async (data, context) => {
+  exigirSesion(context, "cerrarVentanaDescarte");
+  return enRed.cerrarVentana({
+    codigo: validar(EsquemaDeSala, data, errorHttp).codigo,
+  });
+});
 
 /**
  * Hace avanzar la partida si algo venció.

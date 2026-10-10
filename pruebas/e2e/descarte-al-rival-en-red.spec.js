@@ -146,29 +146,9 @@ const partidaFalsa = `
     cartasEnMazo: 20, cartasEnDescarte: 1,
     muestra: { id: "Copa-5", numero: 5, palo: "copa" },
     levantada: null, poderPendiente: null, cambioPendiente: null,
-    /*
-     * La ventana la decide el PASO, no la fase. (Etapa 3c/3)
-     *
-     * Decía «abierta si la fase es descarte, null si no», y era un calco de la
-     * mesa vieja: la ventana vivía dos segundos y la fase los acompañaba. Ya
-     * no — la ventana atraviesa el turno del siguiente, así que la fase de
-     * turno con una ventana ABIERTA es el caso normal, no una rareza.
-     *
-     * Por omisión queda abierta, que es lo que pasa en una mesa de verdad casi
-     * todo el tiempo. Un paso puede pedir ventana nula (no hay ninguna) o un
-     * id distinto (hubo un tiro, y es otra muestra).
-     *
-     * Sin acentos graves en este comentario a propósito: vive dentro de un
-     * template literal, y uno solo lo termina a la mitad.
-     */
-    ventana: paso.ventana === null
-      ? null
-      : {
-          id: paso.ventana ?? "v1",
-          abiertaEn: Date.now() - 500,
-          duracionMs: 5000,
-          cerrada: false,
-        },
+    ventana: (paso.fase ?? "descarte") === "descarte"
+      ? { id: "v1", abiertaEn: Date.now() - 500, duracionMs: 5000, cerrada: false }
+      : null,
     esperando: null,
     plazo: null,
     puedeAtacarEn: paso.puedeAtacarEn ?? [],
@@ -332,21 +312,10 @@ test("si no se elige a tiempo, la mesa suelta la entrega", async ({ page }) => {
     .toEqual(["intentarDescarte"]);
 });
 
-test("un acierto que espera su carta se olvida cuando CAMBIA la muestra", async ({ page }) => {
-  /*
-   * Lo que termina el acierto es la MUESTRA NUEVA, no la fase. (Etapa 3c/3)
-   *
-   * Este caso pasaba a `fase: "turno"`, y el mock le quitaba la ventana: así
-   * se probaba que la mesa soltara la entrega. Seguía siendo cierto, pero
-   * dejó de ser representativo — en una mesa real la ventana nunca se vuelve
-   * `null` entre dos muestras: el mismo tiro que cierra una abre la otra.
-   *
-   * Así que lo que se publica ahora es lo que publica el servidor: fase
-   * `turno` y una ventana ABIERTA con otro id.
-   */
+test("un acierto que espera su carta se olvida cuando la ventana termina", async ({ page }) => {
   await abrirRed(page, [
     ...CONOCE_UNA,
-    { fase: "turno", indiceTurno: 0, ventana: "v2", despues: 1000 },
+    { fase: "turno", indiceTurno: 0, despues: 1000 },
   ]);
 
   await carta(page, 1, 2).dblclick();
@@ -355,47 +324,7 @@ test("un acierto que espera su carta se olvida cuando CAMBIA la muestra", async 
 
   await page.clock.runFor(1100);
 
-  await expect(page.locator(".carta.apagada"), "la mesa quedó apagada con la muestra nueva")
+  await expect(page.locator(".carta.apagada"), "la mesa sigue apagada fuera del descarte")
     .toHaveCount(0);
   await expect(page.locator(".carta.apuntada")).toHaveCount(0);
-});
-
-test("con la ventana abierta y el turno de otro, los reflejos siguen vivos", async ({ page }) => {
-  /**
-   * LA PRUEBA DE QUE LA ETAPA 3 SIRVE PARA ALGO. (Etapa 3c/3)
-   *
-   * Es el caso que el cambio entero existe para habilitar, y el que ningún
-   * spec cubría: la ventana sigue abierta mientras juega el siguiente. Antes
-   * era imposible —la fase salía de `descarte` sólo al cerrarse la ventana— y
-   * `mesa.js` abría los reflejos preguntando por la fase en ocho lugares. Con
-   * la etapa 3b puesta y esto sin arreglar, la mesa se queda SIN reflejos:
-   * nada tocable, nada atacable, ningún pedido.
-   *
-   * Se comprueban las tres cosas que tiene que poder hacer: ver marcada la
-   * carta que conoce, atacarla, y descartar de su propia mano.
-   */
-  const errores = await abrirRed(page, [
-    { fase: "turno", indiceTurno: 2, puedeAtacarEn: [{ objetivo: 1, posicion: 2 }] },
-  ]);
-
-  await expect.poll(() => atacables(page)).toEqual(["1:2"]);
-  await expect(pista(page), "la mesa avisa que los reflejos están abiertos")
-    .toContainText(/reflejos abiertos/i);
-  await expect(pista(page), "y que no hay reloj").toContainText(/sin reloj/i);
-
-  await carta(page, 1, 2).dblclick();
-  await expect.poll(() => pedidos(page)).toEqual([
-    { nombre: "intentarDescarte", posicion: 2, rival: { objetivo: "beto" } },
-  ]);
-  expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
-});
-
-test("y el descarte de la propia mano también, fuera de la fase de descarte", async ({ page }) => {
-  const errores = await abrirRed(page, [{ fase: "turno", indiceTurno: 2 }]);
-
-  await carta(page, 0, 1).dblclick();
-  await expect.poll(() => pedidos(page)).toEqual([
-    { nombre: "intentarDescarte", posicion: 1, rival: null },
-  ]);
-  expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
 });

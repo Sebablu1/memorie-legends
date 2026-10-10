@@ -313,13 +313,8 @@ export const calentarDescarte = (codigo) =>
     () => false,
   );
 
-/*
- * Acá estaba el envoltorio de `cerrarVentanaDescarte`, y se fue con ella.
- *
- * Nunca lo llamó nadie: `mesa.js` importa una función del mismo nombre, pero
- * del MOTOR, que es otra cosa. El motivo del borrado está escrito en
- * `functions/index.js`, donde vivía la callable.
- */
+/** Cierra la ventana. La puede pedir cualquiera que vea que ya venció. */
+export const cerrarVentanaDescarte = (codigo) => llamar("cerrarVentanaDescarte", { codigo });
 
 /**
  * Acción de turno. `clientActionId` la hace idempotente: un doble clic o un

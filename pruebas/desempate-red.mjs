@@ -13,7 +13,13 @@
  */
 
 import { crearMotorEnRed, MS_MIRADA_TOTAL, MS_ENTRE_RONDAS } from "../functions/partida-red.js";
+import { MS_VENTANA, MS_GRACIA } from "../public/js/reglas/red.js";
+import { MS_REVELACION } from "../public/js/reglas/vista.js";
 import { LIMITE_ELIMINACION } from "../public/js/reglas/puntaje.js";
+
+/** Cuándo vence una ventana. Su duración ya no es fija: abre con la
+ *  mirada, así que hay que preguntársela a ella y no a la constante. */
+const vence = (v) => v.abiertaEn + v.duracionMs + v.graciaMs;
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -253,25 +259,18 @@ console.log("\n=== 4. La ronda extra se juega y resuelve ===");
   await red.avanzarPartida({ codigo: CODIGO });
   ok(maestro().estado.fase === "descarte", "se cierra la mirada", maestro().estado.fase);
 
-  const v = maestro().ventana;
-  ok(v && !v.cerrada, "con su ventana de reflejos abierta");
-
-  /*
-   * LA VENTANA YA NO SE CIERRA SOLA. (Etapa 3b/3)
-   *
-   * Acá se adelantaba el reloj hasta que la ventana vencía, y después dos
-   * segundos más para la revelación. Las dos esperas se fueron con los
-   * cronómetros: en red la ventana vive mientras viva la muestra, y el turno
-   * arranca con ella abierta en el golpe siguiente.
-   *
-   * El reloj no se toca a propósito: lo que se prueba es que la mesa avanza
-   * sin que pase el tiempo.
-   */
   await red.avanzarPartida({ codigo: CODIGO });
-  ok(maestro().estado.fase === "turno",
-     "y el turno arranca sin esperar ningún reloj", maestro().estado.fase);
-  ok(maestro().ventana?.cerrada === false,
-     "con la ventana todavía abierta: la cierra el que tire", maestro().ventana?.cerrada);
+  const v = maestro().ventana;
+  ok(v && !v.cerrada, "se abre la ventana de reflejos");
+
+  reloj = vence(v) + 1;
+  await red.avanzarPartida({ codigo: CODIGO });
+  ok(maestro().estado.fase === "descarte",
+     "se cierra sola y la mesa ve lo expuesto", maestro().estado.fase);
+
+  reloj += MS_REVELACION;
+  await red.avanzarPartida({ codigo: CODIGO });
+  ok(maestro().estado.fase === "turno", "y pasados los 2 s empieza el turno", maestro().estado.fase);
 
   // Se fuerza un resultado distinto para romper el empate.
   const empatados = maestro().estado.jugadores.filter((j) => !j.eliminado);

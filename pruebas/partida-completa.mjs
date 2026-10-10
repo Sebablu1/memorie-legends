@@ -43,6 +43,7 @@ import {
   MS_SIN_SENALES,
 } from "../functions/partida-red.js";
 import * as M from "../public/js/reglas/motor.js";
+import { MS_REVELACION } from "../public/js/reglas/vista.js";
 import { LIMITES_DE_PARTIDA } from "../public/js/reglas/puntaje.js";
 
 let fallos = 0;
@@ -182,27 +183,13 @@ async function pasarLaMirada(mesa) {
   return mesa.estado().fase;
 }
 
-/**
- * Deja atrás los reflejos y arranca el turno. (Etapa 3b/3)
- *
- * Antes esto adelantaba el reloj hasta el vencimiento de la ventana
- * —duración más gracia— y después dos segundos más para la revelación. Las
- * dos esperas se fueron: en red la ventana no vence por tiempo y el turno
- * arranca con ella abierta, en un golpe.
- *
- * Adelantar el reloj acá, además, hacía daño: once segundos de salto vencían
- * el reloj de turno y la mesa se salteaba jugadores. El síntoma fue
- * `["beto","dani","beto","dani"]` donde tenían que ir los cuatro.
- *
- * El nombre se queda porque lo que las quince llamadas quieren sigue siendo
- * lo mismo: seguir la mesa después de los reflejos.
- */
+/** Deja vencer la ventana de reflejos y la revelación que la sigue. */
 async function pasarLaVentana(mesa) {
-  // Sólo si la mesa todavía está retenida en los reflejos. `mesa.avanzar()`
-  // adelanta el reloj hasta el plazo que haya, y si no hay ventana que pasar
-  // el plazo es otro: después de un tiro es `pasarPorTiempo`, y el golpe
-  // pasaba el turno del que acababa de tirar.
-  if (mesa.estado().fase === "descarte") await mesa.avanzar();
+  const v = mesa.partida().ventana;
+  reloj = v.abiertaEn + v.duracionMs + v.graciaMs + 1;
+  await mesa.avanzar();          // cerrar la ventana
+  reloj += MS_REVELACION + 1;
+  await mesa.avanzar();          // cerrar la revelación
   return mesa.estado().fase;
 }
 
@@ -343,25 +330,13 @@ console.log("\n=== 4. Los cuatro poderes, uno por uno ===");
 
     await mesa.accion(uid, "tirar");
 
-    /*
-     * LOS REFLEJOS Y EL PODER, A LA VEZ. (Etapa 3b/3)
-     *
-     * Acá se pedía fase `descarte` primero y `poder` después: la ventana
-     * retenía la fase los dos segundos de reflejos, y recién al cerrarse la
-     * mesa llegaba al poder.
-     *
-     * Ahora la ventana no retiene la fase, y no puede: si la retuviera, nadie
-     * podría tirar, y tirar es lo único que la cierra. Así que las dos cosas
-     * conviven —la ventana abierta para los cuatro, el poder esperando a
-     * quien tiró— y lo que la regla promete sigue en pie: la mesa tiene sus
-     * reflejos sobre la carta de poder antes de que el poder se resuelva. De
-     * hecho tiene más que antes, porque ya no se le cortan a los 2 s.
-     */
-    ok(mesa.estado().ventanaDescarte != null,
-       `tirar el ${numero} abre la ventana de reflejos`, mesa.estado().fase);
-    ok(mesa.partida().ventana?.cerrada === false,
-       "y la ventana de red con ella", mesa.partida().ventana?.cerrada);
-    ok(mesa.estado().fase === "poder", `y el ${numero} espera su poder en paralelo`,
+    // Primero los reflejos de toda la mesa, y recién después el poder: la
+    // carta tirada es la muestra nueva y todos pueden descartar contra ella.
+    ok(mesa.estado().fase === "descarte",
+       `tirar el ${numero} abre antes la ventana de reflejos`, mesa.estado().fase);
+    await pasarLaVentana(mesa);
+
+    ok(mesa.estado().fase === "poder", `y después el ${numero} espera su poder`,
        mesa.estado().fase);
     ok(mesa.estado().poderPendiente?.tipo === M.PODERES[numero],
        `y el poder pendiente es el del ${numero}`, mesa.estado().poderPendiente);
@@ -567,19 +542,7 @@ console.log("\n=== 6. Los tres cortes, y el automático ===");
       clientActionId: `auto${++accion}`, declarado: 700, latencia: 30, incertidumbre: 10,
     });
 
-    /*
-     * Y CORTA EN EL ACTO, SIN ESPERAR NINGÚN CIERRE. (Etapa 3b/3)
-     *
-     * Acá se llamaba a `pasarLaVentana` primero: el corte lo miraba
-     * `cerrarVentanaDescarte`, al cerrar la ventana por tiempo. Sin
-     * cronómetro, esperar al cierre dejaría la ronda terminando DESPUÉS de
-     * que el siguiente ya levantó, decidió y tiró.
-     *
-     * Así que se pregunta en cada reflejo aplicado, y el descarte de beto es
-     * uno. El golpe que había acá, además, ya no era inofensivo: con la ronda
-     * cortada, el plazo vigente era el de la ronda siguiente, y el golpe la
-     * repartía — la fase que se leía era `mirar`.
-     */
+    await pasarLaVentana(mesa);
     ok(["finRonda", "finPartida"].includes(mesa.estado().fase),
        "quedarse sin cartas corta la ronda sola", mesa.estado().fase);
     ok(mesa.estado().indiceCortador === 1, "y el corte es de quien se vació", mesa.estado().indiceCortador);

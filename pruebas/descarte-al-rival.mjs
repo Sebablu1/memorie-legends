@@ -498,21 +498,11 @@ console.log("\n=== 12. En red, el servidor aplica la misma regla ===");
      "el acierto y dos errores se anotan: varios intentos en la ventana",
      [acierto, errado, otraVez].map((r) => r.error?.message ?? "ok"));
 
-  /*
-   * Y LA ACERTADA YA NO FIGURA: SE FUE. (Etapa 3b/3)
-   *
-   * Acá se pedían las dos marcadas. Era cierto mientras el acierto esperara
-   * al cierre: la carta seguía en la mano del rival y a conservaba su derecho
-   * sobre ella. Ahora el acierto que viene con su entrega se aplica al
-   * llegar, así que la carta salió de la mesa y no hay nada que atacar ahí.
-   *
-   * La errada sí sigue, y sigue siendo atacable: es la regla, se puede
-   * insistir sobre una carta que se conoce mientras dure la ventana.
-   */
   const atacables = m.vista("a").puedeAtacarEn;
-  ok(atacables.length === 1 &&
-     atacables[0].objetivo === rival && atacables[0].posicion === noVa,
-     "la vista de a marca la errada, y la acertada ya no está", atacables);
+  ok(atacables.some((x) => x.objetivo === rival && x.posicion === va) &&
+     atacables.some((x) => x.objetivo === rival && x.posicion === noVa) &&
+     atacables.length === 2,
+     "la vista de a marca esas dos cartas y ninguna otra", atacables);
   ok(UIDS.slice(1).every((u) => m.vista(u).puedeAtacarEn.length === 0),
      "las de los demás no marcan nada");
 
@@ -640,37 +630,14 @@ console.log("\n=== 15. En red, la carta se elige después, y sólo si acertó ==
        "un reintento contesta lo mismo, con la misma hora", repetido);
 
     m.fijar(venceBase(m.ventana) + 1);
-
-    /*
-     * EL PLAZO DE LA ENTREGA AHORA ES SUYO, NO DEL CIERRE. (Etapa 3b/3)
-     *
-     * Antes el cierre de la ventana esperaba a la entrega —`venceEn` lo
-     * estiraba— así que el plazo vigente era uno solo. Sin cierre por tiempo
-     * la entrega necesita su propio plazo, y lo tiene: `resolverEntregas`.
-     *
-     * Hay que golpear una vez antes de mirarlo: mientras la fase sea
-     * `descarte` el plazo vigente es arrancar el turno, que vence ya y le
-     * gana a todo. Recién con el turno en marcha asoma el de la entrega.
-     */
     ok(!yaVencio(m.partida().ventana, m.ahora()), "vencido el tiempo de intentar, la ventana espera");
-    await m.golpe();
-    ok(m.partida().plazo?.que === "resolverEntregas" &&
-       m.partida().plazo?.hasta === r.entregaHasta,
-       "y el plazo vigente pasa a ser el de la entrega", m.partida().plazo);
+    ok(m.partida().plazo?.hasta === r.entregaHasta, "y su plazo es el de la entrega", m.partida().plazo);
     await m.golpe();
     ok(!m.partida().ventana.cerrada, "un golpe no la resuelve sin la carta");
 
-    /*
-     * Y SE SIGUE PUDIENDO INTENTAR. (Etapa 3b/3)
-     *
-     * Acá se pedía un error: «la espera es sólo para elegir», porque el
-     * tiempo de intentar se había terminado con la ventana. Sin cronómetro no
-     * se termina: la ventana está abierta hasta que alguien tire, y mientras
-     * esté abierta se puede insistir sobre una carta conocida. Es la regla.
-     */
+    // Intentar ya no se puede: la espera es sólo para elegir.
     const tarde = await capturar(() => m.atacar({ posicion: m.noVa, clientActionId: "a2" }));
-    ok(tarde.valor?.anotado === true,
-       "y un ataque nuevo entra igual: la ventana sigue abierta", tarde.error?.message);
+    ok(Boolean(tarde.error), "un ataque nuevo llega tarde", tarde.error?.message);
 
     const ajeno = await capturar(() => m.red.entregarCarta({
       uid: "b", codigo: COD, windowId: m.ventana.id, clientActionId: "a1", posicionEntrega: 0,
@@ -686,10 +653,10 @@ console.log("\n=== 15. En red, la carta se elige después, y sólo si acertó ==
     const otraVez = await m.entregar({ clientActionId: "a1", posicionEntrega: 1 });
     ok(otraVez.duplicado, "y la segunda no cambia nada: vale la primera", otraVez);
 
-    // Y se aplica en el acto, sin cerrar nada: la muestra no cambió, así que
-    // la ventana sigue abierta para los otros tres.
+    ok(yaVencio(m.partida().ventana, m.ahora()), "con la carta elegida, la ventana ya puede cerrar");
+    await m.golpe();
     const fin = m.partida().estado;
-    ok(!m.partida().ventana.cerrada, "la ventana sigue abierta: la cierra el que tire");
+    ok(m.partida().ventana.cerrada, "y el golpe la resuelve");
     ok(fin.jugadores[m.rival].mano[m.va]?.id === miCarta.id,
        "con la carta que se eligió", fin.jugadores[m.rival].mano[m.va]?.id);
     ok(fin.jugadores[0].mano[3] === null, "que salió de la mano de a");
@@ -703,108 +670,15 @@ console.log("\n=== 15. En red, la carta se elige después, y sólo si acertó ==
     const tarde = await capturar(() => m.entregar({ clientActionId: "z1", posicionEntrega: 0 }));
     ok(Boolean(tarde.error), "una carta que llega pasada la hora no se acepta", tarde.error?.message);
 
-    // Dos golpes: el primero arranca el turno —la fase todavía era
-    // `descarte`— y el segundo cumple el plazo de la entrega.
-    await m.golpe();
     await m.golpe();
     const fin = m.partida().estado;
     const ultimo = fin.ventanaDescarte.intentos.at(-1);
-    ok(!m.partida().ventana.cerrada,
-       "la entrega se resuelve sola, y sin cerrar la ventana", m.partida().ventana.cerrada);
+    ok(m.partida().ventana.cerrada, "la ventana se resuelve igual");
     ok(ultimo?.resultado === "rivalAcierto" && ultimo?.entregaAlAzar === true,
        "con el acierto, y la carta al azar", ultimo);
     ok(fin.jugadores[m.rival].mano[m.va]?.id !== m.deRival[m.va].id,
        "la del rival se fue");
-
-    /*
-     * Y EL PLAZO SE APAGA. (Etapa 3b/3)
-     *
-     * Esto lo pide el plazo nuevo. `resolverEntregas` resuelve SIN cerrar la
-     * ventana —la muestra no cambió, los reflejos siguen valiendo— así que
-     * nada impide volver a pasar por ahí. El cierre, que era el único que
-     * llamaba a `aplicarPendientes`, no tenía el problema: dejaba la ventana
-     * `cerrada` y no se volvía a calcular ningún plazo.
-     *
-     * La carta no se entrega dos veces —`aplicarPendientes` saltea los
-     * intentos ya aplicados— pero el plazo se recalculaba igual y se cumplía
-     * en CADA golpe: una publicación por golpe, para siempre, con cuatro
-     * clientes repintando la mesa. Eso es lo que se mide acá: que el plazo
-     * desaparezca y que la partida se quede quieta.
-     */
-    const version = () => m.partida().version;
-    const manoDeA = () => m.partida().estado.jugadores[0].mano.filter(Boolean).length;
-    const cartasAntes = manoDeA();
-    m.adelantar(1);
-    await m.golpe();
-    const quieta = version();
-    await m.golpe();
-    await m.golpe();
-    ok(m.partida().plazo?.que !== "resolverEntregas",
-       "cumplido el plazo de la entrega, se apaga", m.partida().plazo?.que);
-    ok(version() === quieta, "y los golpes siguientes no republican nada",
-       [quieta, version()]);
-    ok(manoDeA() === cartasAntes, "ni vuelven a entregar", [cartasAntes, manoDeA()]);
   }
-}
-
-// ==================================================================== 16
-
-console.log("\n=== 16. El tiro del siguiente le corta el tiempo a la entrega ===");
-{
-  /**
-   * La decisión de diseño que esta sección defiende.
-   *
-   * ─────────────────────────────────────────────────────────────────────────
-   *
-   * Un acierto espera hasta cinco segundos a que su dueño elija qué carta
-   * entrega. Pero la ventana se cierra con el tiro del jugador en turno, y ese
-   * tiro puede llegar antes: nadie va a esperar a que el otro decida.
-   *
-   * Se eligió que el tiro MANDE y la entrega se resuelva al azar en ese
-   * instante, en vez de dejar la entrega pendiente para después. No es un
-   * atajo: `intentarDescarteRival` vuelve a comparar la carta contra la
-   * muestra, así que una entrega resuelta DESPUÉS del tiro se evaluaría
-   * contra la muestra nueva y el acierto se convertiría en error. Resolverla
-   * antes es la única forma de que el que acertó no pague por acertar.
-   *
-   * Y la carta al azar no es un castigo inventado: es lo que el reglamento ya
-   * dice para quien no elige a tiempo.
-   */
-  const m = await montar();
-  const deLaVieja = m.ventana.id;
-
-  const r = await m.atacar({ posicion: m.va, clientActionId: "corta1" });
-  ok(r.acierta === true && r.entregaHasta > m.ahora(),
-     "a acierta y le quedan segundos para elegir", r);
-  const cartasDeA = m.partida().estado.jugadores[0].mano.filter(Boolean).length;
-  ok(m.partida().estado.jugadores[m.rival].mano[m.va]?.id === m.deRival[m.va].id,
-     "y la del rival todavía está donde estaba");
-
-  // Arranca el turno —la fase era `descarte`— y el que le toca tira. Sin
-  // esperar a que a elija: el reloj NO se adelanta, así que a todavía estaría
-  // en tiempo.
-  await m.golpe();
-  const enTurno = UIDS[m.partida().estado.indiceTurno];
-  await m.red.accionDeTurno({ uid: enTurno, codigo: COD, accion: "levantar", clientActionId: "lev16" });
-  await m.red.accionDeTurno({ uid: enTurno, codigo: COD, accion: "tirar", clientActionId: "tir16" });
-
-  const fin = m.partida().estado;
-  ok(fin.jugadores[m.rival].mano[m.va]?.id !== m.deRival[m.va].id,
-     "el tiro resuelve el acierto: la carta del rival se fue",
-     fin.jugadores[m.rival].mano[m.va]?.id);
-  ok(fin.jugadores[0].mano.filter(Boolean).length === cartasDeA - 1,
-     "y a entregó una de las suyas",
-     [cartasDeA, fin.jugadores[0].mano.filter(Boolean).length]);
-
-  // Y la ventana es otra: la vieja murió con su muestra.
-  ok(m.partida().ventana.id !== deLaVieja, "la ventana es nueva", m.partida().ventana.id);
-  ok(m.partida().ventana.cerrada === false, "y está abierta, sobre la muestra nueva");
-  const vieja = await capturar(() => m.red.intentarDescarte({
-    uid: "a", codigo: COD, windowId: deLaVieja, posicion: m.noVa,
-    declarado: 400, latencia: 30, incertidumbre: 15,
-    objetivo: UIDS[m.rival], clientActionId: "corta2",
-  }));
-  ok(Boolean(vieja.error), "y con el id viejo ya no entra nada", vieja.error?.message);
 }
 
 console.log(fallos ? `\n❌ ${fallos} FALLOS` : "\n✅ TODO OK");

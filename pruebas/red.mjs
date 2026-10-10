@@ -129,21 +129,8 @@ console.log("\n=== 3-4. Qué se acepta y qué no ===");
      "una ventana ya cerrada se rechaza");
   ok(R.registrarIntento(base(), intento(), ctx(9000)).motivo === R.RECHAZO_INTENTO.FUERA_DE_TIEMPO,
      "antes de que abra se rechaza");
-  /*
-   * Y MUCHO DESPUÉS DE LA GRACIA SE ACEPTA. (Etapa 3b/3)
-   *
-   * Esta línea pedía `FUERA_DE_TIEMPO`, y era la regla mientras la ventana
-   * venciera a los 2 s. En red la ventana no vence por tiempo: vive mientras
-   * viva la muestra, y la cierra el que la cambia. Veinte segundos después
-   * puede seguir perfectamente abierta —el del turno está pensando— y un
-   * reflejo de ahí es tan legítimo como el del primer segundo.
-   *
-   * La aserción no se afloja: se da vuelta. Lo que SIGUE cerrando la puerta
-   * son las dos líneas de arriba —la ventana tiene que ser la vigente y no
-   * estar cerrada— y eso se prueba ahí.
-   */
-  ok(R.registrarIntento(base(), intento(), ctx(30000)).ok,
-     "veinte segundos después también: la ventana no vence por tiempo");
+  ok(R.registrarIntento(base(), intento(), ctx(30000)).motivo === R.RECHAZO_INTENTO.FUERA_DE_TIEMPO,
+     "mucho después de la gracia se rechaza");
   ok(R.registrarIntento(base(), intento({ posicion: 9 }), ctx(10600)).motivo === R.RECHAZO_INTENTO.POSICION_INVALIDA,
      "una posición que no existe se rechaza");
   ok(R.registrarIntento(base(), intento({ posicion: -1 }), ctx(10600)).motivo === R.RECHAZO_INTENTO.POSICION_INVALIDA,
@@ -171,46 +158,24 @@ console.log("\n=== 3-4. Qué se acepta y qué no ===");
   ok(enGracia.ventana.intentos.c1.efectivo === CASI_AL_CIERRE,
      "y conserva su tiempo de reacción", enGracia.ventana?.intentos?.c1?.efectivo);
 
-  /*
-   * Y SI MIENTE, LO QUE PAGA ES EL TIEMPO, NO EL RECHAZO. (Etapa 3b/3)
-   *
-   * Los dos casos que siguen pedían `FUERA_DE_TIEMPO` por la misma línea que
-   * se fue: un techo de reacción igual a `duracionMs`. Sin cronómetro no hay
-   * techo, así que los dos entran.
-   *
-   * Lo que NO se perdió es la corrección del tiempo declarado, que es la
-   * parte que de verdad protegía algo: nadie se compra una reacción mejor
-   * declarando una latencia que su paquete desmiente. El declarado se acota
-   * al intervalo que la llegada hace posible, y acá eso lo empuja hacia
-   * adelante. Antes esa corrección se notaba porque hacía saltar el techo;
-   * ahora se comprueba directamente sobre `efectivo`, que es donde vive.
-   */
-  const llegaTardisimo = ABRE + R.MS_VENTANA + R.MS_GRACIA - 100;
+  // En cambio, si su paquete tardó mucho más de lo que declara, el reloj se
+  // corrige hacia adelante: no se le puede creer esa reacción con ese viaje.
   const inconsistente = R.registrarIntento(
     base(),
     intento({ declarado: CASI_AL_CIERRE, latencia: 400, incertidumbre: 200 }),
-    ctx(llegaTardisimo),
+    ctx(ABRE + R.MS_VENTANA + R.MS_GRACIA - 100),
   );
-  ok(inconsistente.ok, "declarar poca latencia y llegar tardísimo ya no se rechaza",
-     inconsistente.motivo);
-  const corregido = inconsistente.ventana.intentos.c1.efectivo;
-  ok(corregido > CASI_AL_CIERRE,
-     "pero su reacción se corrige hacia adelante: no se le cree ese viaje",
-     [corregido, CASI_AL_CIERRE]);
-  ok(corregido === llegaTardisimo - ABRE - 400 - 200,
-     "exactamente hasta el primer instante que su llegada permite", corregido);
+  ok(inconsistente.motivo === R.RECHAZO_INTENTO.FUERA_DE_TIEMPO,
+     "declarar poca latencia y llegar tardísimo perjudica al que lo declara", inconsistente.motivo);
 
-  // Reacción posterior al fin nominal de la ventana: vale, y conserva su
-  // tiempo. Ese número ya no decide nada —el orden es el de llegada— pero es
-  // el único registro de cuándo reaccionó cada uno.
+  // Reacción posterior al fin de la ventana: no descarta, por rápido que sea.
   const tarde = R.registrarIntento(
     base(),
     intento({ declarado: R.MS_VENTANA + 1000, latencia: 10, incertidumbre: 5 }),
     ctx(ABRE + R.MS_VENTANA + 1010),
   );
-  ok(tarde.ok, "reaccionar después del fin nominal de la ventana vale", tarde.motivo);
-  ok(tarde.ventana.intentos.c1.efectivo === R.MS_VENTANA + 1000,
-     "y queda anotado tal cual lo declaró", tarde.ventana?.intentos?.c1?.efectivo);
+  ok(tarde.motivo === R.RECHAZO_INTENTO.FUERA_DE_TIEMPO,
+     "reaccionar después de que la ventana terminó no vale", tarde.motivo);
 }
 
 // ==================================================== 7. idempotencia
