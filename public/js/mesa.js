@@ -1457,7 +1457,7 @@ function actualizarBotones() {
    */
   if (marcado && !estabaMarcado && enRed()) {
     pista(
-      "Se acabó tu tiempo y quedaste <b>ausente</b>. Tocá <b>He vuelto</b> para seguir.",
+      "Quedaste ausente. Apretá He vuelto.",
     );
   }
   estabaMarcado = marcado;
@@ -1495,7 +1495,7 @@ function resolverPorTiempo(indice) {
 
   sonidos.error();
   estado = saltarTurno(estado);
-  if (indice === YO) pista("Se te acabó el tiempo: perdiste la levantada.");
+  if (indice === YO) pista("Perdiste la levantada por tiempo.");
   dibujar();
   cicloTurnos();
 }
@@ -1531,7 +1531,7 @@ function pasarPorTiempo() {
   // de diez —tirar, soltar el poder— no marcan: vencerlos es jugar apurado.
   ausenteLocal = true;
   pista(
-    "Se acabó el tiempo: <b>pasaste</b> el turno y quedaste <b>ausente</b>.",
+    "Pasaste por tiempo. Quedaste ausente.",
   );
   dibujar();
   cicloTurnos();
@@ -1594,7 +1594,7 @@ async function resolverDecisionPorTiempo() {
   if (que === "descartarPorTiempo") {
     sonidos.whoosh();
     estado = tirarCarta(estado, { porTiempo: true });
-    pista("Se acabó el tiempo: se tiró la carta.");
+    pista("Por tiempo: se tiró.");
     dibujar();
     // La carta tirada queda de muestra, así que abre reflejos igual que
     // cuando se tira a mano. Sin esto, la mesa se saltearía la ventana.
@@ -1612,7 +1612,7 @@ async function resolverDecisionPorTiempo() {
       ? resolverCambioConVista(estado, false)
       : saltarPoder(estado);
   estado = pasarTurno(sinPendiente);
-  pista("Se acabó el tiempo para decidir: <b>pasaste</b> el turno.");
+  pista("Pasaste por tiempo.");
   dibujar();
   cicloTurnos();
 }
@@ -2262,7 +2262,7 @@ function empezarEntregaLocal(objetivo) {
   };
   sonidos.aviso();
   correrTemporizador(MS_PARA_ENTREGAR, "entrega");
-  pista("¡Le acertaste! Elegí una carta tuya para entregarle.");
+  pista("¡Le acertaste! Elegí una carta tuya.");
   dibujar();
 }
 
@@ -2768,7 +2768,7 @@ dom.btnLevantar.addEventListener("click", () => {
   pista(
     poder
       ? `Levantaste un <b>${estado.levantada.numero}</b>: tenés un poder disponible.`
-      : "Tocá una de tus cartas para <b>cambiarla</b>, o <b>tirá</b> la carta.",
+      : "Cambiala por una tuya, o tirala.",
   );
   dibujar();
   // El poder nunca se activa solo: se pregunta apenas aparece la carta.
@@ -3114,7 +3114,7 @@ document.addEventListener("click", async (evento) => {
 
       // Ya eligió: se explica por qué no pasa nada, en vez de ignorar el clic.
       sonidos.error();
-      pista("⚠️ Ya miraste: una carta por ronda");
+      pista("⚠️ Una carta por ronda.");
       const carta = cartaEl;
       carta.classList.add("rechazada");
       setTimeout(() => carta.classList.remove("rechazada"), 600);
@@ -3186,7 +3186,7 @@ document.addEventListener("click", async (evento) => {
     // se dice por qué en vez de dejarlo en un clic que no pasa nada.
     if (yaIntentoLoSuyo(estado, YO)) {
       sonidos.error();
-      pista("⚠️ Un tiro por ventana: ya jugaste el tuyo");
+      pista("⚠️ Ya jugaste tu tiro.");
       cartaEl.classList.add("rechazada");
       setTimeout(() => cartaEl.classList.remove("rechazada"), 600);
       return;
@@ -3600,7 +3600,7 @@ dom.modal.addEventListener("click", async (evento) => {
     pista(
       usar
         ? "CORTAR O PASAR"
-        : "Tiraste la carta sin usar el poder. Podés <b>cortar</b> o <b>pasar</b> el turno.",
+        : "Tiraste sin el poder. Cortá o pasá.",
     );
     return;
   }
@@ -3610,7 +3610,7 @@ dom.modal.addEventListener("click", async (evento) => {
   if (cambiarPoder) {
     sonidos.clic();
     cerrarModal();
-    pista("Tocá una de tus cartas para <b>cambiarla</b> por la levantada.");
+    pista("Elegí con cuál la cambiás.");
     dibujar();
     return;
   }
@@ -3625,7 +3625,7 @@ dom.modal.addEventListener("click", async (evento) => {
     // que apareciera esta elección. Abrir otra ventana al renunciar le daría
     // dos oportunidades por la misma carta.
     pista(
-      "Descartaste sin usar el poder. Podés <b>cortar</b> o <b>pasar</b> el turno.",
+      "Descartaste sin el poder. Cortá o pasá.",
     );
     dibujar();
     return;
@@ -4159,101 +4159,119 @@ function apagarCuentaEnRed() {
 }
 
 /** Texto de la situación, para el modo red. */
+/**
+ * El nombre, acortado y escapado, para que quepa en un renglón. (§55)
+ *
+ * Diez caracteres y tres puntos. Recortar por CANTIDAD y no por ancho deja un
+ * borde conocido: ocho letras anchas seguidas —`MMMMMMMM`, `WWWWWWWW`— siguen
+ * partiendo la pista en dos renglones, porque una `M` mide casi el doble que
+ * una `i`. Se aceptó a ojos abiertos: no es un nombre de castellano, y el
+ * síntoma es el que la mesa ya tiene con cualquier mensaje largo. La salida
+ * barata, si algún día molesta, es un tope más corto al registrarse (§57).
+ *
+ * Y escapa, que es lo que faltaba. `dibujarJugador` escapa el nombre antes de
+ * ponerlo en el DOM; `pistaDeRed` lo interpolaba crudo en `innerHTML`. El
+ * nombre lo arma el servidor, pero sale del perfil de quien se registra, así
+ * que es texto de otra persona entrando sin filtro. Va acá y no en cada
+ * plantilla para que no se pueda olvidar en la próxima.
+ */
+const nombreCorto = (nombre) => {
+  const n = String(nombre ?? "alguien");
+  return escapar(n.length > 10 ? `${n.slice(0, 10)}...` : n);
+};
+
+/**
+ * La pista de la fase, en red. Una línea, nunca dos. (§55)
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ CORTAS, Y CUÁNTO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Medido en el navegador a 375 px: el renglón de `#pista` mide 16 px y entran
+ * **38 caracteres** de castellano. Pasados, el texto se parte en dos — y el
+ * CSS de `.tira-pista` ya cuenta qué pasa entonces: «en un teléfono bajo esos
+ * 16 px de más empujan la mesa hasta que las cartas se meten encima. Justo el
+ * mensaje que hay que poder leer, tapado.»
+ *
+ * Así que no es cosmética. Cada texto de acá está medido contra ese número,
+ * no estimado: la frase más larga que quedó —«Podés cortar o pasar. Descarte
+ * activo.»— mide 38 justos.
+ *
+ * Y se fueron los `<b>`. La pista entera ya es `font-weight: 700`, así que la
+ * negrita adentro no se veía: eran caracteres que ocupaban lugar en el
+ * presupuesto y no dibujaban nada.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * CUÁNDO SE AGREGA «DESCARTE ACTIVO.»
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Sólo cuando la ventana está abierta Y MI MANO está disponible para
+ * reflejos. No son lo mismo, y por eso no alcanza con `reflejosAbiertos`:
+ *
+ *   - en MI `levantada` mi mano es para cambiar, no para descartar (ver
+ *     `clicEnCartaDeRed`), así que anunciar el descarte invitaría al toque que
+ *     ese arreglo justamente redirige;
+ *   - en MI `poder` el modal se abre sobre `.velo`, que me tapa la mesa
+ *     entera: la ventana está abierta y yo no puedo usarla;
+ *   - en la MIRADA el descarte vale —es la regla D2— pero la pista tiene un
+ *     trabajo más urgente, que es decir qué memorizar, y las dos cosas juntas
+ *     no entran en 38.
+ *
+ * En los demás casos se agrega, y es la única señal que queda de que la
+ * ventana sigue viva: el cronómetro que lo decía se fue con la etapa 3b.
+ */
 function pistaDeRed(vista) {
   if (vista.abandonaron?.includes(miUid)) return "Abandonaste esta partida.";
   const miTurno = vista.indiceTurno === vista.yo;
-  const quien = vista.jugadores[vista.indiceTurno]?.nombre ?? "alguien";
+  const quien = nombreCorto(vista.jugadores[vista.indiceTurno]?.nombre);
 
-  /**
-   * EL AVISO DE QUE LOS REFLEJOS SIGUEN ABIERTOS. (Etapa 3c/3)
-   *
-   * ───────────────────────────────────────────────────────────────────────
-   * POR QUÉ ES UN AVISO PERMANENTE Y NO UNO QUE SE APRENDE
-   * ───────────────────────────────────────────────────────────────────────
-   *
-   * Lo que cambió no es una pantalla, es una regla, y una regla que la mesa no
-   * muestra en ninguna otra parte. Antes el cronómetro de reflejos ERA el
-   * aviso: la barra bajando decía «ahora, y hasta que esto se vacíe». Esa
-   * barra se fue en la etapa 3b —medía un tiempo que ya nadie mide— y si no
-   * se dice nada, lo único que el jugador ve es que le toca a otro. No tiene
-   * cómo saber que sus cartas siguen tocables.
-   *
-   * Así que va pegado a la pista de la fase, y mientras la ventana esté
-   * abierta. Un `pistaSiAprende` —que se muestra dos veces y se calla— sería
-   * suficiente para enseñar la mecánica, pero no para lo otro que esta línea
-   * hace: decir hasta CUÁNDO. El límite ya no es un número que se pueda
-   * aprender de memoria, es un acontecimiento, y cambia en cada mano.
-   */
-  const conReflejos = (texto) => {
-    if (!reflejosAbiertos(vista)) return texto;
-    /*
-     * En MI levantada el aviso se acota, y no es un detalle de redacción.
-     *
-     * Mi mano, en mi levantada, es para cambiar: el reflejo sobre lo propio
-     * espera (ver `clicEnCartaDeRed`). Si acá dijera «reflejos abiertos» a
-     * secas, el jugador tocaría su carta esperando descartarla y vería que
-     * se la cambia — exactamente la confusión que el arreglo del bug de 3c
-     * tiene que evitar, no heredar. Sobre las cartas de los demás sigue
-     * abierto, así que se dice eso.
-     */
-    const soloAjenas = vista.fase === "levantada" && miTurno;
-    return soloAjenas
-      ? `${texto} — <b>Reflejos abiertos</b> sobre las cartas de los demás.`
-      : `${texto} — <b>Reflejos abiertos</b>, sin reloj: hasta que se tire.`;
-  };
+  const conDescarte = (texto) =>
+    reflejosAbiertos(vista) ? `${texto} Descarte activo.` : texto;
 
   switch (vista.fase) {
     case "mirar":
-      // Sólo números: los nombres no hacen falta para saber que falta alguien.
       if (vista.esperando) {
         const { llegaron, total } = vista.esperando;
-        return `Esperando a los jugadores (${Number(llegaron)}/${Number(total)})…`;
+        return `Esperando jugadores (${Number(llegaron)}/${Number(total)})…`;
       }
-      if (miradaTodaviaCerrada(vista)) {
-        return "Preparate: vas a tocar <b>una</b> carta tuya para memorizarla.";
-      }
-      return "Tocá <b>una</b> carta tuya para memorizarla.";
+      if (miradaTodaviaCerrada(vista)) return "Preparate: vas a mirar una carta tuya.";
+      return "Mirá una carta tuya para memorizarla.";
+
     case "descarte":
-      return "<b>¡Reflejos!</b> Tocá una carta que creas igual a la muestra. " +
-             "Sin reloj: tenés hasta que el de turno tire.";
+      // Acá la pista ES el descarte, así que no se anuncia a sí misma.
+      return "Tirá la que creas igual.";
+
     case "turno":
-      return conReflejos(miTurno
-        ? "Es tu turno. <b>Levantá</b> del mazo."
-        : `Juega <b>${quien}</b>.`);
+      return conDescarte(miTurno ? "Levantá del mazo." : `Juega ${quien}.`);
+
     case "levantada": {
-      if (!miTurno) return conReflejos(`<b>${quien}</b> está decidiendo.`);
-      /**
-       * Con una carta de poder en la mano, la pista dice QUÉ se pierde.
-       *
-       * Es el momento equivalente al modal de decisión del entrenamiento, que
-       * acá no existe: el servidor abre la fase `poder` recién cuando la carta
-       * ya se tiró, así que mientras se la tiene en la mano la única autoridad
-       * es esta línea. Y lo que estaba escrito —«Cambiala por una tuya, o
-       * tirala»— no decía lo único que hay que saber para decidir: que
-       * cambiarla deja el poder sin usar.
-       *
-       * La carta se mira acá y no en el servidor porque `vista.levantada` sólo
-       * viaja a quien está en turno (ver `reglas/vista.js`): nadie más puede
-       * saber que es un poder, y así tiene que seguir siendo.
+      if (!miTurno) return conDescarte(`${quien} decide.`);
+      /*
+       * Con un poder en la mano, lo único que hay que saber para decidir es
+       * que cambiarla lo pierde. Antes esto eran 153 caracteres y cuatro
+       * renglones en el teléfono; son dos ideas y entran en 32.
        */
-      const poder = PODERES[vista.levantada?.numero];
-      return conReflejos(poder
-        ? `Levantaste un <b>${vista.levantada.numero}</b>. <b>Tirala</b> para usar el poder, ` +
-            "o tocá una de tus cartas para <b>cambiarla</b> (perdés el poder)."
-        : "Cambiala por una tuya, o tirala.");
+      return PODERES[vista.levantada?.numero]
+        ? "Tirá: poder / Cambiar lo pierde."
+        : "Cambiala por una tuya, o tirala.";
     }
+
     case "poder":
-      return conReflejos(miTurno
-        ? "Levantaste un poder."
-        : `<b>${quien}</b> tiene un poder.`);
+      return miTurno ? "Tenés un poder." : conDescarte(`${quien}: poder.`);
+
     case "postLevantada":
-      return conReflejos(miTurno
-        ? "Podés <b>cortar</b> o <b>pasar</b>."
-        : `<b>${quien}</b> decide si corta.`);
-    case "finRonda":
-      return `Ronda ${vista.ronda} terminada.`;
+      return conDescarte(miTurno ? "Podés cortar o pasar." : `${quien} decide.`);
+
+    case "finRonda": {
+      // Quién cortó, que es lo que la mesa quiere saber. Sirve igual para el
+      // corte automático: `indiceCortador` lo pone el motor en los dos casos.
+      const corto = vista.jugadores[vista.indiceCortador]?.nombre;
+      return corto ? `Cortó ${nombreCorto(corto)}. Ronda terminada.` : "Ronda terminada.";
+    }
+
     case "finPartida":
       return "Partida terminada.";
+
     default:
       return "";
   }
@@ -5181,7 +5199,7 @@ class EsperaVencida extends Error {}
  */
 async function pedir(accion, ejecutar) {
   if (pidiendo) {
-    pista("⏳ Esperá a que termine la acción anterior.");
+    pista("⏳ Esperá la acción anterior.");
     return;
   }
   pidiendo = true;
@@ -5209,7 +5227,7 @@ async function pedir(accion, ejecutar) {
         `Sin respuesta de "${accion}" tras ${MS_ESPERA_MAXIMA} ms. ` +
           "La jugada PUEDE haberse aplicado igual: no se reintenta.",
       );
-      pista("⌛ No pudimos confirmar la acción. Esperá un momento.");
+      pista("⌛ No pudimos confirmar. Reintentá.");
     } else if (esDesincronizacion(error)) {
       // La mesa siguió mientras el dedo iba en camino: el reloj de turno saltó
       // al jugador, o la ventana venció. No es un error del jugador ni algo
@@ -5490,7 +5508,7 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
     if (!ventana || ventana.cerrada) return;
 
     if (!dobleClic) {
-      pistaSiAprende("dos-rival", "Tocá <b>dos veces</b> la carta del rival que conocés.");
+      pistaSiAprende("dos-rival", "¡Doble toque en la del rival!");
       return;
     }
 
@@ -5506,7 +5524,7 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
 
     if (!r.acierta) {
       sonidos.error();
-      pista("No era esa: te comés una carta al cerrar la ventana.");
+      pista("No era esa: te comés una carta.");
       return;
     }
 
@@ -5541,7 +5559,7 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
     };
     sonidos.aviso();
     correrTemporizador(resta, "entrega");
-    pista("¡Le acertaste! Elegí <b>una carta tuya</b> para entregarle.");
+    pista("¡Le acertaste! Elegí una carta tuya.");
     dibujar();
     return;
   }
@@ -5601,7 +5619,7 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
     if (!ventana || ventana.cerrada) return;
 
     if (!dobleClic) {
-      pistaSiAprende("dos-propia", "Tocá <b>dos veces</b> para descartar.");
+      pistaSiAprende("dos-propia", "¡Doble toque si estás seguro!");
       return;
     }
 
@@ -5701,7 +5719,7 @@ async function arrancarModoLeyendas(sala, uid) {
     salaPedida,
     uid,
     (vista) => pintarVista(vista),
-    () => pista("⚠️ Se cortó la conexión con la partida. Reintentando…"),
+    () => pista("⚠️ Sin conexión. Reintentando…"),
   );
   // El aviso de insignias se escucha desde el arranque y no al abrir el
   // modal: el documento puede aparecer en cualquier momento después del

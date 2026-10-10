@@ -148,6 +148,43 @@ constantes en todos los specs y está bien que lo sean —`limitePuntos`,
 motivo de cada una al lado. Si la lista crece sin motivos, el cerrojo dejó de
 servir.
 
+### §55 — ~~Acortar los mensajes largos de la mesa~~ HECHO
+
+**Hecho.** La pista de la mesa entra en un renglón, medido y no estimado.
+
+**El número, medido en el navegador a 375 px:** el renglón de `#pista` mide
+16 px y entran **38 caracteres** de castellano. El CSS de `.tira-pista` ya
+contaba el daño de pasarse: «en un teléfono bajo esos 16 px de más empujan la
+mesa hasta que las cartas se meten encima. Justo el mensaje que hay que poder
+leer, tapado.» No era cosmética.
+
+**Lo que midió, y por qué hacía falta medir:** de la primera tanda de
+propuestas, **cuatro no entraban** aunque parecían cortas — y los emojis
+cuentan mucho más que un carácter (`⚠️ Se cortó la conexión. Reintentando…` da
+38 en el conteo y se parte igual). Estimar a ojo no alcanzaba.
+
+**El vocabulario:** «tocá» salió de todos los carteles —suena raro en
+Argentina—, «tirá» se quedó donde significa tirar al descarte, y «mirá» lo
+reemplaza en el reparto. No queda ninguna ocurrencia de «tocá» en los textos.
+
+**«Descarte activo.»** se agrega sólo cuando la ventana está abierta Y mi mano
+está disponible para reflejos — que no es lo mismo. No va en mi `levantada`
+(mi mano es para cambiar), ni en mi `poder` (el velo me tapa la mesa), ni en la
+mirada (la pista tiene que decir qué memorizar, y las dos cosas no entran en
+38). Es la única señal que queda de que la ventana sigue viva: el cronómetro
+que lo decía se fue con la etapa 3b.
+
+**De paso, dos arreglos que no eran de §55:** `pistaDeRed` interpolaba el
+nombre del jugador en `innerHTML` **sin escapar**, mientras `dibujarJugador` sí
+lo escapa; ahora escapa dentro de `nombreCorto`, que es por donde pasan todos.
+Y «No era esa: te comés una carta al cerrar la ventana» mentía desde la etapa
+1 —el castigo se aplica al llegar, no al cerrar—: acortarla la arregló.
+
+**El borde que se aceptó:** `nombreCorto` recorta por cantidad (10 + `...`), no
+por ancho, así que ocho letras anchas seguidas —`MMMMMMMM`, `WWWWWWWW`— siguen
+partiendo la pista. No es un nombre de castellano y el síntoma es el que la
+mesa ya tenía. La salida barata es §57.
+
 ### §50 — La línea de base de las pruebas, y cómo leerla
 
 Las dos suites miden cosas distintas y ninguna incluye a la otra. Los números

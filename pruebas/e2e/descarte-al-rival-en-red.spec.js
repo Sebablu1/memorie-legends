@@ -408,9 +408,13 @@ test("con la ventana abierta y el turno de otro, los reflejos siguen vivos", asy
   ]);
 
   await expect.poll(() => atacables(page)).toEqual(["1:2"]);
-  await expect(pista(page), "la mesa avisa que los reflejos están abiertos")
-    .toContainText(/reflejos abiertos/i);
-  await expect(pista(page), "y que no hay reloj").toContainText(/sin reloj/i);
+  // El aviso se acortó en §55: era «Reflejos abiertos, sin reloj: hasta que se
+  // tire» en un segundo renglón, y ahora es «Descarte activo.» pegado a la
+  // pista de la fase, en una sola línea. Lo que la prueba defiende es lo
+  // mismo: que la mesa AVISE que la ventana sigue viva, que es la única señal
+  // que queda desde que el cronómetro se fue.
+  await expect(pista(page), "la mesa no avisa que el descarte sigue activo")
+    .toContainText(/descarte activo/i);
 
   await carta(page, 1, 2).dblclick();
   await expect.poll(() => pedidos(page)).toEqual([

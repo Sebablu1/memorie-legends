@@ -304,12 +304,14 @@ export function elegibleParaPoder({ numero, yo, jugadores, propiaElegida = null 
 
 /** Qué hay que pedirle al jugador ahora mismo. */
 export function pasoDelPoder({ numero, propiaElegida = null }) {
-  if (numero === 7) return "Tocá una carta <b>tuya</b> para mirarla.";
-  if (numero === 8) return "Tocá una carta de <b>otro jugador</b> para mirarla.";
+  // Cortas y sin negrita: la pista entera ya es `font-weight: 700`, y el
+  // renglón del teléfono aguanta 38 caracteres. Ver `pistaDeRed`. (§55)
+  if (numero === 7) return "Mirá una carta tuya.";
+  if (numero === 8) return "Mirá una carta de otro.";
   if (numero === 9 || numero === 10) {
     return propiaElegida === null
-      ? "Elegí una carta <b>tuya</b> para cambiar."
-      : "Ahora elegí con qué carta de <b>otro jugador</b> la cambiás.";
+      ? "Elegí una carta tuya para cambiar."
+      : "Ahora una de otro jugador.";
   }
   return "";
 }
