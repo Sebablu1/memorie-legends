@@ -124,10 +124,23 @@ test("el cartel viejo de frase larga ya no existe en el código", async ({ page 
   await expect(page.locator(".anuncio-mirada")).toHaveCount(0);
 });
 
-test("a los 20 segundos sin decidir, el turno pasa solo", async ({ page }) => {
-  // El número se fija acá a propósito: si alguien lo cambia, esta prueba se lo
-  // dice en vez de seguir midiendo un plazo que ya no es el del juego.
-  expect(MS_PASO_AUTOMATICO, "la cuenta la fija el motor").toBe(20000);
+test("sin decidir a tiempo, el turno pasa solo", async ({ page }) => {
+  /*
+   * El número se fija acá a propósito: si alguien lo cambia, esta prueba se lo
+   * dice en vez de seguir midiendo un plazo que ya no es el del juego. Hizo
+   * exactamente eso — eran 20 s y la etapa 3c los bajó a 10, y esta prueba fue
+   * la única que lo denunció, porque la suite de navegador que se corrió en esa
+   * etapa no la incluía.
+   *
+   * El motivo del cambio está en `motor.js`, donde vive la constante: con los
+   * reflejos sin reloj, la decisión ya no sigue a la ventana sino que la
+   * contiene, así que estos segundos dejaron de ser tiempo en el que los otros
+   * tres no pueden hacer nada.
+   *
+   * Y el título dejó de decir el número. Lo decía, y lo volvería a decir mal
+   * la próxima vez: el número está en la línea de abajo, que es la que falla.
+   */
+  expect(MS_PASO_AUTOMATICO, "la cuenta la fija el motor").toBe(10000);
 
   const errores = await abrirMesa(page);
   await elegirCartaParaMirar(page);
