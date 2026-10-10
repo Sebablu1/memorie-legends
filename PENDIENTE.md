@@ -110,6 +110,44 @@ ejecutaba en ninguna prueba de navegador. Es el mismo hueco de forma que los
 dobles vacíos de §51: un campo que ningún spec puebla es un camino que ninguna
 prueba recorre. Ahora se puede guionar por paso.
 
+### §54 — Un cerrojo para los campos de la vista que ningún spec puebla
+
+**Para la próxima sesión.** Es el mismo oficio que `cadena-de-turno.mjs`: una
+prueba que mira las pruebas.
+
+**El patrón que ya costó tres bugs.** Un campo de la vista que viaja constante
+en todos los specs de red es un camino que ninguna prueba recorre:
+
+| Campo | Qué quedó sin cubrir | Lo que costó |
+|---|---|---|
+| los dobles de jugada (`levantar`, `tirarCarta`, `cortar`, `pasarTurno`, `cambiarCarta`) | la cadena de turno entera | el rollback de la etapa 3 |
+| `revelaciones`, siempre `[]` | `mostrarRevelaciones` — uno de los 8 lugares de 3c | se descubrió revisando, no jugando |
+| `registro`, siempre `[]` | los efectos de los poderes | §53, el 9 sin transición |
+
+Las tres veces el síntoma fue el mismo: suite verde, camino muerto. Y las tres
+se encontraron a mano, una por una.
+
+**Qué tendría que hacer.** Recorrer los campos que `vistaDe` publica y, para
+cada uno, mirar si TODOS los specs de red lo mandan con el mismo valor
+—vacío, `null`, el mismo literal—. Si sí, fallar nombrando el campo: nadie está
+ejercitando lo que la mesa hace con él.
+
+**Las trampas, que ya conocemos de `cadena-de-turno.mjs`:**
+
+- **Los archivos mixtos no cuentan.** Cuatro specs montan las dos mesas y no se
+  puede saber, leyendo el texto, a qué modo pertenece cada valor.
+- **Los comentarios se recortan antes de contar.** Una mención como ejemplo no
+  es cobertura.
+- **Y el propio cerrojo tiene que probarse contra sí mismo**, con un caso que
+  SÍ enganche y uno que no. Sin eso, una expresión regular que no engancha nada
+  convierte todo en un «sí» automático.
+
+**Cuidado con el falso positivo legítimo.** Hay campos que de verdad son
+constantes en todos los specs y está bien que lo sean —`limitePuntos`,
+`desempate`—. Va a hacer falta una lista de exenciones escrita a mano, con el
+motivo de cada una al lado. Si la lista crece sin motivos, el cerrojo dejó de
+servir.
+
 ### §50 — La línea de base de las pruebas, y cómo leerla
 
 Las dos suites miden cosas distintas y ninguna incluye a la otra. Los números
