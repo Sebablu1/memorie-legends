@@ -108,6 +108,11 @@ Nada de esto bloquea el despliegue. Se anota porque son consecuencias de
 sacarle el cronómetro a los reflejos, y ninguna se ve leyendo el código: se ven
 jugando.
 
+**Al 10 de octubre quedan abiertos el 1 y el 4**, más los cuatro de limpieza.
+El 2 y el 3 están arreglados y se dejan tachados en vez de borrados: el 3
+porque su descripción original era incorrecta y conviene que se sepa, y el 2
+porque su arreglo deshizo una decisión anterior y el camino importa.
+
 **Reglas, por orden de cuánto cambian una mano:**
 
 1. **El que tira puede cortar en el acto y anular los reflejos de su propia
@@ -117,17 +122,30 @@ jugando.
    conviene al que teme que le descarten una carta. La ventana se cierra con el
    corte, que es lo correcto —la ronda terminó— pero la garantía estratégica se
    perdió.
-2. **Un toque hecho durante la MIRADA se resuelve en el próximo tiro, no al
-   terminar la mirada.** El motor no lo acepta cuando llega —todavía no hay
-   ventana suya— y queda pendiente. Resolverlo en `terminarMirada`, que es el
-   primer instante posible, sería más justo: quien tocó en la mirada reaccionó
-   antes Y llegó antes, así que el orden de llegada debería favorecerlo. Hoy
-   pierde contra alguien que tocó después. Está escrito, con la aserción dada
-   vuelta a propósito, en `mirar-descarte.mjs` §5.
-3. **Con un acierto esperando su carta, el toque en una carta propia es la
-   entrega, no el cambio** — y eso ahora dura todo el turno en vez de los 2 s
-   de la fase. Es coherente (se debe una carta y se paga primero) y se
-   resuelve solo en 5 s, pero es un cambio de comportamiento.
+2. ~~**Un toque hecho durante la MIRADA se resuelve en el próximo tiro.**~~
+   **ARREGLADO** (`3462ff7`). Le daba la mano a quien tocó después: el de la
+   fase de reflejos se aplicaba al llegar y se llevaba el «primero», el de la
+   mirada esperaba al tiro y se llevaba el «tarde». Ahora se aplican al
+   TERMINAR la mirada, que es el primer instante en que el motor puede
+   aceptarlos, y en orden de llegada. Seguro porque la muestra no puede cambiar
+   entre la mirada y el descarte: en `mirar` sólo existen mirar y descartar,
+   `saltarAusente` desde ahí tira, y `rellenarMazo` conserva la muestra. Sólo
+   orquestador. `mirar-descarte.mjs` §5 volvió a su forma original.
+3. ~~**Con un acierto esperando su carta, el toque propio es la entrega y dura
+   todo el turno.**~~ **LA DESCRIPCIÓN ERA FALSA, Y LO QUE SÍ HABÍA ESTÁ
+   ARREGLADO** (`c603293`).
+
+   El cap de 5 s ya existía: la guarda cambió de fase a ventana, pero
+   `atacando` siempre se apagó solo a los `MS_PARA_ENTREGAR` por su propio
+   temporizador. Lo que cambió fue el mínimo —antes ~2 s, ahora los 5
+   limpios—, que es el comportamiento que se quería. No duraba todo el turno.
+
+   Lo que sí estaba flojo: el cap dependía de UN `setTimeout`, y los
+   navegadores los estrangulan en pestañas de fondo. Quien cambiaba de pestaña
+   con un acierto pendiente volvía con el modo puesto, su toque se leía como
+   entrega, el servidor lo rechazaba por vencido, y el toque se perdía en vez
+   de ser un descarte. Ahora la fecha viaja en `atacando` y se comprueba al
+   clic; el temporizador avisa, no decide.
 4. **`MS_PASO_AUTOMATICO` 20 s → 10 s también cambió ENTRENAMIENTO.** El motivo
    —que la decisión ahora contiene la ventana en vez de seguirla— vale sólo en
    red. Allá la ventana sí se cierra a los 2 s, así que esos 10 s volvieron a
