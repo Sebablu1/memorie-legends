@@ -230,9 +230,17 @@ console.log("\n=== Ninguna callable lee el código sin validarlo ===");
   //     valida con el esquema de sala, antes del de descarte.
   //   - 12 → 13: `borrarSalaPublica`, que sólo lleva el código de la mesa.
   //
-  // Lo que esta cuenta vigila es que BAJE sin que se haya borrado ninguna
-  // callable, que sería una que dejó de validar.
-  ok(validadas.length === 13,
+  // Y bajó una vez, que es el caso que esta cuenta existe para interrogar:
+  //
+  //   - 13 → 12: se BORRÓ `cerrarVentanaDescarte`. Al sacarle el cronómetro a
+  //     los reflejos, dejar que cualquier jugador cerrara la ventana desde
+  //     afuera pasó de inofensivo a exploit. El motivo largo está en
+  //     `functions/index.js`, donde vivía.
+  //
+  // Lo que esta cuenta vigila es que baje SIN que se haya borrado ninguna
+  // callable, que sería una que dejó de validar. Cuando una se borra a
+  // propósito, se baja el número y se escribe por qué — como acá.
+  ok(validadas.length === 12,
      `y ${validadas.length} pasan por el esquema de sala`, validadas.length);
 
   // Las dos que llevan más datos usan el suyo, no el de sala a secas.

@@ -133,8 +133,10 @@ console.log("\n=== Las de plata están apretadas ===");
   // la más apretada del sistema entero —devuelve Leyendas de muchas salas de
   // un saque— y compararse contra ella no probaría nada.
   const DE_LA_MESA = [
+    // `cerrarVentanaDescarte` estaba acá y se fue con la callable: cerrar la
+    // ventana desde afuera dejó de ser algo que un cliente pueda pedir.
     "intentarDescarte", "accionDePartida", "abrirVentanaDescarte",
-    "cerrarVentanaDescarte", "cerrarMirada", "avanzarPartida", "latir",
+    "cerrarMirada", "avanzarPartida", "latir",
   ];
   const minMesa = Math.min(...DE_LA_MESA.map((a) => LIMITES[a]));
   const maxPlata = Math.max(...Object.values(LIMITES_DE_PLATA));
