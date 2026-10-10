@@ -5343,6 +5343,27 @@ async function pedirPoderEnRed(indiceJugador, posicion) {
   }
 }
 
+/**
+ * ¿Hay un acierto esperando que yo elija qué carta entregar?
+ *
+ * Mientras lo haya, mi toque en una carta propia es la entrega y no un
+ * descarte. Dura `MS_PARA_ENTREGAR` desde que el servidor contestó, y el
+ * límite lo pone la FECHA que vino con esa respuesta, no el temporizador que
+ * la acompaña: ver la nota en `atacando`.
+ *
+ * Si la fecha ya pasó, se olvida en el acto. El servidor ya resolvió la
+ * entrega al azar, así que seguir en modo entrega sería discutir con algo que
+ * ya ocurrió.
+ */
+function modoEntrega() {
+  if (!atacando || !reflejosAbiertos()) return false;
+  if (atacando.hasta != null && Red.ahoraDelServidor() >= atacando.hasta) {
+    olvidarAtaque();
+    return false;
+  }
+  return true;
+}
+
 async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
   if (!miVista) return;
 
@@ -5354,7 +5375,7 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
    * la entrega no llegaba nunca —el ataque al rival no salía jamás— y un
    * doble toque terminaba en un descarte propio que casi siempre fallaba.
    */
-  if (reflejosAbiertos() && atacando && indiceJugador === YO) {
+  if (modoEntrega() && indiceJugador === YO) {
     const pendiente = atacando;
     olvidarAtaque();
     dibujar();
@@ -5373,7 +5394,7 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
     return;
   }
   // Con un acierto esperando su carta, lo demás de la ventana espera.
-  if (reflejosAbiertos() && atacando) return;
+  if (modoEntrega()) return;
 
   // ---- Resto del código original (poderes, mirar, etc.) ----
   if (miVista.fase === "mirar" && indiceJugador === YO) {
@@ -5469,6 +5490,20 @@ async function clicEnCartaDeRed(indiceJugador, posicion, dobleClic) {
       posicion,
       ventana,
       clientActionId: r.clientActionId,
+      /*
+       * La FECHA, no sólo el temporizador. (§51, ítem 3)
+       *
+       * El modo entrega duraba lo que tardara en disparar este `setTimeout`, y
+       * los navegadores lo estrangulan en pestañas de fondo: quien cambiaba de
+       * pestaña con un acierto pendiente volvía con el modo todavía puesto, su
+       * toque se leía como entrega, el servidor lo rechazaba por vencido y el
+       * toque se perdía — en vez de haber sido un descarte normal.
+       *
+       * Con la fecha guardada, el temporizador pasa a ser lo que avisa, no lo
+       * que decide. Es la misma disciplina que el resto: ningún reloj de
+       * cliente decide nada, y acá el que manda es el del servidor.
+       */
+      hasta,
       vence: setTimeout(() => {
         olvidarAtaque();
         dibujar();

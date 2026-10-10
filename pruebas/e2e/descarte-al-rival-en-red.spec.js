@@ -724,3 +724,46 @@ test("la carta errada se ve destapada, y con el turno en otro", async ({ page })
 
   expect(errores, `la mesa tiró errores: ${errores.join(" | ")}`).toEqual([]);
 });
+
+test("si el temporizador llega tarde, el modo entrega se corta por la fecha", async ({ page }) => {
+  /**
+   * EL BUG DE LA PESTAÑA DE FONDO. (§51, ítem 3)
+   *
+   * El modo entrega duraba lo que tardara en disparar su `setTimeout`, y los
+   * navegadores lo estrangulan en pestañas de fondo. Quien cambiaba de pestaña
+   * con un acierto pendiente volvía con el modo todavía puesto: su toque se
+   * leía como entrega, el servidor lo rechazaba por vencido, y el toque se
+   * perdía en vez de haber sido un descarte normal.
+   *
+   * Acá se reproduce estrangulando el temporizador a mano —se le quita a la
+   * página la posibilidad de que dispare— y adelantando sólo el reloj. Si el
+   * modo lo decidiera el temporizador, el toque saldría como `entregarCarta`;
+   * si lo decide la fecha, sale como `intentarDescarte`.
+   */
+  await abrirRed(page, CONOCE_UNA);
+
+  await carta(page, 1, 2).dblclick();
+  await expect(pista(page)).toContainText(/le acertaste/i);
+
+  /*
+   * Y acá está la parte fina: el reloj avanza y los temporizadores NO corren.
+   *
+   * `runFor` no sirve para esto —dispara los timers agendados, que es
+   * justamente lo que una pestaña de fondo no hace— y desarmar `setTimeout`
+   * tampoco, porque el de la entrega ya estaba agendado desde antes. Con el
+   * primer intento de esta prueba la mutación sobrevivía: el temporizador
+   * disparaba igual y limpiaba el modo por su cuenta.
+   *
+   * `setSystemTime` es la semántica exacta: la hora salta, nada se ejecuta.
+   */
+  const ahora = await page.evaluate(() => Date.now());
+  await page.clock.setSystemTime(new Date(ahora + 6000));
+
+  // El toque en una carta propia tiene que ser un DESCARTE, no una entrega.
+  await carta(page, 0, 3).dblclick();
+  const salieron = (await pedidos(page)).map((p) => p.nombre);
+  expect(salieron, "el toque se fue como entrega con la fecha ya vencida")
+    .not.toContain("entregarCarta");
+  expect(salieron, "y tampoco salió como descarte: el toque se perdió")
+    .toContain("intentarDescarte");
+});
