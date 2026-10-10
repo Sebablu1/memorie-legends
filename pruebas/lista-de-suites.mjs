@@ -61,6 +61,9 @@ export const SUITES = [
   "ausente-por-tiempo.mjs",
   "mirar-descarte.mjs",
   "tirar-reabre.mjs",
+  // El cerrojo de la cadena de turno en red. Va después de las de red: lo
+  // que mira son sus specs, no el juego.
+  "cadena-de-turno.mjs",
   "admin.mjs",
   "ritmo.mjs",
   "validacion.mjs",
