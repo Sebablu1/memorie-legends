@@ -152,6 +152,16 @@
 .figura-item {
   width: 88px;
   height: 88px;
+  /* Aire alrededor del dibujo.
+
+     Desde C2 los avatares llenan su cuadro de punta a punta, y pegados al
+     borde de la tarjeta se leen como un recorte y no como una pieza. Con
+     `border-box` el relleno se come de los 88 px, así que la caja no
+     cambia de tamaño y la rejilla no se mueve: lo único que pasa es que el
+     fondo radial dorado se ve alrededor en vez de quedar tapado. */
+  box-sizing: border-box;
+  padding: 6px;
+
   display: grid;
   place-items: center;
   object-fit: contain;

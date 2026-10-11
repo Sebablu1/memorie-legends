@@ -107,28 +107,44 @@ test("el asiento propio lleva la cara de fábrica cuando no hay avatar comprado"
   expect(mia).toBe("/img/avatar/predeterminado.webp");
 });
 
-test("la cara se ve recortada: entra la figura, no el medallón entero", async ({
+test("la cara llena el aro del asiento, sin zoom y sin huecos", async ({
   page,
 }) => {
-  // Los avatares del catálogo son medallones —aro dorado propio y una cinta
-  // con el nombre debajo— y no caras. Puestos enteros dentro del aro del
-  // asiento se ve un aro adentro de otro y la figura ocupa un tercio.
-  //
-  // Lo que se comprueba es que la imagen esté AMPLIADA respecto de su ventana.
-  // Si alguien le saca el recorte, el ancho de la imagen vuelve a ser el de la
-  // ventana y esto se pone en rojo.
+  /*
+   * ESTA PRUEBA AFIRMABA LO CONTRARIO, Y TENÍA RAZÓN HASTA C2.
+   *
+   * Los avatares eran MEDALLONES: la figura dentro de su propio aro dorado y
+   * con una cinta con el nombre debajo, ocupando un tercio del lienzo. Metidos
+   * enteros en el aro del asiento se veía un aro adentro de otro, así que
+   * `mesa.css` los ampliaba al 200 % y los corría para recortar sólo la cara.
+   * Lo que se comprobaba acá era justamente esa ampliación.
+   *
+   * En C2 los trece se rehicieron como bustos que llenan el cuadro —medido,
+   * entre el 76 % y el 100 % del lienzo— y el parche se fue: ampliar lo que ya
+   * es una cara mostraba los ojos y la nariz, con la capucha cortada.
+   *
+   * Lo que se afirma ahora es el contrato nuevo, y son las mismas tres cosas:
+   *
+   *   - La imagen MIDE la ventana. Si alguien devuelve un zoom, mediría más.
+   *   - Recorta por `cover`. Con `contain`, una imagen cuadrada dentro de un
+   *     círculo deja cuatro huecos transparentes y se ve el fondo del asiento.
+   *   - La ventana sigue recortando. Sin `overflow: hidden`, las esquinas del
+   *     cuadrado se salen del aro.
+   */
   await abrirMesa(page);
 
   const m = await page.locator(`${RETRATOS} .cara`).first().evaluate((cara) => {
     const img = cara.querySelector("img");
     return {
-      ventana: cara.getBoundingClientRect().width,
-      imagen: img.getBoundingClientRect().width,
+      ventana: Math.round(cara.getBoundingClientRect().width),
+      imagen: Math.round(img.getBoundingClientRect().width),
+      ajuste: getComputedStyle(img).objectFit,
       recorta: getComputedStyle(cara).overflow,
     };
   });
 
-  expect(m.imagen, "la imagen dejó de estar ampliada").toBeGreaterThan(m.ventana * 1.5);
+  expect(m.imagen, "la imagen dejó de llenar la ventana").toBe(m.ventana);
+  expect(m.ajuste, "dejó de recortar por `cover`").toBe("cover");
   expect(m.recorta, "la ventana dejó de recortar").toBe("hidden");
 });
 

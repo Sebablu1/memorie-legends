@@ -695,23 +695,33 @@ body::before {
    recorte y se ve entero.
 
    ─────────────────────────────────────────────────────────────────────────
-   Y POR QUÉ LA IMAGEN VA AL DOBLE Y CORRIDA HACIA ARRIBA
+   Y POR QUÉ LA IMAGEN YA NO VA AL DOBLE
    ─────────────────────────────────────────────────────────────────────────
 
-   Porque los trece avatares no son caras: son MEDALLONES. Cada PNG trae la
-   figura dentro de su propio aro dorado y con una cinta con el nombre
-   debajo, sobre fondo transparente. Metido entero en un círculo de sesenta
-   píxeles se ve un aro dentro de otro aro y una cinta ilegible, y la cara
-   queda ocupando un tercio del espacio.
+   Hasta C2 acá había un parche: la imagen al 200 %, corrida a `left: -50%` y
+   `top: -37.5%`, para que de un original de 400x400 quedara a la vista una
+   ventana de 200x200 centrada en (200, 175).
 
-   Al doble y corrida, lo que queda a la vista es la ventana de 200x200
-   centrada en (200, 175) del original de 400x400: la cara, sin el aro de la
-   ilustración —que reemplaza el de acá— y sin la cinta, que repetiría el
-   nombre que ya está escrito al lado.
+   Existía porque los trece avatares no eran caras: eran MEDALLONES. Cada uno
+   traía la figura dentro de su propio aro dorado y con una cinta con el
+   nombre debajo. Metido entero en un círculo de sesenta píxeles se veía un
+   aro dentro de otro aro y una cinta ilegible, con la cara ocupando un
+   tercio del espacio. El parche recortaba justo la cara.
 
-   Los números salen de la plantilla que comparten los trece. Es la única
-   atadura entre esta hoja y el arte, y por eso está escrita: un avatar nuevo
-   con otra composición hay que componerlo igual, o cambiar esto. */
+   Los trece se rehicieron: ahora son bustos que llenan el cuadro, sin aro y
+   sin cinta. Medido, el dibujo ocupa entre el 76 % y el 100 % del lienzo
+   contra el 31-39 % de antes. Aplicarles el parche mostraba el 25 % central
+   de la imagen, o sea los ojos y la nariz, con la capucha cortada arriba y
+   los hombros abajo.
+
+   Así que se fue, y lo que queda es lo mismo que hacen los otros cuatro
+   círculos del sitio —la cabecera, la sala, el ranking y el marcador—: la
+   imagen entera, recortada por el círculo. Que el asiento de la mesa haya
+   dejado de ser el caso especial es la señal de que esto está bien.
+
+   La atadura entre esta hoja y el arte sigue existiendo, sólo que ahora es
+   la natural: un avatar que no llene su cuadro se va a ver chico acá, como
+   en todos los demás lugares. */
 .jugador .retrato .cara {
   position: absolute;
   inset: var(--aro);
@@ -723,11 +733,10 @@ body::before {
 
 .jugador .retrato .cara img {
   position: absolute;
-  width: 200%;
-  height: 200%;
-  left: -50%;
-  top: -37.5%;
-  object-fit: contain;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   display: block;
 }
 
