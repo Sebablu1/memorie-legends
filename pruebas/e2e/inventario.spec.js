@@ -207,7 +207,7 @@ test("se llama Mi colección, y los grupos como en la tienda", async ({ page }) 
 test("el estado dice cuál está puesto, y es uno solo por tipo", async ({ page }) => {
   await abrirPanel(page);
 
-  await expect(tarjeta(page, "El Zorro")).toContainText("Equipado");
+  await expect(tarjeta(page, "El Zorro")).toContainText("En uso");
   await expect(tarjeta(page, "El Dragón")).toContainText("Sin equipar");
 
   // Uno por tipo: si hubiera dos marcados, el perfil estaría mintiendo.
@@ -219,7 +219,7 @@ test("equipar otro avatar saca el anterior en la misma pasada", async ({ page })
 
   await tarjeta(page, "El Dragón").locator("button").click();
 
-  await expect(tarjeta(page, "El Dragón")).toContainText("Equipado");
+  await expect(tarjeta(page, "El Dragón")).toContainText("En uso");
   await expect(tarjeta(page, "El Zorro"), "el anterior tiene que soltarse solo")
     .toContainText("Sin equipar");
   await expect(page.locator("#miInventario .item-inv.puesto")).toHaveCount(1);
@@ -256,8 +256,8 @@ test("el dorso se equipa por su cuenta, sin tocar el avatar", async ({ page }) =
 
   await tarjeta(page, "Dorso Azul").locator("button").click();
 
-  await expect(tarjeta(page, "Dorso Azul")).toContainText("Equipado");
-  await expect(tarjeta(page, "El Zorro"), "el avatar no se toca").toContainText("Equipado");
+  await expect(tarjeta(page, "Dorso Azul")).toContainText("En uso");
+  await expect(tarjeta(page, "El Zorro"), "el avatar no se toca").toContainText("En uso");
   await expect(page.locator("#miInventario .item-inv.puesto")).toHaveCount(2);
 });
 

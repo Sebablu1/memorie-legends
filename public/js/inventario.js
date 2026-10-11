@@ -126,7 +126,11 @@ function dibujarItem(id, tipo) {
           : ""
       }
       ${item?.descripcion ? `<p class="desc-inv">${escapar(item.descripcion)}</p>` : ""}
-      <div class="estado-inv">${puesto ? "✅ Equipado" : "📦 Sin equipar"}</div>
+      <!-- «En uso» y no «Equipado»: es la misma palabra que la cinta de la
+           tienda, que muestra exactamente lo mismo. Dos pantallas que dicen
+           lo mismo de otra forma obligan al jugador a averiguar si son la
+           misma cosa. -->
+      <div class="estado-inv">${puesto ? "✅ En uso" : "📦 Sin equipar"}</div>
       ${
         puesto
           ? `<button class="accion sobria" type="button" data-sacar="${escapar(tipo)}">Desequipar</button>`

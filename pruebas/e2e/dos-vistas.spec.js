@@ -169,7 +169,7 @@ test("lo que me pongo en la tienda aparece puesto en Mi colección", async ({ pa
   await page.goto("/perfil.html#coleccion");
   await page.waitForSelector("#miInventario .item-inv");
 
-  await expect(enMiColeccion(page, "El Dragón")).toContainText("Equipado");
+  await expect(enMiColeccion(page, "El Dragón")).toContainText("En uso");
   await expect(enMiColeccion(page, "El Zorro")).toContainText("Sin equipar");
 });
 
@@ -216,8 +216,8 @@ test("los dos dorsos son artículos distintos: ponerse uno no toca el otro", asy
   // Y el de las cartas sigue puesto: son dos campos del perfil.
   await page.goto("/perfil.html#coleccion");
   await page.waitForSelector("#miInventario .item-inv");
-  await expect(enMiColeccion(page, "Dorso Rojo")).toContainText("Equipado");
-  await expect(enMiColeccion(page, "Mazo Esmeralda")).toContainText("Equipado");
+  await expect(enMiColeccion(page, "Dorso Rojo")).toContainText("En uso");
+  await expect(enMiColeccion(page, "Mazo Esmeralda")).toContainText("En uso");
 });
 
 test("equipar deja el vestuario anotado para que la mesa abra vestida", async ({ page }) => {
