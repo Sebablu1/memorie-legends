@@ -1,4 +1,5 @@
 import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
+import { pintarAvatarCabecera } from "./equipado.js";
 import { PAQUETES, leyendasDePaquete, precioPorLeyenda, paquetesVisibles, MONEDA } from "./reglas/economia.js";
 import { listarPacks, crearOrdenDeCompra, ErrorDeServidor } from "./servidor.js";
 
@@ -193,6 +194,14 @@ dibujarPaquetes(PAQUETES);
 const sesion = await exigirSesion();
 if (sesion) {
   mostrarSaldo(sesion.perfil.saldo);
+
+  // El avatar comprado, en la barra. Ver `perfil.js` para el porqué: hasta
+  // A2b esto lo hacía sólo el tablero y equipar desde otra pantalla no se
+  // veía hasta volver allá.
+  pintarAvatarCabecera({
+    equipado: sesion.perfil.equipado?.avatar,
+    foto: sesion.usuario.photoURL,
+  });
 
   // Y después los de verdad. Si falla, quedan los de la semilla: una tienda
   // que muestra precios viejos es mejor que una tienda vacía, y el precio que

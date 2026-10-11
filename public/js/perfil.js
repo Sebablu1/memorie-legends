@@ -43,6 +43,7 @@
  */
 
 import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
+import { pintarAvatarCabecera } from "./equipado.js";
 import { montarInventario } from "./inventario.js";
 import { montarLogros } from "./logros.js";
 import { montarCuenta } from "./cuenta.js";
@@ -197,6 +198,25 @@ window.addEventListener("hashchange", () => mostrar(seccionPedida()));
 const sesion = await exigirSesion();
 if (sesion) {
   mostrarSaldo(sesion.perfil.saldo);
+
+  /**
+   * El avatar comprado, en la barra.
+   *
+   * Hasta acá lo pintaba sólo el tablero, porque era la única página con un
+   * `#avatar` en la barra. Eso alcanzaba mientras «Mi colección» vivía ahí:
+   * equipar un avatar llamaba a `pintarAvatarCabecera` y el cambio se veía al
+   * instante. Desde A2a la colección vive en esta página, que no tenía el
+   * nodo — así que la llamada de `inventario.js` no encontraba nada y se iba
+   * en silencio: el jugador se ponía un avatar y la barra no se enteraba
+   * hasta volver al tablero.
+   *
+   * El orden de precedencia —comprado, foto de Google, logo— lo decide
+   * `pintarAvatarCabecera`; acá sólo se le pasa lo que el perfil ya trajo.
+   */
+  pintarAvatarCabecera({
+    equipado: sesion.perfil.equipado?.avatar,
+    foto: sesion.usuario.photoURL,
+  });
 
   // Los tres números salen del perfil que ya se leyó. No hay viaje nuevo.
   $("statSaldo").textContent = sesion.perfil.saldo.toLocaleString("es-UY");

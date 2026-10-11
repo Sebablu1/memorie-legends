@@ -27,6 +27,7 @@
 
 import { db, collection, query, where, onSnapshot, getDocs } from "./firebase.js";
 import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
+import { pintarAvatarCabecera } from "./equipado.js";
 import { ENTRADAS, ESTADOS_SALA, MAX_JUGADORES } from "./reglas/salas.js";
 import { juegoDe } from "./reglas/juegos.js";
 import { esRutaDelSitio } from "./reglas/catalogo.js";
@@ -93,6 +94,14 @@ if (sesion) {
   saldo = sesion.perfil.saldo;
   miNombre = sesion.perfil.nombre;
   mostrarSaldo(saldo);
+
+  // El avatar comprado, en la barra. Ver `perfil.js` para el porqué: hasta
+  // A2b esto lo hacía sólo el tablero y equipar desde otra pantalla no se
+  // veía hasta volver allá.
+  pintarAvatarCabecera({
+    equipado: sesion.perfil.equipado?.avatar,
+    foto: sesion.usuario.photoURL,
+  });
 
   montarCarteleraTorneos();
   cargarJuegos();

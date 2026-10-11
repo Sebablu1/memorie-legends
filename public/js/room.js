@@ -9,6 +9,7 @@
 
 import { db, doc, onSnapshot } from "./firebase.js";
 import { exigirSesion, mostrarSaldo } from "./sesion.js";
+import { pintarAvatarCabecera } from "./equipado.js";
 import { iniciarPartida, salirDeSalaEnEspera, marcarListo, reportarJugador, ErrorDeServidor } from "./servidor.js";
 import { ESTADOS_SALA, MIN_JUGADORES, MAX_JUGADORES } from "./reglas/salas.js";
 import { escapar } from "./modulos/texto.js";
@@ -143,6 +144,14 @@ if (!codigo) {
 
 function arrancar({ usuario, perfil }) {
   mostrarSaldo(perfil.saldo);
+
+  // El avatar comprado, en la barra. Ver `perfil.js` para el porqué: hasta
+  // A2b esto lo hacía sólo el tablero y equipar desde otra pantalla no se
+  // veía hasta volver allá.
+  pintarAvatarCabecera({
+    equipado: perfil.equipado?.avatar,
+    foto: usuario.photoURL,
+  });
 
   // Si la mesa nos devolvió acá, se explica por qué.
   const aviso = sessionStorage.getItem("avisoSala");
