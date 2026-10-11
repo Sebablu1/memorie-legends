@@ -294,8 +294,11 @@ once de `ranking-movil.spec.js` (fase D) y diecisiete de
   archivos de la mesa en red y bajó `MS_PASO_AUTOMATICO` de 20 s a 10 sin ver
   que `carteles.spec.js` —que es de entrenamiento— afirmaba los 20. Lo
   denunció en la corrida completa, dos días después.
-- **Son 23 minutos.** Conviene lanzarla en segundo plano y seguir trabajando,
-  no saltearla.
+- **Son 20 minutos.** Medido el 11/10 con la máquina libre: 20 m 6 s para los
+  65 archivos. Conviene lanzarla en segundo plano y seguir trabajando, no
+  saltearla — pero ojo con QUÉ se hace mientras: la corrida del 10/10 tardó
+  34,5 minutos porque compartió la máquina con otras cosas, y esos catorce
+  minutos de más vinieron con cuatro rojos que no eran bugs.
 - **Cerrado el 11/10: los cuatro rojos de la corrida anterior no
   aparecieron.** La suite quedó en 491/492 con un solo rojo, y es fatiga. Eran
   contención de recursos, como decía la hipótesis — ahora medido con la
