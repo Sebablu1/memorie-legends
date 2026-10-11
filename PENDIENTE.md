@@ -279,12 +279,29 @@ de referencia, al 10 de octubre de 2026:
 | Suite | Comando | Verde es |
 |---|---|---|
 | Node | `npm test` | **85 de 85** |
-| Navegador | `npx playwright test` | **464 pasan, 0 fallan** |
+| Navegador | `npx playwright test` | **464 en total; el verde hay que volver a medirlo** |
 
-Los dos rojos históricos de §48 se arreglaron el 10/10/2026 (`cf86b26`): las
-464 son las 462 que pasaban más esas dos, medidas en su propio archivo (3 de 3).
-La corrida completa que lo confirma quedó lanzada y sin terminar — el primero
-que la corra, confirma el número acá.
+Los dos rojos históricos de §48 se arreglaron el 10/10/2026 (`cf86b26`) y su
+archivo da 3 de 3. Pero la corrida completa de esa misma noche dio **460 pasan,
+4 fallan**, y los cuatro son OTROS:
+
+    menu.spec.js:179            se cierra con la X, con el velo y con Escape
+    ojo-del-poder.spec.js:295   los cuatro miran a la vez
+    poder-paso-a-paso.spec.js:156   el cuadro del poder en 390x844
+    tablero.spec.js:1124        el tablero no mide más que la pantalla
+
+**No están clasificados, y no hay que darlos por intermitentes sin probarlo.**
+Lo que se sabe: esa corrida tardó **34,5 minutos** en vez de los 23 de siempre,
+porque compartió la máquina con un `npm test`, otra corrida de Playwright y
+varios `git`. En una laptop de 8 GB eso es contención real, y tres de los
+cuatro miden tiempos o geometría. `ojo-del-poder` ya figura como intermitente
+en §29-Bloque2.
+
+**Lo primero antes del próximo deploy:** correr los 65 archivos con la máquina
+libre. Si los cuatro se van, el número es 464 y queda entero en verde por
+primera vez; si queda alguno, es un rojo nuevo y hay que anotarlo acá con su
+causa. No desplegar leyendo «3 de 3 en su archivo» como «suite verde»: es
+exactamente el error que §48 documenta.
 
 - **Correr los 65 archivos, no un recorte.** La etapa 3c se validó con los
   archivos de la mesa en red y bajó `MS_PASO_AUTOMATICO` de 20 s a 10 sin ver
