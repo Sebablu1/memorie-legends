@@ -1,11 +1,12 @@
 {
   "hosting": {
     "public": "public",
-    "// ignore": "Los PNG de avatares e insignias son los ORIGINALES, antes de recortarles el fondo. Quedan en el repositorio como punto de partida por si algun dia hace falta otra calidad u otro tamano, pero nadie los pide: el catalogo apunta siempre al .webp. Son 3,8 MB que no tiene sentido subir. Ojo: vale SOLO para esas dos carpetas. Los dorsos de img/dorsos se servian en PNG y desde el 30 de septiembre de 2026 son WebP, asi que ya no hay ningun PNG que excluir ahi: si algun dia vuelve a haber uno, sera porque alguien lo puso, y se sube.",
+    "// ignore": "Los PNG de avatares e insignias son los ORIGINALES, antes de recortarles el fondo. Quedan en el repositorio como punto de partida por si algun dia hace falta otra calidad u otro tamano, pero nadie los pide: el catalogo apunta siempre al .webp. Son 3,8 MB que no tiene sentido subir. Ojo: vale SOLO para esas dos carpetas. Los dorsos de img/dorsos se servian en PNG y desde el 30 de septiembre de 2026 son WebP, asi que ya no hay ningun PNG que excluir ahi: si algun dia vuelve a haber uno, sera porque alguien lo puso, y se sube. Y los .bak: `*.bak*` esta en .gitignore, que es OTRA lista — hosting tiene la suya y no mira esa. Las cuatro copias de mesa.js y la de mesa.css se estaban sirviendo en memorielegends.com despues del despliegue del 10 de octubre de 2026: 200 OK y 1,1 MB de codigo viejo publico. Hosting publica una version COMPLETA en cada despliegue, asi que con ignorarlas alcanza: el proximo despliegue las saca y no hay que borrar nada a mano.",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**",
+      "**/*.bak*",
       "img/avatar/*.png",
       "img/insignias/*.png"
     ],
