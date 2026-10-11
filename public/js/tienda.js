@@ -225,5 +225,9 @@ if (sesion) {
   // El uid viaja para poder recordar en ESTE navegador lo que el jugador se
   // pone, y que la mesa abra ya vestida en vez de corregirse a los medio
   // segundo. Ver `modulos/vestuario.js`.
-  montarPersonalizacion({ saldoInicial: sesion.perfil.saldo, uid: sesion.usuario.uid });
+  montarPersonalizacion({
+    saldoInicial: sesion.perfil.saldo,
+    uid: sesion.usuario.uid,
+    foto: sesion.usuario.photoURL,
+  });
 }

@@ -30,6 +30,7 @@ import { db, collection, getDocs, query, orderBy } from "./firebase.js";
 import { escapar } from "./modulos/texto.js";
 import { guardarVestuario, rutasDeLoEquipado } from "./modulos/vestuario.js";
 import { mostrarSaldo } from "./sesion.js";
+import { pintarAvatarCabecera } from "./equipado.js";
 import {
   comprarItem,
   comprarPack,
@@ -109,6 +110,7 @@ let tengo = new Set();
 let equipado = {};
 /** De quién es la sesión. Sólo para recordarle su vestuario a él. */
 let miUid = null;
+let fotoDeGoogle = null;
 let saldo = 0;
 let categoriaActual = CATEGORIAS[0].tipo;
 
@@ -412,11 +414,33 @@ async function llevarPack(boton) {
   });
 }
 
+/**
+ * La cabecera tiene que reflejar el cambio sin recargar la página.
+ *
+ * Es el gemelo de `sincronizarCabecera` en `inventario.js`, y faltaba. Hasta
+ * que `tienda.html` tuvo su `#avatar` no se notaba: no había dónde mostrar el
+ * desfase. Con el nodo puesto quedó a la vista que el servidor registraba el
+ * cambio, la tarjeta pasaba a decir «Equipar», y arriba seguía el avatar
+ * viejo hasta recargar — las dos respuestas distintas a la misma pregunta en
+ * la misma pantalla que el comentario de allá describe.
+ *
+ * `equipado` guarda el ID del artículo, no su imagen: `pintarAvatarCabecera`
+ * lee el artículo del catálogo por su cuenta. Y con `null` repone la foto de
+ * Google, que es lo que corresponde al sacarse el avatar.
+ */
+function sincronizarCabecera() {
+  pintarAvatarCabecera({
+    equipado: equipado[TIPOS.AVATAR] ?? null,
+    foto: fotoDeGoogle,
+  });
+}
+
 async function equipar(itemId, boton) {
   await conBotonApagado(boton, async () => {
     const r = await equiparItem(itemId);
     equipado[r.tipo] = itemId;
     recordarVestuario();
+    sincronizarCabecera();
     // «Equipado» y «Desequipado»: el par, con la misma palabra que dicen los
     // dos botones. Antes eran «te lo pusiste» y «te lo sacaste», que son otras
     // dos palabras para las mismas dos acciones, a un centímetro del botón.
@@ -444,6 +468,7 @@ async function desequipar(tipo, boton) {
     await desequiparItem(tipo);
     equipado[tipo] = null;
     recordarVestuario();
+    sincronizarCabecera();
     // «Desequipado», la misma palabra que dice el botón que se acaba de tocar.
     // Antes decía «te lo sacaste», y el botón «Desequipar»: dos palabras para
     // la misma acción, a un centímetro de distancia.
@@ -460,12 +485,15 @@ async function desequipar(tipo, boton) {
  * Recibe el saldo de quien ya pidió la sesión —`tienda.js` lo hace para pintar
  * los paquetes— para no pedir el perfil dos veces en la misma carga.
  */
-export async function montarPersonalizacion({ saldoInicial = 0, uid = null } = {}) {
+export async function montarPersonalizacion({ saldoInicial = 0, uid = null, foto = null } = {}) {
   const caja = $("rejillaPersonalizacion");
   if (!caja) return;
 
   saldo = saldoInicial;
   miUid = uid;
+  // Para poder reponerla al desequipar. Viaja por acá y no se lee del perfil
+  // de nuevo: `tienda.js` ya pidió la sesión.
+  fotoDeGoogle = foto;
 
   // Las pestañas se dibujan desde la lista: agregar una categoría es agregar
   // una línea en CATEGORIAS, no tocar el HTML.
