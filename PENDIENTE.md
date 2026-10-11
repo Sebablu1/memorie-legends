@@ -2,7 +2,7 @@
 
 Lo abierto, en 3 minutos de lectura. Lo cerrado vive en `HISTORIA.md`.
 
-Última revisión: 10 de octubre de 2026.
+Última revisión: 11 de octubre de 2026.
 
 Los commits con `§N` en el mensaje cierran la sección N.
 Buscar: `git log --oneline --all --grep="§N"`.
@@ -67,7 +67,7 @@ Buscar: `git log --oneline --all --grep="§N"`.
   e infraestructura de Google/Firebase». Desde `03b86ad` hay también Firebase
   Analytics, y habrá un servicio de errores.
 - **No queda falsa:** §11 ya contempla proveedores de «seguridad, análisis,
-  comunicación y pago». Es la enumeración de lo *actual* la que envejeció.
+  comunicación y pago». Es la enumeración de lo _actual_ la que envejeció.
 - **Por qué igual conviene:** el trámite ante la URCDP sigue abierto (§19), y
   esa enumeración es justo lo que se mira.
 
@@ -142,11 +142,11 @@ prueba que mira las pruebas.
 **El patrón que ya costó tres bugs.** Un campo de la vista que viaja constante
 en todos los specs de red es un camino que ninguna prueba recorre:
 
-| Campo | Qué quedó sin cubrir | Lo que costó |
-|---|---|---|
-| los dobles de jugada (`levantar`, `tirarCarta`, `cortar`, `pasarTurno`, `cambiarCarta`) | la cadena de turno entera | el rollback de la etapa 3 |
-| `revelaciones`, siempre `[]` | `mostrarRevelaciones` — uno de los 8 lugares de 3c | se descubrió revisando, no jugando |
-| `registro`, siempre `[]` | los efectos de los poderes | §53, el 9 sin transición |
+| Campo                                                                                   | Qué quedó sin cubrir                               | Lo que costó                       |
+| --------------------------------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------- |
+| los dobles de jugada (`levantar`, `tirarCarta`, `cortar`, `pasarTurno`, `cambiarCarta`) | la cadena de turno entera                          | el rollback de la etapa 3          |
+| `revelaciones`, siempre `[]`                                                            | `mostrarRevelaciones` — uno de los 8 lugares de 3c | se descubrió revisando, no jugando |
+| `registro`, siempre `[]`                                                                | los efectos de los poderes                         | §53, el 9 sin transición           |
 
 Las tres veces el síntoma fue el mismo: suite verde, camino muerto. Y las tres
 se encontraron a mano, una por una.
@@ -274,34 +274,21 @@ un número seguido de «segundos».
 ### §50 — La línea de base de las pruebas, y cómo leerla
 
 Las dos suites miden cosas distintas y ninguna incluye a la otra. Los números
-de referencia, al 10 de octubre de 2026:
+de referencia, al 11 de octubre de 2026:
 
-| Suite | Comando | Verde es |
-|---|---|---|
-| Node | `npm test` | **85 de 85** |
-| Navegador | `npx playwright test` | **464 en total; el verde hay que volver a medirlo** |
+| Suite     | Comando               | Verde es                         |
+| --------- | --------------------- | -------------------------------- |
+| Node      | `npm test`            | **85 de 85** suites              |
+| Navegador | `npx playwright test` | **491 de 492**, en 65 archivos   |
 
-Los dos rojos históricos de §48 se arreglaron el 10/10/2026 (`cf86b26`) y su
-archivo da 3 de 3. Pero la corrida completa de esa misma noche dio **460 pasan,
-4 fallan**, y los cuatro son OTROS:
+**El rojo que queda es uno solo y es fatiga**, no un bug:
+`poder-paso-a-paso.spec.js:117`, el cuadro del poder a 390x844. El error es un
+**503 del servidor local**, no una afirmación sobre el código. Aislado, ese
+archivo da 3 de 3.
 
-    menu.spec.js:179            se cierra con la X, con el velo y con Escape
-    ojo-del-poder.spec.js:295   los cuatro miran a la vez
-    poder-paso-a-paso.spec.js:156   el cuadro del poder en 390x844
-    tablero.spec.js:1124        el tablero no mide más que la pantalla
-
-**No están clasificados, y no hay que darlos por intermitentes sin probarlo.**
-Lo que se sabe: esa corrida tardó **34,5 minutos** en vez de los 23 de siempre,
-porque compartió la máquina con un `npm test`, otra corrida de Playwright y
-varios `git`. En una laptop de 8 GB eso es contención real, y tres de los
-cuatro miden tiempos o geometría. `ojo-del-poder` ya figura como intermitente
-en §29-Bloque2.
-
-**Lo primero antes del próximo deploy:** correr los 65 archivos con la máquina
-libre. Si los cuatro se van, el número es 464 y queda entero en verde por
-primera vez; si queda alguno, es un rojo nuevo y hay que anotarlo acá con su
-causa. No desplegar leyendo «3 de 3 en su archivo» como «suite verde»: es
-exactamente el error que §48 documenta.
+Que el número sea 492 y no 464 es por las pruebas que entraron el 10 y el 11:
+once de `ranking-movil.spec.js` (fase D) y diecisiete de
+`perfil-pestanas.spec.js` (A1 y A2a).
 
 - **Correr los 65 archivos, no un recorte.** La etapa 3c se validó con los
   archivos de la mesa en red y bajó `MS_PASO_AUTOMATICO` de 20 s a 10 sin ver
@@ -309,6 +296,10 @@ exactamente el error que §48 documenta.
   denunció en la corrida completa, dos días después.
 - **Son 23 minutos.** Conviene lanzarla en segundo plano y seguir trabajando,
   no saltearla.
+- **Cerrado el 11/10: los cuatro rojos de la corrida anterior no
+  aparecieron.** La suite quedó en 491/492 con un solo rojo, y es fatiga. Eran
+  contención de recursos, como decía la hipótesis — ahora medido con la
+  máquina libre, no supuesto.
 - **El «92 pasan, 2 fallan» que anduvo dando vueltas no reconcilia** con nada
   medible: los archivos que montan la mesa en red son 14 con 104 pruebas, y
   los dos rojos de §48 están en un spec de entrenamiento. Se descartó.
@@ -357,6 +348,7 @@ porque su arreglo deshizo una decisión anterior y el camino importa.
    entrega, el servidor lo rechazaba por vencido, y el toque se perdía en vez
    de ser un descarte. Ahora la fecha viaja en `atacando` y se comprueba al
    clic; el temporizador avisa, no decide.
+
 4. **`MS_PASO_AUTOMATICO` 20 s → 10 s también cambió ENTRENAMIENTO.** El motivo
    —que la decisión ahora contiene la ventana en vez de seguirla— vale sólo en
    red. Allá la ventana sí se cierra a los 2 s, así que esos 10 s volvieron a
@@ -479,10 +471,15 @@ conviene no confundirlo con un respaldo.
 
 ### §6 — Imágenes de build en GCR
 
-- **Estado:** el deploy del 10/09 avisó. Se borran a mano en
-  `console.cloud.google.com/gcr/images/memorie-legends/us/gcf`.
-- **O:** se van solas en el próximo deploy que logre limpiar.
-- **Verificar:** que la facturación de Artifact Registry no siga creciendo.
+- **Estado:** avisaron los deploys del **10/09** y del **11/10**. O sea que no
+  se limpiaron solas en el medio: van tres meses juntándose.
+- **Dónde:** `console.cloud.google.com/gcr/images/memorie-legends/us/gcf`. Se
+  borran a mano.
+- **O:** se van solas en el próximo deploy que logre limpiar — que es
+  justamente lo que no viene pasando.
+- **Cuánto:** centavos por mes. No urge; lo que importa es que no crezca sin
+  que nadie mire.
+- **Verificar:** que la facturación de Artifact Registry no siga subiendo.
 
 ---
 
@@ -526,3 +523,4 @@ conviene no confundirlo con un respaldo.
 
 §0, §3b, §3d, §5, §7, §8, §11, §13b, §14, §22, §24, §28, §30,
 §31, §33, §34, §35, §36, §38, §39, §42 (parcial).
+
