@@ -306,7 +306,7 @@ console.log("\n=== 6. Las fases CON plazo se destraban solas ===");
     ok(recalculo.valor?.hizo === "recalcularPlazo",
        `${fase}: el primer golpe repone el plazo`, recalculo.valor?.hizo);
 
-    // El plazo sale del motor. Son distintos —la levantada decide en 5 s y la
+    // El plazo sale del motor. Son distintos —la levantada decide en 8 s y la
     // caja del poder en 10— y escribirlos acá sería el error que ya costó seis
     // suites en rojo.
     const dura = msDeLaDecision(fase);

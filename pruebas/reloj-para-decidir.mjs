@@ -47,10 +47,10 @@ console.log("\n=== 1. Dos plazos, cada uno en un solo lugar ===");
 {
   /*
    * Acá decía `MS_PARA_DECIDIR === 10_000`, y se quedó viejo: desde `6897faa`
-   * la levantada decide en 5 s y la caja del poder en 10, y el repartidor que
-   * elige entre las dos es `msDeLaDecision`.
+   * la levantada y la caja del poder NO duran lo mismo —8 y 10 hoy— y el
+   * repartidor que elige entre las dos es `msDeLaDecision`.
    *
-   * No se reemplaza por `=== 5_000`, que sería el mismo número a mano un año
+   * No se reemplaza por `=== 8_000`, que sería el mismo número a mano un año
    * más joven. Lo que se fija es la RELACIÓN, que es la decisión que se tomó:
    * resolver un poder da más tiempo que decidir qué hacer con la levantada,
    * porque en el poder hay que elegir sobre la mesa y en la levantada la

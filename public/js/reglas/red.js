@@ -520,29 +520,46 @@ export function registrarIntento(
  * El vencimiento lo calcula el servidor con su reloj, en `plazoDe`. Acá vive
  * la tabla —qué fase merece reloj y qué hacer cuando se agota— que es la parte
  * que se puede leer, discutir y probar sin levantar nada.
+ *
+ * ───────────────────────────────────────────────────────────────────────
+ * OCHO Y NO CINCO
+ * ───────────────────────────────────────────────────────────────────────
+ *
+ * Cinco se sentían apurados jugando, y la decisión no es un reflejo: hay que
+ * leer la carta que se levantó, acordarse de dónde está la propia que conviene
+ * cambiar y tocarla. En el teléfono eso son dos toques sobre cartas de 84 px.
+ *
+ * Que coincida con `MS_TURNO` —ocho también— no es que sean el mismo reloj.
+ * Son dos, y el de acá arranca cuando levanta, no cuando empezó el turno: ver
+ * `plazoDe` en `functions/partida-red.js`, que lo explica con el borde. El
+ * turno completo puede llegar a dieciséis segundos, y eso es a propósito.
+ *
+ * El precio lo pagan los otros tres: en red la ventana de reflejos la cierra
+ * el que tira, así que un turno más largo es una ventana más larga. Se aceptó,
+ * porque la ventana abierta no le impide jugar al que tiene el turno.
  */
-export const MS_PARA_DECIDIR = 5_000;
+export const MS_PARA_DECIDIR = 8_000;
 
 /**
  * Lo que tiene el jugador para usar un poder, cuando la caja ya esta abierta.
  *
  * Diez segundos: elegir con que carta cambia el 9, o ver las dos del 10 y
- * decidir, es una jugada con informacion nueva en pantalla. Cinco alcanzan para
- * tirar o cambiar la levantada, no para esto.
+ * decidir, es una jugada con informacion nueva en pantalla. Los ocho de la
+ * levantada alcanzan para tirarla o cambiarla, no para esto.
  */
 export const MS_PARA_USAR_PODER = 10_000;
 
 /**
  * Cuanto dura la decision segun la fase.
  *
- * `levantada` (tirar/cambiar/usar sin abrir la caja) son cinco. `poder` y
+ * `levantada` (tirar/cambiar/usar sin abrir la caja) son ocho. `poder` y
  * `cambioConVista` (la caja abierta, con las cartas a la vista) son diez.
  */
 export const msDeLaDecision = (fase) =>
   fase === 'levantada' ? MS_PARA_DECIDIR : MS_PARA_USAR_PODER;
 
 /**
- * Qué hace el servidor cuando se agotan los diez segundos, por fase.
+ * Qué hace el servidor cuando se agota el plazo de la decisión, por fase.
  *
  * Las cuatro cartas con poder —7, 8, 9 y 10— comparten la fase `poder`: el
  * número está en `poderPendiente`, no en la fase. Por eso la tabla tiene tres

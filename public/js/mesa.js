@@ -622,10 +622,11 @@ async function heVuelto() {
  *
  *   - `MS_TURNO` (8 s) — levantar del mazo. Si se agota, se pierde la
  *     levantada y el turno pasa al siguiente.
- *   - `MS_PARA_DECIDIR` (5 s) — qué hacer con la carta que ya se tiene en la
- *     mano: tirarla, cambiarla, usar el poder. Decía 10, y son 10 los de la
- *     caja del poder: desde `6897faa` las dos no duran lo mismo y hay una
- *     función, `msDeLaDecision(fase)`, justamente porque son dos.
+ *   - `MS_PARA_DECIDIR` (8 s) — qué hacer con la carta que ya se tiene en la
+ *     mano: tirarla, cambiarla, usar el poder. No son los 10 de la caja del
+ *     poder: desde `6897faa` las dos no duran lo mismo y hay una función,
+ *     `msDeLaDecision(fase)`, justamente porque son dos. Fueron 10, después 5
+ *     y desde §58 son 8; los de la caja del poder nunca se movieron.
  *   - `MS_PASO_AUTOMATICO` (10 s) — cortar o pasar.
  *
  * Y uno que se fue: la ventana de reflejos EN RED no tiene reloj. (Etapa 3)
@@ -3388,9 +3389,10 @@ function abrirModalPoder() {
    * Con una sola a la vista la carta pasa de 42 a 84 px, que es el doble.
    *
    * Pestañas y no un «Siguiente», y la razón es el reloj: la decisión del
-   * poder vence a los 10 segundos (`MS_PARA_DECIDIR`). Con un botón de avanzar,
-   * llegar al tercer rival costaba tres toques contra ese reloj; con las
-   * pestañas cuesta uno, siempre, y «el siguiente» sigue estando al lado.
+   * poder vence a los 10 segundos (`MS_PARA_USAR_PODER` — acá decía
+   * `MS_PARA_DECIDIR`, que es el de la levantada y son 8). Con un botón de
+   * avanzar, llegar al tercer rival costaba tres toques contra ese reloj; con
+   * las pestañas cuesta uno, siempre, y «el siguiente» sigue estando al lado.
    *
    * La etiqueta de la propia es «Vos» y no «Tus cartas»: son cuatro pestañas
    * repartiéndose 336 px y «TUS CARTAS» no entra sin recortarse. «Vos» es el

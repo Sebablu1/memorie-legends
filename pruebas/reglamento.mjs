@@ -91,7 +91,7 @@ const TIEMPOS = {
   "Revelación por error o acierto tarde": MS_REVELACION,
   "Levantar del mazo": M.MS_TURNO,
   // Las dos salen del repartidor y no de una constante suelta: desde
-  // `6897faa` NO duran lo mismo —la levantada decide en 5 s y la caja del
+  // `6897faa` NO duran lo mismo —la levantada decide en 8 s y la caja del
   // poder en 10— y acá las dos filas apuntaban a `MS_PARA_DECIDIR`. O sea que
   // la fila del poder comparaba la página contra el plazo equivocado: decía
   // que el reglamento mentía cuando el que mentía era este archivo.

@@ -685,10 +685,11 @@ export function crearMotorEnRed({
        * Y ARRANCA CUANDO LEVANTA, NO CUANDO EMPEZÓ EL TURNO
        * ───────────────────────────────────────────────────────────────────
        *
-       * `ahoraMs + MS_PARA_DECIDIR`, contado desde este golpe. El turno dura
-       * ocho segundos y esto dura diez, así que levantar con dos segundos de
-       * turno restante NO deja dos segundos para decidir: deja diez. El plazo
-       * es de la decisión, no lo que sobra del turno.
+       * `ahoraMs + msDeLaDecision(fase)`, contado desde este golpe. El turno
+       * dura ocho segundos y la levantada decide en otros ocho, así que
+       * levantar con dos segundos de turno restante NO deja dos segundos para
+       * decidir: deja ocho, y el turno completo puede llegar a dieciséis. El
+       * plazo es de la decisión, no lo que sobra del turno.
        *
        * Qué pasa al vencer sale de `decisionQueVence`, en `reglas/red.js`: con
        * una carta levantada se descarta —es la única jugada posible— y con un

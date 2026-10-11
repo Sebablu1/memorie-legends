@@ -26,7 +26,7 @@ import { crearMotorEnRed, MS_TURNO } from "../functions/partida-red.js";
 /*
  * `msDeLaDecision` y no `MS_PARA_DECIDIR` a secas.
  *
- * Las tres fases NO duran lo mismo desde `6897faa`: la levantada decide en 5 s
+ * Las tres fases NO duran lo mismo desde `6897faa`: la levantada decide en 8 s
  * y la caja del poder en 10. Este archivo comparaba las tres contra
  * `MS_PARA_DECIDIR`, así que aprobaba la levantada y reprobaba las otras dos
  * —y los avances de reloj de las secciones 4 y 5 se quedaban cortos, con lo
@@ -177,10 +177,10 @@ console.log("\n=== 2. Levantar tarde en el turno igual da el plazo entero ===");
    * La guarda de la escena, no una regla de diseño.
    *
    * Decía `MS_TURNO < MS_PARA_DECIDIR`, y era cierto cuando decidir duraba
-   * 10 s contra un turno de 8. Hoy la levantada decide en 5 y el turno dura 8,
-   * así que la comparación se dio vuelta — pero la escena sigue siendo válida,
-   * porque lo que se prueba no es cuál de los dos es más largo: es que el
-   * plazo NO hereda lo que sobra del turno.
+   * 10 s contra un turno de 8. Desde §58 los dos duran ocho, así que esa
+   * comparación es falsa — y la que la daría vuelta, también. La escena sigue
+   * siendo válida, porque lo que se prueba no es cuál de los dos es más
+   * largo: es que el plazo NO hereda lo que sobra del turno.
    *
    * Lo que de verdad hace falta para que la prueba signifique algo es que el
    * plazo pase del final del turno. Con un segundo de turno restante, eso es
