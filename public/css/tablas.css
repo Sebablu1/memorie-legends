@@ -190,3 +190,66 @@
   .jugador-ranking .titulo-jugador { display: none; }
   .nombre-ranking { max-width: 10ch; }
 }
+
+/* ===================================================== la tabla en el teléfono
+
+   LA RED DE SEGURIDAD, PRIMERO.
+
+   Una tabla con cinco columnas tiene un ancho mínimo y ninguna cantidad de CSS
+   lo baja a cero. Sin esto, lo que no entra se sale del `.panel`, del `main` y
+   de la ventana: el documento medía 452 px en una pantalla de 320 y la página
+   entera se corría en horizontal, con la barra y el título. Medido a 320, 375,
+   390 y 414 px.
+
+   Con `overflow-x: auto` lo que no entra se desplaza ADENTRO de su caja, que
+   es lo que hace cualquier tabla ancha en cualquier sitio. La página deja de
+   moverse y el `ranking-movil.spec.js` lo afirma. */
+.caja-tabla {
+  overflow-x: auto;
+  /* El desplazamiento con el dedo, con freno al soltar. */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Y después, que no haga falta desplazar.
+
+   La forma corta de los encabezados numéricos vive escondida en pantalla
+   grande: ver `encabezadoNum` en `ranking-ui.js`, que explica por qué son dos
+   palabras y no un recorte. Con las tres letras, menos separación y menos
+   relleno a los costados, el ancho mínimo de la tabla baja de 417 px a 293 con
+   una fila normal y a 325 con la peor —un nombre de 14 caracteres contra su
+   tope de 10ch, más un puntaje de cinco cifras con separador de miles—.
+
+   O sea: con filas normales entra desde 375 px, donde hay 305 disponibles. Con
+   un nombre largo sobran 20 px a 375 y 5 a 390, y se desplazan adentro de la
+   caja, que es para lo que está. A 320 px sobra siempre: ahí no hay forma de
+   meter cinco columnas, y esconder «Jugadas» dejaría a «Ganadas» sin contra
+   qué leerse —12 de 40 no es lo mismo que 12 de 300—.
+
+   Los dos números están medidos, en la página de verdad y con los dos juegos
+   de filas, a 320, 375, 390 y 414 px. Las dos cosas las afirma
+   `ranking-movil.spec.js`, cada una con sus filas. */
+.tabla-ranking .th-corto { display: none; }
+
+@media (max-width: 480px) {
+  .tabla-ranking .th-largo { display: none; }
+  .tabla-ranking .th-corto { display: inline; }
+
+  .tabla-ranking th { letter-spacing: 0.6px; padding: 8px 6px; }
+  .tabla-ranking td { padding: 12px 6px; }
+
+  /* Y la columna del puesto, a lo que mida.
+
+     Los 58 px de arriba son para que los números del puesto queden alineados
+     en una lista larga de escritorio. En el teléfono esa prolijidad no paga:
+     lo que de verdad ocupa es la medalla del podio a 1,2 rem.
+
+     Medido, y menos de lo que esperaba: las dos reglas juntas bajan el piso
+     de la tabla de 330 px a 325. Los 58 px fijos ya no eran el tope a ese
+     tamaño —el contenido mínimo manda antes—, así que lo que se gana es el
+     tamaño de la medalla. Se quedan igual: cinco píxeles menos de
+     desplazamiento es algo real a 320 px, donde cada uno se nota. */
+  .tabla-ranking .puesto { width: auto; }
+  .tabla-ranking tr.podio-1 .puesto,
+  .tabla-ranking tr.podio-2 .puesto,
+  .tabla-ranking tr.podio-3 .puesto { font-size: 1rem; }
+}

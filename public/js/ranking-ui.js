@@ -69,6 +69,39 @@ function marcoEnLaTabla(f) {
   return `<img class="marco-ranking" src="${escapar(f.marco)}" alt="" aria-hidden="true" />`;
 }
 
+/**
+ * Un encabezado de columna numérica, con su forma corta para el teléfono.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LOS ENCABEZADOS ERAN EL PISO DE LA TABLA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * «GANADAS» y «JUGADAS», a 0,66 rem con 1,4 px de separación entre letras,
+ * medían 85 y 83 px cada uno. Los valores que van abajo —«12», «40»— miden la
+ * mitad. Y son palabras sin espacios: una columna no puede ser más angosta
+ * que su encabezado porque no hay dónde cortarlo.
+ *
+ * Medido: la tabla no bajaba de 417 px de ancho a ningún tamaño de pantalla,
+ * y a 375 px tiene 305 disponibles. Los 112 que sobraban se salían de la
+ * ventana y arrastraban la página entera en horizontal —la barra y el título
+ * incluidos—, no sólo la tabla.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DOS PALABRAS Y NO UN RECORTE CON CSS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `text-overflow: ellipsis` sobre «Ganadas» daría «Gana…», que no es más
+ * corto de entender y encima miente sobre dónde termina la palabra. Y el CSS
+ * no puede cambiar un texto por otro: para eso hacen falta los dos textos.
+ *
+ * El `aria-label` lleva la palabra COMPLETA en los dos tamaños. Quien usa un
+ * lector de pantalla no gana nada con «Gan», y las tres letras son una
+ * concesión al ancho del teléfono, no una forma de llamar a la columna.
+ */
+const encabezadoNum = (largo, corto) =>
+  `<th class="num" aria-label="${largo}"><span class="th-largo">${largo}</span>` +
+  `<span class="th-corto" aria-hidden="true">${corto}</span></th>`;
+
 /** El título, al lado del nombre. Es texto de un administrador: va escapado. */
 function tituloEnLaTabla(f) {
   const titulo = String(f?.titulo ?? "").trim();
@@ -115,7 +148,7 @@ if (sesion) {
     $("tabla").innerHTML = `
       <table class="tabla-ranking">
         <thead>
-          <tr><th>#</th><th>Jugador</th><th class="num">Puntos</th><th class="num">Ganadas</th><th class="num">Jugadas</th></tr>
+          <tr><th>#</th><th>Jugador</th>${encabezadoNum("Puntos", "Pts")}${encabezadoNum("Ganadas", "Gan")}${encabezadoNum("Jugadas", "Jug")}</tr>
         </thead>
         <tbody>
           ${filas
