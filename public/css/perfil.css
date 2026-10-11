@@ -1,0 +1,56 @@
+/* Mi perfil: lo que no existía ya en otra hoja.
+
+   Las pestañas son las del ranking —`.pestanas` y `.pestana`, en
+   `tablas.css`— y no se redefinen acá. Esta hoja tiene sólo tres cosas: el
+   ancho de la página, la separación entre la tira de pestañas y el panel, y
+   el foco del panel. Todo lo demás —el `.panel`, los títulos, los enlaces—
+   sale de `app.css` igual que en las otras pantallas. */
+
+/* Más angosta que el tablero y más ancha que `cuenta.html`.
+
+   El tablero usa los 1100 px del `main` porque reparte tarjetas en rejilla;
+   `cuenta.html` se limita a 620 porque es un formulario de una columna. Esto
+   es una lista de cosas —artículos, insignias, filas de datos— y a 1100 px
+   las filas quedan de punta a punta con el texto perdido en el medio. */
+.pagina-perfil {
+  max-width: 820px;
+}
+
+/* La tira de pestañas, separada del panel.
+
+   `.pestanas` no trae margen: en el ranking la separa el párrafo del período
+   que va en el medio, y acá no hay nada en el medio. */
+.pestanas-perfil {
+  margin: 20px 0 18px;
+}
+
+/* El panel recibe el foco al cambiar de pestaña —ver `mostrar()` en
+   `perfil.js`— y eso lo vuelve enfocable. Sin esto, el navegador le dibuja su
+   anillo de siempre en un borde de 16 px de radio y queda un rectángulo
+   cortado en las esquinas.
+
+   `:focus-visible` y no `:focus`: con `:focus` el anillo aparecería también
+   cuando el foco llega por el programa, que es justo el caso de acá, y se
+   vería un recuadro dorado cada vez que se toca una pestaña con el dedo. */
+.panel-perfil:focus { outline: none; }
+
+.panel-perfil:focus-visible {
+  outline: 2px solid var(--oro);
+  outline-offset: 3px;
+}
+
+/* El texto de un panel que todavía no tiene lo suyo.
+
+   Vive mientras dure la mudanza: cada panel dice qué va a venir y adónde está
+   eso hoy. Cuando llegue el contenido, estos párrafos se van y esta regla
+   también. */
+.aun-no {
+  color: var(--texto-tenue);
+  font-size: 0.92rem;
+  line-height: 1.7;
+  margin: 0;
+}
+
+.aun-no a {
+  color: var(--oro-claro);
+}

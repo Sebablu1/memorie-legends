@@ -400,8 +400,8 @@ console.log("\n=== 11. El sitemap y el robots ===");
 {
   // Las que piden sesión: un buscador que llega termina en la pantalla de
   // ingreso. La 404 y el panel, tampoco.
-  const PRIVADAS = ["dashboard.html", "cuenta.html", "room.html", "lobby.html", "mesa.html",
-                    "ranking.html", "tienda.html", "404.html", "admin/index.html",
+  const PRIVADAS = ["dashboard.html", "cuenta.html", "perfil.html", "room.html", "lobby.html",
+                    "mesa.html", "ranking.html", "tienda.html", "404.html", "admin/index.html",
                     // El redirector de los links cortos. No es una página que
                     // alguien busque: se entra por una invitación y se sale
                     // sola al lobby.
@@ -433,7 +433,8 @@ console.log("\n=== 11. El sitemap y el robots ===");
 
   const robots = leer(join(PUBLIC, "robots.txt")).split(/\r?\n/).map((l) => l.trim());
   for (const linea of ["User-agent: *", "Allow: /", "Disallow: /admin/", "Disallow: /dashboard.html",
-                       "Disallow: /cuenta.html", "Sitemap: https://memorielegends.com/sitemap.xml"]) {
+                       "Disallow: /cuenta.html", "Disallow: /perfil.html",
+                       "Sitemap: https://memorielegends.com/sitemap.xml"]) {
     ok(robots.includes(linea), `robots.txt: ${linea}`);
   }
   const prohibidas = robots.filter((l) => l.startsWith("Disallow:")).map((l) => l.slice(9).trim());
@@ -531,8 +532,14 @@ console.log("\n=== 14. El mismo menú, y en el mismo orden, en todas las página
   // legales llevan menos—, pero la que lleva dos los lleva en este orden. Si
   // una los ordena distinto, quien viaja entre páginas pierde el lugar donde
   // estaba el enlace que busca, y eso se siente más que un color cambiado.
+  //
+  // «Mi perfil» entra después de «Tu cuenta» y antes del soporte. Las dos
+  // conviven mientras dure la mudanza: el perfil todavía no tiene adentro la
+  // verificación en dos pasos, así que sacar «Tu cuenta» ahora dejaría eso sin
+  // ninguna puerta en el menú. Cuando el contenido se mude, «Tu cuenta» sale
+  // de esta lista y de los catorce HTML.
   const ORDEN = ["Inicio", "Lobby", "Jugar", "Cómo se juega", "Ranking", "Tienda",
-                 "Tu cuenta", "Soporte WhatsApp", "Administración"];
+                 "Tu cuenta", "Mi perfil", "Soporte WhatsApp", "Administración"];
   // El soporte: UN número y UN mensaje, los mismos en todas. Escrito catorce
   // veces a mano, un dígito cambiado en una sola página manda a un desconocido,
   // y un mensaje distinto es una grieta todavía más difícil de ver.
@@ -542,7 +549,7 @@ console.log("\n=== 14. El mismo menú, y en el mismo orden, en todas las página
   // registrarse, y nada más. La mesa tampoco, porque adentro de una partida no
   // hay a dónde ir. El panel de administración es otra cosa.
   const conMenu = PAGINAS.filter((p) => /<nav\b/.test(html[p]) && !/admin/.test(p));
-  ok(conMenu.length === 14, "las páginas con menú son catorce", conMenu.map(deRepo));
+  ok(conMenu.length === 15, "las páginas con menú son quince", conMenu.map(deRepo));
 
   for (const pagina of conMenu) {
     const nombre = relative(PUBLIC, pagina).replaceAll("\\", "/");

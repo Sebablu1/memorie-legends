@@ -49,6 +49,7 @@ const PAGINAS = [
   "ranking.html",
   "tienda.html",
   "cuenta.html",
+  "perfil.html",
   "room.html",
   "mesa.html",
   "quienes-somos.html",
