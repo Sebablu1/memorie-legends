@@ -235,6 +235,50 @@ entra, en vez de recortes en cada lugar donde se dibuja. Hay que mirar también
 qué hace el lobby y el ranking con un nombre largo — la mesa no es el único
 lado que lo muestra.
 
+### §63 — «No tenés nada» y «el catálogo no contestó» se ven igual
+
+La pestaña «Colección» del perfil muestra `#sinColeccion` cuando
+`montarInventario` no destapa la sección. Eso pasa por DOS motivos distintos:
+el jugador no tiene nada, o el catálogo no contestó. El montaje trata los dos
+igual —se va sin tocar nada— así que la pantalla no puede distinguirlos.
+
+Hoy el cartel está redactado para ser cierto en los dos casos y para decir lo
+mismo que hay que hacer, así que no miente. Pero a quien se le cayó la lectura
+le estamos diciendo que vaya a la tienda, cuando lo que necesita es recargar.
+
+**Para arreglarlo**, `montarInventario` tiene que devolver POR QUÉ se fue
+—`"sin-seccion" | "error" | "vacio" | "ok"`— y el perfil elegir el cartel. Es
+un cambio en un módulo que comparten dos pantallas, y por eso quedó afuera de
+A2a: aquella etapa era una mudanza, no un rediseño.
+
+`public/perfil.html` tiene el comentario que apunta acá.
+
+### §66 — Cache busting para insignias, marcos y paños
+
+Los avatares ya tienen su versión al dibujar —`avatarUrl`, con
+`VERSION_AVATARES`, en `modulos/imagenes.js`— y los dorsos la suya,
+`VERSION_DORSOS` en `reglas/baraja.js`.
+
+**Las insignias, los marcos y los paños no tienen ninguna.** Si se reemplaza
+uno de esos archivos manteniendo el nombre, pasa exactamente lo que pasó con
+los avatares en C2: el archivo nuevo queda en el servidor y el borde del CDN
+sigue entregando el viejo hasta que venza el `max-age`, que para ellos siguen
+siendo treinta días.
+
+No es hipotético: es el mismo agujero, en los mismos archivos, con el mismo
+comentario de `firebase.json` avisando desde hace meses.
+
+**Se arregla cuando C1 unifique los dibujantes**, con el mismo ayudante: hoy
+hay siete lugares que dibujan un avatar y otros tantos para insignias, y
+agregarles la versión uno por uno ahora sería escribir catorce veces lo que
+después se escribe una. El `avatarUrl` de `imagenes.js` ya está hecho para
+generalizarse: lo único atado a los avatares es el prefijo que filtra.
+
+**Mientras tanto**, si hay que reemplazar una insignia antes de C1: cambiarle
+el nombre al archivo es la salida barata, porque un nombre distinto ya es una
+dirección distinta. Ojo con que la ruta vieja está copiada en Firestore —el
+documento del artículo— y en las filas del ranking.
+
 ### §62 — Extender `tiempos-en-prosa.mjs` a la portada y al tablero
 
 `tiempos-en-prosa.mjs` compara los tiempos escritos EN PALABRAS contra el
