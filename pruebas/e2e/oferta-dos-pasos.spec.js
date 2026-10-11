@@ -62,7 +62,7 @@ test("se ofrece a quien no los tiene", async ({ page }) => {
 
   // Las dos salidas tienen que estar, y la de activar tiene que llevar a algún
   // lado: un aviso que ofrece algo sin decir cómo hacerlo es peor que ninguno.
-  await expect(caja.locator("a")).toHaveAttribute("href", "cuenta.html");
+  await expect(caja.locator("a")).toHaveAttribute("href", "perfil.html#cuenta");
   await expect(page.locator("#btnAhoraNo")).toBeVisible();
 });
 

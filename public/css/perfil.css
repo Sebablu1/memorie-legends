@@ -54,3 +54,109 @@
 .aun-no a {
   color: var(--oro-claro);
 }
+
+/* ══════════════════════════════════ la pestaña de la cuenta (A2b)
+
+   Lo que vivía en el `<style>` de `cuenta.html`, traído tal cual salvo dos
+   cosas: `.paso-dos` —el ancho de aquella página, que acá lo pone
+   `.pagina-perfil`— se borró, y `.panel a` pasó a `#panelCuenta a`, porque
+   ahora hay cinco paneles en la página y aquel selector le habría pintado los
+   enlaces a los cinco. */
+
+/* Los dos bloques de la pestaña, separados. El panel que los contiene ya
+   tiene su relleno; esto es el aire entre uno y otro. */
+#panelCuenta > section + section {
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid var(--borde-suave);
+}
+
+/* La clave para escribir a mano. Monoespaciada y separada en bloques:
+   son 32 caracteres que alguien va a copiar mirando, y en una tipografía
+   normal la I y la l son el mismo dibujo. */
+.clave-secreta {
+  display: block;
+  margin: 14px 0;
+  padding: 14px 16px;
+  border: 1px dashed rgba(212, 168, 67, 0.5);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--oro);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1rem;
+  letter-spacing: 2px;
+  word-break: break-all;
+  text-align: center;
+}
+
+.codigo-mfa {
+  width: 100%;
+  max-width: 220px;
+  margin: 0 auto;
+  display: block;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.5rem;
+  letter-spacing: 6px;
+}
+
+.factor-puesto {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.factor-puesto:last-child { border-bottom: none; }
+.factor-puesto b { color: var(--texto); }
+.factor-puesto small { color: var(--texto-tenue); }
+.factor-puesto .accion { margin-left: auto; }
+
+/* El QR va sobre blanco aunque la página sea oscura. No es un descuido:
+   un lector necesita contraste alto y un margen claro para encontrar el
+   código. Es de los pocos sitios donde la marca cede. */
+.caja-qr {
+  display: flex;
+  justify-content: center;
+  margin: 18px 0;
+}
+
+.caja-qr canvas {
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px rgba(212, 168, 67, 0.35), 0 8px 28px rgba(0, 0, 0, 0.55);
+  max-width: 100%;
+  height: auto;
+}
+
+/* La clave a mano queda plegada: la mayoría escanea, y mostrar las dos
+   cosas a la vez hace dudar sobre cuál hay que usar. */
+.a-mano {
+  margin: 6px 0 18px;
+  color: var(--texto-tenue);
+  font-size: 0.9rem;
+}
+
+.a-mano summary {
+  cursor: pointer;
+  color: var(--oro);
+  padding: 6px 0;
+}
+
+.aviso-fuerte {
+  border-left: 3px solid var(--oro);
+  padding: 10px 0 10px 14px;
+  color: var(--texto-tenue);
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+/* Los enlaces salían en el azul del navegador: sobre el fondo oscuro casi no
+   se leen, y encima no se parecen a ningún otro enlace del sitio. */
+#panelCuenta a {
+  color: var(--oro);
+  text-decoration: underline;
+}
+
+#panelCuenta a:hover { color: var(--oro-claro, #f0d089); }

@@ -1,5 +1,25 @@
 /**
- * La pantalla de la cuenta: activar y quitar la verificación en dos pasos.
+ * La cuenta: los dos bolsillos y la verificación en dos pasos.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ESTO YA NO ES UNA PANTALLA: ES UNA PESTAÑA DE `perfil.html`
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Hasta A2b este archivo era el guión de `cuenta.html` y corría entero al
+ * importarse: pedía la sesión, pintaba y colgaba cinco escuchadores sobre
+ * botones que daba por existentes. Ahora lo monta `perfil.js` cuando se abre
+ * la pestaña «Cuenta», así que NADA puede correr al importar — un
+ * `$("btnActivarMfa").addEventListener(…)` de nivel superior tiraría
+ * `TypeError` en cualquier pestaña que no sea ésa, y se llevaría puesta la
+ * página entera antes de dibujar nada.
+ *
+ * Por eso los manejadores son funciones con nombre, declaradas acá y
+ * enganchadas adentro de `montarCuenta`. Declarar una función no hace nada;
+ * engancharla, sí.
+ *
+ * Lo que NO hace este módulo, porque ya lo hizo `perfil.js`: pedir la sesión,
+ * pintar el saldo de la barra y conectar el botón de salir. Hacerlo dos veces
+ * sería una lectura de más y dos escuchadores sobre el mismo botón.
  *
  * Todo lo que hace de verdad está en `mfa.js`. Acá sólo se decide qué se
  * muestra en cada momento, que son cuatro estados y conviene tenerlos claros:
@@ -16,7 +36,6 @@
  */
 
 import { auth } from "./firebase.js";
-import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
 import {
   estadoMfa,
   verificarCorreo,
@@ -86,7 +105,7 @@ async function refrescar() {
 
 // ------------------------------------------------------------ acciones
 
-$("btnVerificarCorreo").addEventListener("click", async (evento) => {
+async function alVerificarCorreo(evento) {
   const boton = evento.currentTarget;
   boton.disabled = true;
   try {
@@ -96,9 +115,9 @@ $("btnVerificarCorreo").addEventListener("click", async (evento) => {
     boton.disabled = false;
     avisar(error.message, "error");
   }
-});
+}
 
-$("btnActivarMfa").addEventListener("click", async (evento) => {
+async function alActivarMfa(evento) {
   const boton = evento.currentTarget;
   boton.disabled = true;
   avisar("Preparando…", "info");
@@ -127,9 +146,9 @@ $("btnActivarMfa").addEventListener("click", async (evento) => {
   } finally {
     boton.disabled = false;
   }
-});
+}
 
-$("btnCopiarClave").addEventListener("click", async (evento) => {
+async function alCopiarClave(evento) {
   const boton = evento.currentTarget;
   try {
     await navigator.clipboard.writeText(enCurso?.clave ?? "");
@@ -141,18 +160,18 @@ $("btnCopiarClave").addEventListener("click", async (evento) => {
     // seleccionar a mano.
     boton.textContent = "Copiala a mano";
   }
-});
+}
 
-$("btnCancelarMfa").addEventListener("click", async () => {
+async function alCancelarMfa() {
   // No hay nada que deshacer: sin código confirmado, la cuenta nunca llegó a
   // cambiar. El secreto se tira y ya.
   enCurso = null;
   $("codigoConfirmar").value = "";
   avisar("");
   await refrescar();
-});
+}
 
-$("formConfirmarMfa").addEventListener("submit", async (evento) => {
+async function alConfirmarMfa(evento) {
   evento.preventDefault();
   const boton = evento.target.querySelector('button[type="submit"]');
   boton.disabled = true;
@@ -176,7 +195,7 @@ $("formConfirmarMfa").addEventListener("submit", async (evento) => {
   } finally {
     boton.disabled = false;
   }
-});
+}
 
 async function sacar(factor, boton) {
   // Sí se pregunta, al revés que en las acciones inocuas: esto baja la
@@ -221,13 +240,39 @@ function pintarBolsillos(perfil) {
   panel.hidden = false;
 }
 
-// ------------------------------------------------------------ arranque
+// ------------------------------------------------------------ el montaje
 
-const sesion = await exigirSesion();
-if (sesion) {
-  mostrarSaldo(sesion.perfil.saldo);
-  pintarBolsillos(sesion.perfil);
-  conectarBotonSalir();
+/**
+ * Engancha la pestaña «Cuenta» y la deja al día.
+ *
+ * La llama `perfil.js` la primera vez que esa pestaña se muestra. Es
+ * idempotente por omisión: `perfil.js` la llama una sola vez, y el guard de
+ * abajo la vuelve inofensiva en cualquier página que no tenga este markup.
+ *
+ * El orden importa en los dos extremos:
+ *
+ *   - Los escuchadores van ANTES del viaje al servidor. Al revés, hay un rato
+ *     en el que los botones están dibujados y no hacen nada, que es la peor
+ *     forma de esperar.
+ *   - `pintarBolsillos` va primero de todo porque no necesita viajar: los dos
+ *     números ya vienen en el perfil que `perfil.js` leyó.
+ *
+ * @param {object} opciones
+ * @param {object} opciones.perfil  el que devolvió `exigirSesion`
+ */
+export async function montarCuenta({ perfil } = {}) {
+  // Sin el markup de la cuenta no hay nada que enganchar. Es el mismo guard
+  // que usan `montarInventario` y `montarLogros`, y por el mismo motivo:
+  // estos módulos tienen que poder importarse desde cualquier página.
+  if (!$("panelBolsillos")) return;
+
+  pintarBolsillos(perfil);
+
+  $("btnVerificarCorreo").addEventListener("click", alVerificarCorreo);
+  $("btnActivarMfa").addEventListener("click", alActivarMfa);
+  $("btnCopiarClave").addEventListener("click", alCopiarClave);
+  $("btnCancelarMfa").addEventListener("click", alCancelarMfa);
+  $("formConfirmarMfa").addEventListener("submit", alConfirmarMfa);
 
   // `currentUser` puede traer datos viejos: si alguien acaba de verificar el
   // correo en otra pestaña, acá seguiría figurando sin verificar. Recargarlo

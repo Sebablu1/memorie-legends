@@ -83,6 +83,22 @@ const FIREBASE = `
   // su ausencia hacía que uth.js no cargara, que onAuthStateChanged no
   // se registrara, y que el velo de carga se quedara puesto para siempre.
   export function precalentarFunciones(){}
+
+  // Y esto, desde A2b: la cuenta vive en \`perfil.html\`, que además monta la
+  // colección y la vitrina de logros. Ésas pasan por \`servidor.js\` —que pide
+  // \`funciones\` y \`httpsCallable\`— y leen el catálogo con \`collection\`,
+  // \`getDocs\`, \`query\` y \`orderBy\`.
+  //
+  // Es exactamente el agujero que describe el comentario de arriba, una
+  // vuelta más tarde: faltando UN nombre, el import se cae entero, \`perfil.js\`
+  // no llega a correr y la pestaña de la cuenta no se monta nunca. Los dos
+  // tests del QR se ponían rojos sin decir una palabra sobre el QR.
+  export const funciones = {};
+  export function httpsCallable(){ return async () => ({ data: {} }); }
+  export function collection(){ return {}; }
+  export function query(){ return {}; }
+  export function orderBy(){ return {}; }
+  export async function getDocs(){ return { docs: [] }; }
 `;
 
 const servir = (page, ruta, cuerpo) =>
@@ -98,7 +114,10 @@ test("el QR de la pantalla es escaneable y lleva la URI correcta", async ({ page
   // autorizado —que es exactamente lo que pasa con `localhost`—.
   await servir(page, "**/js/firebase.js", FIREBASE);
 
-  await page.goto("/cuenta.html");
+  // La cuenta es una pestaña de «Mi perfil» desde A2b, y se entra con el
+  // hash: `toBeVisible` exige que se vea, y sin el hash el perfil abre en
+  // otra pestaña.
+  await page.goto("/perfil.html#cuenta");
   await expect(page.locator("#pasoActivar")).toBeVisible({ timeout: 15_000 });
 
   await page.locator("#btnActivarMfa").click();
@@ -132,7 +151,7 @@ test("el QR se dibuja con margen claro alrededor", async ({ page }) => {
   await servir(page, "**/js/mfa.js", MFA);
   await servir(page, "**/js/firebase.js", FIREBASE);
 
-  await page.goto("/cuenta.html");
+  await page.goto("/perfil.html#cuenta");
   await expect(page.locator("#pasoActivar")).toBeVisible({ timeout: 15_000 });
   await page.locator("#btnActivarMfa").click();
   await expect(page.locator("#pasoConfirmar")).toBeVisible();

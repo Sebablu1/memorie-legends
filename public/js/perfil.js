@@ -45,6 +45,7 @@
 import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
 import { montarInventario } from "./inventario.js";
 import { montarLogros } from "./logros.js";
+import { montarCuenta } from "./cuenta.js";
 
 /**
  * Las cinco, y el orden es el de la pantalla.
@@ -58,6 +59,51 @@ const SECCIONES = ["perfil", "coleccion", "logros", "numeros", "cuenta"];
 const POR_OMISION = SECCIONES[0];
 
 const $ = (id) => document.getElementById(id);
+
+/**
+ * La cuenta se monta cuando se la mira, y es la única de las cinco.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * POR QUÉ ÉSTA SÍ Y LA COLECCIÓN NO
+ * ───────────────────────────────────────────────────────────────────────────
+ *
+ * Son dos preguntas distintas y dan respuestas distintas.
+ *
+ * La colección se monta al entrar porque su panel nace VACÍO: el HTML no
+ * tiene nada hasta que llega el catálogo, y montarla al tocar abriría una
+ * pestaña en blanco que se llena después. Además `#sinColeccion` depende de
+ * lo que encuentre.
+ *
+ * La cuenta es al revés: su panel está escrito entero en el HTML —el aviso,
+ * los botones, el formulario— y se ve completo apenas se abre. Lo único que
+ * llega de afuera son los dos números de los bolsillos y la lista de
+ * aplicaciones registradas.
+ *
+ * Y su montaje hace algo que ninguno de los otros hace: `auth.currentUser
+ * .reload()`, un viaje de AUTENTICACIÓN. Hacerlo en cada visita al perfil, le
+ * interese o no la cuenta a quien entró, es trabajo que nadie pidió sobre la
+ * parte más delicada del sistema.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * DOS DISPARADORES, UNA SOLA VEZ
+ * ───────────────────────────────────────────────────────────────────────────
+ *
+ * Hacen falta dos cosas para montar: que la pestaña esté a la vista y que la
+ * sesión haya contestado. Y pueden llegar en cualquier orden —entrar con
+ * `#cuenta` en la dirección pone la pestaña primero; tocarla después de un
+ * rato pone la sesión primero—, así que lo comprueban las dos y monta la que
+ * complete el par. `montada` es lo que impide que monte dos veces y cuelgue
+ * los escuchadores por duplicado.
+ */
+let montada = false;
+let aLaVista = null;
+let miPerfil = null;
+
+function quizasMontarLaCuenta() {
+  if (montada || aLaVista !== "cuenta" || !miPerfil) return;
+  montada = true;
+  montarCuenta({ perfil: miPerfil });
+}
 
 /** El nombre de sección que pide la dirección, si es una de las nuestras. */
 function seccionPedida() {
@@ -74,6 +120,8 @@ function seccionPedida() {
  * contradiciéndose.
  */
 function mostrar(seccion, { moverFoco = false } = {}) {
+  aLaVista = seccion;
+
   for (const nombre of SECCIONES) {
     const esta = nombre === seccion;
     const boton = document.querySelector(`#pestanasPerfil [data-panel="${nombre}"]`);
@@ -101,6 +149,8 @@ function mostrar(seccion, { moverFoco = false } = {}) {
     const panel = $(`panel${seccion[0].toUpperCase()}${seccion.slice(1)}`);
     panel?.focus({ preventScroll: true });
   }
+
+  quizasMontarLaCuenta();
 }
 
 /** La dirección, sin ensuciar el historial. Ver el encabezado. */
@@ -198,6 +248,11 @@ if (sesion) {
    * tiene el jugador: la respuesta ya está en el DOM y preguntarla de nuevo
    * sería un segundo viaje para saber lo mismo.
    */
+  // Y la cuenta, si es la pestaña que se está mirando. Ver
+  // `quizasMontarLaCuenta`: el otro disparador es `mostrar`.
+  miPerfil = sesion.perfil;
+  quizasMontarLaCuenta();
+
   await coleccion;
   const vacia = $("miInventario")?.hidden !== false;
   if ($("sinColeccion")) $("sinColeccion").hidden = !vacia;

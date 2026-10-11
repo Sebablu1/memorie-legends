@@ -192,14 +192,133 @@
         <div class="fila-dato"><span>Victorias</span><b id="statVictorias">—</b></div>
       </section>
 
+      <!-- La cuenta: los dos bolsillos y la verificación en dos pasos.
+
+           Es la única pestaña con DOS bloques, y van en este orden porque el
+           primero se mira seguido y el segundo se toca una vez en la vida.
+
+           A diferencia de las otras cuatro, ésta no se monta al entrar: la
+           engancha `perfil.js` la primera vez que se muestra. Ver allá el
+           porqué — resumido, es la única cuyo montaje hace un viaje de
+           autenticación. -->
       <section class="panel panel-perfil" id="panelCuenta" role="tabpanel"
                aria-labelledby="tabCuenta" tabindex="0" hidden>
-        <h2>Cuenta</h2>
-        <p class="aun-no">
-          Tus dos bolsillos de Leyendas y la verificación en dos pasos. Hoy
-          están en <a href="cuenta.html">Tu cuenta</a>, que sigue funcionando
-          igual hasta que esto se mude.
-        </p>
+        <!-- Los dos bolsillos.
+
+             No son decoración: de los dos, sólo las ganadas sirven para entrar
+             a un torneo. Sin esto, quien compra un paquete y después no puede
+             inscribirse ve un rechazo con el saldo a la vista y no entiende
+             nada. El mensaje de error lo explica, pero llega tarde: aparece
+             recién cuando ya intentó. -->
+        <section id="panelBolsillos" hidden>
+          <h2>Tus Leyendas</h2>
+          <div class="bolsillos">
+            <div class="bolsillo">
+              <b id="saldoGanado">—</b>
+              <span>ganadas jugando</span>
+              <small>Sirven para todo, torneos incluidos.</small>
+            </div>
+            <div class="bolsillo">
+              <b id="saldoComprado">—</b>
+              <span>compradas</span>
+              <small>Para partidas privadas y la tienda. No para torneos.</small>
+            </div>
+          </div>
+        </section>
+
+        <section class="dos-pasos">
+          <h2>Verificación en dos pasos</h2>
+          <p style="color: var(--texto-tenue); font-size: 0.92rem; line-height: 1.7">
+            Además de tu contraseña, para entrar te pedimos un código de seis
+            dígitos que genera una aplicación en tu teléfono
+            (<b>Google Authenticator</b>, Authy, 1Password y cualquier otra que
+            sirva). Es opcional, y lo recomendamos si tenés Leyendas guardadas.
+          </p>
+
+          <p class="aviso-fuerte">
+            <b>Antes de activarlo, leé esto.</b> Si perdés el teléfono y no
+            guardaste la clave de recuperación, no vas a poder entrar por tu
+            cuenta: hay que pedírnoslo a
+            <a href="mailto:soporte@memorielegends.com">soporte</a> y lo
+            resolvemos a mano. Guardá la clave que te vamos a mostrar en un
+            lugar seguro, fuera del teléfono.
+          </p>
+
+          <div id="avisoMfa" class="mensaje" role="status"></div>
+
+          <!-- Estado actual -->
+          <div id="estadoMfa" hidden>
+            <div id="listaFactores"></div>
+          </div>
+
+          <!-- Correo sin verificar: no se puede seguir -->
+          <div id="faltaVerificar" hidden>
+            <p style="color: var(--texto-tenue); font-size: 0.92rem">
+              Primero hay que verificar tu correo. Es lo que asegura que quien
+              recupere la contraseña por correo seas vos.
+            </p>
+            <button class="accion" id="btnVerificarCorreo" type="button">
+              Enviarme el correo de verificación
+            </button>
+          </div>
+
+          <!-- Paso 1: activar -->
+          <div id="pasoActivar" hidden>
+            <button class="accion grande" id="btnActivarMfa" type="button">
+              Activar la verificación en dos pasos
+            </button>
+          </div>
+
+          <!-- Paso 2: cargar el secreto y confirmar -->
+          <div id="pasoConfirmar" hidden>
+            <h3>1. Escaneá esto con tu aplicación</h3>
+            <p style="color: var(--texto-tenue); font-size: 0.9rem">
+              Abrí Google Authenticator (o la que uses), tocá "agregar" y apuntá
+              la cámara acá:
+            </p>
+
+            <div class="caja-qr">
+              <canvas id="qr" role="img"
+                      aria-label="Código QR para tu aplicación de autenticación"></canvas>
+            </div>
+
+            <details class="a-mano">
+              <summary>No puedo escanear</summary>
+              <p style="color: var(--texto-tenue); font-size: 0.88rem">
+                Elegí "escribir clave de configuración" en tu aplicación y usá
+                esta, tal cual:
+              </p>
+              <code class="clave-secreta" id="claveSecreta"></code>
+              <button class="accion sobria" id="btnCopiarClave" type="button">
+                Copiar la clave
+              </button>
+              <p style="color: var(--texto-tenue); font-size: 0.85rem; margin-top: 10px">
+                <a id="enlaceOtp" href="#">Abrir directamente en la aplicación</a>
+                — funciona si la tenés instalada en este mismo dispositivo.
+              </p>
+            </details>
+
+            <h3 style="margin-top: 26px">2. Escribí el código que aparece</h3>
+            <form id="formConfirmarMfa">
+              <input
+                class="codigo-mfa"
+                id="codigoConfirmar"
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                maxlength="6"
+                pattern="[0-9]{6}"
+                placeholder="000000"
+                aria-label="Código de seis dígitos"
+                required
+              />
+              <div style="display: flex; gap: 10px; margin-top: 16px">
+                <button class="accion sobria" id="btnCancelarMfa" type="button">Cancelar</button>
+                <button class="accion" type="submit">Confirmar</button>
+              </div>
+            </form>
+          </div>
+        </section>
       </section>
     </main>
 

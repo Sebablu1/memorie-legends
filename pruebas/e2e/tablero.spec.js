@@ -915,7 +915,6 @@ test("a la mesa se entra por el tablero, no desde el menú", async ({ page }) =>
     "dashboard.html",
     "ranking.html",
     "tienda.html",
-    "cuenta.html",
     "perfil.html",
     "como-se-juega.html",
     "reglamento-partidas.html",

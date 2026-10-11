@@ -296,7 +296,11 @@ console.log("\n=== 7. La dirección canónica, sin www ===");
     // tampoco se indexa: ninguna de las dos lleva canónica. `s.html` es el
     // redirector de los links cortos: cada dirección suya lleva el código de
     // una sala privada adentro, así que indexarla sería publicar invitaciones.
-    if (nombre === "404.html" || nombre === "s.html" || nombre.startsWith("admin/")) continue;
+    // `cuenta.html` es desde A2b una redirección a `perfil.html#cuenta`. No
+    // es una página: no se comparte, no se indexa, y lo que haya que decir lo
+    // dice su destino.
+    if (nombre === "404.html" || nombre === "s.html" || nombre === "cuenta.html"
+        || nombre.startsWith("admin/")) continue;
 
     const esperada = `${SITIO}/${nombre === "index.html" ? "" : nombre}`;
     const canonicas = etiquetas(texto, "link").filter((l) => l.rel === "canonical");
@@ -451,7 +455,11 @@ console.log("\n=== 12. Cada página con sus metadatos ===");
     // La 404 no se indexa, el panel tampoco, y `s.html` menos todavía: es una
     // pantalla de paso que dura menos de un segundo y su dirección lleva un
     // código de sala. Ninguna necesita Open Graph.
-    if (nombre === "404.html" || nombre === "s.html" || nombre.startsWith("admin/")) continue;
+    // `cuenta.html` es desde A2b una redirección a `perfil.html#cuenta`. No
+    // es una página: no se comparte, no se indexa, y lo que haya que decir lo
+    // dice su destino.
+    if (nombre === "404.html" || nombre === "s.html" || nombre === "cuenta.html"
+        || nombre.startsWith("admin/")) continue;
     const texto = html[pagina];
     const meta = etiquetas(texto, "meta");
     const titulo = texto.match(/<title>([^<]*)<\/title>/)?.[1];
@@ -533,13 +541,10 @@ console.log("\n=== 14. El mismo menú, y en el mismo orden, en todas las página
   // una los ordena distinto, quien viaja entre páginas pierde el lugar donde
   // estaba el enlace que busca, y eso se siente más que un color cambiado.
   //
-  // «Mi perfil» entra después de «Tu cuenta» y antes del soporte. Las dos
-  // conviven mientras dure la mudanza: el perfil todavía no tiene adentro la
-  // verificación en dos pasos, así que sacar «Tu cuenta» ahora dejaría eso sin
-  // ninguna puerta en el menú. Cuando el contenido se mude, «Tu cuenta» sale
-  // de esta lista y de los catorce HTML.
+  // «Tu cuenta» salió en A2b: su contenido es ahora una pestaña de «Mi
+  // perfil», y su página una redirección sin menú.
   const ORDEN = ["Inicio", "Lobby", "Jugar", "Cómo se juega", "Ranking", "Tienda",
-                 "Tu cuenta", "Mi perfil", "Soporte WhatsApp", "Administración"];
+                 "Mi perfil", "Soporte WhatsApp", "Administración"];
   // El soporte: UN número y UN mensaje, los mismos en todas. Escrito catorce
   // veces a mano, un dígito cambiado en una sola página manda a un desconocido,
   // y un mensaje distinto es una grieta todavía más difícil de ver.
@@ -549,7 +554,7 @@ console.log("\n=== 14. El mismo menú, y en el mismo orden, en todas las página
   // registrarse, y nada más. La mesa tampoco, porque adentro de una partida no
   // hay a dónde ir. El panel de administración es otra cosa.
   const conMenu = PAGINAS.filter((p) => /<nav\b/.test(html[p]) && !/admin/.test(p));
-  ok(conMenu.length === 15, "las páginas con menú son quince", conMenu.map(deRepo));
+  ok(conMenu.length === 14, "las páginas con menú son catorce", conMenu.map(deRepo));
 
   for (const pagina of conMenu) {
     const nombre = relative(PUBLIC, pagina).replaceAll("\\", "/");
