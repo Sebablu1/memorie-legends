@@ -66,6 +66,7 @@ import {
   RETRATO_INICIAL,
 } from "./modulos/retratos.js";
 import { esRutaDelSitio } from "./reglas/catalogo.js";
+import { avatarUrl } from "./modulos/imagenes.js";
 
 // Medir no puede romper lo que se mide. Ver `analitica.js`.
 import { anotar } from "./analitica.js";
@@ -836,8 +837,10 @@ const FASES_CON_TURNO = new Set([
  * escribe, no donde se originó. Una ruta que no sea de este sitio cae a la
  * cara de la casa en vez de pedirle una imagen a un dominio ajeno.
  */
+// Con la versión puesta acá, que es por donde pasan los dos lugares de la
+// mesa que dibujan una cara: el asiento y el marcador. Ver `imagenes.js`.
 const caraDe = (jugador, i) =>
-  esRutaDelSitio(jugador?.retrato) ? jugador.retrato : retratoDe(i);
+  avatarUrl(esRutaDelSitio(jugador?.retrato) ? jugador.retrato : retratoDe(i));
 
 /**
  * El reverso de las cartas de un jugador.

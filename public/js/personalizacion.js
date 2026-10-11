@@ -31,6 +31,7 @@ import { escapar } from "./modulos/texto.js";
 import { guardarVestuario, rutasDeLoEquipado } from "./modulos/vestuario.js";
 import { mostrarSaldo } from "./sesion.js";
 import { pintarAvatarCabecera } from "./equipado.js";
+import { avatarUrl } from "./modulos/imagenes.js";
 import {
   comprarItem,
   comprarPack,
@@ -181,7 +182,7 @@ const precioTexto = (n) => (n === 0 ? "Gratis" : `${n.toLocaleString("es-UY")} L
  */
 function dibujarImagen(item) {
   if (imagenEsArchivo(item.imagen)) {
-    return `<img class="figura-item" src="${escapar(item.imagen)}" alt="" loading="lazy" />`;
+    return `<img class="figura-item" src="${escapar(avatarUrl(item.imagen))}" alt="" loading="lazy" />`;
   }
   return `<span class="figura-item glifo" aria-hidden="true">${escapar(item.imagen ?? "")}</span>`;
 }

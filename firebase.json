@@ -37,6 +37,13 @@
         ]
       },
       {
+        "// avatar": "Un DÍA, no un mes, y sólo para los avatares. Son las únicas imágenes que se reemplazan manteniendo el nombre: el arte se rehace y el archivo sigue llamándose asesino.webp. Con el mes de abajo, el borde del CDN siguió entregando los viejos despues de desplegar los nuevos —el archivo estaba en el servidor, se veía pidiendolo con cualquier query— y la unica salida era esperar. La version al dibujar (avatarUrl, en modulos/imagenes.js) resuelve el caso de cada cambio; esto acota lo que puede durar un descuido. El precio es una revalidacion por avatar por dia: trece 304 de doscientos bytes.",
+        "source": "img/avatar/**",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=86400, stale-while-revalidate=604800" }
+        ]
+      },
+      {
         "//": "Las fuentes no cambian nunca: si hiciera falta otra, sería otro archivo.",
         "source": "**/*.@(woff2|woff|ttf)",
         "headers": [

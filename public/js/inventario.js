@@ -29,6 +29,7 @@ import { misItems, equiparItem, desequiparItem, ErrorDeServidor } from "./servid
 import { db, collection, getDocs, query, orderBy } from "./firebase.js";
 import { COLECCION_CATALOGO, TIPOS, imagenEsArchivo, enMiColeccion } from "./reglas/catalogo.js";
 import { pintarAvatarCabecera } from "./equipado.js";
+import { avatarUrl } from "./modulos/imagenes.js";
 import { guardarVestuario, rutasDeLoEquipado } from "./modulos/vestuario.js";
 
 const $ = (id) => document.getElementById(id);
@@ -104,7 +105,7 @@ function avisar(texto, esError = false) {
  */
 function dibujarFigura(item) {
   if (imagenEsArchivo(item?.imagen)) {
-    return `<img class="figura-inv" src="${escapar(item.imagen)}" alt="" loading="lazy" />`;
+    return `<img class="figura-inv" src="${escapar(avatarUrl(item.imagen))}" alt="" loading="lazy" />`;
   }
   return `<span class="figura-inv glifo" aria-hidden="true">${escapar(item?.imagen ?? "🎭")}</span>`;
 }
