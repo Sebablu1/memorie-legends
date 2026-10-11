@@ -57,7 +57,7 @@ export const TIPOS = {
    * mira la partida entera.
    *
    * Por eso son tipos distintos y no colores de uno solo: se equipan por
-   * separado, se compran por separado, y ponerse uno no cambia el otro.
+   * separado, se compran por separado, y equipar uno no cambia el otro.
    */
   MAZO: "mazo",
 
@@ -210,7 +210,7 @@ export function precioDePack(suma, cantidad) {
  * En qué campo del perfil se guarda lo que el jugador tiene puesto.
  *
  * Uno por tipo, y por eso equipar es idempotente por naturaleza: el campo
- * guarda un id, no una lista. Ponerse otro avatar pisa el anterior sin que
+ * guarda un id, no una lista. Equipar otro avatar pisa el anterior sin que
  * haya que acordarse de desequipar nada.
  *
  * `avatar` ya existía en el documento del perfil —lo permitían las reglas de

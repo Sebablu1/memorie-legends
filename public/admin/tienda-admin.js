@@ -473,7 +473,8 @@ async function alternar(id, encender) {
  * La lista de quienes compraron un artículo, debajo de su fila.
  *
  * Va en la lista y no en una ventana aparte a propósito: lo que se hace acá
- * es decidir si sacárselo a alguien, y esa decisión se toma mirando la fila
+ * es decidir si desposeer a alguien del artículo, y esa decisión se toma
+ * mirando la fila
  * del artículo. Una ventana modal taparía justamente eso.
  *
  * El panel no guarda esta lista: cada vez que se abre se vuelve a pedir. Es

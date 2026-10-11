@@ -194,7 +194,7 @@ test("y lo que me saco en Mi colección aparece sacado en la tienda", async ({ p
   ).toBeVisible();
 });
 
-test("los dos dorsos son artículos distintos: ponerse uno no toca el otro", async ({ page }) => {
+test("los dos dorsos son artículos distintos: equipar uno no toca el otro", async ({ page }) => {
   /**
    * Es la razón de que sean dos tipos y no dos colores de uno solo. Si
    * compartieran campo, comprar el del mazo central le sacaría al jugador el

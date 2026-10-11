@@ -196,7 +196,7 @@ export const crearOrdenDeCompra = (paqueteId) =>
  * Se saca lo que lleva puesto de un tipo.
  *
  * `equiparItem` no alcanza para esto: el perfil guarda UN id por tipo, así que
- * ponerse otro pisa el anterior, pero "ninguno" no es un artículo que se pueda
+ * equipar otro pisa el anterior, pero "ninguno" no es un artículo que se pueda
  * elegir. Quien quiere jugar sin insignia no tenía forma de decirlo.
  *
  * @returns {Promise<{tipo: string, campo: string, equipado: null}>}

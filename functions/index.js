@@ -1521,7 +1521,7 @@ export const equiparItem = llamable(async (data, context) => {
  * Se saca lo que tiene puesto de un tipo.
  *
  * Hace falta porque equipar no puede deshacerse solo: el perfil guarda un id
- * por tipo, así que ponerse otro pisa el anterior, pero "ninguno" no es un
+ * por tipo, así que equipar otro pisa el anterior, pero "ninguno" no es un
  * artículo que se pueda elegir. Quien quiere jugar sin insignia no tenía forma
  * de decirlo.
  */

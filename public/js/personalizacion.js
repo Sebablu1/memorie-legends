@@ -427,7 +427,7 @@ async function llevarPack(boton) {
  *
  * `equipado` guarda el ID del artículo, no su imagen: `pintarAvatarCabecera`
  * lee el artículo del catálogo por su cuenta. Y con `null` repone la foto de
- * Google, que es lo que corresponde al sacarse el avatar.
+ * Google, que es lo que corresponde al desequipar el avatar.
  */
 function sincronizarCabecera() {
   pintarAvatarCabecera({
@@ -443,8 +443,8 @@ async function equipar(itemId, boton) {
     recordarVestuario();
     sincronizarCabecera();
     // «Equipado» y «Desequipado»: el par, con la misma palabra que dicen los
-    // dos botones. Antes eran «te lo pusiste» y «te lo sacaste», que son otras
-    // dos palabras para las mismas dos acciones, a un centímetro del botón.
+    // dos botones. Antes el aviso usaba otras dos palabras para las mismas dos
+    // acciones, a un centímetro del botón que las nombra.
     avisar("Listo, equipado.", "bien");
     dibujar();
   });
@@ -471,8 +471,8 @@ async function desequipar(tipo, boton) {
     recordarVestuario();
     sincronizarCabecera();
     // «Desequipado», la misma palabra que dice el botón que se acaba de tocar.
-    // Antes decía «te lo sacaste», y el botón «Desequipar»: dos palabras para
-    // la misma acción, a un centímetro de distancia.
+    // Antes el aviso y el botón usaban dos palabras distintas para la misma
+    // acción, a un centímetro de distancia.
     avisar("Listo, desequipado.", "bien");
     dibujar();
   });

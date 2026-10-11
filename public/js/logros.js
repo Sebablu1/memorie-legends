@@ -8,7 +8,7 @@
  * Porque una insignia no se compra. Ponerla entre los avatares con un precio
  * al lado le enseña al jugador que las seis se consiguen igual, y después hay
  * que desenseñárselo. Acá no hay botón de comprar: hay una condición, un
- * progreso y —cuando está cumplida— un botón para ponérsela.
+ * progreso y —cuando está cumplida— un botón para equiparla.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * LAS SEIS SE MUESTRAN SIEMPRE, GANADAS O NO

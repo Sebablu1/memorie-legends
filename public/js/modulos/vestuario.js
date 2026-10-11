@@ -98,7 +98,7 @@ export function vestuarioGuardado(uid) {
     const crudo = localStorage.getItem(CLAVE);
     if (!crudo) return null;
     const guardado = JSON.parse(crudo);
-    // De otra cuenta no sirve, y ponérselo sería peor que no tener nada.
+    // De otra cuenta no sirve, y equiparlo sería peor que no tener nada.
     return guardado?.uid === uid ? guardado : null;
   } catch {
     return null;

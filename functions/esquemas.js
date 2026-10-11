@@ -293,7 +293,7 @@ export const EsquemaPack = z.object({
   itemIds: z.array(idDeItem).min(1).max(3),
 });
 
-/** El tipo de artículo, para sacarse lo que se tenga puesto. */
+/** El tipo de artículo, para desequipar lo que se tenga puesto. */
 /**
  * El tipo, para listar el catálogo por categoría en el panel.
  *

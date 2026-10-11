@@ -265,7 +265,7 @@ export function crearTienda({
    * tienda sería decorativa — cualquiera se equiparía el dragón sin pagarlo.
    *
    * Equipar es idempotente sin esfuerzo: el perfil guarda UN id por tipo, así
-   * que ponerse otro avatar pisa el anterior. No hay nada que desequipar.
+   * que equipar otro avatar pisa el anterior. No hay nada que desequipar.
    */
   async function equipar(uid, itemId) {
     return db.runTransaction(async (tx) => {
@@ -310,11 +310,12 @@ export function crearTienda({
    * Se saca lo que tiene puesto, dejando el campo en `null`.
    *
    * Hace falta porque equipar no puede deshacerse solo: el perfil guarda un id
-   * por tipo, así que ponerse otro pisa el anterior, pero no ponerse NINGUNO
+   * por tipo, así que equipar otro pisa el anterior, pero no equipar NINGUNO
    * no tiene forma de expresarse cambiando de artículo. Quien quiere jugar sin
    * insignia no tiene un "artículo sin insignia" que elegir.
    *
-   * No comprueba posesión a propósito: sacarse algo que no se tiene no es un
+   * No comprueba posesión a propósito: desequipar algo que no se tiene no es
+   * un
    * privilegio, y si el perfil quedó apuntando a un artículo borrado, esto es
    * exactamente lo que lo destraba.
    */

@@ -5,9 +5,10 @@
  * POR QUÉ HACÍA FALTA
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Porque hasta ahora un avatar o un dorso se podían poner pero no SACAR. La
- * tienda equipa, y como el perfil guarda un id por tipo, ponerse otro pisa el
- * anterior — pero «ninguno» no es un artículo que se pueda elegir. Quien se
+ * Porque hasta ahora un avatar o un dorso se podían EQUIPAR pero no
+ * DESEQUIPAR. La tienda equipa, y como el perfil guarda un id por tipo,
+ * equipar otro pisa el anterior — pero «ninguno» no es un artículo que se
+ * pueda elegir. Quien se
  * probaba un avatar quedaba con uno puesto para siempre.
  *
  * Las insignias ya tenían las dos mitades en la vitrina de logros, que además
@@ -205,8 +206,8 @@ async function cambiar(boton, trabajo) {
 function sincronizarCabecera() {
   // `equipado` es el ID del artículo, no su imagen: `pintarAvatarCabecera` lee
   // el artículo del catálogo por su cuenta. Y cuando es `null` vuelve a poner
-  // la foto de Google, que es exactamente lo que tiene que pasar al sacarse el
-  // avatar.
+  // la foto de Google, que es exactamente lo que tiene que pasar al
+  // desequipar el avatar.
   pintarAvatarCabecera({
     equipado: equipado[TIPOS.AVATAR] ?? null,
     foto: fotoDeGoogle,

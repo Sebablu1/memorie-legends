@@ -6,7 +6,7 @@
  * ─────────────────────────────────────────────────────────────────────────
  *
  * La mitad que faltaba. La tienda equipaba avatares y dorsos, y como el perfil
- * guarda un id por tipo, ponerse otro pisa el anterior — pero «ninguno» no es
+ * guarda un id por tipo, equipar otro pisa el anterior — pero «ninguno» no es
  * un artículo que se pueda elegir de una rejilla. Quien se probaba un avatar
  * quedaba con uno puesto para siempre.
  *
