@@ -208,8 +208,8 @@
 }
 
 .figura-inv {
-  width: 68px;
-  height: 68px;
+  width: 104px;
+  height: 104px;
   /* Aire alrededor del dibujo.
 
      Desde C2 los avatares llenan su cuadro de punta a punta, y pegados al
@@ -224,11 +224,26 @@
   place-items: center;
   object-fit: contain;
   border-radius: 12px;
-  background: radial-gradient(circle at 50% 40%, rgba(212, 168, 67, 0.16), transparent 70%);
+  /* Un marco fino en vez del esfumado dorado que había.
+
+     El `radial-gradient` existía para despegar del panel un MEDALLÓN que
+     ocupaba un tercio de su cuadro. Con bustos que lo llenan, el dibujo tiene
+     masa propia y el esfumado sólo ensuciaba las esquinas: a este tamaño
+     queda tapado casi entero, así que iluminaba lo que ya no se ve.
+
+     El marco, en cambio, dice dónde termina la pieza. Va sólo acá y en la
+     tienda —las dos vistas en tarjeta— y NO en los cuatro contenedores
+     circulares: ésos ya tienen su propio aro, y un segundo borde sería un
+     marco adentro de otro, que es justo lo que el arte nuevo vino a sacar.
+
+     El `border-box` de abajo es lo que hace que el borde se coma de adentro y
+     la caja siga midiendo lo mismo: sin eso la rejilla se correría un píxel
+     por tarjeta. */
+  border: 1px solid rgba(212, 168, 67, 0.35);
 }
 
 .figura-inv.glifo {
-  font-size: 2.3rem;
+  font-size: 3.4rem;
   line-height: 1;
 }
 
@@ -290,9 +305,13 @@
     grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
     gap: 10px;
   }
+  /* 80 y no 104, por lo mismo que en la tienda: acá la tarjeta más angosta
+     mide 128 y deja 108 útiles. Y mantiene la proporción con la tienda —120 a
+     104 arriba, 92 a 80 acá— para que el mismo avatar no se vea de dos
+     tamaños muy distintos en dos pantallas que muestran lo mismo. */
   .figura-inv {
-    width: 56px;
-    height: 56px;
+    width: 80px;
+    height: 80px;
   }
 }
 

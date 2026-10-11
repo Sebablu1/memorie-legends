@@ -150,8 +150,8 @@
 /* La figura: una imagen o un glifo, con el mismo hueco para las dos.
    Sin alto fijo, una rejilla con emojis y PNG mezclados queda escalonada. */
 .figura-item {
-  width: 88px;
-  height: 88px;
+  width: 120px;
+  height: 120px;
   /* Aire alrededor del dibujo.
 
      Desde C2 los avatares llenan su cuadro de punta a punta, y pegados al
@@ -166,11 +166,26 @@
   place-items: center;
   object-fit: contain;
   border-radius: 14px;
-  background: radial-gradient(circle at 50% 40%, rgba(212, 168, 67, 0.16), transparent 70%);
+  /* Un marco fino en vez del esfumado dorado que había.
+
+     El `radial-gradient` existía para despegar del panel un MEDALLÓN que
+     ocupaba un tercio de su cuadro. Con bustos que lo llenan, el dibujo tiene
+     masa propia y el esfumado sólo ensuciaba las esquinas: a este tamaño
+     queda tapado casi entero, así que iluminaba lo que ya no se ve.
+
+     El marco, en cambio, dice dónde termina la pieza. Va sólo acá y en la
+     colección —las dos vistas en tarjeta— y NO en los cuatro contenedores
+     circulares: ésos ya tienen su propio aro, y un segundo borde sería un
+     marco adentro de otro, que es justo lo que el arte nuevo vino a sacar.
+
+     El `border-box` de abajo es lo que hace que el borde se coma de adentro y
+     la caja siga midiendo lo mismo: sin eso la rejilla se correría un píxel
+     por tarjeta. */
+  border: 1px solid rgba(212, 168, 67, 0.35);
 }
 
 .figura-item.glifo {
-  font-size: 3rem;
+  font-size: 4rem;
   line-height: 1;
 }
 
@@ -237,8 +252,10 @@
 
 @media (max-width: 480px) {
   .rejilla-tienda { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
-  .figura-item { width: 68px; height: 68px; }
-  .figura-item.glifo { font-size: 2.4rem; }
+  /* 92 y no 120: la tarjeta más angosta de esta rejilla mide 140 y deja 120
+     útiles, así que a 120 el dibujo tocaría los dos bordes. */
+  .figura-item { width: 92px; height: 92px; }
+  .figura-item.glifo { font-size: 3.2rem; }
   .item-tienda { padding: 14px 10px 12px; }
 }
 
