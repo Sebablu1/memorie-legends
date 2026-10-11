@@ -132,7 +132,7 @@ console.log("\n=== 1. La mirada se cierra y la ventana se abre solas ===");
   ok(Boolean(vInicial) && !vInicial.cerrada, "la ventana ya está abierta durante la mirada");
   ok(vInicial.abiertaEn === 1000000, "abierta en el reparto", vInicial.abiertaEn);
   ok(vInicial.duracionMs === MS_MIRADA_TOTAL + MS_VENTANA,
-     "y dura los 2 s de mirada más los 5 de descarte", vInicial.duracionMs);
+     "y dura los 7 s de mirada más los 2 de descarte", vInicial.duracionMs);
 
   // Golpear temprano no adelanta nada.
   const temprano = await red.avanzarPartida({ codigo: CODIGO });

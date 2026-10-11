@@ -560,9 +560,9 @@ console.log("\n=== 2. Modelo de la ventana ===");
 
   // D2: la ventana abre con la MIRADA, no con el descarte. Por eso su hora de
   // apertura es la del reparto —100000, antes de `cerrarMirada`— y su duración
-  // cubre los 7 s de mirar —5 para elegir, 2 para ver— más los 5 de descartar.
+  // cubre los 7 s de mirar —5 para elegir, 2 para ver— más los 2 de descartar.
   ok(ventana.duracionMs === MS_MIRADA_TOTAL + R.MS_VENTANA,
-     "y duración: 7 s de mirada + 5 s de descarte", ventana.duracionMs);
+     "y duración: 7 s de mirada + 2 s de descarte", ventana.duracionMs);
 
   // Y es UNA sola: `abrirVentana` después de la mirada devuelve la que ya
   // estaba, no una nueva. Si creara otra, el jugador que descartó durante la

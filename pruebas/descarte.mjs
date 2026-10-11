@@ -106,8 +106,9 @@ ok(reveladas.filter((r) => r.indiceJugador === 2).length === 1,
  *
  * Se mostraba en el error, y el castigo pegaba dos veces: una carta más Y
  * una carta conocida por los otros tres, que podían descartársela en cuanto
- * saliera su número. Equivocarse en cinco segundos de reflejos salía más caro
- * que cualquier otra cosa del juego.
+ * saliera su número. Equivocarse en los cinco segundos de reflejos de entonces
+ * —hoy son dos, y en red no hay reloj— salía más caro que cualquier otra
+ * cosa del juego.
  */
 const castigoDeC = s.jugadores[2].mano.at(-1);
 ok(Boolean(castigoDeC), "C recibió su carta de castigo", castigoDeC?.id);

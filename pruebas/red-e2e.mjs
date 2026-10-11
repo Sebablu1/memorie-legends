@@ -265,7 +265,7 @@ console.log("\n=== 5. La ventana de reflejos, de punta a punta ===");
    *
    * Y por eso llevan `MS_MIRADA_TOTAL` sumado, de los dos lados.
    *
-   * La ventana abre con la MIRADA y dura 7 s de mirar más 5 de descartar, así
+   * La ventana abre con la MIRADA y dura 7 s de mirar más 2 de descartar, así
    * que sus primeros 7 segundos son memorización: nadie puede descartar ahí.
    * Esto decía `reloj = 100275` y `declarado: 250` a secas, de cuando
    * `cerrarMirada` cerraba la mirada en el mismo instante del reparto y el
