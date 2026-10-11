@@ -276,33 +276,39 @@ un número seguido de «segundos».
 Las dos suites miden cosas distintas y ninguna incluye a la otra. Los números
 de referencia, al 11 de octubre de 2026:
 
-| Suite     | Comando               | Verde es                         |
-| --------- | --------------------- | -------------------------------- |
-| Node      | `npm test`            | **85 de 85** suites              |
-| Navegador | `npx playwright test` | **491 de 492**, en 65 archivos   |
+| Suite     | Comando               | Verde es                        |
+| --------- | --------------------- | ------------------------------- |
+| Node      | `npm test`            | **85 de 85** suites             |
+| Navegador | `npx playwright test` | **510 de 510**, en 68 archivos  |
 
-**El rojo que queda es uno solo y es fatiga**, no un bug:
-`poder-paso-a-paso.spec.js:117`, el cuadro del poder a 390x844. El error es un
-**503 del servidor local**, no una afirmación sobre el código. Aislado, ese
-archivo da 3 de 3.
+**La corrida del 11/10 por la tarde fue la primera entera en verde: 510 de
+510, cero rojos, 20,8 minutos.** No hay rojo conocido ni tolerado: cualquiera
+que aparezca es nuevo y hay que mirarlo.
 
-Que el número sea 492 y no 464 es por las pruebas que entraron el 10 y el 11:
-once de `ranking-movil.spec.js` (fase D) y diecisiete de
-`perfil-pestanas.spec.js` (A1 y A2a).
+El único rojo de la corrida anterior —`poder-paso-a-paso.spec.js:117`, el
+cuadro del poder a 390x844, con un 503 del servidor local— **no volvió a
+aparecer**. Era fatiga, como decía la hipótesis, y ahora está medido dos
+veces: una con la máquina ocupada y otra sin.
 
-- **Correr los 65 archivos, no un recorte.** La etapa 3c se validó con los
+De 464 a 510 en dos días, y las cuarenta y seis son de lo que se fue
+arreglando: once de `ranking-movil` (fase D), diecisiete de
+`perfil-pestanas` (A1 y A2a) y dieciocho de `cabecera` (C2).
+
+- **Correr los 68 archivos, no un recorte.** La etapa 3c se validó con los
   archivos de la mesa en red y bajó `MS_PASO_AUTOMATICO` de 20 s a 10 sin ver
   que `carteles.spec.js` —que es de entrenamiento— afirmaba los 20. Lo
   denunció en la corrida completa, dos días después.
-- **Son 20 minutos.** Medido el 11/10 con la máquina libre: 20 m 6 s para los
-  65 archivos. Conviene lanzarla en segundo plano y seguir trabajando, no
+- **Son 20 minutos.** Medido el 11/10 con la máquina libre: 20 m 6 s para 65
+  archivos a la mañana y 20,8 minutos para 68 a la tarde — o sea que cuarenta
+  y seis pruebas más casi no se notan, porque lo que tarda es levantar las
+  mesas y no correrlas. Conviene lanzarla en segundo plano y seguir trabajando, no
   saltearla — pero ojo con QUÉ se hace mientras: la corrida del 10/10 tardó
   34,5 minutos porque compartió la máquina con otras cosas, y esos catorce
   minutos de más vinieron con cuatro rojos que no eran bugs.
-- **Cerrado el 11/10: los cuatro rojos de la corrida anterior no
-  aparecieron.** La suite quedó en 491/492 con un solo rojo, y es fatiga. Eran
-  contención de recursos, como decía la hipótesis — ahora medido con la
-  máquina libre, no supuesto.
+- **Cerrado el 11/10: primero se fueron los cuatro rojos, después el quinto.**
+  La corrida de la mañana quedó en 491/492 con un solo rojo por fatiga; la de
+  la tarde, en 510/510. Los cinco eran contención de recursos, y eso ya no es
+  una hipótesis: está medido con la máquina ocupada y con la máquina libre.
 - **El «92 pasan, 2 fallan» que anduvo dando vueltas no reconcilia** con nada
   medible: los archivos que montan la mesa en red son 14 con 104 pruebas, y
   los dos rojos de §48 están en un spec de entrenamiento. Se descartó.
