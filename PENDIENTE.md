@@ -71,16 +71,40 @@ Buscar: `git log --oneline --all --grep="§N"`.
 - **Por qué igual conviene:** el trámite ante la URCDP sigue abierto (§19), y
   esa enumeración es justo lo que se mira.
 
-### §48 — `entregar-a-rival.spec.js` falla en dos pruebas
+### §48 — ~~`entregar-a-rival.spec.js` falla en dos pruebas~~ ARREGLADO
 
-- **Estado:** los tests de las líneas 211 y 233 fallan. La mesa dice «No era
-  esa: te comés una carta» donde debería decir «le acertaste».
-- **Preexistente:** se corrió en worktrees contra `6a386dd`, `01be9d6` y
-  `5b47670` y falla igual en los tres. No lo trajeron las etapas de reflejos.
-- **Es de ENTRENAMIENTO**, no de red: la escena no pasa por el servidor.
-- **Y `npm test` no lo ve.** Las suites de Node están verdes mientras estas dos
-  llevan rojas desde antes. Cuidado con leer «85/85» como «todo verde».
-- **Revisar aparte, en su propio commit.**
+Arreglado en `cf86b26`. Era un bug de la prueba, y el primer diagnóstico que se
+dio fue equivocado: las diez semillas de `SEMILLAS_ACIERTO` seguían siendo
+buenas —corrido el motor contra las diez, las diez reparten un 8 arriba del
+mazo y un 8 en la carta 0 del jugador 1—.
+
+**La causa:** la ventana de reflejos de la ronda abre con la mirada, ANTES de
+mi turno, y ahí juegan las tres IA. Si el jugador 1 descarta una carta anterior
+a la que la cuenta predice, su mano se corre y el modal ofrece otra carta: la
+semilla sigue siendo «de acierto» sobre el papel y el ataque es un error.
+Encima `mesaConOcho` devolvía la PRIMERA semilla que repartiera un 8, sin mirar
+el resultado, así que ni siquiera probaba las otras nueve.
+
+**La lección, que vale para cualquier prueba con semillas:** una lista de
+semillas calculada en Node predice el REPARTO, no la partida. Todo lo que pasa
+entre el reparto y la jugada —y en esta mesa pasa una ventana entera de
+reflejos con tres IA— queda afuera. El ayudante ahora usa el 8, lee lo que el 8
+muestra y lo compara con la muestra; si no es el resultado que la prueba
+necesita, prueba la semilla siguiente. Las listas pasaron de promesas a
+candidatas.
+
+**Y el `test.skip` se fue.** Si ninguna candidata sirve, esto se pone rojo con
+la cuenta de lo que vio cada semilla. Un salto silencioso no protege y no se
+nota, que es la peor de las tres salidas.
+
+**Una aserción corregida** (con OK explícito): decía que el 8 marca la carta
+vista «y sólo ésa», y eso el juego no lo garantiza. `recordarFallo` deja a la
+vista de todos la carta que alguien tocó por error, y conocerla da derecho a
+atacarla. Ahora se afirma la regla de verdad —la carta vista está marcada, la
+mano entera no—, que es el bug original. **El mismo punto flojo le queda a la
+línea de al lado**, `atacablesOtro` contra `[]`: si el que se equivoca en la
+ventana inicial es el OTRO rival, va a sobrar una marca. Se dejó como está; la
+corrección, si aparece, es la misma.
 
 ### §53 — ~~El poder 9 no hace su transición visual en red~~ ARREGLADO
 
@@ -211,6 +235,42 @@ entra, en vez de recortes en cada lugar donde se dibuja. Hay que mirar también
 qué hace el lobby y el ranking con un nombre largo — la mesa no es el único
 lado que lo muestra.
 
+### §62 — Extender `tiempos-en-prosa.mjs` a la portada y al tablero
+
+`tiempos-en-prosa.mjs` compara los tiempos escritos EN PALABRAS contra el
+motor, y lo hace con el mecanismo correcto: la página declara de qué habla cada
+mención —`data-tiempo="MS_DESCARTE"`— y el valor lo pone el motor. Además exige
+que no quede ninguna mención de «segundos» fuera de un elemento marcado, así
+que una frase nueva sin marca se denuncia sola.
+
+**Mira una sola página:** `como-se-juega.html`. Por eso §60 y §61 llegaron a
+producción. La portada decía «Cinco segundos de reflejos» en un `<h2>` y el
+tablero «5 segundos de descarte por reflejos» en su resumen, con `MS_DESCARTE`
+en 2 s desde `f5749a5` y la ventana de red sin reloj desde la etapa 3. Lo único
+que vigilaba esas dos páginas era la sección 5 de `reglamento.mjs`, con dos
+patrones puntuales —la mirada de 2 s y el límite de 150— que no se cruzan con
+esto.
+
+**El trabajo**, medido y no estimado:
+
+- Parametrizar la suite sobre una lista de páginas, en vez de la constante
+  `PAGINA`.
+- Marcar **3 menciones**: `dashboard.html:381` («cinco segundos para elegir
+  cuál y dos para verla» → `MS_ELEGIR_MIRADA,MS_MIRAR`), `dashboard.html:382`
+  (el descarte → `MS_DESCARTE`) y lo que quede en `index.html` sobre reflejos,
+  que hoy ya no lleva número.
+- **Y resolver un choque real:** el tablero escribe «2 segundos», con dígito, y
+  esta suite compara contra la palabra («dos»). Su propio encabezado dice que
+  los dígitos no los cubre. Hay que decidir: o la página pasa a «dos segundos»,
+  o la suite aprende a aceptar las dos formas. El reglamento usa dígitos en el
+  mismo párrafo, así que la decisión es de estilo y vale para los dos lados.
+
+**Lo que NO hace falta**, para que nadie lo busque: las otras dos menciones de
+«segundo» de esas páginas no molestan. La de `index.html` («llega un segundo
+más tarde») vive dentro de un comentario HTML, y el chequeo de cobertura
+recorta los comentarios; la del tablero es «el primero y el segundo», que no es
+un número seguido de «segundos».
+
 ### §50 — La línea de base de las pruebas, y cómo leerla
 
 Las dos suites miden cosas distintas y ninguna incluye a la otra. Los números
@@ -219,7 +279,12 @@ de referencia, al 10 de octubre de 2026:
 | Suite | Comando | Verde es |
 |---|---|---|
 | Node | `npm test` | **85 de 85** |
-| Navegador | `npx playwright test` | **460 pasan, 2 fallan** (§48) |
+| Navegador | `npx playwright test` | **464 pasan, 0 fallan** |
+
+Los dos rojos históricos de §48 se arreglaron el 10/10/2026 (`cf86b26`): las
+464 son las 462 que pasaban más esas dos, medidas en su propio archivo (3 de 3).
+La corrida completa que lo confirma quedó lanzada y sin terminar — el primero
+que la corra, confirma el número acá.
 
 - **Correr los 65 archivos, no un recorte.** La etapa 3c se validó con los
   archivos de la mesa en red y bajó `MS_PASO_AUTOMATICO` de 20 s a 10 sin ver
@@ -303,11 +368,23 @@ porque su arreglo deshizo una decisión anterior y el camino importa.
 
 ### §45 — PITR y protección de borrado en producción
 
-- **Estado:** la base `southamerica` tiene `POINT_IN_TIME_RECOVERY_DISABLED` y
-  `DELETE_PROTECTION_DISABLED`. La retención de versiones es de **una hora**.
-- **Qué significa hoy:** no hay respaldo de la base viva. El único export del
-  bucket `memorie-legends-backup` es del 5/10 y es de la base `(default)`,
-  tomado durante la mudanza.
+**HECHO.** Lo configuró el usuario en la consola. Verificado el 10/10/2026
+contra la base de producción, no de memoria:
+
+    gcloud firestore databases describe --database=southamerica \
+      --project=memorie-legends
+
+- `POINT_IN_TIME_RECOVERY_ENABLED` y `DELETE_PROTECTION_ENABLED`.
+- Retención de versiones: **604800 s**, o sea 7 días. Era una hora.
+- `earliestVersionTime`: 2026-10-09T03:35Z. Hasta ahí llega la recuperación.
+- **Y hay respaldo automático diario**, con retención de 8467200 s (98 días),
+  creado el 9/10. El primero ya está `READY`, del 10/10 a las 03:45Z.
+
+Queda sólo una cosa suelta, y es de limpieza: el export viejo del bucket
+`memorie-legends-backup` es del 5/10 y es de la base `(default)`, tomado
+durante la mudanza. No sirve para restaurar nada de lo que hay hoy, así que
+conviene no confundirlo con un respaldo.
+
 - **Antes de cobrar:** el libro mayor de Leyendas vive en `movimientos`.
 
 ### §10 — Velocidad en red (Fase 3, 4, 0b)
