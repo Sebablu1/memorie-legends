@@ -24,6 +24,10 @@
          donde arreglar el mismo color. Quien llega acá desde el ranking ya la
          tiene en la memoria del navegador. -->
     <link rel="stylesheet" href="css/tablas.css" />
+    <!-- La colección y la vitrina de logros: `.item-inv`, `.figura-inv`,
+         `.rejilla-logros`, `.tira-sellos`. Es la misma hoja que carga el
+         tablero, de donde estos dos bloques se mudaron. -->
+    <link rel="stylesheet" href="css/logros.css" />
     <link rel="stylesheet" href="css/perfil.css" />
     <link rel="stylesheet" href="css/pie.css" />
     <meta name="description" content="Tu perfil de Memorie Legends: apodo, avatar, insignias, tu colección, tus logros, tus números y la seguridad de tu cuenta, todo en un solo lugar." />
@@ -129,33 +133,63 @@
         </p>
       </section>
 
+      <!-- Mi colección: lo comprado, con equipar y desequipar.
+
+           `montarInventario` la destapa sólo si el jugador tiene algo. En el
+           tablero, donde vivía antes, eso alcanzaba: la sección no aparecía y
+           no se notaba. Acá es una pestaña entera, y una pestaña en blanco se
+           lee como rota — por eso `#sinColeccion`, que `perfil.js` deja a la
+           vista cuando no hay nada que mostrar.
+
+           Las insignias NO están acá a propósito: viven en la pestaña de al
+           lado, que además muestra las que faltan y cuánto falta para cada
+           una. Dos listas de lo mismo no le sirven a nadie. -->
       <section class="panel panel-perfil" id="panelColeccion" role="tabpanel"
                aria-labelledby="tabColeccion" tabindex="0" hidden>
-        <h2>Colección</h2>
-        <p class="aun-no">
-          Todo lo que tenés, para ponértelo y sacártelo. Hoy vive en
-          <a href="dashboard.html">Inicio</a>, abajo de todo, con el nombre
-          «Mi colección».
+        <section class="mi-inventario" id="miInventario" hidden>
+          <h2>🎒 Mi colección</h2>
+          <p class="aviso-tienda" id="avisoInventario" role="status" aria-live="polite"></p>
+          <div id="rejillaInventario"></div>
+        </section>
+        <!-- No dice «todavía no tenés nada», y es a propósito: este cartel
+             también aparece si el catálogo no contestó. `montarInventario`
+             trata los dos casos igual —se va sin destapar la sección— y
+             distinguirlos obligaría a que devuelva por qué, que es un cambio
+             en un módulo que esta etapa no viene a tocar. Anotado como §63.
+
+             Así redactado es cierto en los dos casos, y en los dos dice lo
+             mismo que hay que hacer. -->
+        <p class="aun-no" id="sinColeccion" hidden>
+          Acá va a estar todo lo que tengas, para ponértelo y sacártelo. Los
+          avatares, los dorsos, los paños y los marcos se consiguen en
+          <a href="tienda.html">la tienda</a>.
         </p>
       </section>
 
+      <!-- La vitrina de logros. Las insignias NO se compran: las otorga el
+           servidor al terminar una partida o al cerrar un ranking, así que acá
+           no hay ningún botón de comprar — sólo el de equipar la que ya se
+           ganó. La condición de cada una está a la vista, cumplida o no,
+           porque una insignia que no se sabe cómo se gana no motiva nada. -->
       <section class="panel panel-perfil" id="panelLogros" role="tabpanel"
                aria-labelledby="tabLogros" tabindex="0" hidden>
-        <h2>Logros</h2>
-        <p class="aun-no">
-          Las insignias que ganaste y las que te faltan, con lo que hace falta
-          para cada una. Hoy viven en <a href="dashboard.html">Inicio</a>, con
-          el nombre «Tus logros».
-        </p>
+        <section class="vitrina-logros" id="vitrinaLogros" hidden>
+          <h2>Tus logros</h2>
+          <p class="aviso-tienda" id="avisoLogros" role="status" aria-live="polite"></p>
+          <!-- Los sellos van ARRIBA de las insignias y sin botón: no se
+               equipan ni se desequipan. Nace escondido porque casi nadie tiene
+               uno, y una fila vacía se lee como que algo no cargó. -->
+          <div class="tira-sellos" id="tiraSellos" hidden></div>
+          <div class="rejilla-logros" id="rejillaLogros"></div>
+        </section>
       </section>
 
       <section class="panel panel-perfil" id="panelNumeros" role="tabpanel"
                aria-labelledby="tabNumeros" tabindex="0" hidden>
-        <h2>Números</h2>
-        <p class="aun-no">
-          Partidas jugadas, victorias y Leyendas. Hoy están en
-          <a href="dashboard.html">Inicio</a>, con el nombre «Tus números».
-        </p>
+        <h2>Tus números</h2>
+        <div class="fila-dato"><span>Leyendas</span><b id="statSaldo">—</b></div>
+        <div class="fila-dato"><span>Partidas jugadas</span><b id="statPartidas">—</b></div>
+        <div class="fila-dato"><span>Victorias</span><b id="statVictorias">—</b></div>
       </section>
 
       <section class="panel panel-perfil" id="panelCuenta" role="tabpanel"

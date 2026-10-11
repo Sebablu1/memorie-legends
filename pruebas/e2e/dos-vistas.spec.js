@@ -166,7 +166,7 @@ test("lo que me pongo en la tienda aparece puesto en Mi colección", async ({ pa
   await enLaTienda(page, "El Dragón").getByRole("button", { name: "Equipar" }).click();
   await expect(enLaTienda(page, "El Dragón").getByRole("button", { name: "Desequipar" })).toBeVisible();
 
-  await page.goto("/dashboard.html");
+  await page.goto("/perfil.html#coleccion");
   await page.waitForSelector("#miInventario .item-inv");
 
   await expect(enMiColeccion(page, "El Dragón")).toContainText("Equipado");
@@ -182,7 +182,7 @@ test("y lo que me saco en Mi colección aparece sacado en la tienda", async ({ p
   await enLaTienda(page, "El Dragón").getByRole("button", { name: "Equipar" }).click();
   await expect(enLaTienda(page, "El Dragón").getByRole("button", { name: "Desequipar" })).toBeVisible();
 
-  await page.goto("/dashboard.html");
+  await page.goto("/perfil.html#coleccion");
   await page.waitForSelector("#miInventario .item-inv");
   await enMiColeccion(page, "El Dragón").getByRole("button", { name: "Desequipar" }).click();
   await expect(enMiColeccion(page, "El Dragón")).toContainText("Sin equipar");
@@ -214,7 +214,7 @@ test("los dos dorsos son artículos distintos: ponerse uno no toca el otro", asy
   await expect(enLaTienda(page, "Mazo Esmeralda").getByRole("button", { name: "Desequipar" })).toBeVisible();
 
   // Y el de las cartas sigue puesto: son dos campos del perfil.
-  await page.goto("/dashboard.html");
+  await page.goto("/perfil.html#coleccion");
   await page.waitForSelector("#miInventario .item-inv");
   await expect(enMiColeccion(page, "Dorso Rojo")).toContainText("Equipado");
   await expect(enMiColeccion(page, "Mazo Esmeralda")).toContainText("Equipado");

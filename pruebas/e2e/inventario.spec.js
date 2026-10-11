@@ -152,7 +152,10 @@ async function abrirPanel(page, { catalogo = CATALOGO } = {}) {
   await page.route("**/js/sesion.js", (r) => r.fulfill(js(sesionFalsa)));
   await page.route("**/js/servidor.js", (r) => r.fulfill(js(servidorFalso)));
 
-  await page.goto("/dashboard.html");
+  // Con el hash: la colección vive en una pestaña, y `waitForSelector` espera
+  // a que el elemento sea VISIBLE. Entrando por `/perfil.html` a secas, el
+  // panel abre en «Perfil» y nada de esto se ve nunca.
+  await page.goto("/perfil.html#coleccion");
   await page.waitForSelector("#miInventario .item-inv", { timeout: 15_000 });
 }
 

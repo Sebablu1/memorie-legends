@@ -43,6 +43,8 @@
  */
 
 import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
+import { montarInventario } from "./inventario.js";
+import { montarLogros } from "./logros.js";
 
 /**
  * Las cinco, y el orden es el de la pantalla.
@@ -145,4 +147,58 @@ window.addEventListener("hashchange", () => mostrar(seccionPedida()));
 const sesion = await exigirSesion();
 if (sesion) {
   mostrarSaldo(sesion.perfil.saldo);
+
+  // Los tres números salen del perfil que ya se leyó. No hay viaje nuevo.
+  $("statSaldo").textContent = sesion.perfil.saldo.toLocaleString("es-UY");
+  $("statPartidas").textContent = sesion.perfil.partidas;
+  $("statVictorias").textContent = sesion.perfil.victorias;
+
+  /**
+   * Las dos secciones se montan AL ENTRAR, no al tocar su pestaña.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * POR QUÉ NO PEREZOSO, QUE ERA LO ESPERABLE
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Montar al tocar ahorra dos lecturas a quien entra sólo a mirar sus
+   * números. El precio es que la pestaña se abre VACÍA y se llena un
+   * instante después, cuando el catálogo vuelve del servidor. Es la misma
+   * pantalla dibujada que no responde contra la que este archivo ya decide
+   * más abajo, con la sesión: una espera sin aviso en el momento en que el
+   * jugador acaba de pedir algo se siente peor que la misma espera hecha
+   * antes, mientras todavía está leyendo la primera pestaña.
+   *
+   * Y el costo no es nuevo: el tablero hacía estas dos lecturas en CADA
+   * visita, y el tablero se abre mucho más que el perfil. Esto no agrega
+   * tráfico, lo mueve a una pantalla que se abre menos.
+   *
+   * Hay además una razón que decide sola: `#sinColeccion` depende de si el
+   * inventario encontró algo. Perezoso, ese cartel aparecería recién al
+   * tocar la pestaña, y por un rato la pestaña no diría ni que está vacía.
+   *
+   * Las dos arrancan JUNTAS —`montarLogros` sin esperar a la otra— porque
+   * son dos viajes independientes y encadenarlos duplicaría la espera.
+   */
+  const coleccion = montarInventario({
+    foto: sesion.usuario.photoURL,
+    uid: sesion.usuario.uid,
+  });
+  montarLogros();
+
+  /*
+   * El cartel de la colección vacía.
+   *
+   * `montarInventario` destapa `#miInventario` sólo si hay algo; si no, se
+   * va sin tocar nada y la sección se queda escondida. En el tablero eso
+   * alcanzaba —la sección no aparecía entre otras siete y nadie la
+   * extrañaba—, pero acá es una pestaña entera: sin este cartel, «Colección»
+   * se abre en blanco y se lee como una pantalla rota.
+   *
+   * Se mira el `hidden` que dejó el montaje en vez de volver a preguntar qué
+   * tiene el jugador: la respuesta ya está en el DOM y preguntarla de nuevo
+   * sería un segundo viaje para saber lo mismo.
+   */
+  await coleccion;
+  const vacia = $("miInventario")?.hidden !== false;
+  if ($("sinColeccion")) $("sinColeccion").hidden = !vacia;
 }

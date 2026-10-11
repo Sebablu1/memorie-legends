@@ -49,7 +49,8 @@ const SESION = `
   export const CAMPO_SALDO = "credits";
   export async function exigirSesion() {
     return { usuario: { uid: "ana", email: "a@b.c", photoURL: null },
-             perfil: { uid: "ana", nombre: "Ana", saldo: 777 } };
+             perfil: { uid: "ana", nombre: "Ana", saldo: 777,
+                       partidas: 42, victorias: 7 } };
   }
   export function mostrarSaldo(saldo) {
     const nodo = document.getElementById("saldoValor");
@@ -236,7 +237,37 @@ test("cambiar el hash desde afuera mueve la pestaña", async ({ page }) => {
 });
 
 // =====================================================================
-// 4. La puerta
+// 4. La colección vacía
+// =====================================================================
+
+test("sin colección que mostrar, la pestaña lo dice en vez de quedar en blanco", async ({ page }) => {
+  /*
+   * `montarInventario` destapa `#miInventario` sólo si el jugador tiene algo,
+   * y se va sin tocar nada si no —o si el catálogo no contesta, que acá es lo
+   * que pasa: este archivo no dobla `firebase.js` a propósito—.
+   *
+   * En el tablero, de donde esto se mudó, con eso alcanzaba: la sección no
+   * aparecía entre otras siete y nadie la extrañaba. Acá es una pestaña
+   * entera, y una pestaña en blanco se lee como una pantalla rota.
+   */
+  await abrirPerfil(page, { hash: "#coleccion" });
+
+  await expect(page.locator("#sinColeccion")).toBeVisible();
+  await expect(page.locator("#miInventario")).toBeHidden();
+  await expect(page.locator("#sinColeccion")).toContainText("la tienda");
+});
+
+test("los números salen del perfil, sin pedir nada de nuevo", async ({ page }) => {
+  await abrirPerfil(page, { hash: "#numeros" });
+
+  // Son los del doble de `sesion.js`, que es el único que contesta acá.
+  await expect(page.locator("#statSaldo")).toHaveText("777");
+  await expect(page.locator("#statPartidas")).toHaveText("42");
+  await expect(page.locator("#statVictorias")).toHaveText("7");
+});
+
+// =====================================================================
+// 5. La puerta
 // =====================================================================
 
 test("sin sesión no se ve el perfil: manda al login", async ({ page }) => {

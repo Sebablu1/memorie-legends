@@ -32,8 +32,6 @@ import {
   armarRivales, NIVELES, limiteDelModo, MODOS_PARTIDA, opcionesDeDuracion,
 } from "./rivales.js";
 import { pintarAvatarCabecera, pintarInsignia } from "./equipado.js";
-import { montarLogros } from "./logros.js";
-import { montarInventario } from "./inventario.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -123,20 +121,11 @@ if (sesion) {
     const enlace = $("enlaceAdmin");
     if (enlace) enlace.hidden = false;
   }
-  $("statSaldo").textContent = perfil.saldo.toLocaleString("es-UY");
-  $("statPartidas").textContent = perfil.partidas;
-  $("statVictorias").textContent = perfil.victorias;
-
-  // Sin `await`: la vitrina hace dos viajes al servidor y el panel no tiene
-  // por qué esperarlos. Se muestra sola cuando llega, y si no llega no se
-  // muestra — pero nadie se queda sin poder entrar a jugar por eso.
-  // La foto de Google viaja para que, al sacarse el avatar, la cabecera
-  // vuelva a mostrarla sin recargar la página.
-  // El uid viaja para poder recordar en ESTE navegador lo que el jugador se
-  // pone, y que la mesa abra ya vestida. Ver `modulos/vestuario.js`.
-  montarInventario({ foto: usuario.photoURL, uid: usuario.uid });
-  montarLogros();
-
+  // Los números, la colección y la vitrina de logros se mudaron a
+  // `perfil.html` (A2a). Las dos llamadas de montaje se van de acá aunque
+  // fueran inofensivas —`montarInventario` y `montarLogros` arrancan con un
+  // `if (!seccion) return`— porque una llamada que no hace nada es una
+  // mentira que el próximo lector tiene que ir a desarmar.
   arrancarSalas();
 }
 
