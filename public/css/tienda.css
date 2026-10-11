@@ -351,3 +351,106 @@
   min-height: 44px;
   font-size: 0.76rem;
 }
+
+/* ═══════════════════════════════════════════ el avatar, en grande
+
+   La ventana la arma `modulos/zoom-avatar.js`. El estilo vive acá y no en
+   `app.css` porque hoy sólo la abre la tienda; el día que la abra una segunda
+   pantalla, esto se muda con ella. */
+
+/* El botón que envuelve la figura.
+
+   Tiene que no verse: lo que se toca es el dibujo, y un botón con su relleno
+   y su borde propios cambiaría el tamaño de la tarjeta. Pero SÍ se ve cuando
+   llega el foco por teclado, que es lo único que delata que es tocable para
+   quien no usa el mouse. */
+.lupa-avatar {
+  padding: 0;
+  border: 0;
+  background: none;
+  line-height: 0;
+  cursor: zoom-in;
+  border-radius: 14px;
+}
+
+.lupa-avatar:focus-visible {
+  outline: 2px solid var(--oro);
+  outline-offset: 3px;
+}
+
+/* El velo.
+
+   `backdrop-filter` desenfoca lo que hay detrás en vez de taparlo con un negro
+   plano: la tienda sigue reconociéndose, y la imagen de arriba se separa sola
+   sin tener que oscurecer tanto. El `background` que lo acompaña es apenas un
+   velo; el que hace el trabajo es el desenfoque. */
+.zoom-avatar {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Sin desenfoque, un fondo oscuro sólido.
+
+   Safari viejo y Firefox con la opción apagada no lo soportan, y ahí el velo
+   de 0,45 deja la tienda legible DETRÁS de la imagen, que es exactamente lo
+   que el desenfoque venía a evitar. */
+@supports not ((backdrop-filter: blur(8px)) or (-webkit-backdrop-filter: blur(8px))) {
+  .zoom-avatar { background: rgba(0, 0, 0, 0.7); }
+}
+
+.zoom-caja {
+  position: relative;
+  /* 320 es lo que mide el archivo. Más sería agrandar píxeles. */
+  width: min(320px, 100%);
+  animation: entrarZoom 0.15s ease-out;
+}
+
+.zoom-caja:focus { outline: none; }
+
+.zoom-caja img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+@keyframes entrarZoom {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Quien pidió menos movimiento no recibe el salto de escala. La ventana
+   aparece igual: lo que se saca es el camino, no el destino. */
+@media (prefers-reduced-motion: reduce) {
+  .zoom-caja { animation: none; }
+}
+
+/* La cruz, chica y fuera de la imagen para no taparle una esquina. */
+.cerrar-zoom {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--borde);
+  background: rgba(12, 12, 14, 0.92);
+  color: var(--texto-tenue);
+  cursor: pointer;
+}
+
+.cerrar-zoom:hover { color: var(--oro-claro); border-color: var(--oro); }
+
+.cerrar-zoom:focus-visible {
+  outline: 2px solid var(--oro);
+  outline-offset: 2px;
+}

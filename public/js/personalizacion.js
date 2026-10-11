@@ -32,6 +32,7 @@ import { guardarVestuario, rutasDeLoEquipado } from "./modulos/vestuario.js";
 import { mostrarSaldo } from "./sesion.js";
 import { pintarAvatarCabecera } from "./equipado.js";
 import { avatarUrl } from "./modulos/imagenes.js";
+import { abrirZoom } from "./modulos/zoom-avatar.js";
 import {
   comprarItem,
   comprarPack,
@@ -181,10 +182,28 @@ const precioTexto = (n) => (n === 0 ? "Gratis" : `${n.toLocaleString("es-UY")} L
  * petición a una URL que no existe.
  */
 function dibujarImagen(item) {
-  if (imagenEsArchivo(item.imagen)) {
-    return `<img class="figura-item" src="${escapar(avatarUrl(item.imagen))}" alt="" loading="lazy" />`;
+  if (!imagenEsArchivo(item.imagen)) {
+    return `<span class="figura-item glifo" aria-hidden="true">${escapar(item.imagen ?? "")}</span>`;
   }
-  return `<span class="figura-item glifo" aria-hidden="true">${escapar(item.imagen ?? "")}</span>`;
+
+  const figura = `<img class="figura-item" src="${escapar(avatarUrl(item.imagen))}" alt="" loading="lazy" />`;
+
+  /*
+   * Los avatares se pueden abrir en grande; los dorsos y los paños, no.
+   *
+   * No es que los otros no merezcan verse: es que a 120 px un avatar es una
+   * CARA, y una cara chica se mira de cerca. Un dorso o un paño son una
+   * textura, y una textura se entiende igual en miniatura. El día que alguno
+   * pida lo mismo, la condición es esta línea.
+   *
+   * Y es un `<button>` y no un `<img>` con un escuchador encima: lo que se
+   * puede tocar tiene que poder recibir el foco y responder a la barra
+   * espaciadora, y eso lo da el elemento, no una clase.
+   */
+  if (item.tipo !== TIPOS.AVATAR) return figura;
+
+  return `<button class="lupa-avatar" type="button" data-zoom="${escapar(avatarUrl(item.imagen))}"
+            aria-label="Ver ${escapar(item.nombre ?? item.id)} en grande">${figura}</button>`;
 }
 
 /**
@@ -545,7 +564,11 @@ export async function montarPersonalizacion({ saldoInicial = 0, uid = null, foto
   caja.addEventListener("click", (evento) => {
     const boton = evento.target.closest("button");
     if (!boton) return;
-    if (boton.dataset.comprar) comprar(boton.dataset.comprar, boton);
+    // El zoom va PRIMERO porque es el único que no toca el servidor: si algún
+    // día una tarjeta tuviera la lupa adentro de otro botón, lo que gana es
+    // mirar y no comprar.
+    if (boton.dataset.zoom) abrirZoom(boton.dataset.zoom, { etiqueta: boton.getAttribute("aria-label") });
+    else if (boton.dataset.comprar) comprar(boton.dataset.comprar, boton);
     else if (boton.dataset.equipar) equipar(boton.dataset.equipar, boton);
     else if (boton.dataset.sacar) desequipar(boton.dataset.sacar, boton);
     else if (boton.dataset.pack) alternarEnPack(boton.dataset.pack);
