@@ -98,6 +98,7 @@ export const SUITES = [
   // tenga dicho qué hacer con su imagen.
   "imagenes-del-catalogo.mjs",
   "imagenes-de-catalogo.mjs",
+  "version-de-imagenes.mjs",
   "barrido.mjs",
   "revancha.mjs",
   "logros-y-packs.mjs",

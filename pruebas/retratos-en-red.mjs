@@ -349,13 +349,14 @@ console.log("\n=== Y los cuatro navegadores ven lo mismo ===");
 console.log("\n=== La mesa prefiere lo que trae la vista ===");
 {
   const mesa = readFileSync(new URL("../public/js/mesa.js", import.meta.url), "utf8");
-  // Desde el `?v=` de los avatares, lo de adentro va envuelto en `avatarUrl`.
+  // Desde el `?v=` de los avatares, lo de adentro va envuelto en `imagenUrl`
+  // —se llamaba `avatarUrl` hasta que la versión se unificó para todo `/img/`—.
   // Se exige el envoltorio ADEMÁS de la caída, no en vez de ella: `caraDe` es
   // el embudo por donde pasan los dos lugares que dibujan una cara en la mesa
   // —el asiento y el marcador—, así que una versión que no se ponga acá no se
   // pone en ninguno de los dos.
   ok(
-    /const caraDe = \(jugador, i\) =>\s*\n\s*avatarUrl\(esRutaDelSitio\(jugador\?\.retrato\) \? jugador\.retrato : retratoDe\(i\)\)/.test(mesa),
+    /const caraDe = \(jugador, i\) =>\s*\n\s*imagenUrl\(esRutaDelSitio\(jugador\?\.retrato\) \? jugador\.retrato : retratoDe\(i\)\)/.test(mesa),
     "la cara sale de la vista, cae a la de la casa, y lleva su versión",
   );
   ok(

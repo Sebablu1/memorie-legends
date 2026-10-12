@@ -29,7 +29,7 @@
 
 import { test, expect } from "@playwright/test";
 import { JUEGO_POR_DEFECTO } from "../../public/js/reglas/juegos.js";
-import { avatarUrl } from "../../public/js/modulos/imagenes.js";
+import { imagenUrl } from "../../public/js/modulos/imagenes.js";
 
 const js = (body) => ({ status: 200, contentType: "text/javascript; charset=utf-8", body });
 
@@ -171,11 +171,11 @@ test("la cara, el marco y el título salen de la fila", async ({ page }) => {
   ]);
 
   // Con la versión, que es la que evita que el navegador siga mostrando el
-  // avatar viejo un mes después de reemplazarlo. Se pide a `avatarUrl` en vez
+  // avatar viejo un mes después de reemplazarlo. Se pide a `imagenUrl` en vez
   // de escribir «?v=2» acá: así la prueba sigue al número cuando suba, y no
   // hay que acordarse de dos lugares.
   await expect(filaN(page, 0).locator(".avatar-inicial img"))
-    .toHaveAttribute("src", avatarUrl(CARA));
+    .toHaveAttribute("src", imagenUrl(CARA));
   await expect(filaN(page, 0).locator(".marco-ranking")).toHaveAttribute("src", MARCO);
   await expect(filaN(page, 0).locator(".titulo-jugador")).toHaveText("Leyenda");
 

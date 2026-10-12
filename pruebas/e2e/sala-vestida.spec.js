@@ -25,7 +25,7 @@
 import { test, expect } from "@playwright/test";
 // La versión que la sala le pone al avatar al dibujarlo. Se importa en vez
 // de escribir «?v=2» a mano: así esto sigue al número cuando suba.
-import { avatarUrl } from "../../public/js/modulos/imagenes.js";
+import { imagenUrl } from "../../public/js/modulos/imagenes.js";
 
 const js = (body) => ({ status: 200, contentType: "text/javascript; charset=utf-8", body });
 
@@ -163,7 +163,7 @@ test("el avatar comprado se ve, y quien no tiene sigue con su inicial", async ({
     SIN_NADA,
   ]));
 
-  await expect(fila(page, 0).locator(".avatar-inicial img")).toHaveAttribute("src", avatarUrl(CARA));
+  await expect(fila(page, 0).locator(".avatar-inicial img")).toHaveAttribute("src", imagenUrl(CARA));
 
   // Beto no compró nada: le queda la inicial de siempre.
   await expect(fila(page, 1).locator(".avatar-inicial")).toHaveText("B");
@@ -309,7 +309,7 @@ test("una sala del formato viejo sigue dibujándose", async ({ page }) => {
 
   const errores = await abrirSala(page, sala);
 
-  await expect(fila(page, 0).locator(".avatar-inicial img")).toHaveAttribute("src", avatarUrl(CARA));
+  await expect(fila(page, 0).locator(".avatar-inicial img")).toHaveAttribute("src", imagenUrl(CARA));
   await expect(page.locator(".marco-sala")).toHaveCount(0);
   await expect(page.locator(".titulo-jugador")).toHaveCount(0);
   expect(errores, `la sala tiró errores: ${errores.join(" | ")}`).toEqual([]);

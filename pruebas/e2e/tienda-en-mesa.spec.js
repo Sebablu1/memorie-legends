@@ -73,8 +73,9 @@ async function abrirVestida(page, equipo = COMPRADO) {
  * El dorso de un asiento en la misma forma que devuelve `dorsosDe`: sin la
  * versión.
  *
- * `dorsoDeAsiento` entrega la dirección completa —`…webp?v=1`, para que un
- * dibujo nuevo con el mismo nombre no se quede tapado por la caché de un mes—
+ * `dorsoDeAsiento` entrega la dirección completa —con el `?v=` de
+ * `VERSION_IMAGENES`, para que un dibujo nuevo con el mismo nombre no se quede
+ * tapado por la caché de un mes—
  * y `dorsosDe` devuelve `pathname`, que no la lleva. Comparar la función
  * contra lo que dibuja la mesa sigue siendo lo correcto; lo que hay que
  * emparejar es la forma.

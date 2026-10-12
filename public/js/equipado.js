@@ -32,7 +32,7 @@
 
 import { db, doc, getDoc } from "./firebase.js";
 import { imagenEsArchivo, COLECCION_CATALOGO } from "./reglas/catalogo.js";
-import { avatarUrl } from "./modulos/imagenes.js";
+import { imagenUrl } from "./modulos/imagenes.js";
 
 /** Un artículo del catálogo, o null si no está o si la lectura falla. */
 async function leerItem(id) {
@@ -79,7 +79,7 @@ export async function pintarAvatarCabecera({ equipado, foto, id = "avatar" }) {
   if (!item) return;
 
   if (imagenEsArchivo(item.imagen)) {
-    if (nodo.tagName === "IMG") nodo.src = avatarUrl(item.imagen);
+    if (nodo.tagName === "IMG") nodo.src = imagenUrl(item.imagen);
     else nodo.replaceWith(crearImagen(nodo, item));
     return;
   }
@@ -139,7 +139,7 @@ export async function pintarInsignia({ equipado, dentroDe = "saludo" }) {
 
 function crearImagen(viejo, item) {
   const img = document.createElement("img");
-  img.src = avatarUrl(item.imagen);
+  img.src = imagenUrl(item.imagen);
   img.alt = "";
   img.id = viejo.id;
   img.className = viejo.className;

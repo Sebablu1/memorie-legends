@@ -31,7 +31,7 @@ import { escapar } from "./modulos/texto.js";
 import { guardarVestuario, rutasDeLoEquipado } from "./modulos/vestuario.js";
 import { mostrarSaldo } from "./sesion.js";
 import { pintarAvatarCabecera } from "./equipado.js";
-import { avatarUrl } from "./modulos/imagenes.js";
+import { imagenUrl } from "./modulos/imagenes.js";
 import { abrirZoom } from "./modulos/zoom-avatar.js";
 import {
   comprarItem,
@@ -186,7 +186,7 @@ function dibujarImagen(item) {
     return `<span class="figura-item glifo" aria-hidden="true">${escapar(item.imagen ?? "")}</span>`;
   }
 
-  const figura = `<img class="figura-item" src="${escapar(avatarUrl(item.imagen))}" alt="" loading="lazy" />`;
+  const figura = `<img class="figura-item" src="${escapar(imagenUrl(item.imagen))}" alt="" loading="lazy" />`;
 
   /*
    * Los avatares se pueden abrir en grande; los dorsos y los paños, no.
@@ -202,7 +202,7 @@ function dibujarImagen(item) {
    */
   if (item.tipo !== TIPOS.AVATAR) return figura;
 
-  return `<button class="lupa-avatar" type="button" data-zoom="${escapar(avatarUrl(item.imagen))}"
+  return `<button class="lupa-avatar" type="button" data-zoom="${escapar(imagenUrl(item.imagen))}"
             aria-label="Ver ${escapar(item.nombre ?? item.id)} en grande">${figura}</button>`;
 }
 

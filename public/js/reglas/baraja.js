@@ -1,29 +1,35 @@
 // Baraja española de 48 cartas: 4 palos x 12 valores, sin comodines.
 // Los nombres de palo coinciden con las carpetas reales de /public/assets/.
+import { imagenUrl } from "./imagenes.js";
+
 export const PALOS = ["Basto", "Copa", "Espada", "Oro"];
 export const NUMEROS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 export const TAM_MANO = 4;
 
 /**
- * La versión de los dorsos. La misma idea que `VERSION_CARTAS`, más abajo, y
- * por el mismo motivo: las imágenes se guardan un mes en cada navegador, así
- * que un dibujo nuevo con el mismo nombre no llega hasta que venza.
+ * La dirección de un dorso, con su versión.
  *
- * Hoy no hacía falta —los dorsos pasaron de `.png` a `.webp`, y un nombre
- * distinto ya es una dirección distinta—. Está para la PRÓXIMA vez, que es
- * cuando muerde: cuando se reemplace el dibujo dejando el nombre.
+ * ─────────────────────────────────────────────────────────────────────────
+ * TENÍA UN NÚMERO PROPIO, Y ÉSE ERA EL PROBLEMA
+ * ─────────────────────────────────────────────────────────────────────────
  *
- * Ojo con el alcance: esto cubre los dos dorsos de la casa, que son los que
- * vive acá. El dorso que alguien COMPRÓ sale de su artículo en el catálogo de
- * Firestore, y su dirección es la que diga ese documento.
+ * `VERSION_DORSOS` cubría los dos dorsos de la CASA, que son los que viven
+ * en este archivo. El dorso que alguien COMPRÓ sale de su artículo en el
+ * catálogo de Firestore y llegaba al `<img>` sin pasar por acá — o sea, sin
+ * versión ninguna.
  *
- * 1 — los dorsos en WebP.
+ * Así que `/img/dorsos/dorso-azul.webp` llevaba `?v=1` repartido por la casa
+ * y nada cuando era el que alguien se compró. El mismo archivo, con dos
+ * comportamientos según el camino, y el segundo sin red: reemplazar ese
+ * dibujo era desplegarlo y esperar.
+ *
+ * Ahora los dos caminos cruzan `imagenUrl`, que versiona todo `/img/`. El
+ * número es uno solo y está en `reglas/imagenes.js`.
+ *
+ * `imagenCarta`, más abajo, NO se unificó: ver el porqué allá.
  */
-export const VERSION_DORSOS = 1;
-
-/** La dirección de un dorso, con su versión. */
-export const dorsoUrl = (ruta) => `${ruta}?v=${VERSION_DORSOS}`;
+export const dorsoUrl = (ruta) => imagenUrl(ruta);
 
 // Sólo existen dos dorsos. Con 3 o 4 jugadores se repiten alternando, y los
 // asientos se distinguen por el color del aro (ver --color-asiento en el CSS).
@@ -56,6 +62,11 @@ export function puntosCarta(numero) {
  * 3 — las cartas nuevas, en WebP de 448×672. Siguen cubriendo un teléfono de
  *     3x: la carta más grande de la mesa es la del centro, que llega a 146×219
  *     de CSS, o sea 438×657 reales. Y pesan la mitad: 3,3 MB las 48 contra 6,6.
+ *
+ * NO se unificó con `VERSION_IMAGENES`, que cubre todo `/img/`. Las cartas
+ * viven bajo `/assets/`, son cuarenta y ocho archivos y 3,3 MB, y este número
+ * cuenta otra cosa: un rediseño de la baraja. Unificarlos haría que recortar
+ * un avatar obligue a redescargar el mazo entero.
  */
 export const VERSION_CARTAS = 3;
 

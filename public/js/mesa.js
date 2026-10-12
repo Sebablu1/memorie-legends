@@ -66,7 +66,7 @@ import {
   RETRATO_INICIAL,
 } from "./modulos/retratos.js";
 import { esRutaDelSitio } from "./reglas/catalogo.js";
-import { avatarUrl } from "./modulos/imagenes.js";
+import { imagenUrl } from "./modulos/imagenes.js";
 
 // Medir no puede romper lo que se mide. Ver `analitica.js`.
 import { anotar } from "./analitica.js";
@@ -840,7 +840,7 @@ const FASES_CON_TURNO = new Set([
 // Con la versión puesta acá, que es por donde pasan los dos lugares de la
 // mesa que dibujan una cara: el asiento y el marcador. Ver `imagenes.js`.
 const caraDe = (jugador, i) =>
-  avatarUrl(esRutaDelSitio(jugador?.retrato) ? jugador.retrato : retratoDe(i));
+  imagenUrl(esRutaDelSitio(jugador?.retrato) ? jugador.retrato : retratoDe(i));
 
 /**
  * El reverso de las cartas de un jugador.

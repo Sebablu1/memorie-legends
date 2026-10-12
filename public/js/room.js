@@ -10,7 +10,7 @@
 import { db, doc, onSnapshot } from "./firebase.js";
 import { exigirSesion, mostrarSaldo } from "./sesion.js";
 import { pintarAvatarCabecera } from "./equipado.js";
-import { avatarUrl } from "./modulos/imagenes.js";
+import { imagenUrl } from "./modulos/imagenes.js";
 import { iniciarPartida, salirDeSalaEnEspera, marcarListo, reportarJugador, ErrorDeServidor } from "./servidor.js";
 import { ESTADOS_SALA, MIN_JUGADORES, MAX_JUGADORES } from "./reglas/salas.js";
 import { escapar } from "./modulos/texto.js";
@@ -112,7 +112,7 @@ function caraEnLaSala(luce, inicialEscapada) {
     return `<span class="avatar-inicial" aria-hidden="true">${inicialEscapada}</span>`;
   }
   return `<span class="avatar-inicial con-cara" aria-hidden="true">
-      <img src="${escapar(avatarUrl(luce.retrato))}" alt="" loading="lazy" />
+      <img src="${escapar(imagenUrl(luce.retrato))}" alt="" loading="lazy" />
     </span>`;
 }
 

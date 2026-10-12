@@ -1,6 +1,6 @@
 import { exigirSesion, mostrarSaldo, conectarBotonSalir } from "./sesion.js";
 import { pintarAvatarCabecera } from "./equipado.js";
-import { avatarUrl } from "./modulos/imagenes.js";
+import { imagenUrl } from "./modulos/imagenes.js";
 // Los nombres del ranking los eligen los jugadores y esta tabla la ve todo el
 // mundo: es la pantalla de mayor alcance del sitio.
 import { escapar } from "./modulos/texto.js";
@@ -61,7 +61,7 @@ function caraEnLaTabla(f) {
     return `<span class="avatar-inicial" aria-hidden="true">${escapar(inicial)}</span>`;
   }
   return `<span class="avatar-inicial con-cara" aria-hidden="true">
-      <img src="${escapar(avatarUrl(f.retrato))}" alt="" loading="lazy" />
+      <img src="${escapar(imagenUrl(f.retrato))}" alt="" loading="lazy" />
     </span>`;
 }
 
