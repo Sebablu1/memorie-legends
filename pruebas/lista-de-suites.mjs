@@ -93,7 +93,11 @@ export const SUITES = [
   "retratos-en-red.mjs",
   "corte-automatico.mjs",
   "panos.mjs",
+  // Las dos mitades de lo mismo, juntas a propósito: aquélla comprueba que el
+  // archivo que nombra un artículo exista; ésta, que el TIPO de ese artículo
+  // tenga dicho qué hacer con su imagen.
   "imagenes-del-catalogo.mjs",
+  "imagenes-de-catalogo.mjs",
   "barrido.mjs",
   "revancha.mjs",
   "logros-y-packs.mjs",
