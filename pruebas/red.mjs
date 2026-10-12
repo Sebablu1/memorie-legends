@@ -49,6 +49,73 @@ console.log("\n=== 5. Sincronización temporal ===");
      "sin muestras asume lo peor, no lo mejor");
 }
 
+// ============================ 5b. qué estimación manda, entre dos tandas
+
+/**
+ * Medir una sola vez al entrar a la mesa no alcanza, y ésta es la regla que
+ * decide qué hacer con la segunda medición.
+ *
+ * La distorsión que importa no está en la red: `t2` se toma en el callback de
+ * la promesa, así que un atasco del hilo principal —montar la mesa, decodificar
+ * los retratos— se le suma al viaje de vuelta y le RESTA al desfase. El
+ * navegador cree que al servidor le falta más tiempo del que le falta y el
+ * jugador toca tarde.
+ *
+ * Una medición así tiene el viaje largo. Por eso la regla es la misma que
+ * dentro de una tanda —gana el viaje más corto— y por eso tiene vencimiento:
+ * un reloj que SALTA dejaría la vieja clavada para siempre.
+ */
+console.log("\n=== 5b. Entre dos mediciones manda el viaje más corto ===");
+{
+  const sucia  = { desfase: -1000, viaje: 2100, incertidumbre: 1050, muestras: 5 };
+  const limpia = { desfase: 0, viaje: 60, incertidumbre: 30, muestras: 5 };
+
+  const sinNada = { desfase: 0, incertidumbre: 1500, viaje: 3000, muestras: 0 };
+  ok(R.mejorEstimacion(sinNada, sucia, 1000).desfase === -1000,
+     "la primera medición gana siempre: antes no había ninguna");
+
+  ok(R.mejorEstimacion(sucia, limpia, 1000).desfase === 0,
+     "una medición limpia desplaza a una sucia — es el arreglo del turno perdido");
+
+  ok(R.mejorEstimacion(limpia, sucia, 1000).desfase === 0,
+     "y una sucia NO desplaza a una limpia");
+
+  ok(R.mejorEstimacion(limpia, sucia, 1000) === limpia,
+     "cuando no gana, se devuelve la misma de antes y no una copia");
+
+  // El empate va para la nueva: con el mismo viaje, la reciente describe
+  // mejor un reloj que pudo haberse movido.
+  const igualDeBuena = { ...limpia, desfase: 7 };
+  ok(R.mejorEstimacion(limpia, igualDeBuena, 1000).desfase === 7,
+     "con el mismo viaje gana la nueva");
+
+  // El vencimiento.
+  const medidaEn = 1000;
+  const buenaYFechada = R.mejorEstimacion(sinNada, limpia, medidaEn);
+  ok(buenaYFechada.medidaEn === medidaEn, "la que gana queda fechada", buenaYFechada.medidaEn);
+
+  const apenasAntes = medidaEn + R.MS_VIDA_DE_LA_MUESTRA - 1;
+  ok(R.mejorEstimacion(buenaYFechada, sucia, apenasAntes).desfase === 0,
+     "antes del vencimiento sigue defendiendo el puesto");
+
+  const justoAlVencer = medidaEn + R.MS_VIDA_DE_LA_MUESTRA;
+  ok(R.mejorEstimacion(buenaYFechada, sucia, justoAlVencer).desfase === -1000,
+     "y al vencer la desplaza cualquiera: el reloj del aparato pudo haber saltado");
+
+  /*
+   * Cualquiera MENOS la nada.
+   *
+   * Y se comprueba DESPUÉS del vencimiento a propósito: antes de vencer, la
+   * estimación vigente se defiende sola y el caso no prueba nada. Vencida, la
+   * única línea que impide que una tanda perdida borre el reloj —y lo deje en
+   * `muestras: 0`, o sea en el reloj crudo del aparato— es la primera de
+   * `mejorEstimacion`.
+   */
+  const perdida = R.estimarReloj([]);
+  ok(R.mejorEstimacion(buenaYFechada, perdida, justoAlVencer) === buenaYFechada,
+     "una tanda entera perdida no desplaza a nada, ni siquiera a una vencida");
+}
+
 // ================================== 1 y 2. latencia y clientes mentirosos
 
 console.log("\n=== La conexión no decide quién gana ===");

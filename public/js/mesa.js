@@ -3971,6 +3971,7 @@ async function mostrarFinRonda() {
 
 let dejarDeEscuchar = null;
 let dejarDeLatir = null;
+let dejarDeSincronizar = null;
 let dejarDeAvanzar = null;
 let dejarDeRescatar = null;
 
@@ -5224,13 +5225,64 @@ class EsperaVencida extends Error {}
  * se toca ni una carta. La autoridad sigue siendo la vista que publica el
  * servidor; lo único que se recupera acá es la posibilidad de volver a tocar.
  */
+/**
+ * Cuánto se tarda en avisar que se está poniendo el reloj en hora.
+ *
+ * Medio segundo. Por debajo de eso la espera no se percibe y el cartel sería
+ * una distracción; por encima, el botón que no responde se percibe como una
+ * mesa colgada.
+ */
+const MS_ANTES_DE_AVISAR_DEL_RELOJ = 500;
+
+/**
+ * Espera a que el reloj esté en hora, si todavía no lo está.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ESPERA, NO RECHAZA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La alternativa era contestar «todavía no» y hacer tocar de nuevo. Sería
+ * peor por dos lados: el jugador pierde los segundos que tarda en darse
+ * cuenta de que tiene que repetir el toque, y los pierde de un turno que
+ * está corriendo. Esperar y mandar sola cuesta lo mismo y no pide nada.
+ *
+ * En la práctica no se nota nunca: para cuando a alguien le toca jugar, la
+ * primera tanda de mediciones terminó hace rato —la primera ronda arranca
+ * mirando, con su propia cuenta regresiva—. Esto es para el caso patológico,
+ * no para el normal.
+ *
+ * Y si el reloj no llega, se juega igual. Ver `MS_MAXIMO_SIN_RELOJ`: dejar a
+ * alguien sin poder jugar una partida que pagó, porque un callable auxiliar
+ * no contesta, sería cambiar un problema de tiempo por uno de plata.
+ */
+async function esperarElReloj() {
+  if (Red.relojEnHora()) return;
+
+  const aviso = setTimeout(
+    () => pista("🕐 Poniendo el reloj en hora…"),
+    MS_ANTES_DE_AVISAR_DEL_RELOJ,
+  );
+  const hay = await Red.cuandoHayaReloj();
+  clearTimeout(aviso);
+
+  if (!hay) {
+    console.warn(
+      "Se juega sin el reloj sincronizado: `horaDelServidor` no contestó a tiempo. " +
+        "La cuenta regresiva puede estar corrida.",
+    );
+  }
+}
+
 async function pedir(accion, ejecutar) {
   if (pidiendo) {
     pista("⏳ Esperá la acción anterior.");
     return;
   }
   pidiendo = true;
-  
+
+  // Ninguna jugada sale antes de que el reloj esté en hora.
+  await esperarElReloj();
+
   // Con retraso: la mayoría de las jugadas vuelven en menos de lo que tarda
   // en aparecer, y para ésas es mejor no mostrar nada. Ver spinner.js.
   mostrarCargando("Enviando la jugada…");
@@ -5740,7 +5792,12 @@ async function arrancarModoLeyendas(sala, uid) {
   // El reloj se sincroniza antes de la primera ventana de reflejos: sin esto
   // el servidor asume la peor incertidumbre posible y todo empate se resuelve
   // por sorteo en vez de por reacción.
-  Red.sincronizarReloj().catch(() => {});
+  //
+  // Y se SIGUE sincronizando toda la partida. Una sola medición, tomada
+  // mientras la mesa se monta, es la más sucia que se va a tomar: ver
+  // `mantenerElRelojEnHora`, que explica por qué eso se veía como un problema
+  // de iPhone.
+  dejarDeSincronizar = Red.mantenerElRelojEnHora();
 
   dejarDeEscuchar = Red.escucharMiVista(
     salaPedida,
@@ -5778,6 +5835,7 @@ async function arrancarModoLeyendas(sala, uid) {
     dejarDeLatir?.();
     dejarDeAvanzar?.();
     dejarDeRescatar?.();
+    dejarDeSincronizar?.();
   });
 
   pista("Conectando con la partida…");

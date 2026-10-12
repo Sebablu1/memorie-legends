@@ -90,6 +90,17 @@ const partidaFalsa = `
   export const ahoraDelServidor = () => AHORA;
   export const relojActual = () => ({ desfase: 0, incertidumbre: 10 });
   export const sincronizarReloj = async () => {};
+  // El reloj, ya en hora: estas pruebas no miden el tiempo de red, lo fijan.
+  // Salvo que el caso pida lo contrario, que es como se prueba la espera.
+  export const relojEnHora = () => !CASO.sinReloj;
+  export const cuandoHayaReloj = async () => {
+    if (!CASO.sinReloj) return true;
+    await new Promise((r) => setTimeout(r, CASO.tardaElReloj ?? 0));
+    return true;
+  };
+  export const mantenerElRelojEnHora = () => () => {};
+  export const MS_ENTRE_SINCRONIAS = 30000;
+  export const MS_MAXIMO_SIN_RELOJ = 20000;
   export const mantenerVivo = () => () => {};
   export const mantenerEnMarcha = () => () => {};
   export const nuevoIdDeAccion = () => "a1";
@@ -103,7 +114,7 @@ const partidaFalsa = `
   export const levantar = async () => {};
   export const tirarCarta = async () => {};
   export const cortar = async () => {};
-  export const pasarTurno = async () => {};
+  export const pasarTurno = async () => { window.__pasadas = (window.__pasadas ?? 0) + 1; };
   export const cambiarCarta = async () => {};
   export const resolverCambio = async () => {};
   export const saltarPoder = async () => {};
@@ -409,4 +420,69 @@ test("un plazo ya vencido sigue sin dibujarse, con ventana abierta o sin ella", 
   });
 
   await expect(reloj(page)).toBeHidden();
+});
+
+// =====================================================================
+// Ninguna jugada sale antes de tener el reloj en hora
+// =====================================================================
+
+/**
+ * El otro extremo del arreglo de la re-sincronización.
+ *
+ * `partida-red.js` insiste hasta conseguir una medición; esto es lo que pasa
+ * del lado de la mesa mientras tanto. Sin ninguna muestra,
+ * `ahoraDelServidor()` es el reloj crudo del aparato, que puede estar a
+ * minutos de la hora real — y una jugada mandada así es la que vuelve con
+ * «se te pasó el turno».
+ *
+ * La mesa ESPERA y manda sola. No rechaza y hace tocar de nuevo: el jugador
+ * perdería los segundos que tarda en darse cuenta, de un turno que corre.
+ *
+ * `reloj-se-pone-en-hora.spec.js` prueba el módulo de verdad; acá el doble
+ * finge la demora, que es lo único que la mesa necesita saber.
+ */
+
+test("una jugada espera a que el reloj esté en hora, y sale sola", async ({ page }) => {
+  await abrirMesa(page, {
+    fase: "postLevantada",
+    decide: 0,
+    que: "pasarPorTiempo",
+    faltanMs: 60_000,
+    sinReloj: true,
+    tardaElReloj: 1200,
+  });
+
+  await page.locator("#btnPasar").click();
+
+  // Todavía no salió: el reloj no está en hora.
+  expect(
+    await page.evaluate(() => window.__pasadas ?? 0),
+    "la jugada salió sin esperar el reloj",
+  ).toBe(0);
+
+  // Y el aviso sutil, que es lo que distingue una espera de una mesa colgada.
+  await expect(page.locator("#pista")).toContainText(/reloj en hora/i);
+
+  // Pero sale sola, sin volver a tocar.
+  await expect
+    .poll(() => page.evaluate(() => window.__pasadas ?? 0), { timeout: 5000 })
+    .toBe(1);
+});
+
+test("con el reloj en hora no espera ni avisa nada", async ({ page }) => {
+  /*
+   * El caso normal, que es el que tiene que no notarse: para cuando a alguien
+   * le toca jugar, la primera tanda de mediciones terminó hace rato.
+   */
+  await abrirMesa(page, {
+    fase: "postLevantada",
+    decide: 0,
+    que: "pasarPorTiempo",
+    faltanMs: 60_000,
+  });
+
+  await page.locator("#btnPasar").click();
+
+  await expect.poll(() => page.evaluate(() => window.__pasadas ?? 0)).toBe(1);
+  await expect(page.locator("#pista")).not.toContainText(/reloj en hora/i);
 });

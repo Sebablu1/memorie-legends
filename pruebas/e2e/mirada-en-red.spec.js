@@ -101,6 +101,12 @@ const partidaFalsa = `
   export const ahoraDelServidor = () => Date.now();
   export const relojActual = () => ({ desfase: 0, incertidumbre: 10 });
   export const sincronizarReloj = async () => {};
+  // El reloj, ya en hora: estas pruebas no miden el tiempo de red, lo fijan.
+  export const relojEnHora = () => true;
+  export const cuandoHayaReloj = async () => true;
+  export const mantenerElRelojEnHora = () => () => {};
+  export const MS_ENTRE_SINCRONIAS = 30000;
+  export const MS_MAXIMO_SIN_RELOJ = 20000;
   export const mantenerVivo = () => () => {};
   export const mantenerEnMarcha = () => () => {};
   export const nuevoIdDeAccion = () => "a1";

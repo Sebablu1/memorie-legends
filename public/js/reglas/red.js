@@ -133,6 +133,68 @@ export function estimarReloj(muestras) {
   };
 }
 
+/**
+ * Cuánto se le defiende el puesto a una estimación buena.
+ *
+ * Dos minutos. Por debajo, una medición limpia no la desplaza una sucia; por
+ * encima, cualquiera la desplaza. Ver `mejorEstimacion`.
+ */
+export const MS_VIDA_DE_LA_MUESTRA = 120_000;
+
+/**
+ * ¿La medición nueva reemplaza a la que ya había?
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ NO GANA SIEMPRE LA ÚLTIMA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Es el mismo criterio que `estimarReloj` usa DENTRO de una tanda, extendido
+ * a través de las tandas: gana el viaje más corto, porque es el que menos se
+ * pudo distorsionar.
+ *
+ * Y no es un detalle fino. La distorsión que importa no está en la red: `t2`
+ * se toma en el callback de la promesa, así que cualquier atasco del hilo
+ * principal entre que llega la respuesta y que corre ese callback se le suma
+ * a `t2` sin tener contraparte en el servidor. El desfase sale bajo, el
+ * navegador cree que al servidor le falta más tiempo del que le falta, y el
+ * jugador toca tarde.
+ *
+ * Eso pasa justo al entrar a la mesa, que es cuando el hilo principal está
+ * montando la pantalla — y es la razón por la que una tanda sola, medida una
+ * vez, no alcanza. Una medición así tiene el viaje LARGO, así que la regla
+ * del viaje más corto la descarta sola en cuanto llega una tanda limpia.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * PERO NO PARA SIEMPRE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Si el viaje más corto ganara sin vencimiento, un reloj que SALTA dejaría la
+ * estimación vieja clavada toda la partida. Y salta: el sistema operativo
+ * corrige la hora contra su servidor cuando se le da la gana, y un teléfono
+ * que vuelve de modo avión la corrige entera de golpe.
+ *
+ * Por eso la estimación que manda tiene fecha. Pasados `MS_VIDA_DE_LA_MUESTRA`
+ * deja de defender el puesto y la entrante gana aunque venga por un camino
+ * peor: una medición mediocre de hace diez segundos vale más que una
+ * excelente de hace cinco minutos, si entre medio alguien movió el reloj.
+ *
+ * @param actual  la estimación vigente, o una sin muestras
+ * @param nueva   la recién medida
+ * @param ahora   `Date.now()` del cliente, para fechar la que gane
+ */
+export function mejorEstimacion(actual, nueva, ahora) {
+  // Una tanda sin muestras no es una estimación: no desplaza a nada, ni
+  // siquiera a la nada.
+  if (!nueva?.muestras) return actual;
+
+  const fechada = { ...nueva, medidaEn: ahora };
+  if (!actual?.muestras) return fechada;
+
+  if (fechada.viaje <= actual.viaje) return fechada;
+  if (ahora - (actual.medidaEn ?? 0) >= MS_VIDA_DE_LA_MUESTRA) return fechada;
+  return actual;
+}
+
 // -------------------------------------------------------------- ventanas
 
 /**

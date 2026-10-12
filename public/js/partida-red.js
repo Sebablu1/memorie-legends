@@ -19,7 +19,12 @@
 import { db, doc, onSnapshot } from "./firebase.js";
 import { funciones, httpsCallable } from "./firebase.js";
 import { ErrorDeServidor } from "./servidor.js";
-import { crearFiltroDeVersion, estimarReloj, muestraDeReloj } from "./reglas/red.js";
+import {
+  crearFiltroDeVersion,
+  estimarReloj,
+  mejorEstimacion,
+  muestraDeReloj,
+} from "./reglas/red.js";
 
 /** Identificador único de acción, para que un reintento no cuente dos veces. */
 export function nuevoIdDeAccion() {
@@ -50,15 +55,25 @@ async function llamar(nombre, datos = {}) {
  * Empieza en "no sé nada": incertidumbre máxima. Quien no sincroniza no gana
  * por no sincronizar — el servidor le asigna el peor caso.
  */
-let reloj = { desfase: 0, incertidumbre: 1500, viaje: 3000, muestras: 0 };
+let reloj = { desfase: 0, incertidumbre: 1500, viaje: 3000, muestras: 0, medidaEn: 0 };
 
 export const relojActual = () => ({ ...reloj });
 
+/** ¿Hay al menos una medición, o se está usando el reloj crudo del aparato? */
+export const relojEnHora = () => reloj.muestras > 0;
+
+/** Los que están esperando a que llegue la primera medición. */
+let esperandoElReloj = [];
+
 /**
- * Sincroniza con varias pasadas y se queda con la de viaje más corto.
+ * Sincroniza con varias pasadas y se queda con la mejor.
  *
- * Se llama al entrar a la mesa y conviene repetirlo de tanto en tanto: el
- * desfase de un reloj de escritorio deriva, y la latencia cambia sola.
+ * La tanda elige su mejor muestra con `estimarReloj`, y `mejorEstimacion`
+ * decide si esa gana contra la que ya estaba. Las dos usan el mismo criterio
+ * —viaje más corto— y la segunda le pone vencimiento: ver `reglas/red.js`.
+ *
+ * Una tanda entera perdida NO pisa lo que había: sin muestras no hay
+ * estimación, y quedarse con la anterior es mejor que volver a cero.
  */
 export async function sincronizarReloj(pasadas = 5) {
   const muestras = [];
@@ -72,12 +87,154 @@ export async function sincronizarReloj(pasadas = 5) {
       // Una pasada perdida no es un problema: alcanza con que llegue alguna.
     }
   }
-  if (muestras.length) reloj = estimarReloj(muestras);
+  if (muestras.length) reloj = mejorEstimacion(reloj, estimarReloj(muestras), Date.now());
+
+  if (relojEnHora() && esperandoElReloj.length) {
+    const avisar = esperandoElReloj;
+    esperandoElReloj = [];
+    for (const resolver of avisar) resolver(true);
+  }
   return relojActual();
 }
 
 /** Ahora, en el reloj del SERVIDOR, según nuestra estimación. */
 export const ahoraDelServidor = () => Date.now() + reloj.desfase;
+
+/**
+ * Lo máximo que una jugada espera a que el reloj esté en hora.
+ *
+ * Pasado esto se juega igual, con el reloj crudo del aparato. El techo no es
+ * una comodidad: sin él, un `horaDelServidor` roto —desplegado mal, sin cuota—
+ * dejaría a alguien sin poder jugar una partida que ya pagó, mientras el
+ * resto del servidor contesta perfecto.
+ */
+export const MS_MAXIMO_SIN_RELOJ = 20_000;
+
+/**
+ * Se resuelve cuando hay reloj, o cuando se acaba la espera.
+ *
+ * @returns true si hay reloj, false si se jugará sin él.
+ */
+export function cuandoHayaReloj(tope = MS_MAXIMO_SIN_RELOJ) {
+  if (relojEnHora()) return Promise.resolve(true);
+
+  return new Promise((resolver) => {
+    const avisar = (hay) => {
+      clearTimeout(reparo);
+      esperandoElReloj = esperandoElReloj.filter((f) => f !== avisar);
+      resolver(hay);
+    };
+    const reparo = setTimeout(() => avisar(false), tope);
+    esperandoElReloj.push(avisar);
+  });
+}
+
+/** Cada cuánto se vuelve a poner el reloj en hora durante la partida. */
+export const MS_ENTRE_SINCRONIAS = 30_000;
+
+/**
+ * Las esperas del reintento de arranque, mientras no haya NINGUNA muestra.
+ *
+ * Crecen porque un `horaDelServidor` que no contesta no va a contestar por
+ * insistirle más rápido, y se detienen en ocho: más que eso es abandonar a
+ * alguien que entró a una partida con entrada pagada.
+ */
+const ESPERAS_DE_ARRANQUE = [1000, 2000, 4000, 8000];
+
+/**
+ * Mantiene el reloj en hora toda la partida.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ NO ALCANZA CON MEDIR UNA VEZ AL ENTRAR
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Que es lo que se hacía, y lo que este mismo archivo venía pidiendo arreglar
+ * desde que se escribió: «conviene repetirlo de tanto en tanto».
+ *
+ * Tres motivos, y el primero es el que rompía partidas:
+ *
+ *   · LA PRIMERA MEDICIÓN ES LA PEOR. Sale junto con el montaje de la mesa,
+ *     compitiendo con la primera vista, el primer pintado y la decodificación
+ *     de los retratos. Como `t2` se toma en el callback de la promesa, cada
+ *     milisegundo que el hilo principal esté ocupado se le suma al viaje de
+ *     vuelta y le resta al desfase. El navegador termina creyendo que tiene
+ *     más tiempo del que tiene, toca tarde, y el servidor le contesta que el
+ *     turno ya no es suyo. En un teléfono eso es peor que en una computadora,
+ *     y por eso se veía como un problema «de iPhone».
+ *
+ *   · EL RELOJ DEL APARATO SALTA. El sistema operativo lo corrige contra su
+ *     servidor cuando quiere. Una medición de hace diez minutos puede estar
+ *     describiendo un reloj que ya no existe.
+ *
+ *   · Y LA LATENCIA CAMBIA SOLA: de wifi a datos, de una celda a otra.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * TRES DISPARADORES
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ *   1. AL ENTRAR, insistiendo hasta tener al menos una muestra. Sin ninguna,
+ *      `ahoraDelServidor()` es el reloj crudo del aparato, que es la única
+ *      situación en la que el error no tiene techo.
+ *   2. CADA 30 s mientras se juega.
+ *   3. AL VOLVER A LA PESTAÑA. Es el momento en que el reloj del aparato más
+ *      probablemente se movió —el teléfono estuvo bloqueado, cambió de red—
+ *      y además es gratis: nadie estaba mirando.
+ *
+ * Con la pestaña oculta no se mide. No hay a quién mostrarle la hora, y los
+ * temporizadores de segundo plano están estrangulados: una medición tomada
+ * así saldría mal y, por la regla del viaje más corto, al menos no ganaría.
+ *
+ * Las de rutina van con tres pasadas y no con cinco: para entonces la
+ * instancia está caliente, y la mayoría se descarta igual sin desplazar a la
+ * que ya estaba. Lo que importa no es medir seguido, es que exista la
+ * oportunidad de que una medición limpia reemplace a una sucia.
+ *
+ * @returns función para dejar de sincronizar
+ */
+export function mantenerElRelojEnHora() {
+  let vivo = true;
+  let midiendo = false;
+  let intentos = 0;
+  let reintento = null;
+
+  const medir = async (pasadas) => {
+    // Dos tandas a la vez se pisarían las muestras y medirían la congestión
+    // que ellas mismas causan.
+    if (!vivo || midiendo) return;
+    midiendo = true;
+    try {
+      await sincronizarReloj(pasadas);
+    } catch {
+      // `sincronizarReloj` ya se traga las pasadas sueltas; esto es el resto.
+    } finally {
+      midiendo = false;
+    }
+  };
+
+  /** Al entrar: insistir hasta que haya una muestra. */
+  const insistir = async () => {
+    await medir(5);
+    if (!vivo || relojEnHora()) return;
+    const espera = ESPERAS_DE_ARRANQUE[Math.min(intentos, ESPERAS_DE_ARRANQUE.length - 1)];
+    intentos += 1;
+    reintento = setTimeout(insistir, espera);
+  };
+
+  const deRutina = () => {
+    if (!document.hidden) medir(3);
+  };
+
+  const t = setInterval(deRutina, MS_ENTRE_SINCRONIAS);
+  document.addEventListener("visibilitychange", deRutina);
+  insistir();
+
+  return () => {
+    vivo = false;
+    clearInterval(t);
+    clearTimeout(reintento);
+    document.removeEventListener("visibilitychange", deRutina);
+  };
+}
 
 // ----------------------------------------------------------- la escucha
 
