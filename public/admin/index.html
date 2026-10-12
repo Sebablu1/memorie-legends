@@ -240,6 +240,60 @@
               autocomplete="off"
             />
           </label>
+
+          <!-- El conversor va AL LADO del campo de arriba, no en su lugar.
+               Aquél sigue siendo la única forma de poner un emoji o de apuntar
+               a un archivo que ya existe; esto prepara uno nuevo.
+
+               Y NO SUBE NADA: convierte en el navegador y descarga. El archivo
+               lo pone a mano quien despliega. Ver `conversor-de-imagen.js`. -->
+          <div class="ancho conversor" id="conversorImagen">
+            <span class="titulo-conversor">Preparar un archivo nuevo</span>
+
+            <div class="zona-conversor" id="conversorZona">
+              <label class="elegir-archivo">
+                <input
+                  id="conversorArchivo"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                />
+                <span>Arrastrá una imagen acá, o elegila</span>
+              </label>
+
+              <!-- Sólo para avatares e insignias: un dorso es un rectángulo
+                   lleno y la inundación desde los bordes se le comería el
+                   dibujo. Lo enciende `alCambiarDeTipo`. -->
+              <label class="casilla" id="conversorCampoFondo" hidden>
+                <input id="conversorQuitarFondo" type="checkbox" />
+                <span>Quitar el fondo blanco</span>
+              </label>
+            </div>
+
+            <!-- Sobre un tablero oscuro, para que se vea si quedó halo. -->
+            <!-- `width`/`height` reservan el lugar para que nada salte cuando
+                 aparece la vista previa: lo exige `sitio.mjs` y lo mide el CLS.
+                 Son el cuadro máximo, no las medidas del dibujo — el CSS lo
+                 encaja adentro con `max-width`/`max-height` y `object-fit`. -->
+            <img
+              id="conversorVista"
+              class="vista-conversor"
+              alt=""
+              width="180"
+              height="180"
+              hidden
+            />
+
+            <small class="nota-campo" id="conversorAviso"></small>
+
+            <button id="conversorDescargar" type="button" class="secundario" disabled>
+              Descargar
+            </button>
+
+            <small class="nota-campo">
+              Se descarga a tu máquina. Ponelo en <code>public/img/…</code>,
+              escribí esa ruta en el campo de arriba y desplegá.
+            </small>
+          </div>
           <label>
             <span>Orden</span>
             <input id="itemOrden" type="number" step="1" value="0" />

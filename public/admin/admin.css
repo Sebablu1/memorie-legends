@@ -346,6 +346,14 @@ select {
   color: var(--texto-tenue);
 }
 
+/* El `display: flex` de arriba le gana al `[hidden]` del navegador, así que
+   una etiqueta escondida seguía ocupando su lugar y mostrándose entera.
+   Lo destapó el campo del recorte de fondo, que sólo corresponde a avatares
+   e insignias: con `hidden` puesto se veía igual en un dorso. */
+.campos-item label[hidden] {
+  display: none;
+}
+
 /* La descripción y la imagen ocupan la fila entera: son las dos que llevan
    texto largo, y en una columna angosta no se ve lo que uno escribió. */
 .campos-item label.ancho {
@@ -709,4 +717,90 @@ select {
   border-left: 3px solid #f0d060;
   background: rgba(240, 208, 96, 0.08);
   color: #ffd79a;
+}
+
+/* ═══════════════════════════════════════ el conversor de imágenes
+
+   Va dentro del formulario del catálogo, al lado del campo de la ruta. No lo
+   reemplaza: aquél sigue siendo la única forma de poner un emoji o de apuntar
+   a un archivo que ya existe. Ver `conversor-de-imagen.js`. */
+
+.conversor {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Un tipo que no se convierte —un paño, que es SVG— no se esconde: se apaga y
+   la nota dice por qué. Esconderlo haría creer que la función no existe. */
+.conversor.apagado {
+  opacity: 0.5;
+}
+
+.titulo-conversor {
+  font-size: 0.78rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--oro);
+}
+
+.zona-conversor {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px dashed var(--borde);
+  border-radius: 10px;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+/* Mientras el archivo está sobre la zona. Sin esto no hay forma de saber que
+   soltar ahí va a hacer algo. */
+.zona-conversor.encima {
+  border-color: var(--oro);
+  background: rgba(212, 168, 67, 0.07);
+}
+
+.elegir-archivo {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  cursor: pointer;
+}
+
+.elegir-archivo span {
+  font-size: 0.85rem;
+  color: var(--texto-tenue);
+}
+
+/* La vista previa va sobre un fondo OSCURO y a tablero de ajedrez: es la única
+   forma de ver si el recorte dejó un halo claro, que es justamente lo que el
+   suavizado del contorno existe para evitar. Sobre blanco no se nota nada. */
+.vista-conversor {
+  justify-self: center;
+  /* El dibujo se encaja dentro del cuadro de 180 que reservan los atributos,
+     sin deformarse: sus medidas reales las decide la receta, no esto. */
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid var(--borde);
+  background-color: #141418;
+  background-image:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.05) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.05) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.nota-campo.bien { color: var(--verde); }
+.nota-campo.mal { color: var(--rojo); }
+
+#conversorDescargar {
+  justify-self: start;
 }

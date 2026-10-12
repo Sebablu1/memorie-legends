@@ -34,6 +34,7 @@ import {
   imagenEsArchivo,
   ETIQUETA_TIPO,
 } from "../js/reglas/catalogo.js";
+import { montarConversor } from "./conversor-de-imagen.js";
 
 /**
  * Lo que se vende y lo que se gana, separados.
@@ -335,7 +336,15 @@ function ajustarFormularioAlTipo() {
   // administrador sin poder sacar una insignia de circulación.
   const etiqueta = $("etiquetaActivo");
   if (etiqueta) etiqueta.textContent = vende ? "A la venta" : "Logro disponible";
+
+  // El conversor lee la receta del TIPO, así que se entera por acá y no por
+  // su propio escuchador: un segundo `change` sobre `#itemTipo` correría en
+  // un orden que nadie garantiza.
+  conversor?.alCambiarDeTipo();
 }
+
+/** El conversor de imágenes, encendido al montar. Ver `conversor-de-imagen.js`. */
+let conversor = null;
 
 /** Vacía el formulario y lo deja listo para crear uno nuevo. */
 function limpiarFormulario() {
@@ -679,6 +688,12 @@ export function montarTiendaAdmin() {
   // El formulario se ajusta al tipo elegido en cuanto se elige, no al
   // guardar: enterarse de que una insignia no lleva precio DESPUÉS de
   // escribirlo es enterarse tarde.
+  // Antes del primer `ajustarFormularioAlTipo`, que ya le va a avisar.
+  conversor = montarConversor({
+    tipoActual: () => $("itemTipo").value,
+    idActual: () => $("itemId").value.trim(),
+  });
+
   $("itemTipo").addEventListener("change", ajustarFormularioAlTipo);
   llenarPacks();
   $("itemPack")?.addEventListener("change", ajustarFormularioAlTipo);
