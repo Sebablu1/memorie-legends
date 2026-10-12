@@ -129,6 +129,16 @@ const partidaFalsa = `
         ? { tipo: "mirarPropia", numero: 7, indiceJugador: CASO.decide ?? 0 }
         : null,
       puedeAtacar: [], puntosDeMano: null,
+      // La ventana de reflejos, que en una partida de verdad está ABIERTA
+      // durante el turno: dura lo que dure la muestra. Acá era siempre null,
+      // y por eso la mesa nunca veía un \`graciaMs\`.
+      ventana: CASO.graciaMs == null ? null : {
+        id: "v1",
+        abiertaEn: AHORA - 500,
+        duracionMs: 3000,
+        graciaMs: CASO.graciaMs,
+        cerrada: false,
+      },
       plazo: CASO.plazo === null ? null : {
         // plazoFase existe para poder mandar un plazo que NO corresponde a la
         // fase, que es lo que pasa con una vista a medio actualizar. Sin
@@ -302,6 +312,100 @@ test("un plazo de OTRA fase no enciende este reloj", async ({ page }) => {
     plazoFase: "levantada",
     decide: 0,
     que: "descartarPorTiempo",
+  });
+
+  await expect(reloj(page)).toBeHidden();
+});
+
+// =====================================================================
+// La gracia de la ventana de reflejos NO se le descuenta al turno
+// =====================================================================
+
+/**
+ * Acá vivía un error de dos segundos en todas las barras de la mesa.
+ *
+ * `espejoDelPlazo` restaba `vista.ventana.graciaMs` del plazo que dibujaba.
+ * El argumento era bueno para la ventana de reflejos —`venceEn` sí le suma la
+ * gracia, y esos dos segundos son para los paquetes lentos, no para pensar—
+ * pero esta función NO dibuja la ventana de reflejos. No la dibuja nadie: en
+ * red la fase `descarte` devuelve null antes de llegar al espejo.
+ *
+ * Los tres relojes que sí pasan por acá —turno, postLevantada y las
+ * decisiones— tienen su vencimiento calculado como `ahoraMs + MS_X`, sin
+ * gracia. Así que la resta tomaba la gracia de un plazo y se la descontaba a
+ * otro: los ocho segundos del turno se veían como seis.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ LA GRACIA DE ESTAS PRUEBAS ES DE 55 SEGUNDOS Y NO DE 2
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque con los 2 reales las dos versiones no se distinguen. Sobre un plazo
+ * de 60 s, la rota muestra 58 y la sana 60, y entre el montaje de la página y
+ * la primera lectura ya se fueron uno o dos segundos: los rangos se pisan y
+ * la prueba pasaría con el error puesto.
+ *
+ * `graciaMs` lo manda la vista, así que la prueba lo elige. Con 55 la versión
+ * rota arranca en 5 s y la sana en 60, y no hay máquina lenta que cruce esa
+ * distancia. Es el mismo criterio del caso de los 60 s de más arriba: no
+ * afirmar un instante, afirmar de qué plazo salió el número.
+ */
+const CASI_TODO = 55_000;
+
+test("la gracia de la ventana no le recorta el reloj al TURNO", async ({ page }) => {
+  await abrirMesa(page, {
+    fase: "turno",
+    decide: 0,
+    que: "saltarTurno",
+    faltanMs: 60_000,
+    graciaMs: CASI_TODO,
+  });
+
+  await expect(reloj(page)).toBeVisible();
+
+  const texto = await page.locator("#relojNumero").textContent();
+  const segundos = Number.parseInt(texto, 10);
+
+  expect(
+    segundos,
+    `la cuenta dice ${texto}: con la gracia descontada arrancaría en 5s`,
+  ).toBeGreaterThan(30);
+  expect(segundos, "y no puede pasar del plazo que mandó el servidor").toBeLessThanOrEqual(60);
+});
+
+test("ni a la decisión de cortar o pasar", async ({ page }) => {
+  /*
+   * El mismo espejo lo usan las cuatro fases, así que arreglarlo para el turno
+   * y dejarlo roto para las demás es un arreglo a medias que nadie vería: la
+   * barra de `postLevantada` la mira sólo quien está decidiendo.
+   */
+  await abrirMesa(page, {
+    fase: "postLevantada",
+    decide: 0,
+    que: "pasarPorTiempo",
+    faltanMs: 60_000,
+    graciaMs: CASI_TODO,
+  });
+
+  await expect(reloj(page)).toBeVisible();
+
+  const texto = await page.locator("#relojNumero").textContent();
+  const segundos = Number.parseInt(texto, 10);
+
+  expect(segundos, `la cuenta dice ${texto}`).toBeGreaterThan(30);
+});
+
+test("un plazo ya vencido sigue sin dibujarse, con ventana abierta o sin ella", async ({ page }) => {
+  /*
+   * La línea de abajo del arreglo: `if (restante <= 0) return null`. Un plazo
+   * vencido no tiene nada que contar —el servidor está por moverse— y sacar la
+   * resta de la gracia no podía convertir eso en una barra.
+   */
+  await abrirMesa(page, {
+    fase: "turno",
+    decide: 0,
+    que: "saltarTurno",
+    faltanMs: -1000,
+    graciaMs: 2000,
   });
 
   await expect(reloj(page)).toBeHidden();

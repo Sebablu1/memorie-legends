@@ -1655,15 +1655,35 @@ function espejoDelPlazo(fase) {
   const plazo = miVista?.plazo?.fase === fase ? miVista.plazo : null;
   if (!plazo) return null;
 
-  // plazo.hasta es el vencimiento REAL del servidor: duracion + gracia.
-  // La gracia existe para que lleguen los paquetes lentos que se tocaron a
-  // tiempo (ver MS_GRACIA en reglas/red.js), no para que el jugador tenga
-  // mas tiempo: su intento se rechaza apenas pasa duracionMs. Si la barra
-  // la mostraba, una reapertura de 3 s se veia como una de 5 s y parecia que
-  // todas las ventanas duraban lo mismo. Solo se descuenta para pintar; el
-  // servidor sigue usandola para cerrar.
-  const gracia = Number(miVista?.ventana?.graciaMs) || 0;
-  const restante = plazo.hasta - gracia - Red.ahoraDelServidor();
+  /*
+   * `plazo.hasta` se dibuja ENTERO. Acá se le restaba la gracia, y era un
+   * error de dos segundos en todas las barras de la mesa.
+   *
+   * El argumento viejo era bueno para la ventana de reflejos: ahí
+   * `venceEn` SÍ suma `graciaMs`, y esos dos segundos existen para que
+   * lleguen los paquetes lentos que se tocaron a tiempo, no para que el
+   * jugador tenga más tiempo. Mostrarlos habría hecho que una reapertura de
+   * 3 s se viera como una de 5.
+   *
+   * Pero esta función no dibuja la ventana de reflejos. No la dibuja NADIE:
+   * en red la fase `descarte` devuelve `null` antes de llegar acá, desde que
+   * la ventana dura lo que dure la muestra (etapa 3b/3). Los tres relojes
+   * que sí pasan por este espejo —`turno`, `postLevantada` y las decisiones—
+   * tienen su vencimiento calculado en `plazoDe` como `ahoraMs + MS_X`, sin
+   * gracia ninguna. Los diez `nuevo(...)` de `functions/partida-red.js` son
+   * así, sin excepción.
+   *
+   * O sea que la resta tomaba la gracia de un plazo —el de la ventana, que
+   * viaja en la vista como `ventana.graciaMs` y sigue abierta durante el
+   * turno— y se la descontaba a OTRO. La barra del turno llegaba a cero con
+   * dos segundos de turno real por delante, y lo mismo las demás: los ocho
+   * segundos se veían como seis, y los diez de `postLevantada` como ocho.
+   *
+   * Apurar al jugador es el lado seguro del error —no le hace perder una
+   * jugada— pero es igual de mentira que el otro lado, y le cuesta la cuarta
+   * parte del tiempo que tiene para pensar.
+   */
+  const restante = plazo.hasta - Red.ahoraDelServidor();
   if (restante <= 0) return null;
   return { ms: restante, alVencer: () => {} };
 }
