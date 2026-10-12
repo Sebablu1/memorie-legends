@@ -73,7 +73,23 @@ export default defineConfig({
    * volver a subirlo hay que medirlo con `--repeat-each`, y sobre la suite
    * completa, no sobre un subconjunto.
    *
-   * En otra máquina, `--workers=N` manda sobre esto sin tocar el archivo.
+   * ───────────────────────────────────────────────────────────────────────
+   * NO LO PISES CON `--workers=N` SIN MEDIR
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Este número está medido, y lo que lo limita es la RAM, no los núcleos.
+   * Correr la suite con `--workers=4` da fallos que ROTAN entre corridas
+   * —`ojo-del-poder` una vez, `carteles` la otra— y eso se lee como una suite
+   * poco confiable cuando en realidad es la máquina quedándose sin memoria.
+   *
+   * Pasó: dos corridas seguidas con `--workers=4` dieron seis y ocho fallos,
+   * casi todos distintos. Sin pisar el número, con estos dos, la misma suite
+   * pasa. Los únicos dos que eran de verdad —`equipado` y `menu`— se
+   * arreglaron y no volvieron a aparecer.
+   *
+   * Si hay que subirlo, se mide antes con `--repeat-each` y sobre la suite
+   * COMPLETA. En otra máquina, `--workers=N` manda sobre esto sin tocar el
+   * archivo — pero ahí también hay que medirlo.
    */
   workers: 2,
 
