@@ -5,8 +5,17 @@
  * QUÉ MUESTRA, Y QUÉ NO
  * ─────────────────────────────────────────────────────────────────────────
  *
- * El dibujo, centrado, hasta 320 px —que es exactamente lo que mide el
- * archivo—. Sin nombre, sin precio, sin descripción y sin botones.
+ * El dibujo, centrado, hasta 320 px. Sin nombre, sin precio, sin descripción
+ * y sin botones.
+ *
+ * Los 320 son de PANTALLA; el archivo mide 512. No es un descuido: en un
+ * teléfono de 3× esos 320 CSS son 960 píxeles de verdad, así que con un
+ * archivo de 320 el navegador agrandaba ×3 y el pelo se empastaba. Con 512
+ * agranda ×1,88 y los mechones se separan. Medido con una comparación lado a
+ * lado a 3×, no supuesto.
+ *
+ * Tampoco se llega a los 960, y es a propósito: 768 los cubriría casi enteros
+ * y costaría el doble que 512 en una imagen que ya pesa 80 KB.
  *
  * Es a propósito: la tarjeta de la tienda ya dice todo eso a dos centímetros,
  * y repetirlo acá obligaría a mantener dos versiones del mismo texto. Lo único

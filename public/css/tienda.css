@@ -407,7 +407,10 @@
 
 .zoom-caja {
   position: relative;
-  /* 320 es lo que mide el archivo. Más sería agrandar píxeles. */
+  /* 320 de PANTALLA, con un archivo de 512: en un teléfono de 3× estos 320
+     CSS son 960 píxeles reales, así que el archivo más denso es lo que evita
+     que el dibujo se vea blando. Lo que no cambia es este número — subirlo
+     agrandaría la ventana, que es otra decisión. Ver `modulos/zoom-avatar.js`. */
   width: min(320px, 100%);
   animation: entrarZoom 0.15s ease-out;
 }

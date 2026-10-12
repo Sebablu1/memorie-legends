@@ -50,11 +50,18 @@
 /**
  * 2 — los trece avatares rehechos: bustos que llenan el cuadro, 320x320,
  *     reemplazando a los medallones de 400x400 con el mismo nombre (C2).
+ * 3 — los mismos trece, a 512x512, por el modal de zoom: ahí el dibujo se
+ *     muestra a 320 CSS, que en un teléfono de 3x son 960 px de verdad.
  *
  * Al subir este número, el navegador pide una dirección que nunca vio y el
- * mes de caché deja de importar. No hace falta tocar ningún dato guardado.
+ * día de caché deja de importar. No hace falta tocar ningún dato guardado.
+ *
+ * Y hay que subirlo SIEMPRE que se reemplace un archivo manteniendo el
+ * nombre. En C2 se desplegó sin hacerlo y el borde del CDN siguió entregando
+ * los viejos: el archivo nuevo estaba en el servidor y no había forma de
+ * verlo. La única salida fue esto.
  */
-export const VERSION_AVATARES = 2;
+export const VERSION_AVATARES = 3;
 
 /**
  * La dirección de un avatar, con su versión.
