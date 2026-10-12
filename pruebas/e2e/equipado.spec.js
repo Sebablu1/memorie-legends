@@ -24,11 +24,22 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { imagenUrl } from "../../public/js/reglas/imagenes.js";
+
+/**
+ * Un avatar que es un ARCHIVO, para distinguirlo del que es un emoji.
+ *
+ * Era `/img/dorsos/dorso-azul.png`, y estaba mal por dos lados: un dorso no es
+ * un avatar, y ese `.png` ya no existe —los dorsos pasaron a WebP—. Que el
+ * doble apuntara a un archivo inexistente no rompía nada, porque es un doble,
+ * pero se leía como si la ruta fuera de verdad.
+ */
+const CARA = "/img/avatar/el_as.webp";
 
 /** Los artículos que devuelve el Firestore de mentira, por id. */
 const ARTICULOS = {
   "avatar-dragon": { tipo: "avatar", nombre: "El Dragón", imagen: "🐉", precio: 2500 },
-  "avatar-foto": { tipo: "avatar", nombre: "Con archivo", imagen: "/img/dorsos/dorso-azul.png", precio: 100 },
+  "avatar-foto": { tipo: "avatar", nombre: "Con archivo", imagen: CARA, precio: 100 },
   "insignia-corona": { tipo: "insignia", nombre: "Corona de Laurel", imagen: "🏆", precio: 1800 },
 };
 
@@ -95,7 +106,10 @@ test("el avatar comprado le gana a la foto de Google", async ({ page }) => {
   // Es una elección explícita: alguien gastó Leyendas para verse así.
   await abrirTablero(page, { ...SIN_NADA, avatar: "avatar-foto" }, "https://example.com/foto.jpg");
 
-  await expect(page.locator("#avatar")).toHaveAttribute("src", "/img/dorsos/dorso-azul.png");
+  // Con la versión, que es lo que evita que el navegador siga mostrando el
+  // avatar viejo después de reemplazarlo. Se pide a `imagenUrl` en vez de
+  // escribir «?v=3» acá: así la prueba sigue al número cuando suba.
+  await expect(page.locator("#avatar")).toHaveAttribute("src", imagenUrl(CARA));
 });
 
 test("un avatar con emoji reemplaza la imagen por un glifo", async ({ page }) => {

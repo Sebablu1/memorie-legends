@@ -176,6 +176,68 @@ test("abre, y el resto de la página queda apagado", async ({ page }) => {
   expect(apagado.principal, "la página sigue activa detrás del cajón").toBe(true);
 });
 
+/**
+ * Toca el velo donde un dedo de verdad puede tocarlo.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ NO ALCANZA CON `.fondo-menu.click()`
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque Playwright toca el CENTRO del elemento, y el centro del velo está
+ * tapado por el cajón. Medido a 390 px de ancho: el velo va de 0 a 390 —es
+ * `position: fixed; inset: 0`— y el cajón ocupa de 70 a 390, así que
+ * `elementFromPoint` en el centro devuelve el cajón, siempre.
+ *
+ * Que es exactamente como tiene que ser: el velo cubre todo para que nada de
+ * atrás se pueda tocar, y el cajón va encima. Lo que queda tocable del velo
+ * es la franja de 70 px de la izquierda, y es ahí donde toca quien usa el
+ * menú.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Y POR QUÉ ESTO PASABA ANTES
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Por una carrera que esta suite ganaba cuando corría sola y perdía con
+ * cuatro trabajadores. El cajón entra con `transform 0.3s`, y durante esos
+ * 300 ms todavía está fuera de la pantalla: en ese hueco el centro del velo
+ * está libre y el clic entra. Con la máquina cargada, los chequeos de
+ * Playwright tardan más, la animación termina antes de que llegue a tocar, y
+ * el clic queda interceptado hasta que vence el tiempo.
+ *
+ * O sea que el caso no probaba lo que decía probar: pasaba por llegar
+ * temprano, no por tocar el velo.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA FRANJA SE CALCULA DEL ANCHO, NO DE LA POSICIÓN
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Y ésa es la parte que importa. Preguntar `boundingBox().x` mientras el
+ * cajón se desliza devuelve dónde está AHORA, no dónde va a quedar: a mitad
+ * de la animación da un número grande, el punto calculado cae donde el cajón
+ * todavía no llegó, y para cuando Playwright toca ya está tapado. Es la
+ * misma carrera, movida de lugar.
+ *
+ * El ANCHO no se mueve durante el deslizamiento. Y el cajón está anclado a
+ * la derecha, así que su borde izquierdo final es `innerWidth - ancho`, se
+ * esté animando o no. De ahí sale la franja, sin esperar nada y sin suponer
+ * ningún número: si mañana el cajón cambia de ancho, esto lo sigue.
+ */
+async function tocarElVelo(page) {
+  const velo = page.locator(".fondo-menu");
+
+  const franja = await page.evaluate(() => {
+    const cajon = document.querySelector(".cajon-menu");
+    // El ancho es estable durante el `transform`; la posición no.
+    const ancho = cajon.getBoundingClientRect().width;
+    return { libre: Math.round(innerWidth - ancho), alto: innerHeight };
+  });
+
+  expect(franja.libre, "el cajón tapa el velo entero: no queda dónde tocar").toBeGreaterThan(8);
+  await velo.click({
+    position: { x: Math.round(franja.libre / 2), y: Math.round(franja.alto / 2) },
+  });
+}
+
 test("se cierra con la X, con el velo y con Escape", async ({ page }) => {
   await abrirTablero(page);
   const cajon = page.locator("#cajonMenu");
@@ -185,7 +247,7 @@ test("se cierra con la X, con el velo y con Escape", async ({ page }) => {
     await expect(cajon).toBeVisible();
 
     if (cerrarDe === "equis") await page.locator(".cerrar-menu").click();
-    if (cerrarDe === "velo") await page.locator(".fondo-menu").click();
+    if (cerrarDe === "velo") await tocarElVelo(page);
     if (cerrarDe === "escape") await page.keyboard.press("Escape");
 
     await expect(cajon, `no cerró con ${cerrarDe}`).toBeHidden();
