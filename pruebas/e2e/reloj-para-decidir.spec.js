@@ -101,6 +101,7 @@ const partidaFalsa = `
   export const mantenerElRelojEnHora = () => () => {};
   export const MS_ENTRE_SINCRONIAS = 30000;
   export const MS_MAXIMO_SIN_RELOJ = 20000;
+  export const ESPERAS_DE_RECONEXION = [1000, 2000, 4000, 8000, 16000, 30000];
   export const mantenerVivo = () => () => {};
   export const mantenerEnMarcha = () => () => {};
   export const nuevoIdDeAccion = () => "a1";
@@ -127,7 +128,9 @@ const partidaFalsa = `
   export const MS_ENTRE_LATIDOS = 5000;
   export const escucharMisLogros = () => () => {};
 
-  export function escucharMiVista(codigo, uid, alRecibir) {
+  export function escucharMiVista(codigo, uid, alRecibir, alSaberDeLaConexion) {
+    // Para que la prueba pueda provocar una caída sin tocar Firestore.
+    window.__conexion = alSaberDeLaConexion;
     alRecibir({
       version: 3,
       fase: CASO.fase ?? "turno",
@@ -485,4 +488,60 @@ test("con el reloj en hora no espera ni avisa nada", async ({ page }) => {
 
   await expect.poll(() => page.evaluate(() => window.__pasadas ?? 0)).toBe(1);
   await expect(page.locator("#pista")).not.toContainText(/reloj en hora/i);
+});
+
+// =====================================================================
+// El cartel de la conexión
+// =====================================================================
+
+/**
+ * Viven acá, y no en `escucha-revive.spec.js`, porque necesitan la MESA
+ * montada: lo que se afirma es qué dice `#pista`, y eso lo decide
+ * `contarDeLaConexion` en `mesa.js`. Aquella suite prueba el otro lado —que
+ * la escucha revive— con el módulo de red de verdad y sin mesa.
+ *
+ * El doble de `escucharMiVista` guarda el cuarto argumento en `window` para
+ * que la prueba pueda provocar la caída sin tocar Firestore.
+ */
+
+const conexion = (page, estado) =>
+  page.evaluate((e) => window.__conexion(e), estado);
+
+test("un corte corto se dice en voz baja", async ({ page }) => {
+  await abrirMesa(page, { fase: "turno", decide: 1, faltanMs: 60_000 });
+
+  await conexion(page, { conectado: false, intentos: 1, caidaHaceMs: 0 });
+  await expect(page.locator("#pista")).toContainText(/Sin conexión/i);
+});
+
+test("y uno largo sube el tono y dice qué pasó", async ({ page }) => {
+  /*
+   * Pasados diez segundos ya se perdió un turno. Callarlo deja al jugador
+   * mirando una mesa que no se mueve, sin saber si el problema es de él.
+   */
+  await abrirMesa(page, { fase: "turno", decide: 1, faltanMs: 60_000 });
+
+  await conexion(page, { conectado: false, intentos: 4, caidaHaceMs: 12_000 });
+
+  const pista = page.locator("#pista");
+  await expect(pista).toContainText(/Seguimos sin conexión/i);
+  await expect(pista, "no dice que la partida siguió sin él").toContainText(/sigue sin vos/i);
+});
+
+test("al volver, el cartel de la caída se va", async ({ page }) => {
+  /*
+   * Y no se va solo: si mientras no estábamos nadie jugó, no llega ninguna
+   * vista nueva que repinte la pista. La repone `contarDeLaConexion`.
+   */
+  await abrirMesa(page, { fase: "turno", decide: 1, faltanMs: 60_000 });
+
+  await conexion(page, { conectado: false, intentos: 1, caidaHaceMs: 0 });
+  await expect(page.locator("#pista")).toContainText(/Sin conexión/i);
+
+  await conexion(page, { conectado: true, intentos: 0, caidaHaceMs: 0 });
+
+  const pista = page.locator("#pista");
+  await expect(pista).not.toContainText(/conexión/i);
+  // Y lo que queda es la pista de la mesa: de quién es el turno.
+  await expect(pista).toContainText(/Beto/i);
 });

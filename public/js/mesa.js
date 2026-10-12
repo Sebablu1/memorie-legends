@@ -5769,6 +5769,47 @@ function mostrarUnMomento(indiceJugador, posicion, carta, ms = MS_MIRAR) {
  * que se hace es volver a escuchar la vista propia. Crear la partida es
  * trabajo de `iniciarPartida`, que se llama desde la sala y una sola vez.
  */
+/**
+ * A partir de cuánto el corte deja de ser un parpadeo y hay que decirlo claro.
+ *
+ * Diez segundos. Por debajo, la mayoría de los cortes se arreglan solos antes
+ * de que el jugador alcance a leer el cartel, y asustarlo sería ruido. Por
+ * encima, ya se perdió un turno: callarlo lo deja mirando una mesa que no se
+ * mueve, sin saber si el problema es de él.
+ */
+const MS_PARA_DECIR_QUE_ES_EN_SERIO = 10_000;
+
+/**
+ * El estado de la escucha, contado en el cartel de la mesa.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * TRES MENSAJES Y NO UNO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * El corte corto —un cambio de celda, el wifi que se despierta— se arregla
+ * solo y lo único que corresponde decir es que se está reintentando. El largo
+ * es otra cosa: la partida siguió sin el jugador, y eso hay que decirlo, con
+ * lo que puede hacer al respecto.
+ *
+ * Y al volver se repone la pista que la mesa habría mostrado. Dejar puesto el
+ * aviso de la caída sería peor que no haberlo puesto nunca: la pista es el
+ * canal por el que se sabe de quién es el turno.
+ *
+ * `pintarVista` la repone sola en cuanto llega una vista nueva — pero si
+ * mientras no estábamos nadie jugó, no llega ninguna. Por eso se repone acá.
+ */
+function contarDeLaConexion({ conectado, caidaHaceMs = 0 }) {
+  if (conectado) {
+    pista(miVista ? pistaDeRed(miVista) : "Conectando con la partida…");
+    return;
+  }
+  if (caidaHaceMs >= MS_PARA_DECIR_QUE_ES_EN_SERIO) {
+    pista("🔌 Seguimos sin conexión. La partida sigue sin vos: revisá tu internet.");
+    return;
+  }
+  pista("⚠️ Sin conexión. Reintentando…");
+}
+
 async function arrancarModoLeyendas(sala, uid) {
   miUid = uid;
 
@@ -5803,7 +5844,7 @@ async function arrancarModoLeyendas(sala, uid) {
     salaPedida,
     uid,
     (vista) => pintarVista(vista),
-    () => pista("⚠️ Sin conexión. Reintentando…"),
+    contarDeLaConexion,
   );
   // El aviso de insignias se escucha desde el arranque y no al abrir el
   // modal: el documento puede aparecer en cualquier momento después del

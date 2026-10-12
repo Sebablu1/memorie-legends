@@ -239,34 +239,119 @@ export function mantenerElRelojEnHora() {
 // ----------------------------------------------------------- la escucha
 
 /**
- * Escucha la propia vista.
+ * Las esperas entre reintentos de la escucha, en milisegundos.
+ *
+ * Se duplican hasta medio minuto. El primero es corto porque la mayoría de
+ * los cortes son de un segundo —un cambio de celda, el wifi que se despierta—
+ * y el techo existe porque una partida de la que nos echaron no se arregla
+ * insistiendo: lo único que haría es gastar batería.
+ */
+export const ESPERAS_DE_RECONEXION = [1000, 2000, 4000, 8000, 16_000, 30_000];
+
+/**
+ * Escucha la propia vista, y se vuelve a suscribir sola si se corta.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ HACE FALTA REINTENTAR ACÁ
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque `onSnapshot` no lo hace. El SDK reintenta solo mientras la escucha
+ * sigue viva —un corte de red común ni siquiera llama al callback de error, se
+ * queda en modo desconectado y recupera al volver—. Pero cuando el error SÍ
+ * llega hasta acá, esa escucha terminó: no entrega una vista más, nunca.
+ *
+ * Y la mesa decía «⚠️ Sin conexión. Reintentando…» sin que nada reintentara.
+ * El tablero se quedaba en la última vista recibida, con su cuenta regresiva
+ * corriendo sobre un plazo viejo, y el jugador tocaba creyendo que le tocaba.
+ * Es la otra mitad del «se te pasó el turno»: no un reloj corrido, una mesa
+ * congelada que parece viva.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * EL FILTRO DE VERSIÓN SOBREVIVE A LA RECONEXIÓN, Y ESTÁ BIEN
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Se crea UNA vez, afuera de `suscribir`. Al volver, Firestore entrega el
+ * documento actual: si la versión no avanzó mientras no estábamos, es la que
+ * ya pintamos y se descarta; si avanzó, pasa. Un filtro nuevo por cada
+ * reconexión volvería a entregar lo mismo que ya estaba en pantalla.
  *
  * @param codigo   código de la partida
  * @param miUid    quién soy. Sólo se puede escuchar la vista propia.
  * @param alCambiar  se llama con cada vista nueva
- * @param alFallar   se llama si Firestore rechaza o corta la escucha
+ * @param alSaberDeLaConexion  `{ conectado, intentos, caidaHaceMs }` cada vez
+ *                   que el estado de la escucha cambia. Al conectar por
+ *                   primera vez no se llama: sólo cuando se cae y cuando
+ *                   vuelve.
  * @returns función para dejar de escuchar
  */
-export function escucharMiVista(codigo, miUid, alCambiar, alFallar) {
+export function escucharMiVista(codigo, miUid, alCambiar, alSaberDeLaConexion = () => {}) {
   if (!codigo || !miUid) throw new Error("Hace falta el código de la partida y el uid propio.");
 
   // Firestore reenvía al suscribirse, repite versiones y tras una reconexión
   // puede entregar fuera de orden. La lógica está en reglas/red.js, probada.
   const esNueva = crearFiltroDeVersion();
 
-  return onSnapshot(
-    doc(db, "partidas", codigo, "vistas", miUid),
-    (snap) => {
-      if (!snap.exists()) return;
-      const vista = snap.data();
-      if (!esNueva(vista)) return;
-      alCambiar(vista);
-    },
-    (error) => {
-      console.error("Se cortó la escucha de la partida:", error);
-      alFallar?.(error);
-    },
-  );
+  let vivo = true;
+  let cortar = null;
+  let reintento = null;
+  let intentos = 0;
+  let caidaDesde = null;
+
+  const suscribir = () => {
+    cortar = onSnapshot(
+      doc(db, "partidas", codigo, "vistas", miUid),
+      (snap) => {
+        if (!vivo) return;
+
+        // Llegó algo: la escucha está viva, haya vista nueva o no. Se avisa
+        // ANTES de filtrar por versión a propósito — volver de un corte sin
+        // que nadie haya jugado mientras tanto es una reconexión igual, y
+        // dejar el cartel de «sin conexión» puesto sería mentir.
+        if (caidaDesde !== null) {
+          caidaDesde = null;
+          intentos = 0;
+          alSaberDeLaConexion({ conectado: true, intentos: 0, caidaHaceMs: 0 });
+        }
+
+        if (!snap.exists()) return;
+        const vista = snap.data();
+        if (!esNueva(vista)) return;
+        alCambiar(vista);
+      },
+      (error) => {
+        if (!vivo) return;
+        console.error("Se cortó la escucha de la partida:", error);
+
+        // Esta escucha ya está terminada; cortarla es por prolijidad, para no
+        // dejar dos vivas si algún día el SDK cambiara de idea.
+        cortar?.();
+        cortar = null;
+
+        if (caidaDesde === null) caidaDesde = Date.now();
+        const espera = ESPERAS_DE_RECONEXION[
+          Math.min(intentos, ESPERAS_DE_RECONEXION.length - 1)
+        ];
+        intentos += 1;
+        alSaberDeLaConexion({
+          conectado: false,
+          intentos,
+          caidaHaceMs: Date.now() - caidaDesde,
+        });
+
+        reintento = setTimeout(() => {
+          if (vivo) suscribir();
+        }, espera);
+      },
+    );
+  };
+
+  suscribir();
+
+  return () => {
+    vivo = false;
+    clearTimeout(reintento);
+    cortar?.();
+  };
 }
 
 /**

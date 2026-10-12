@@ -89,6 +89,7 @@ const partidaFalsa = `
   export const mantenerElRelojEnHora = () => () => {};
   export const MS_ENTRE_SINCRONIAS = 30000;
   export const MS_MAXIMO_SIN_RELOJ = 20000;
+  export const ESPERAS_DE_RECONEXION = [1000, 2000, 4000, 8000, 16000, 30000];
   export const mantenerVivo = () => () => {};
   export const mantenerEnMarcha = () => () => {};
   export const nuevoIdDeAccion = () => "a1";
