@@ -532,6 +532,79 @@ conviene no confundirlo con un respaldo.
 
 - **Decisión:** queda así. Es el kit oficial de WhatsApp.
 
+### §69 — Mesa personalizable
+
+Cinco piezas, 4–6 h, 2–3 sesiones. Las tres primeras son fáciles y sueltas;
+las dos últimas tienen lo suyo.
+
+El diagnóstico está hecho: lo que sigue son referencias, no suposiciones.
+
+**C6 — la rosa de los vientos** (lo que se ve como «una rueda de carro»).
+`mesa.css:400-401`, las dos ÚNICAS referencias a `rosa-viento.svg` en todo el
+repo. Vive en `.mesa::before`, con `pointer-events: none`, así que no ocupa
+lugar ni recibe clics. Quitarla o cambiarla no toca nada más. Ojo: se usa como
+MÁSCARA, así que el color lo pone el CSS y lo que manda el archivo es la
+opacidad — un reemplazo con relleno sólido se vería como un bloque. Y ninguna
+prueba la vigila, o sea que un reemplazo malo no se denuncia solo.
+
+**D — `--sala`.** El hueco ya existe y está comentado: `mesa.css:111`,
+`var(--sala, none)` como primera capa del fondo del `body`. **Nadie la
+escribe.** `--pano` sí tiene quien lo haga, en `mesa.js:209`. Conectarla es
+darle un escritor, igual que aquél. No define nada estructural: es
+`background-attachment: fixed` sobre el `body`.
+
+**B1 + C — el paño en ráster.** Son el mismo trabajo: no hay «dibujo de la
+mesa» que reemplazar —son capas de CSS— y el hueco para el diseño ES `--pano`,
+que ya funciona. Lo único que falta es que el panel deje subir ráster para
+`fondo`: cambiar su `clase` de VECTOR a RASTER en
+`reglas/imagenes-de-catalogo.js:154`. La receta (1200 lado mayor, nativa) ya
+la soporta la tabla.
+
+Cinco cerrojos a seguir, no cuatro: `imagenes-de-catalogo.mjs` en :146, :79 y
+:117; `admin-conversor.spec.js:300`; y `panos.mjs:175`, que lee CADA paño como
+texto buscando `preserveAspectRatio` y daría falso negativo con un WebP — el
+arreglo está al lado, en :284, donde los mazos ya se filtran con
+`.endsWith(".svg")`.
+
+El mensaje «es un SVG y no se rasteriza» está en UN solo lugar,
+`conversor-de-imagen.js:255`, y se queda sin usuarios solo. El admin no se
+toca.
+
+Aviso de diseño: `--pano` se aplica ESTIRADO —`center / 100% 100%`,
+`mesa.js:209`— y la mesa es fluida, sin medidas fijas. Por eso los cuatro
+paños actuales son SVG con `preserveAspectRatio="none"`. Un ráster estirado a
+un óvalo de proporción variable se deforma.
+
+**B2 — el mazo a 400×600 exactos.** Lo único que necesita código nuevo.
+`PROPORCIONES` (`imagenes-de-catalogo.js:70`) sólo tiene CUADRADA y NATIVA, y
+las dos trabajan sobre `ladoMayor`. Falta un modo de PAR EXACTO: una entrada
+en `PROPORCIONES`, una rama en `medidasDeSalida`
+(`conversor-de-imagen.js:59`) y generalizar el recorte centrado de 1:1 a w:h
+—el código ya existe para CUADRADA—, más sus pruebas.
+
+**E — mesa por modo.** Decidido: **archivos fijos elegidos por código**, en
+`/img/mesa/modos/{entrenamiento,publica,privada,torneo}`. NO artículos del
+catálogo: el catálogo es lo que un jugador compra y equipa, y esto lo decide
+la casa y no se elige. El jugador sigue eligiendo paño y dorsos como hoy.
+
+Hoy la mesa es SIEMPRE la misma. `MODO` es binario —`mesa.js:459`,
+`salaPedida ? "leyendas" : "entrenamiento"`— y ni eso cambia el dibujo: el CSS
+de la mesa no sabe de modos y `mesa.html` no lleva ningún `data-`.
+
+El dato existe a medias: la sala privada YA trae `extra.privada: true`
+(`salas-privadas.js:215`), la pública es su ausencia, y el `tipo` del torneo
+vive en el documento del TORNEO (`torneos.js:138`), no en la sala — ése hay
+que propagarlo o cruzarlo. La mesa hoy lee de la sala sólo `entrada`,
+`estado`, `jugadores`, `pozo` y `revancha`.
+
+Y la capa donde entra ya está: `mesa.css:336` apila paño (del jugador),
+piedra (de la casa) y baranda, las tres en el mismo `background`. Una mesa por
+modo va entre la piedra y el paño, sin tocar geometría ni el paño del jugador.
+
+**Lo que NO se toca: `marco` y `sello`.** No hay una sola pieza de arte
+dibujada, y elegir medidas para algo que nadie vio es escribir un número para
+cambiarlo después.
+
 ### §68 — `entregar-a-rival.spec.js:315` — RESUELTO
 
 El spec asumía posiciones DENSAS (0, 1, 2) y la mesa usa posiciones HUECAS
