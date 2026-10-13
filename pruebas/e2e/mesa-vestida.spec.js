@@ -269,19 +269,54 @@ test("al que le toca se lo distingue por un halo, no por un contorno", async ({
    * Sin esto, apagar el halo para TODOS pasaría esta prueba igual.
    */
   const asiento = page.locator('.jugador[data-jugador="0"]');
-  await asiento.evaluate((el) => el.classList.remove("propio"));
+  /**
+   * Se PROVOCA el pico y se mira el máximo, en un solo viaje al navegador.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * ESTO ERA UN `expect.poll` Y TENÍA UNA VENTANA DE 550 ms
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Sacaba la clase desde acá y después esperaba, desde afuera, a ver la
+   * opacidad en 1. Medido, muestreando cada 100 ms:
+   *
+   *     +   0 ms  propio=false  opacidad=0      mismo nodo=true
+   *     + 412 ms  propio=false  opacidad=1      mismo nodo=true
+   *     + 960 ms  propio=true   opacidad=0      mismo nodo=FALSE
+   *
+   * Dos cosas que no sabía. Una: la transición de 0,35 s corre igual con
+   * `reducedMotion: "reduce"` puesto en la config, y tarda 412 ms en llegar.
+   * Dos: a los ~960 ms el asiento SE REEMPLAZA —`mesa.js` lo redibuja desde
+   * una plantilla que incluye sus clases—, así que `propio` vuelve y la
+   * opacidad se queda en 0. No es que tarde: ya no va a pasar nunca.
+   *
+   * Así que la afirmación tenía ~550 ms para acertar, y `expect.poll` lee a
+   * los ~0, 100, 350 y 850 ms: con la máquina descansada el tiro de los 850
+   * caía adentro, con carga se corría y los 15 s de timeout eran 15 s
+   * esperando algo que no vuelve. Pasaba 5 de 5 sola y fallaba en la suite.
+   *
+   * Muestreando acá adentro con `rAF`, el pico se captura antes de que el
+   * redibujo llegue. Y si llegara primero, se corta por `isConnected` y
+   * vuelve el máximo parcial: la prueba falla fuerte en vez de leerle la
+   * opacidad a un nodo desprendido, que contesta cualquier cosa.
+   *
+   * Aflojar el `toBe(1)` a `> 0.5` ensancharía la ventana a ~800 ms y la
+   * dejaría igual de colgada del redibujo. Es comprar tiempo, no arreglar.
+   */
+  const picoDelHalo = await asiento.evaluate(async (el) => {
+    el.classList.remove("propio");
 
-  // Con `expect.poll` y no leyendo una sola vez: el halo entra con una
-  // transición de 0,35 s, así que medirlo apenas cambia la clase devuelve el
-  // valor de partida —cero— y la prueba fallaría por el reloj, no por el CSS.
-  // Un `sleep` calibrado a mano haría lo mismo peor: anda en esta máquina y
-  // falla en la de al lado.
-  await expect
-    .poll(
-      () => asiento.evaluate((el) => Number(getComputedStyle(el, "::before").opacity)),
-      { message: "un asiento en turno que no es el mío no se enciende" },
-    )
-    .toBe(1);
+    let pico = 0;
+    const limite = performance.now() + 600;
+    while (performance.now() < limite) {
+      if (!el.isConnected) break; // lo redibujaron: lo que siga no es este asiento
+      pico = Math.max(pico, Number(getComputedStyle(el, "::before").opacity));
+      if (pico === 1) break;
+      await new Promise(requestAnimationFrame);
+    }
+    return pico;
+  });
+
+  expect(picoDelHalo, "un asiento en turno que no es el mío no se enciende").toBe(1);
 
   await asiento.evaluate((el) => el.classList.add("propio"));
 
