@@ -532,6 +532,55 @@ conviene no confundirlo con un respaldo.
 
 - **Decisión:** queda así. Es el kit oficial de WhatsApp.
 
+### §70 — La configuración general ya no se edita desde el panel
+
+Salió de la fase 4 de la mesa por contexto. El selector tiene los CUATRO
+contextos y nada más, así que `config/mesa` —el documento global, el que esta
+pantalla escribía antes de que hubiera contextos— quedó de sólo lectura: se
+muestra como heredada y se adopta al guardar, pero no hay forma de escribirla.
+
+Hoy no se pierde nada porque está vacío: ninguna mesa tiene documento propio y
+todas caen al global, que tampoco existe, así que todo el mundo ve la mesa de
+siempre. El costo aparece el día que quieras cambiar lo que heredan las cuatro:
+hay que tocarlas de a una, cuatro veces lo mismo.
+
+**Lo que haría falta:** una quinta opción «General (todas las mesas)» en el
+selector, con valor vacío, que `documentoDeMesa` ya resuelve al global
+(`reglas/salas.js:92` — cualquier cosa que no sea uno de los cuatro cae en
+`mesa`). El servidor no necesita cambios: `guardar` sin contexto ya escribe
+ahí. Las opciones se arman en `admin/mesas-admin.js:108` desde
+`CONTEXTOS_VALIDOS`, así que la quinta tendría que agregarse a mano fuera de
+ese bucle, y eso es justo lo que la prueba «el selector tiene las cuatro mesas»
+afirma hoy — habría que ajustarla.
+
+**Por qué no se hizo:** no me lo pidieron, y no es gratis. Una opción que
+escribe lo que heredan las otras cuatro es la que más fácil se toca sin querer.
+Si se agrega, el panel tendría que decir en qué modo está con más énfasis que
+una línea de texto.
+
+### §71 — Dos lecturas de config por cada arranque de mesa
+
+`mesa.js:262` pide `config/mesa-{contexto}` y, si no está, `mesa.js:265` pide
+`config/mesa`. Mientras ningún contexto tenga documento propio —o sea, hoy
+siempre— son **dos** viajes a Firestore por partida en vez de uno.
+
+No bloquea nada: `vestirLaCasa()` se dispara sin `await` a propósito, la mesa
+se dibuja con lo de siempre y el diseño se aplica cuando llega. Son dos
+variables de CSS, así que aplicarlas no redibuja ni mueve una carta. Pero es un
+viaje de más, y se paga en cada mesa que se abre.
+
+**Se arregla solo** en cuanto los cuatro contextos tengan su documento: ahí la
+primera lectura acierta y la segunda no ocurre (`diseno-de-mesa.js:89` y `:92`
+hacen lo mismo del lado del panel, y hay una prueba que afirma que con el
+documento propio puesto NO se va a buscar el general).
+
+**Si alguna vez molesta:** la salida no es cachear en el cliente —el diseño lo
+decide la casa y tiene que poder cambiar— sino que las cuatro mesas tengan lo
+suyo escrito, aunque sea copiando el global una vez. Eso es una decisión de
+datos, no de código, y tiene su contra: cuatro copias de lo mismo que después
+hay que mantener sincronizadas (es la razón por la que el fallback existe y no
+se copió nada en la fase 1).
+
 ### §69 — Mesa personalizable
 
 Cinco piezas, 4–6 h, 2–3 sesiones. Las tres primeras son fáciles y sueltas;
