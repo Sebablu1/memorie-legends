@@ -388,5 +388,78 @@ console.log("\n=== 8. El servidor escribe al documento del contexto ===");
   }
 }
 
+// =====================================================================
+console.log("\n=== 9. De quién es lo que el panel muestra ===");
+// =====================================================================
+{
+  /*
+   * Tres estados, y el panel los dice con palabras distintas. Se informan
+   * con DOS banderas porque por el diseño no se distinguen: un documento
+   * propio vacío —«esta mesa usa la de siempre y no hereda la general»—
+   * llega con el mismo `{}` que no tener documento.
+   */
+  const espiar = (documentos) => {
+    const pedidos = [];
+    const db = { collection: () => ({ doc: (d) => ({
+      set: async () => {},
+      get: async () => {
+        pedidos.push(d);
+        const guardado = documentos[d];
+        return { exists: guardado != null, data: () => guardado };
+      },
+    }) }) };
+    const d = crearDisenoDeMesa({
+      db,
+      administradores: { exigir: async () => {} },
+      campoBorrado: () => "«BORRADO»",
+    });
+    return { d, pedidos };
+  };
+
+  {
+    const { d, pedidos } = espiar({ "mesa-privada": { sala: "#101010" } });
+    const r = await d.leer({}, { contexto: "privada" });
+    ok(r.propio === true && r.heredado === false, "con el suyo puesto, es propio", r);
+    ok(r.diseno.sala === "#101010", "y muestra el suyo");
+    ok(pedidos.join(",") === "mesa-privada", "sin ir a buscar el general", pedidos);
+  }
+
+  {
+    const { d, pedidos } = espiar({ mesa: { sala: "#202020" } });
+    const r = await d.leer({}, { contexto: "privada" });
+    ok(r.propio === false && r.heredado === true, "sin el suyo, hereda el general", r);
+    ok(r.diseno.sala === "#202020", "y muestra el general");
+    ok(pedidos.join(",") === "mesa-privada,mesa", "primero el suyo", pedidos);
+  }
+
+  {
+    /*
+     * LA BASE VACÍA, que es el estado de producción de hoy.
+     *
+     * Con una sola bandera esto se confundía con «tiene su propia
+     * configuración», y el panel lo decía con la cara seria.
+     */
+    const { d } = espiar({});
+    const r = await d.leer({}, { contexto: "privada" });
+    ok(r.propio === false && r.heredado === false, "sin nada, no es propio ni heredado", r);
+    ok(Object.keys(r.diseno).length === 0, "y el diseño viene vacío", r.diseno);
+  }
+
+  {
+    /*
+     * EL CASO QUE OBLIGA A LA BANDERA.
+     *
+     * Documento propio VACÍO: es la forma de decir «no heredes la general».
+     * El diseño es `{}`, igual que cuando no hay nada, así que mirar el
+     * diseño no alcanza — hay que mirar si el documento existe.
+     */
+    const { d, pedidos } = espiar({ "mesa-privada": {} });
+    const r = await d.leer({}, { contexto: "privada" });
+    ok(r.propio === true, "un documento propio vacío sigue siendo propio", r);
+    ok(r.heredado === false, "y no hereda nada");
+    ok(pedidos.join(",") === "mesa-privada", "ni va a buscarlo", pedidos);
+  }
+}
+
 console.log(fallos ? `\n❌ ${fallos} fallos` : "\n✅ TODO OK");
 process.exit(fallos ? 1 : 0);

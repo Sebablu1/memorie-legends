@@ -64,21 +64,37 @@ export function crearDisenoDeMesa({ db, administradores, campoBorrado }) {
     return { guardado: true, campos: Object.keys(cambios), documento: documentoDeMesa(contexto) };
   }
 
-  /** Lo que hay guardado, para que el panel muestre lo que ya está puesto. */
+  /**
+   * Lo que hay guardado, para que el panel muestre lo que ya está puesto.
+   *
+   * Son TRES estados, no dos, y se informan con dos banderas porque por el
+   * diseño no se distinguen:
+   *
+   *   propio: true                 tiene su documento. Lo que se ve es de
+   *                                esta mesa y no hereda nada.
+   *   propio: false, heredado      no tiene el suyo: lo que se ve es la
+   *                                configuración general, prestada.
+   *   los dos en false             no hay nada guardado en ningún lado.
+   *
+   * El tercero es el estado de producción de hoy, y es el que obliga a
+   * mandar `propio` además del diseño: un documento propio VACÍO —la forma
+   * de decir «esta mesa usa la de siempre y no hereda la general»— llega con
+   * el mismo `{}` que no tener nada. Sin la bandera, el panel tiene que
+   * adivinar, y adivina mal: diría «tiene su propia configuración» sobre una
+   * base vacía.
+   */
   async function leer(context, { contexto } = {}) {
     await administradores.exigir(context);
 
-    /*
-     * El panel necesita saber si lo que muestra es PROPIO de ese contexto o
-     * HEREDADO del global, porque no es lo mismo editar lo tuyo que editar
-     * una copia de otra cosa: guardar sobre lo heredado crea el documento
-     * del contexto y lo desengancha de la general para siempre.
-     */
-    const propio = await ref(contexto).get();
-    if (propio.exists) return { diseno: propio.data(), heredado: false };
+    const suyo = await ref(contexto).get();
+    if (suyo.exists) return { diseno: suyo.data(), propio: true, heredado: false };
 
-    const global = await ref(undefined).get();
-    return { diseno: global.exists ? global.data() : {}, heredado: global.exists };
+    const general = await ref(undefined).get();
+    return {
+      diseno: general.exists ? general.data() : {},
+      propio: false,
+      heredado: general.exists,
+    };
   }
 
   return { guardar, leer };

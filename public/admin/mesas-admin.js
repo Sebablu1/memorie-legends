@@ -140,17 +140,27 @@ export function montarMesasAdmin() {
   };
 
   /**
-   * Dice si lo que está en pantalla es de esta mesa o prestado.
+   * Dice de quién es lo que está en pantalla: de esta mesa, prestado, o nada.
    *
    * No es un detalle: editar lo propio y editar una copia de otra cosa se
    * ven idénticos en el formulario, y sólo uno de los dos desengancha esta
    * mesa de la general para siempre. Decirlo antes evita la sorpresa.
+   *
+   * Y el tercer estado tiene que ser suyo. Con dos mensajes, «no hay nada
+   * guardado» caía en «tiene su propia configuración» — que con la base
+   * vacía, que es el estado de hoy, es simplemente falso. Lo dice el
+   * servidor con dos banderas: por el diseño no se distingue, porque un
+   * documento propio vacío llega con el mismo `{}` que no tener documento.
    */
-  const mostrarDeQuien = (heredado) => {
+  const mostrarDeQuien = ({ propio, heredado }) => {
     if (!deQuien) return;
-    deQuien.textContent = heredado
-      ? "Esto es la configuración general: esta mesa la hereda. Si guardás, pasa a tener la suya."
-      : "Esta mesa tiene su propia configuración.";
+    if (propio) deQuien.textContent = "Esta mesa tiene su propia configuración.";
+    else if (heredado) {
+      deQuien.textContent =
+        "Esto es la configuración general: esta mesa la hereda. Si guardás, pasa a tener la suya.";
+    } else {
+      deQuien.textContent = "Todavía no hay nada puesto: se ve la mesa de siempre.";
+    }
   };
 
   async function cargar() {
@@ -160,7 +170,10 @@ export function montarMesasAdmin() {
       brujula.value = data?.diseno?.brujula ?? "";
       if (sala) sala.value = data?.diseno?.sala ?? "";
       mostrarLoLeido();
-      mostrarDeQuien(data?.heredado === true);
+      mostrarDeQuien({
+        propio: data?.propio === true,
+        heredado: data?.heredado === true,
+      });
       decir("");
     } catch (error) {
       console.error("No se pudo leer el diseño de la mesa:", error);

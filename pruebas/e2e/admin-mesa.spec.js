@@ -61,10 +61,12 @@ const firebaseFalso = (porContexto) => `
       window.__llamadas.push({ nombre, datos });
       const cual = datos?.contexto ?? "";
       if (nombre === "leerDisenoDeMesaAdmin") {
-        const propio = window.__guardado[cual];
-        if (propio) return { data: { diseno: propio, heredado: false } };
+        const suyo = window.__guardado[cual];
+        if (suyo) return { data: { diseno: suyo, propio: true, heredado: false } };
         const general = window.__guardado[""];
-        return { data: { diseno: general ?? {}, heredado: Boolean(general) } };
+        return {
+          data: { diseno: general ?? {}, propio: false, heredado: Boolean(general) },
+        };
       }
       if (nombre === "guardarDisenoDeMesaAdmin") {
         // El servidor de verdad borra el campo con FieldValue.delete(); acá
@@ -540,4 +542,42 @@ test("y algo inválido en el otro campo frena el botón", async ({ page }) => {
 
   await expect(page.locator("#avisoMesa")).toContainText(/\/img\//);
   expect(await ultimoGuardado(page), "salió igual a la red").toBeNull();
+});
+
+// =====================================================================
+// 6. De quién es lo que el panel muestra
+// =====================================================================
+
+test("con la base vacía, el panel NO dice que la mesa tenga lo suyo", async ({ page }) => {
+  /*
+   * Es el estado de producción de hoy: no existe ni `config/mesa`.
+   *
+   * Con dos mensajes, esto caía en «tiene su propia configuración» y el
+   * panel lo decía con la cara seria sobre una base vacía. Son tres estados
+   * y necesitan tres palabras.
+   */
+  await abrirPanelCon(page, {});
+  const dice = page.locator("#mesaContextoLeido");
+
+  await expect(dice).toContainText(/todavía no hay nada/i);
+  await expect(dice, "dijo que la mesa tiene lo suyo").not.toContainText(/propia/i);
+  await expect(dice, "dijo que hereda algo que no existe").not.toContainText(/hereda/i);
+});
+
+test("un documento propio VACÍO es propio, no «no hay nada»", async ({ page }) => {
+  /*
+   * EL CASO QUE OBLIGA A QUE EL SERVIDOR MANDE LA BANDERA.
+   *
+   * Vaciar los dos campos y guardar es la forma de decir «esta mesa usa la
+   * de siempre y NO hereda la general». El diseño que llega es `{}`, igual
+   * que cuando no hay nada: mirar el diseño no alcanza, hay que saber si el
+   * documento existe.
+   */
+  await abrirPanelCon(page, { "": { sala: "#101010" }, entrenamiento: {} });
+  const dice = page.locator("#mesaContextoLeido");
+
+  await expect(dice).toContainText(/propia/i);
+  await expect(dice, "lo confundió con la base vacía").not.toContainText(/no hay nada/i);
+  // Y no muestra la general, porque esta mesa dejó de heredarla.
+  await expect(page.locator("#mesaSala")).toHaveValue("");
 });
