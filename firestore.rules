@@ -184,6 +184,18 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Configuración de la casa: la decora el administrador y la mira todo el
+    // mundo. Mismo trato que `juegos` y por el mismo motivo: no hay nada
+    // privado adentro —una ruta de imagen y un color— y la mesa la necesita
+    // antes de que haya sesión para dibujarse bien.
+    //
+    // Se ESCRIBE sólo desde el servidor, como todo lo que decide la casa. Un
+    // navegador que pudiera escribir acá le cambiaría la mesa a todo el mundo.
+    match /config/{clave} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // ------------------------------------------------------- salas
     // Las salas las escribe ÚNICAMENTE el servidor: crear, unirse, iniciar
     // y salir pasan por Cloud Functions, que usan credenciales de admin y

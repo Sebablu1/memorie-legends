@@ -397,8 +397,12 @@ body::before {
   opacity: 0.5;
   background: rgba(255, 244, 214, 0.85);
   filter: drop-shadow(0 1.5px 0 rgba(0, 0, 0, 0.55));
-  -webkit-mask: url("/img/mesa/rosa-viento.svg") center 46% / contain no-repeat;
-  mask: url("/img/mesa/rosa-viento.svg") center 46% / contain no-repeat;
+  /* `--brujula` la escribe `modulos/diseno-de-mesa.js` si el administrador
+     cargó una propia. Sin escribir, el `var()` cae en la de siempre; con
+     `none`, el pseudo-elemento no pinta nada. Las tres opciones —la de
+     siempre, una propia, ninguna— sin una sola línea condicional. */
+  -webkit-mask: var(--brujula, url("/img/mesa/rosa-viento.svg") center 46% / contain no-repeat);
+  mask: var(--brujula, url("/img/mesa/rosa-viento.svg") center 46% / contain no-repeat);
 }
 
 /* La veta de la piedra. Ruido estirado, casi invisible: su trabajo es que la

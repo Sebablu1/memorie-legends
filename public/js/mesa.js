@@ -72,6 +72,7 @@ import { imagenUrl } from "./modulos/imagenes.js";
 import { anotar } from "./analitica.js";
 import { caraDeCarta, imagenCarta, PALOS, NUMEROS } from "./reglas/baraja.js";
 import { guardarVestuario, vestuarioGuardado } from "./modulos/vestuario.js";
+import { aplicarDisenoDeMesa } from "./modulos/diseno-de-mesa.js";
 import { LIMITE_ELIMINACION, puntosMano } from "./reglas/puntaje.js";
 import * as IA from "./reglas/ia.js";
 import {
@@ -212,6 +213,39 @@ function vestirLaMesa() {
   }
 
   aplicarDorsoPropio();
+}
+
+/**
+ * El diseño que decide la casa: la sala de atrás y la brújula del paño.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * NO BLOQUEA EL ARRANQUE, Y ES A PROPÓSITO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Se dispara y no se espera. La mesa se dibuja con lo de siempre y, si hay
+ * configuración, se aplica cuando llega — son dos variables de CSS, así que
+ * cambiarlas no redibuja nada ni mueve una carta.
+ *
+ * Esperar la lectura sería agregarle un viaje a Firestore al momento más
+ * caro de la pantalla, justo cuando el reloj se está sincronizando y la
+ * primera vista está por llegar. Ya sabemos lo que cuesta cargar ese
+ * instante: el desfase del reloj se mide ahí, y cada milisegundo de más
+ * ensucia la medición.
+ *
+ * Y si falla —sin red, reglas, documento inexistente— no pasa nada: la mesa
+ * ya está bien. Por eso el error se anota y no se muestra.
+ */
+async function vestirLaCasa() {
+  try {
+    const { db, doc, getDoc } = await import("./firebase.js");
+    const snap = await getDoc(doc(db, "config", "mesa"));
+    if (!snap.exists()) return;
+    aplicarDisenoDeMesa(document.querySelector(".mesa"), snap.data());
+  } catch (error) {
+    // La mesa de siempre ya está en pantalla: esto no es un problema del
+    // jugador y no tiene nada que hacer al respecto.
+    console.warn("No se pudo leer el diseño de la mesa:", error);
+  }
 }
 
 (async () => {
@@ -402,6 +436,9 @@ let YO = 0;
 // carta. Ésa es la línea que saca el salto — la mesa abre ya vestida y la
 // lectura de Firestore, cuando llega, casi siempre confirma lo mismo.
 vestirLaMesa();
+
+// Y lo que decide la casa, sin esperarlo: la mesa ya está bien sin esto.
+vestirLaCasa();
 
 /**
  * Las 48 caras, pedidas apenas la mesa deja de estar ocupada.
