@@ -532,6 +532,57 @@ conviene no confundirlo con un respaldo.
 
 - **Decisión:** queda así. Es el kit oficial de WhatsApp.
 
+### §68 — `entregar-a-rival.spec.js:315` — RESUELTO
+
+El spec asumía posiciones DENSAS (0, 1, 2) y la mesa usa posiciones HUECAS
+después de un descarte —{0, 2, 3}, por ejemplo—: `data-posicion` es el
+protocolo del motor y NO se compacta. Lo dice `mesa.js` donde dibuja la mano:
+«si se compactara también eso, tocar la tercera carta jugaría la cuarta».
+
+Pedía `cartaDe(otroRival, 0)` —dando por hecho que existe la posición 0— y
+`cartaDe(rival, (posicion + 1) % cuantas(rival))`, que mezclaba una CUENTA
+con un ÍNDICE. Las dos daban `null` apenas la mano tenía un hueco.
+
+Arreglado con `posicionesDe()` y `otraCartaDe()`: se leen las posiciones que
+la mano tiene en vez de suponerlas. **El código de la mesa estaba bien.**
+
+Verificado ×5 el caso y ×2 el archivo entero. Commit `f4422fd`.
+
+### §67 — `fin-de-ronda-en-red.spec.js` es frágil por diseño
+
+El archivo entero depende de atrapar un estado que dura ~1 segundo con un
+SALTO de reloj falso que dispara la apertura y el cierre dentro del mismo
+avance. No es un caso mal escrito: es la forma del archivo.
+
+**Ajustar `runFor` no lo arregla.** Se probó, con medición de por medio:
+
+| `runFor` | fallos |
+|---|---|
+| 600 (el actual) | 1 de 50 |
+| 800 | 8 de 18 |
+| 1000 | 17 de 50 |
+
+Medido con un `MutationObserver` sobre la clase de `#velo`: el modal dura
+~1000 ms de reloj falso y **se cierra solo** —no lo cierra la vista de
+`mirar` de los 1500, que es lo que parece mirando la secuencia— y su
+apertura salta entre 121 y 377 ms según cuánto tarde la mesa en montar.
+
+Y una trampa para el que venga: un barrido de CUATRO repeticiones da
+«perfecto» sobre valores que fallan un tercio de las veces. `runFor(1000)`
+pasó 4 de 4 y falla 17 de 50. Para este archivo, menos de veinte
+repeticiones no dice nada.
+
+**El arreglo real es cambiar CÓMO el test observa el modal** —esperar el
+evento en vez de adivinar el milisegundo— no cuánto avanza el reloj.
+
+Hay otros dos casos del mismo archivo con la misma forma, que también
+cayeron en la verificación: `el 10 a medio decidir se cierra si el servidor
+lo resuelve por tiempo` (línea 290) y `la cuenta sale del plazo del
+servidor, no de ocho segundos fijos` (línea 328).
+
+Sesión propia. **No bloquea el despliegue**: es viejo, conocido y el rojo
+que produce es siempre el mismo.
+
 ### §27 — Barrido responsive (cosas dejadas a propósito)
 
 - Panel admin: campos a 14,4px.
