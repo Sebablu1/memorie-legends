@@ -30,18 +30,17 @@
         ]
       },
       {
-        "// por qué un día": "Los avatares son las únicas imágenes que se reemplazan manteniendo el nombre: el arte se rehace y el archivo sigue llamándose asesino.webp. La versión al dibujar (imagenUrl, en reglas/imagenes.js) resuelve cada cambio; esto acota lo que puede durar un descuido. El precio es una revalidación por avatar por día: trece 304 de doscientos bytes.",
-        "// y va primero": "VA PRIMERO, Y ÉSE ES EL PUNTO. Firebase aplica la PRIMERA regla que coincide, no la más específica ni la última. Esta regla existía desde C2 pero estaba DEBAJO de la genérica de imágenes, así que nunca se aplicó: el servidor entregaba los avatares con el mes de abajo. Comprobado con curl contra producción, que devolvía max-age=2592000 para img/avatar/el_as.webp. Si alguien vuelve a mover este bloque debajo del otro, se apaga sin que nada falle.",
-        "source": "img/avatar/**",
-        "headers": [
-          { "key": "Cache-Control", "value": "public, max-age=86400, stale-while-revalidate=604800" }
-        ]
-      },
-      {
-        "//": "Un mes. Es seguro SOLO si una imagen que cambia cambia de dirección: de nombre (memorie-legends2.png -> .webp) o de versión (?v=VERSION_IMAGENES para todo /img/, en reglas/imagenes.js; ?v=VERSION_CARTAS para las cartas, en reglas/baraja.js). Reemplazar un archivo con el mismo nombre deja la copia vieja en cada navegador que ya la tenía, hasta que venza: pasó con las cartas rediseñadas. Eran 7 días.",
+        "//": "Un mes. Es seguro SOLO si una imagen que cambia cambia de dirección: de nombre (memorie-legends2.png -> .webp) o de versión (las cartas llevan ?v=VERSION_CARTAS, en reglas/baraja.js). Reemplazar un archivo con el mismo nombre deja la copia vieja en cada navegador que ya la tenía, hasta que venza: pasó con las cartas rediseñadas. Eran 7 días.",
         "source": "**/*.@(png|jpg|jpeg|gif|webp|svg|ico|avif)",
         "headers": [
           { "key": "Cache-Control", "value": "public, max-age=2592000, stale-while-revalidate=604800" }
+        ]
+      },
+      {
+        "// avatar": "Un DÍA, no un mes, y sólo para los avatares. Son las únicas imágenes que se reemplazan manteniendo el nombre: el arte se rehace y el archivo sigue llamándose asesino.webp. Con el mes de abajo, el borde del CDN siguió entregando los viejos despues de desplegar los nuevos —el archivo estaba en el servidor, se veía pidiendolo con cualquier query— y la unica salida era esperar. La version al dibujar (avatarUrl, en modulos/imagenes.js) resuelve el caso de cada cambio; esto acota lo que puede durar un descuido. El precio es una revalidacion por avatar por dia: trece 304 de doscientos bytes.",
+        "source": "img/avatar/**",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=86400, stale-while-revalidate=604800" }
         ]
       },
       {
