@@ -347,7 +347,12 @@ export const EsquemaDisenoDeMesa = z.object({
   sala: z
     .union([
       RutaDeImagen,
-      z.string().regex(/^#[0-9a-fA-F]{3,8}$/, "El color tiene que ser un hexadecimal."),
+      z.string().regex(
+        // 3, 4, 6 u 8 dígitos: lo que CSS acepta. Cinco y siete no existen, y
+        // guardarlas daría un color aceptado que al dibujar no pinta nada.
+        /^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/,
+        "El color tiene que ser un hexadecimal de 3, 4, 6 u 8 dígitos.",
+      ),
       z.null(),
     ])
     .optional(),

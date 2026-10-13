@@ -750,12 +750,27 @@
               lea sobre cualquier paño.
             </small>
           </label>
+
+          <label class="ancho">
+            <span>El fondo de la sala — una ruta (<code>/img/…</code>) o un color</span>
+            <input id="mesaSala" type="text" placeholder="/img/mesa/salas/cueva.webp  o  #1a1a2e" autocomplete="off" />
+            <small class="nota-campo">
+              Vacío deja la sala de siempre —las antorchas y la piedra—. Un
+              color va en hexadecimal (<code>#1a1a2e</code>) y se pinta plano:
+              va a verse más chato que el degradado actual, que es lo que da
+              la sensación de pared iluminada desde arriba.
+            </small>
+            <small class="nota-campo" id="mesaSalaLeido"></small>
+          </label>
         </div>
 
         <div class="acciones">
           <button id="btnGuardarMesa" class="accion" type="button">Guardar</button>
           <button id="btnBorrarBrujula" class="secundario" type="button">
             Volver a la brújula de siempre
+          </button>
+          <button id="btnBorrarSala" class="secundario" type="button">
+            Volver a la sala de siempre
           </button>
         </div>
         <div class="aviso" id="avisoMesa"></div>

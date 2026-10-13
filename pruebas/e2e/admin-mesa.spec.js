@@ -111,8 +111,11 @@ test("guardar una ruta la manda tal cual", async ({ page }) => {
   await page.fill("#mesaBrujula", "/img/mesa/brujulas/nueva.webp");
   await page.click("#btnGuardarMesa");
 
+  // Van los DOS campos: «Guardar» guarda el formulario, y el formulario se
+  // cargó con lo que había. La sala vacía viaja como `null` porque vacío
+  // quiere decir «dejá la de siempre».
   await expect.poll(() => ultimoGuardado(page))
-    .toEqual({ brujula: "/img/mesa/brujulas/nueva.webp" });
+    .toEqual({ brujula: "/img/mesa/brujulas/nueva.webp", sala: null });
   await expect(page.locator("#avisoMesa")).toContainText(/Listo/i);
 });
 
@@ -127,7 +130,7 @@ test("«ninguna» se guarda como palabra, no como ruta", async ({ page }) => {
   await page.fill("#mesaBrujula", "ninguna");
   await page.click("#btnGuardarMesa");
 
-  await expect.poll(() => ultimoGuardado(page)).toEqual({ brujula: "ninguna" });
+  await expect.poll(() => ultimoGuardado(page)).toEqual({ brujula: "ninguna", sala: null });
 });
 
 test("vaciar el campo manda null, que es volver a la de siempre", async ({ page }) => {
@@ -144,9 +147,8 @@ test("vaciar el campo manda null, que es volver a la de siempre", async ({ page 
   await page.fill("#mesaBrujula", "");
   await page.click("#btnGuardarMesa");
 
-  await expect.poll(() => ultimoGuardado(page)).toEqual({ brujula: null });
+  await expect.poll(() => ultimoGuardado(page)).toEqual({ brujula: null, sala: null });
   await expect(page.locator("#mesaBrujula")).toHaveValue("");
-  await expect(page.locator("#avisoMesa")).toContainText(/de siempre/i);
 });
 
 test("y el botón de volver atrás hace lo mismo sin tener que borrar a mano", async ({ page }) => {
@@ -198,4 +200,93 @@ test("la brújula NO aparece entre los tipos de artículo del catálogo", async 
 
   const tipos = await page.locator("#itemTipo option").allTextContents();
   expect(tipos.join(" "), tipos.join(", ")).not.toMatch(/brujula/i);
+});
+
+// =====================================================================
+// 4. La sala: imagen o color, en un solo campo
+// =====================================================================
+
+test("una ruta se guarda como ruta", async ({ page }) => {
+  await abrirPanel(page, {});
+
+  await page.fill("#mesaSala", "/img/mesa/salas/cueva.webp");
+  await page.click("#btnGuardarMesa");
+
+  await expect.poll(() => ultimoGuardado(page))
+    .toEqual({ brujula: null, sala: "/img/mesa/salas/cueva.webp" });
+});
+
+test("un color se guarda en HEXADECIMAL, no como degradado armado", async ({ page }) => {
+  /*
+   * El degradado lo arma `capaDeSala` al DIBUJAR, no el panel al guardar.
+   *
+   * Si acá se guardara `linear-gradient(#1a1a2e, #1a1a2e)`, la base quedaría
+   * con un detalle de CSS en vez del dato, y el día que la capa se dibuje de
+   * otra forma —o que alguien quiera leer qué color es— habría que migrar
+   * documentos para recuperar una información que ya estaba.
+   */
+  await abrirPanel(page, {});
+
+  await page.fill("#mesaSala", "#1a1a2e");
+  await page.click("#btnGuardarMesa");
+
+  await expect.poll(() => ultimoGuardado(page))
+    .toEqual({ brujula: null, sala: "#1a1a2e" });
+});
+
+test("vaciar la sala manda null, que es volver a la de siempre", async ({ page }) => {
+  await abrirPanel(page, { sala: "#101010" });
+  await expect(page.locator("#mesaSala")).toHaveValue("#101010");
+
+  await page.fill("#mesaSala", "");
+  await page.click("#btnGuardarMesa");
+
+  await expect.poll(() => ultimoGuardado(page)).toEqual({ brujula: null, sala: null });
+});
+
+test("y su botón de volver atrás toca SÓLO la sala", async ({ page }) => {
+  /*
+   * La diferencia con «Guardar»: deshacer una cosa puntual no puede tocar la
+   * otra. Si mandara los dos campos, volver a la sala de siempre borraría
+   * una brújula que alguien acababa de cargar.
+   */
+  await abrirPanel(page, { brujula: "/img/mesa/brujulas/suya.webp", sala: "#101010" });
+
+  await page.click("#btnBorrarSala");
+
+  await expect.poll(() => ultimoGuardado(page)).toEqual({ sala: null });
+  await expect(page.locator("#mesaSala")).toHaveValue("");
+  await expect(page.locator("#mesaBrujula"), "se llevó puesta la brújula")
+    .toHaveValue("/img/mesa/brujulas/suya.webp");
+});
+
+test("algo que no es ni ruta ni color se rechaza sin salir a la red", async ({ page }) => {
+  await abrirPanel(page, {});
+
+  await page.fill("#mesaSala", "azul oscuro");
+  await page.click("#btnGuardarMesa");
+
+  await expect(page.locator("#avisoMesa")).toContainText(/hexadecimal/i);
+  expect(await ultimoGuardado(page), "salió igual a la red").toBeNull();
+});
+
+test("el panel dice qué entendió mientras se escribe", async ({ page }) => {
+  /*
+   * Un `#1a1a2` de cinco dígitos se parece a uno válido. Decirlo en el
+   * momento evita guardar algo que el servidor rechace — y, peor, algo que
+   * ACEPTE y no haga nada.
+   */
+  await abrirPanel(page, {});
+  const leido = page.locator("#mesaSalaLeido");
+
+  await expect(leido).toContainText(/de siempre/i);
+
+  await page.fill("#mesaSala", "/img/x.webp");
+  await expect(leido).toContainText(/imagen/i);
+
+  await page.fill("#mesaSala", "#1a1a2e");
+  await expect(leido).toContainText(/color/i);
+
+  await page.fill("#mesaSala", "#1a1a2");
+  await expect(leido).toContainText(/no se entiende/i);
 });

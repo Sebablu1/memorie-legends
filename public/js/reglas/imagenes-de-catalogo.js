@@ -224,6 +224,40 @@ export const RECETAS_DE_CONFIGURACION = Object.freeze({
     calidad: 85,
     maxEntradaMb: MAX_ENTRADA_MB,
   },
+
+  /**
+   * El fondo de la sala: 1920 de lado mayor.
+   *
+   * Cubre la VENTANA, no la mesa, así que la medida sale de la pantalla más
+   * grande que vale la pena cubrir. 1920 alcanza y sobra para un monitor
+   * común, y en uno más denso el recorte de `cover` disimula lo que falte.
+   *
+   * ───────────────────────────────────────────────────────────────────
+   * NATIVA Y NO UN PAR EXACTO, AUNQUE SE ESPERE 1920x1080
+   * ───────────────────────────────────────────────────────────────────
+   *
+   * Porque con lado mayor 1920 una imagen 16:9 sale EXACTAMENTE 1920x1080,
+   * que es lo que se va a subir. Y una que no sea 16:9 se conserva entera en
+   * vez de recortarse dos veces: una al convertir y otra con el `cover` del
+   * CSS. El segundo recorte es inevitable y se adapta a cada ventana; el
+   * primero sería una decisión tomada antes de saber en qué pantalla se va a
+   * ver.
+   *
+   * Un par exacto necesitaría un modo de proporción que la tabla todavía no
+   * tiene: hoy sólo sabe `cuadrada` y `nativa`, las dos sobre `ladoMayor`.
+   *
+   * Y NO lleva recorte de fondo blanco: una sala es una pared, tiene fondo a
+   * propósito. Lo decide `conversor-de-imagen.js`, que ofrece la casilla
+   * sólo para avatares e insignias.
+   */
+  [TIPOS_DE_CONFIGURACION.SALA]: {
+    clase: CLASES.RASTER,
+    formato: "webp",
+    ladoMayor: 1920,
+    proporcion: PROPORCIONES.NATIVA,
+    calidad: 85,
+    maxEntradaMb: MAX_ENTRADA_MB,
+  },
 });
 
 /**

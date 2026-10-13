@@ -45,7 +45,17 @@
 export const SIN_BRUJULA = "ninguna";
 
 const esRutaDelSitio = (v) => typeof v === "string" && v.startsWith("/");
-const esColor = (v) => typeof v === "string" && /^#[0-9a-f]{3,8}$/i.test(v.trim());
+/**
+ * Un hexadecimal que CSS acepte: 3, 4, 6 u 8 dígitos.
+ *
+ * NO «de 3 a 8». Cinco y siete son longitudes que no existen en CSS, y una
+ * comprobación laxa las dejaría pasar: el panel diría que sí, el servidor lo
+ * guardaría, y al dibujar el `linear-gradient` saldría inválido y el
+ * navegador descartaría la declaración entera. O sea, aceptado y sin efecto,
+ * que es la peor de las dos fallas — la que no se nota.
+ */
+const esColor = (v) =>
+  typeof v === "string" && /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v.trim());
 const esDegradado = (v) => typeof v === "string" && /^(linear|radial|conic)-gradient\(/i.test(v.trim());
 
 /**

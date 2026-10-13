@@ -74,6 +74,16 @@ console.log("\n=== 1. La sala: imagen, color o degradado ===");
      "con los espacios de más sacados", capaDeSala("  #000  "));
   ok(capaDeSala("#AABBCCDD") === "linear-gradient(#AABBCCDD, #AABBCCDD)",
      "y con alfa de ocho dígitos también");
+  ok(capaDeSala("#abcd") === "linear-gradient(#abcd, #abcd)", "y de cuatro");
+
+  /*
+   * Y SÓLO 3, 4, 6 u 8. Cinco y siete dígitos se parecen a un color y CSS no
+   * los acepta: dejarlos pasar daría un `linear-gradient` inválido, el
+   * navegador descartaría la declaración entera, y el color quedaría
+   * guardado sin pintar nada. Aceptado y sin efecto es peor que rechazado.
+   */
+  ok(capaDeSala("#1a1a2") === null, "cinco dígitos no es un color de CSS");
+  ok(capaDeSala("#1a1a2ea") === null, "siete tampoco");
 
   const deg = "linear-gradient(178deg, #131721 0%, #05070c 100%)";
   ok(capaDeSala(deg) === deg, "un degradado entero se escribe tal cual: ya es una imagen");
@@ -177,6 +187,27 @@ console.log("\n=== 5. La receta de la brújula NO es un tipo del catálogo ===")
   ok(!TIPOS_CONVERTIBLES.includes(TIPOS_DE_CONFIGURACION.BRUJULA),
      "sin colarse en `TIPOS_CONVERTIBLES`, que es sólo del catálogo",
      TIPOS_CONVERTIBLES);
+
+  // Y la sala, lo mismo: receta sí, catálogo no.
+  ok(!TIPOS_VALIDOS.includes(TIPOS_DE_CONFIGURACION.SALA),
+     "la sala tampoco es un tipo del catálogo");
+
+  const s = recetaDe(TIPOS_DE_CONFIGURACION.SALA);
+  ok(s !== null, "pero tiene su receta", s);
+
+  /*
+   * 1920 de lado mayor y proporción NATIVA, no un par exacto.
+   *
+   * Con lado mayor 1920 una imagen 16:9 sale exactamente 1920x1080, que es
+   * lo que se va a subir. Y una que no sea 16:9 se conserva entera en vez de
+   * recortarse dos veces: una al convertir y otra con el `cover` del CSS. El
+   * segundo recorte se adapta a cada ventana; el primero sería una decisión
+   * tomada antes de saber en qué pantalla se va a ver.
+   */
+  ok(s.formato === "webp" && s.ladoMayor === 1920 && s.proporcion === "nativa",
+     "1920 de lado mayor, proporción nativa", s);
+  ok(seConvierte(TIPOS_DE_CONFIGURACION.SALA) === true,
+     "y el conversor la trata como cualquier otra ráster");
 }
 
 // =====================================================================
