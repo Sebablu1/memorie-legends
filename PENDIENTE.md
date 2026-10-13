@@ -532,6 +532,81 @@ conviene no confundirlo con un respaldo.
 
 - **Decisión:** queda así. Es el kit oficial de WhatsApp.
 
+### §73 — `mesa-vestida.spec.js:230`, una ventana de 550 ms — RESUELTO
+
+El halo del asiento en turno. La prueba le saca a mano la clase `propio` al
+asiento propio y espera que la opacidad del `::before` llegue a 1.
+
+**Medido**, muestreando cada 100 ms después de sacar la clase:
+
+```
+  +   0 ms  propio=false  en-turno=true  opacidad=0        mismo nodo=true
+  + 412 ms  propio=false  en-turno=true  opacidad=1        mismo nodo=true
+  + 960 ms  propio=true   en-turno=true  opacidad=0        mismo nodo=FALSE
+```
+
+Dos cosas que la prueba no sabe:
+
+1. La transición de 0,35 s **corre igual** con `reducedMotion: "reduce"`
+   puesto en `playwright.config.js`. Tarda 412 ms en llegar a 1.
+2. A los ~960 ms el asiento **se reemplaza**: `mesa.js:1112` lo redibuja
+   desde una plantilla que incluye sus clases, así que `propio` vuelve y la
+   opacidad se queda en 0. No es que tarde: ya no va a pasar nunca.
+
+O sea que la afirmación tiene **~550 ms** para acertar. `expect.poll` lee a los
+~0, 100, 350 y 850 ms: con la máquina descansada el tiro de los 850 cae dentro
+de la ventana y pasa; con carga esas lecturas se corren y pasan de largo, y los
+15 s de timeout son 15 s esperando algo que no vuelve. Eso explica los dos
+resultados: **5 de 5 en aislamiento** y rojo en la suite completa.
+
+**Cómo se arregló:** no esperando a ver el pico, sino PROVOCÁNDOLO y quedándose
+con el máximo. Un solo `page.evaluate` saca la clase, muestrea con `rAF` hasta
+~600 ms y devuelve la opacidad más alta vista. El pico se captura antes de que
+el redibujo llegue, y si llegara primero se corta por `isConnected` y vuelve el
+máximo parcial: la prueba falla fuerte en vez de leerle la opacidad a un nodo
+desprendido, que contesta cualquier cosa. Sigue afirmando lo mismo —que un
+asiento en turno que no es el mío se enciende— y ya no depende del reloj.
+
+**Lo que NO se hizo:** aflojar el `toBe(1)` a `> 0.5`. Ensanchaba la ventana a
+~800 ms y la dejaba igual de colgada del redibujo. Era comprar tiempo.
+
+**Lo que queda escrito acá y no en el código:** que una prueba que le muta el
+DOM a la mesa tiene fecha de vencimiento, porque la mesa redibuja sus asientos
+desde una plantilla con las clases adentro. Si aparece otra prueba que saque o
+ponga una clase a mano y después espere, es el mismo pozo.
+
+### §72 — El harness de mesa sale a la Firestore de producción
+
+**Medido:** un solo arranque de mesa en las pruebas hace **5 pedidos** al canal
+`Listen` de `firestore.googleapis.com`, al proyecto de producción.
+
+`pruebas/e2e/mesa.js` dobla únicamente `guardia-sesion.js`. `firebase.js` es el
+de verdad, y las reglas dejan leer `config/{clave}` sin sesión
+(`firestore.rules:194`), así que la lectura de `vestirLaCasa` sale a la red y
+vuelve. Son **26 specs** los que arrancan una mesa.
+
+**Lo que costó, con número.** Ojo: el flake de `mesa-vestida.spec.js:230`
+NO es esto —se midió y tiene causa propia, ver §73—. Lo que sí es de acá:
+
+- `entregar-a-rival.spec.js` busca semilla en un bucle que hace `continue`
+  cuando «una IA se comió la carta de arriba del mazo»: **la semilla que toca
+  depende del reloj**. La fase 1 le agregó una lectura al arranque y eso la
+  movió a otra semilla. Medido en aislamiento: con dos lecturas **0 de 5**, con
+  una **3 de 3**. La afirmación ya se arregló —ahora cuenta en vez de comparar
+  un conjunto exacto— pero el acoplamiento al reloj sigue ahí.
+
+**Lo que haría falta:** doblar `firebase.js` en `pruebas/e2e/mesa.js`, como ya
+lo hacen `diseno-de-mesa.spec.js` y `admin-mesa.spec.js`, o bloquear
+`firestore.googleapis.com` en `playwright.config.js`. Saca una clase entera de
+ruido de 26 specs, y de paso la suite se acorta.
+
+**Y hay algo peor que los flakes:** la suite depende de datos de producción. El
+día que el panel escriba `config/mesa`, esos 26 specs van a ver una mesa
+distinta a la que esperan, sin que nadie haya tocado una prueba.
+
+**Por qué no se hizo acá:** es el harness compartido de 26 specs. Eso se toca
+con su propia sesión y su propia corrida completa, no de pasada.
+
 ### §70 — La configuración general ya no se edita desde el panel
 
 Salió de la fase 4 de la mesa por contexto. El selector tiene los CUATRO
