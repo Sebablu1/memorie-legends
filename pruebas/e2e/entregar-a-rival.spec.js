@@ -208,6 +208,31 @@ function atacarEnLaVentana(page, rival, posicion) {
       const marcadas = (j) =>
         [...document.querySelectorAll(`.jugador[data-jugador="${j}"] .carta[data-posicion].atacable`)]
           .map((c) => Number(c.dataset.posicion));
+
+      /**
+       * Las posiciones que una mano TIENE, que no son 0..n-1.
+       *
+       * `data-posicion` es el protocolo: direcciona la carta por su lugar
+       * ORIGINAL, y `mesa.js` lo dice con todas las letras —«si se compactara
+       * también eso, tocar la tercera carta jugaría la cuarta»—. Así que una
+       * mano de tres puede ser {0, 2, 3}, y después de que una IA descarta,
+       * normalmente lo es.
+       *
+       * Acá se pedía la posición 0 del otro rival y `(posicion + 1) % cuantas`
+       * del propio. Las dos daban `null` en cuanto la mano tenía un hueco, y
+       * el `.click()` sobre null era el error que se veía. La segunda además
+       * mezclaba una CUENTA con un ÍNDICE, que es la misma confusión que el
+       * comentario de la mesa advierte.
+       */
+      const posicionesDe = (j) =>
+        [...document.querySelectorAll(`.jugador[data-jugador="${j}"] .carta[data-posicion]`)]
+          .map((c) => Number(c.dataset.posicion));
+
+      /** Una carta cualquiera de esa mano que no sea la de `salvo`. */
+      const otraCartaDe = (j, salvo) => {
+        const p = posicionesDe(j).find((x) => x !== salvo);
+        return p === undefined ? null : cartaDe(j, p);
+      };
       const otroRival = rival === 1 ? 2 : 1;
 
       /**
@@ -235,14 +260,17 @@ function atacarEnLaVentana(page, rival, posicion) {
       const atacablesOtro = marcadas(otroRival);
 
       // Dos toques sobre una carta del otro rival, que no conozco: nada.
-      const ajena = cartaDe(otroRival, 0);
+      // Cualquiera de las que tenga, no «la cero»: puede no tenerla.
+      const ajena = otraCartaDe(otroRival, -1);
+      if (!ajena) return { fallo: `el rival ${otroRival} se quedó sin cartas que tocar` };
       ajena.click();
       ajena.click();
       await dormir(30);
       const trasLaAjena = texto(sel.pista);
 
       // Ni sobre otra carta del MISMO rival: conocer una no habilita las demás.
-      const vecina = cartaDe(rival, (posicion + 1) % cuantas(rival));
+      const vecina = otraCartaDe(rival, posicion);
+      if (!vecina) return { fallo: `al rival ${rival} le quedó una sola carta: no hay vecina que tocar` };
       vecina.click();
       vecina.click();
       await dormir(30);
@@ -252,6 +280,9 @@ function atacarEnLaVentana(page, rival, posicion) {
       const misAntes = cuantas(0);
       const suyasAntes = cuantas(rival);
       const suya = cartaDe(rival, posicion);
+      if (!suya) {
+        return { fallo: `la carta ${posicion} del rival ${rival} ya no está: la descartó antes del ataque` };
+      }
       suya.click();
       const trasUnToque = texto(sel.pista);
       suya.click();
