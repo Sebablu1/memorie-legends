@@ -172,8 +172,69 @@ export const RECETAS = Object.freeze({
   [TIPOS.TITULO]: { clase: CLASES.TEXTO },
 });
 
-/** La receta de un tipo, o `null` si el tipo no existe. */
-export const recetaDe = (tipo) => RECETAS[tipo] ?? null;
+/**
+ * Las imágenes que decide la CASA, que no son artículos.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POR QUÉ NO ENTRAN EN `TIPOS`
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque `TIPOS` es el catálogo, y el catálogo es lo que un jugador compra y
+ * posee. Estas dos no se compran, no se equipan y no las ve nadie en la
+ * tienda: las pone el administrador y el jugador las encuentra puestas.
+ *
+ * Y la diferencia no es filosófica, es operativa. `TIPOS_VALIDOS` alimenta el
+ * desplegable de artículos del panel y el `z.enum` del servidor: meter la
+ * brújula ahí dejaría crear un ARTÍCULO del catálogo de tipo «brujula-mesa»,
+ * que es exactamente lo que no tiene que poder pasar.
+ *
+ * Lo único que comparten con los artículos es cómo se CONVIERTE su imagen, y
+ * eso es lo que vive acá. Por eso la receta está en esta tabla y el tipo no
+ * está en aquélla.
+ */
+export const TIPOS_DE_CONFIGURACION = Object.freeze({
+  BRUJULA: "brujula-mesa",
+  SALA: "fondo-sala",
+});
+
+export const RECETAS_DE_CONFIGURACION = Object.freeze({
+  /**
+   * La brújula del paño: 1024 cuadrados.
+   *
+   * Medido en la mesa real: con `contain` sobre una caja de 1210×683 en
+   * escritorio, la brújula se dibuja a 683×683. 1024 cubre eso con aire para
+   * pantallas densas, y es lo mismo que ya declara el SVG de siempre en su
+   * `viewBox` de 1000.
+   *
+   * Cuadrada porque la máscara se ajusta al lado MENOR de la mesa, que en un
+   * teléfono es el ancho y en un monitor el alto.
+   *
+   * Y va como GRABADO: lo que el archivo aporta es la SILUETA, no el color.
+   * El color lo pone `.mesa::before` para que se lea sobre cualquier paño —
+   * un dorado fijo desaparecía sobre el roble de taberna, que es lo que el
+   * diseño actual vino a resolver. En la práctica: lo que importa del WebP es
+   * su canal alfa, y un dibujo con relleno opaco de lado a lado se vería como
+   * un bloque.
+   */
+  [TIPOS_DE_CONFIGURACION.BRUJULA]: {
+    clase: CLASES.RASTER,
+    formato: "webp",
+    ladoMayor: 1024,
+    proporcion: PROPORCIONES.CUADRADA,
+    calidad: 85,
+    maxEntradaMb: MAX_ENTRADA_MB,
+  },
+});
+
+/**
+ * La receta de un tipo, sea del catálogo o de la casa.
+ *
+ * Las dos tablas se consultan por el mismo nombre a propósito: el conversor
+ * del panel no tiene por qué saber de cuál de las dos salió lo que le toca
+ * convertir.
+ */
+export const recetaDe = (tipo) =>
+  RECETAS[tipo] ?? RECETAS_DE_CONFIGURACION[tipo] ?? null;
 
 /** ¿Una imagen de este tipo se convierte? Sólo las ráster. */
 export const seConvierte = (tipo) => recetaDe(tipo)?.clase === CLASES.RASTER;

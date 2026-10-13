@@ -32,6 +32,15 @@ import {
   capaDeBrujula,
   capaDeSala,
 } from "../public/js/modulos/diseno-de-mesa.js";
+import { crearDisenoDeMesa } from "../functions/diseno-de-mesa.js";
+import { TIPOS_VALIDOS } from "../public/js/reglas/catalogo.js";
+import {
+  RECETAS,
+  TIPOS_CONVERTIBLES,
+  TIPOS_DE_CONFIGURACION,
+  recetaDe,
+  seConvierte,
+} from "../public/js/reglas/imagenes-de-catalogo.js";
 
 let fallos = 0;
 const ok = (c, m, x) => {
@@ -137,6 +146,116 @@ console.log("\n=== 4. Las dos son independientes ===");
      "sala puesta y brújula sin tocar");
   ok(capaDeSala(undefined) === null && capaDeBrujula("/img/b.svg") !== null,
      "brújula puesta y sala sin tocar");
+}
+
+// =====================================================================
+console.log("\n=== 5. La receta de la brújula NO es un tipo del catálogo ===");
+// =====================================================================
+{
+  /*
+   * La distinción que sostiene toda la fase 2.
+   *
+   * `TIPOS_VALIDOS` alimenta el desplegable de artículos del panel y el
+   * `z.enum` del servidor. Si la brújula entrara ahí, se podría crear un
+   * ARTÍCULO de catálogo de tipo «brujula-mesa» —con precio, en `misItems`
+   * y equipable—, que es exactamente lo que no tiene que poder pasar.
+   *
+   * Lo único que comparte con un artículo es CÓMO se convierte su imagen.
+   */
+  ok(!TIPOS_VALIDOS.includes(TIPOS_DE_CONFIGURACION.BRUJULA),
+     "la brújula no es un tipo del catálogo", TIPOS_VALIDOS);
+  ok(!(TIPOS_DE_CONFIGURACION.BRUJULA in RECETAS),
+     "ni tiene entrada en la tabla de artículos");
+
+  const r = recetaDe(TIPOS_DE_CONFIGURACION.BRUJULA);
+  ok(r !== null, "pero SÍ tiene receta: el conversor la necesita", r);
+  ok(r.formato === "webp" && r.proporcion === "cuadrada" && r.ladoMayor === 1024,
+     "cuadrada de 1024: la máscara se ajusta al lado menor de la mesa", r);
+  ok(seConvierte(TIPOS_DE_CONFIGURACION.BRUJULA) === true,
+     "y el conversor la trata como cualquier otra ráster");
+
+  ok(!TIPOS_CONVERTIBLES.includes(TIPOS_DE_CONFIGURACION.BRUJULA),
+     "sin colarse en `TIPOS_CONVERTIBLES`, que es sólo del catálogo",
+     TIPOS_CONVERTIBLES);
+}
+
+// =====================================================================
+console.log("\n=== 6. El servidor: qué escribe y qué borra ===");
+// =====================================================================
+{
+  /*
+   * `functions/diseno-de-mesa.js` es el ÚNICO camino para escribir
+   * `config/mesa`: las reglas se lo prohíben al navegador a propósito, porque
+   * un cliente que pudiera escribir ahí le cambiaría la mesa a todo el mundo.
+   *
+   * Lo que se prueba acá es la regla que hace posible volver atrás: un campo
+   * AUSENTE no toca, un campo en `null` BORRA. Sin esa distinción, cargar una
+   * brújula sería una decisión sin vuelta — no habría forma de recuperar la
+   * de siempre sin tocar la base a mano.
+   */
+  const espiar = () => {
+    const escrito = [];
+    const db = { collection: () => ({ doc: () => ({
+      set: async (c, o) => escrito.push({ c, o }),
+      get: async () => ({ exists: false }),
+    }) }) };
+    const d = crearDisenoDeMesa({
+      db,
+      administradores: { exigir: async () => {} },
+      campoBorrado: () => "«BORRADO»",
+    });
+    return { d, escrito };
+  };
+
+  {
+    const { d, escrito } = espiar();
+    await d.guardar({}, { brujula: "/img/x.webp" });
+    ok(JSON.stringify(escrito[0].c) === JSON.stringify({ brujula: "/img/x.webp" }),
+       "un valor se escribe tal cual", escrito[0]?.c);
+    ok(escrito[0].o?.merge === true,
+       "y con `merge`: el panel puede estar editando una sola de las dos cosas",
+       escrito[0]?.o);
+  }
+
+  {
+    const { d, escrito } = espiar();
+    await d.guardar({}, { brujula: null });
+    ok(escrito[0].c.brujula === "«BORRADO»",
+       "un `null` BORRA el campo, que es volver a la de siempre", escrito[0]?.c);
+  }
+
+  {
+    /*
+     * Lo que NO está no se toca. Es lo que permite guardar la sala sin pisar
+     * la brújula, y al revés.
+     */
+    const { d, escrito } = espiar();
+    await d.guardar({}, { sala: "#101010" });
+    ok(!("brujula" in escrito[0].c),
+       "un campo ausente no se escribe: guardar la sala no pisa la brújula",
+       escrito[0]?.c);
+  }
+
+  {
+    /*
+     * Y sin campos no se escribe NADA. Un `set({}, {merge:true})` crearía el
+     * documento vacío, y «existe pero no dice nada» es un estado más para que
+     * alguien tenga que interpretarlo.
+     */
+    const { d, escrito } = espiar();
+    const r = await d.guardar({}, {});
+    ok(escrito.length === 0, "sin cambios no se toca la base", escrito);
+    ok(r.guardado === false && r.campos.length === 0, "y se dice que no se guardó", r);
+  }
+
+  {
+    // Las dos juntas, que es el caso de cargar todo de una.
+    const { d, escrito } = espiar();
+    const r = await d.guardar({}, { brujula: "ninguna", sala: null });
+    ok(escrito[0].c.brujula === "ninguna" && escrito[0].c.sala === "«BORRADO»",
+       "las dos a la vez, cada una con lo suyo", escrito[0]?.c);
+    ok(r.campos.join(",") === "brujula,sala", "y se informa qué se tocó", r);
+  }
 }
 
 console.log(fallos ? `\n❌ ${fallos} fallos` : "\n✅ TODO OK");

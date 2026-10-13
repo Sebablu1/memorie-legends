@@ -37,6 +37,7 @@ import { CORREO_ADMINISTRACION } from "../js/administracion.js";
 import { montarTiendaAdmin } from "./tienda-admin.js";
 import { montarTorneosAdmin } from "./torneos-admin.js";
 import { montarPacksAdmin } from "./packs-admin.js";
+import { montarMesasAdmin } from "./mesas-admin.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -260,6 +261,7 @@ onAuthStateChanged(auth, (usuario) => {
     montarTiendaAdmin();
     montarTorneosAdmin();
     montarPacksAdmin();
+    montarMesasAdmin();
   }
 
   // Con sesión resuelta, la pantalla del código ya no va: o entró, o hay que

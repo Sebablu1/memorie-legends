@@ -308,6 +308,52 @@ export const EsquemaTipo = z.object({
 });
 
 /**
+ * El diseño de la mesa que decide la casa.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * TRES FORMAS DE DECIR CADA COSA, Y LA TERCERA ES BORRARLA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Un campo AUSENTE deja lo que había. Un campo en `null` lo BORRA, que es
+ * como se vuelve a la brújula de siempre. Y un valor lo reemplaza.
+ *
+ * Sin esa distinción no habría forma de volver atrás: mandar la cadena vacía
+ * para borrar obligaría a que el cliente y el servidor se pusieran de acuerdo
+ * en que "" significa algo, y eso se olvida.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA RUTA SE VALIDA ACÁ, NO SÓLO AL DIBUJAR
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `modulos/diseno-de-mesa.js` ya descarta lo que no sea una ruta del sitio,
+ * así que una basura guardada no rompería la mesa. Pero quedaría guardada, y
+ * el administrador vería su configuración aceptada sin efecto, que es la peor
+ * de las dos fallas: la que no se nota.
+ *
+ * `/img/` y no sólo `/`: lo único que esto puede nombrar son imágenes del
+ * sitio. Una ruta a otra cosa no serviría para nada y sí sería una forma de
+ * que el panel apunte a donde no debe.
+ */
+const RutaDeImagen = z
+  .string()
+  .max(300)
+  .refine((v) => v.startsWith("/img/"), { message: "La ruta tiene que empezar con /img/." });
+
+export const EsquemaDisenoDeMesa = z.object({
+  // `ninguna` es la tercera opción de la brújula: ni la de siempre ni una
+  // propia, sino que no haya. Para la sala no existe —apagarla y no tocarla
+  // son lo mismo— y por eso sólo está de este lado.
+  brujula: z.union([RutaDeImagen, z.literal("ninguna"), z.null()]).optional(),
+  sala: z
+    .union([
+      RutaDeImagen,
+      z.string().regex(/^#[0-9a-fA-F]{3,8}$/, "El color tiene que ser un hexadecimal."),
+      z.null(),
+    ])
+    .optional(),
+});
+
+/**
  * Quitarle un artículo a una persona.
  *
  * El `uid` viaja en la llamada porque el administrador está actuando SOBRE

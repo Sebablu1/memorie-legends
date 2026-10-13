@@ -727,6 +727,40 @@
         <div class="aviso" id="avisoUmbrales"></div>
       </section>
 
+      <!-- Configuración de la MESA. No es el catálogo: nada de esto se
+           compra, se equipa ni se ve en la tienda. Lo pone el administrador
+           y el jugador lo encuentra puesto. Ver `mesas-admin.js`. -->
+      <section>
+        <h2>Diseño de la mesa</h2>
+        <p class="nota">
+          Lo que ve todo el mundo al jugar. No se compra ni se equipa.
+          Para preparar un archivo, usá el conversor del catálogo de arriba:
+          te lo descarga listo, lo ponés en <code>public/img/…</code> y
+          desplegás. Acá se escribe la ruta.
+        </p>
+
+        <div class="campos-item">
+          <label class="ancho">
+            <span>La brújula del paño — una ruta (<code>/img/…</code>)</span>
+            <input id="mesaBrujula" type="text" placeholder="/img/mesa/rosa-viento.svg" autocomplete="off" />
+            <small class="nota-campo">
+              Vacío deja la de siempre. Escribí <code>ninguna</code> para que
+              no haya brújula. Es un GRABADO: lo que se usa del archivo es su
+              silueta, no sus colores — el color lo pone la mesa para que se
+              lea sobre cualquier paño.
+            </small>
+          </label>
+        </div>
+
+        <div class="acciones">
+          <button id="btnGuardarMesa" class="accion" type="button">Guardar</button>
+          <button id="btnBorrarBrujula" class="secundario" type="button">
+            Volver a la brújula de siempre
+          </button>
+        </div>
+        <div class="aviso" id="avisoMesa"></div>
+      </section>
+
       <section>
         <h2>Partidas en curso</h2>
         <!-- De las partidas no llega ni una carta: el servidor manda sólo

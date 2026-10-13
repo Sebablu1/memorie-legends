@@ -95,6 +95,7 @@ import { crearCierreDePeriodos } from "./cierre-de-periodos.js";
 import { crearPacks } from "./packs.js";
 import { crearLimiteDeRitmo } from "./limite-de-ritmo.js";
 import { crearTienda } from "./tienda.js";
+import { crearDisenoDeMesa } from "./diseno-de-mesa.js";
 import { crearInsignias } from "./insignias.js";
 import { crearTorneos } from "./torneos.js";
 import { crearRankingDePartidas } from "./ranking.js";
@@ -124,6 +125,7 @@ import {
   EsquemaCancelarTorneo,
   EsquemaUmbrales,
   EsquemaItemAdmin,
+  EsquemaDisenoDeMesa,
   EsquemaActivarItem,
   EsquemaDesposeer,
   EsquemaAjustarLeyendas,
@@ -1445,6 +1447,18 @@ const moderacion = crearReportes({
  * Comparte `moverLeyendas` con todo lo demás: no hay un segundo camino que
  * escriba `credits`, que es la regla que hace auditable el saldo.
  */
+/**
+ * El diseño de la mesa: lo decide la casa y lo escribe sólo el servidor.
+ *
+ * `campoBorrado` se inyecta en vez de importar `admin` allá: ese módulo no
+ * tiene por qué conocer el SDK, igual que no lo conoce ninguno de los otros.
+ */
+const disenoDeMesa = crearDisenoDeMesa({
+  db,
+  administradores,
+  campoBorrado: () => admin.firestore.FieldValue.delete(),
+});
+
 const tienda = crearTienda({
   db,
   moverLeyendas,
@@ -1682,6 +1696,21 @@ export const listarCatalogoAdmin = llamable((_data, context) =>
  */
 export const guardarItemAdmin = llamable((data, context) =>
   tienda.guardarItem(context, validar(EsquemaItemAdmin, data, errorHttp)),
+);
+
+/**
+ * El diseño de la mesa, leer y guardar.
+ *
+ * Dos llamables y no una con un modo: leer no cambia nada y guardar sí, y
+ * mezclarlas obligaría a mirar el cuerpo del pedido para saber cuál de las
+ * dos cosas está pasando.
+ */
+export const leerDisenoDeMesaAdmin = llamable((_data, context) =>
+  disenoDeMesa.leer(context),
+);
+
+export const guardarDisenoDeMesaAdmin = llamable((data, context) =>
+  disenoDeMesa.guardar(context, validar(EsquemaDisenoDeMesa, data, errorHttp)),
 );
 
 /** Enciende o apaga un artículo. Es lo que se usa en vez de borrar. */
