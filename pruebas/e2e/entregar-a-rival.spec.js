@@ -258,6 +258,10 @@ function atacarEnLaVentana(page, rival, posicion) {
 
       const atacablesRival = marcadas(rival);
       const atacablesOtro = marcadas(otroRival);
+      // Su mano se mide ACÁ, en el mismo instante que sus marcas: medirla al
+      // final dejaría los toques y el ataque en el medio, y una cuenta contra
+      // un total de otro momento es la clase de prueba que falla por el reloj.
+      const suyasOtro = cuantas(otroRival);
 
       // Dos toques sobre una carta del otro rival, que no conozco: nada.
       // Cualquiera de las que tenga, no «la cero»: puede no tenerla.
@@ -298,6 +302,7 @@ function atacarEnLaVentana(page, rival, posicion) {
         misAntes,
         misTrasAtacar: cuantas(0),
         suyasAntes,
+        suyasOtro,
         apagadas: document.querySelectorAll(".carta.apagada").length,
       };
     },
@@ -333,11 +338,31 @@ function comprobarLoComun(visto, posicion) {
   expect(visto.atacablesRival.length, "y no la mano entera")
     .toBeLessThan(visto.suyasAntes);
 
-  // Y del otro rival, nada. Esto tiene el mismo punto flojo que el de arriba
-  // —si el que se equivoca en la ventana inicial es ÉL, acá va a sobrar una
-  // marca— pero se deja como está: afirma lo que se quiso probar y todavía no
-  // falló. Si falla, la corrección es la misma que la de arriba.
-  expect(visto.atacablesOtro, "del otro rival no se marca nada").toEqual([]);
+  /*
+   * Y al otro rival tampoco se le marca la mano entera.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * ESTO DECÍA `toEqual([])`, Y EL PUNTO FLOJO ESTABA ANOTADO ACÁ
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Decía «del otro rival no se marca nada», con la nota de que si el que se
+   * equivoca en la ventana inicial es ÉL iba a sobrar una marca. Pasó: sobró
+   * una, `[1]`. `recordarFallo` deja a la vista de TODOS la carta que
+   * alguien tocó por error, así que una marca suya es el juego funcionando.
+   *
+   * Qué la destapó: la fase 1 de la mesa por contexto le agregó una lectura
+   * de Firestore al arranque, y la BÚSQUEDA DE SEMILLA de más arriba está
+   * acoplada al reloj —hace `continue` cuando una IA se comió la carta del
+   * mazo—, así que un arranque un viaje más lento cae en otra semilla.
+   * Medido en aislamiento: con dos lecturas 0 de 5, con una 3 de 3. La
+   * prueba no vigilaba el juego, vigilaba el reloj.
+   *
+   * Así que la misma corrección que cuatro líneas arriba: una CUENTA. El bug
+   * de verdad es que un 8 marcaba la mano ENTERA, y eso se afirma sin
+   * depender de qué semilla toque ni de quién se equivocó.
+   */
+  expect(visto.atacablesOtro.length, "al otro rival se le marcó la mano entera")
+    .toBeLessThan(visto.suyasOtro);
   expect(visto.trasLaAjena, "dos toques sobre una carta que no conozco").toMatch(/no la conocés/i);
   expect(visto.trasLaVecina, "dos toques sobre otra carta del mismo rival").toMatch(/no la conocés/i);
   expect(visto.trasUnToque, "un solo toque ya disparó el ataque").toMatch(/doble toque/i);
