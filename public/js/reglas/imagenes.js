@@ -5,10 +5,18 @@
  * POR QUÉ HACE FALTA UNA VERSIÓN EN LA DIRECCIÓN
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Las imágenes se guardan en el navegador —un mes casi todas, un día los
- * avatares; ver `firebase.json`— y una copia guardada NO vuelve a preguntar.
- * Así que reemplazar un archivo manteniendo el nombre deja a quien ya lo tenía
- * viendo el viejo hasta que venza, y cambiar el encabezado no lo arregla.
+ * Las imágenes se guardan en el navegador un mes —ver `firebase.json`— y una
+ * copia guardada NO vuelve a preguntar. Así que reemplazar un archivo
+ * manteniendo el nombre deja a quien ya lo tenía viendo el viejo hasta que
+ * venza, y cambiar el encabezado no lo arregla.
+ *
+ * Acá decía «un mes casi todas, un día los avatares», y era FALSO. La regla
+ * de un día para `img/avatar/**` existía desde C2 pero estaba debajo de la
+ * genérica de imágenes, y Firebase aplica la PRIMERA que coincide: el
+ * servidor entregaba los avatares con el mes, como se comprobó con curl
+ * contra producción. O sea que la única red contra el problema de C2 fue
+ * siempre esta versión, nunca el encabezado. Ahora la regla va primero y sí
+ * se aplica, pero lo que sostiene esto sigue siendo el `?v=`.
  *
  * Pasó dos veces. Las cartas rediseñadas con los mismos nombres, y después los
  * trece avatares de C2: el archivo nuevo estaba en el servidor, se veía

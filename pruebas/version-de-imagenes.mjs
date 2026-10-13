@@ -181,5 +181,42 @@ console.log("\n=== 6. El número ===");
      "y la arma interpolando la constante, no con un número escrito a mano");
 }
 
+// =====================================================================
+console.log("\n=== 7. La regla de caché de los avatares va PRIMERO ===");
+// =====================================================================
+{
+  /*
+   * Firebase aplica la PRIMERA regla de `headers` que coincide — no la más
+   * específica, no la última.
+   *
+   * La regla de un día para `img/avatar/**` existe desde C2, pero estaba
+   * DEBAJO de la genérica de imágenes, así que nunca se aplicó: producción
+   * entregaba los avatares con el mes. Se descubrió pidiéndolos con curl.
+   *
+   * No falla nada cuando se rompe. Ni el despliegue, ni una prueba, ni la
+   * consola: simplemente los avatares se guardan treinta días en vez de uno,
+   * y eso recién se nota el día que hay que reemplazar uno. Por eso el orden
+   * se afirma acá.
+   */
+  const firebase = JSON.parse(
+    readFileSync(new URL("../firebase.json", import.meta.url), "utf8"),
+  );
+  const fuentes = firebase.hosting.headers.map((r) => r.source);
+
+  const avatares = fuentes.indexOf("img/avatar/**");
+  const generica = fuentes.findIndex((s) => /png\|jpg/.test(s));
+
+  ok(avatares !== -1, "la regla de los avatares sigue existiendo", fuentes);
+  ok(generica !== -1, "y la genérica de imágenes también", fuentes);
+  ok(avatares < generica,
+     "la de los avatares va ANTES: Firebase se queda con la primera que coincide",
+     { avatares, generica, fuentes });
+
+  // Y que siga diciendo un día: mover la regla no sirve si el número se fue.
+  const regla = firebase.hosting.headers[avatares];
+  const valor = regla.headers.find((h) => h.key === "Cache-Control")?.value ?? "";
+  ok(/max-age=86400\b/.test(valor), "y sigue siendo un día", valor);
+}
+
 console.log(fallos ? `\n❌ ${fallos} fallos` : "\n✅ TODO OK");
 process.exit(fallos ? 1 : 0);
