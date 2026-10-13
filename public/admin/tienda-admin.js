@@ -35,6 +35,7 @@ import {
   ETIQUETA_TIPO,
 } from "../js/reglas/catalogo.js";
 import { montarConversor } from "./conversor-de-imagen.js";
+import { imagenUrl } from "../js/modulos/imagenes.js";
 
 /**
  * Lo que se vende y lo que se gana, separados.
@@ -215,8 +216,21 @@ function dibujarGrupo(grupo, catalogo) {
  * administrador nuevo enciende una insignia creyendo que la arregla.
  */
 function dibujarFila(item, vende) {
+  /*
+   * La miniatura pasa por `imagenUrl`, como todo lo que dibuja una imagen
+   * del sitio.
+   *
+   * Acá se pedía `item.imagen` pelado, y el admin era el ÚNICO lugar que no
+   * versionaba. Eso lo hacía el peor de todos para no hacerlo: es justamente
+   * la pantalla desde la que se reemplaza una imagen, así que el que acababa
+   * de cambiar un avatar veía el viejo y no tenía forma de saber si el
+   * cambio había entrado.
+   *
+   * Y no es que se haya quedado atrás con la unificación de la fase 1: nunca
+   * pasó por el `avatarUrl` anterior tampoco.
+   */
   const figura = imagenEsArchivo(item.imagen)
-    ? `<img src="${limpio(item.imagen)}" alt="" style="width:34px;height:34px;object-fit:contain;border-radius:8px" />`
+    ? `<img src="${limpio(imagenUrl(item.imagen))}" alt="" style="width:34px;height:34px;object-fit:contain;border-radius:8px" />`
     : `<span style="font-size:1.6rem;line-height:1">${limpio(item.imagen)}</span>`;
 
   const apagado = item.activo === false;

@@ -33,8 +33,12 @@ import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 import { RECETAS } from "../../public/js/reglas/imagenes-de-catalogo.js";
+import { imagenUrl } from "../../public/js/reglas/imagenes.js";
 
 const ADMIN = "soporte.memorie.legends@gmail.com";
+
+/** Un artículo con archivo de verdad, para mirar la miniatura de la lista. */
+const CARA = "/img/avatar/el_as.webp";
 
 // =====================================================================
 // Un PNG de verdad, fabricado
@@ -128,6 +132,9 @@ const CATALOGO = [
   { id: "el-zorro", tipo: "avatar", nombre: "El Zorro", precio: 150, imagen: "🦊", activo: true, orden: 10 },
   { id: "novato", tipo: "insignia", nombre: "Novato", precio: 0, imagen: "🏅", activo: true, orden: 10 },
   { id: "pano-roble", tipo: "fondo", nombre: "Roble", precio: 300, imagen: "🟫", activo: true, orden: 10 },
+  // Uno con ARCHIVO, no emoji: es el único que hace visible la miniatura, y
+  // sin él nadie miraba nunca cómo se dibuja.
+  { id: "el-as", tipo: "avatar", nombre: "El As", precio: 100, imagen: CARA, activo: true, orden: 20 },
 ];
 
 const firebaseFalso = `
@@ -389,4 +396,31 @@ test("el campo de la ruta sigue estando y sigue aceptando un emoji", async ({ pa
 
   await campo.fill("🐺");
   await expect(campo).toHaveValue("🐺");
+});
+
+// =====================================================================
+// 6. La miniatura de la lista
+// =====================================================================
+
+test("la miniatura del catálogo lleva la versión de la imagen", async ({ page }) => {
+  /*
+   * El admin era el ÚNICO lugar del sitio que dibujaba una imagen sin pasar
+   * por `imagenUrl`, y el peor para no hacerlo: es la pantalla desde la que
+   * se reemplaza una imagen, así que el que acababa de cambiar un avatar
+   * seguía viendo el viejo —hasta treinta días— y no tenía forma de saber si
+   * el cambio había entrado.
+   *
+   * Se compara contra `imagenUrl` y no contra «?v=3» escrito acá, para que
+   * la prueba siga al número cuando suba.
+   */
+  await abrirPanel(page);
+  await page.click("#btnRefrescarCatalogo");
+  await page.waitForSelector("#listaCatalogo .fila");
+
+  const mini = page
+    .locator("#listaCatalogo .fila")
+    .filter({ has: page.locator('[data-editar="el-as"]') })
+    .locator("img");
+
+  await expect(mini).toHaveAttribute("src", imagenUrl(CARA));
 });
