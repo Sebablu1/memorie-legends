@@ -1705,8 +1705,10 @@ export const guardarItemAdmin = llamable((data, context) =>
  * mezclarlas obligaría a mirar el cuerpo del pedido para saber cuál de las
  * dos cosas está pasando.
  */
-export const leerDisenoDeMesaAdmin = llamable((_data, context) =>
-  disenoDeMesa.leer(context),
+export const leerDisenoDeMesaAdmin = llamable((data, context) =>
+  // El mismo esquema que guardar: lo único que importa de `data` al leer es
+  // el contexto, y validarlo con el que ya existe evita una lista repetida.
+  disenoDeMesa.leer(context, validar(EsquemaDisenoDeMesa, data ?? {}, errorHttp)),
 );
 
 export const guardarDisenoDeMesaAdmin = llamable((data, context) =>

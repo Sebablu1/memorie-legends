@@ -80,6 +80,9 @@ import {
   ENTRADAS,
   ESTADOS_SALA,
   costoDeAbandonar,
+  CONTEXTOS_DE_MESA,
+  DOCUMENTO_GLOBAL_DE_MESA,
+  documentoDeMesa,
 } from "./reglas/salas.js";
 import * as Red from "./partida-red.js";
 import {
@@ -238,7 +241,29 @@ function vestirLaMesa() {
 async function vestirLaCasa() {
   try {
     const { db, doc, getDoc } = await import("./firebase.js");
-    const snap = await getDoc(doc(db, "config", "mesa"));
+
+    /*
+     * Primero el documento del contexto; si no está, el global.
+     *
+     * El de abajo es el que escribía el panel antes de que hubiera
+     * contextos, y sigue siendo el que vale para los que no tienen el suyo.
+     * NO se copia a los cuatro: copiarlo obligaría a mantener cuatro
+     * versiones de lo mismo, y cambiar la global no llegaría a ninguna.
+     *
+     * El fallback es por DOCUMENTO ENTERO, no por campo. Si el contexto
+     * tiene el suyo con sólo la brújula, la sala queda la de siempre y NO
+     * cae al global. Es más fácil de explicar —«esta mesa usa su propia
+     * configuración» o «hereda la general», sin estados mezclados— y lo
+     * contrario sería una migración de datos, no un cambio de código.
+     *
+     * La segunda lectura sólo ocurre cuando la primera no está, que hoy es
+     * siempre. Como esto no bloquea el arranque, el viaje de más no se nota.
+     */
+    const propio = await getDoc(doc(db, "config", documentoDeMesa(CONTEXTO_DE_MESA)));
+    const snap = propio.exists()
+      ? propio
+      : await getDoc(doc(db, "config", DOCUMENTO_GLOBAL_DE_MESA));
+
     if (!snap.exists()) return;
     aplicarDisenoDeMesa(document.querySelector(".mesa"), snap.data());
   } catch (error) {
@@ -384,6 +409,31 @@ const CONFIG_POR_DEFECTO = {
 const salaPedida = (new URLSearchParams(location.search).get("sala") ?? "")
   .trim()
   .toUpperCase();
+
+/**
+ * Cuál de las cuatro mesas decoradas le toca a esta partida.
+ *
+ * Por ahora sale de lo mismo que `MODO`, que es todo lo que se sabe ANTES de
+ * leer la sala: sin `?sala=` es entrenamiento, y con `?sala=` es pública por
+ * descarte.
+ *
+ * Privada todavía cae acá dentro, y es a propósito: distinguirla exige
+ * `extra.privada`, que llega recién con el documento de la sala —
+ * `entrarDesdeSala` ya lo tiene entero— y leerlo obligaría a mover cuándo se
+ * viste la casa. Eso es otra etapa; mezclarlo acá haría que esta no pudiera
+ * quedar verde sola.
+ *
+ * VA ACÁ, Y NO JUNTO A `MODO`, porque `vestirLaCasa()` se dispara más abajo
+ * pero ANTES de donde estaría la declaración. Hoy eso no estalla sólo porque
+ * la primera línea de esa función es un `await import(...)` que la suspende
+ * hasta que el módulo termina de evaluarse; el día que ese import se cachee,
+ * leer esto sería un `ReferenceError` que cae en el `catch` de la función y
+ * deja la mesa sin diseño en silencio. Declararlo antes del uso no cuesta
+ * nada y saca la trampa.
+ */
+const CONTEXTO_DE_MESA = salaPedida
+  ? CONTEXTOS_DE_MESA.PUBLICA
+  : CONTEXTOS_DE_MESA.ENTRENAMIENTO;
 
 function leerConfiguracion() {
   try {

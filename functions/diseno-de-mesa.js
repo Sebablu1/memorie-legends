@@ -26,8 +26,18 @@
  * de más.
  */
 
+import { documentoDeMesa } from "./reglas/salas.js";
+
 export function crearDisenoDeMesa({ db, administradores, campoBorrado }) {
-  const ref = () => db.collection("config").doc("mesa");
+  /*
+   * El documento del contexto, o el global.
+   *
+   * `documentoDeMesa` vive en las reglas y lo usan los tres: la mesa que
+   * lee, el panel que escribe y esto. Un contexto desconocido —o ninguno—
+   * cae al global, que es el que escribía el panel antes de que hubiera
+   * contextos. Así lo ya guardado sigue valiendo sin migrar nada.
+   */
+  const ref = (contexto) => db.collection("config").doc(documentoDeMesa(contexto));
 
   /**
    * Guarda lo que venga, y sólo lo que venga.
@@ -36,7 +46,7 @@ export function crearDisenoDeMesa({ db, administradores, campoBorrado }) {
    * cosas: mandar el documento entero obligaría a que el formulario supiera
    * el valor de la otra, y un formulario a medio cargar la borraría.
    */
-  async function guardar(context, datos) {
+  async function guardar(context, { contexto, ...datos }) {
     await administradores.exigir(context);
 
     const cambios = {};
@@ -50,15 +60,25 @@ export function crearDisenoDeMesa({ db, administradores, campoBorrado }) {
     // más para que alguien lo interprete.
     if (!Object.keys(cambios).length) return { guardado: false, campos: [] };
 
-    await ref().set(cambios, { merge: true });
-    return { guardado: true, campos: Object.keys(cambios) };
+    await ref(contexto).set(cambios, { merge: true });
+    return { guardado: true, campos: Object.keys(cambios), documento: documentoDeMesa(contexto) };
   }
 
   /** Lo que hay guardado, para que el panel muestre lo que ya está puesto. */
-  async function leer(context) {
+  async function leer(context, { contexto } = {}) {
     await administradores.exigir(context);
-    const snap = await ref().get();
-    return { diseno: snap.exists ? snap.data() : {} };
+
+    /*
+     * El panel necesita saber si lo que muestra es PROPIO de ese contexto o
+     * HEREDADO del global, porque no es lo mismo editar lo tuyo que editar
+     * una copia de otra cosa: guardar sobre lo heredado crea el documento
+     * del contexto y lo desengancha de la general para siempre.
+     */
+    const propio = await ref(contexto).get();
+    if (propio.exists) return { diseno: propio.data(), heredado: false };
+
+    const global = await ref(undefined).get();
+    return { diseno: global.exists ? global.data() : {}, heredado: global.exists };
   }
 
   return { guardar, leer };

@@ -46,19 +46,28 @@ const SESION_FALSA = `
 `;
 
 /**
- * El doble de firebase, con el documento de configuración bajo control.
+ * El doble de firebase, con los documentos de configuración bajo control.
  *
- * `getDoc` tiene que distinguir QUÉ le están pidiendo: la sala o la
- * configuración. `doc(...)` devuelve sus argumentos tal cual —`(db, "config",
- * "mesa")`— así que alcanza con mirar si entre ellos está «config».
+ * `getDoc` tiene que distinguir QUÉ le están pidiendo, y desde que hay una
+ * mesa por contexto no alcanza con «es configuración»: hay que saber CUÁL de
+ * los cinco documentos —los cuatro contextos y el global—, porque la mesa
+ * pide el suyo y recién si no está pide el general. Un doble que contestara
+ * lo mismo a todos haría pasar a una mesa que leyera siempre el global.
+ *
+ * `doc(...)` devuelve sus argumentos tal cual, así que la colección y el
+ * nombre están en posiciones fijas: `(db, "config", "mesa-publica")`.
+ *
+ * Se anota en `window.__configPedidas` qué pidió y en qué orden. Es la única
+ * forma de afirmar «pidió el del contexto PRIMERO»: por lo que se ve pintado
+ * no se distingue de haber pedido sólo el global cuando los dos dicen igual.
  */
-const firebaseFalso = (config) => `
+const firebaseFalso = (documentos) => `
   const SALA = {
     codigo: "ABCDEF", estado: "jugando", entrada: 50,
     jugadores: ["ana", "beto", "caro", "dani"],
     jugadoresNombres: ["Ana", "Beto", "Caro", "Dani"], maxJugadores: 4,
   };
-  const CONFIG = ${JSON.stringify(config)};
+  const DOCUMENTOS = ${JSON.stringify(documentos)};
   export const db = {};
   export const doc = (...a) => a;
   export const collection = (...a) => a;
@@ -68,9 +77,12 @@ const firebaseFalso = (config) => `
   export const limit = () => ({});
   export const getDocs = async () => ({ docs: [] });
   export async function getDoc(ref) {
-    const esConfig = JSON.stringify(ref ?? "").includes("config");
+    const esConfig = Array.isArray(ref) && ref[1] === "config";
     if (!esConfig) return { exists: () => true, data: () => SALA };
-    return { exists: () => CONFIG !== null, data: () => CONFIG };
+    const nombre = ref[2];
+    (window.__configPedidas ??= []).push(nombre);
+    const guardado = DOCUMENTOS[nombre];
+    return { exists: () => guardado != null, data: () => guardado };
   }
   export const setDoc = async () => {};
   export const updateDoc = async () => {};
@@ -98,18 +110,36 @@ const firebaseFalso = (config) => `
   export function precalentarFunciones() {}
 `;
 
-/** La mesa de ENTRENAMIENTO: no hace falta sala ni red para esto. */
-async function abrirMesa(page, config = null) {
+/**
+ * La mesa, con los documentos de configuración que se le indiquen.
+ *
+ * `documentos` va con los nombres de verdad: `mesa` es el global y
+ * `mesa-entrenamiento`, `mesa-publica`, … los de cada contexto. Escribirlos
+ * tal cual —en vez de pasar «el contexto» y armarlos acá— es a propósito: si
+ * la prueba armara el nombre con la misma función que el código, las dos se
+ * equivocarían juntas y nadie lo notaría.
+ */
+async function abrirMesaCon(page, documentos, { sala = "" } = {}) {
   const errores = [];
   page.on("pageerror", (e) => errores.push(String(e)));
 
   await page.route("**/js/sesion.js", (r) => r.fulfill(js(SESION_FALSA)));
-  await page.route("**/js/firebase.js", (r) => r.fulfill(js(firebaseFalso(config))));
+  await page.route("**/js/firebase.js", (r) => r.fulfill(js(firebaseFalso(documentos))));
 
-  await page.goto("/mesa.html");
+  await page.goto(sala ? `/mesa.html?sala=${sala}` : "/mesa.html");
   await page.waitForSelector(".mesa");
   return errores;
 }
+
+/**
+ * La mesa de ENTRENAMIENTO con la configuración GLOBAL puesta, y nada más.
+ *
+ * Es el caso de producción: el único documento que existe es `config/mesa`,
+ * el que escribía el panel antes de que hubiera contextos. Así que estas
+ * pruebas pasan por el camino del fallback, que es el que hoy usan todos.
+ */
+const abrirMesa = (page, config = null) =>
+  abrirMesaCon(page, config === null ? {} : { mesa: config });
 
 /** Lo que el navegador está pintando de verdad, no lo que dice la variable. */
 const mascaraDeLaBrujula = (page) =>
@@ -236,9 +266,9 @@ test("si la lectura falla, la mesa sigue entera", async ({ page }) => {
 
   await page.route("**/js/sesion.js", (r) => r.fulfill(js(SESION_FALSA)));
   await page.route("**/js/firebase.js", (r) =>
-    r.fulfill(js(firebaseFalso(null).replace(
-      "const esConfig = JSON.stringify(ref ?? \"\").includes(\"config\");",
-      "const esConfig = JSON.stringify(ref ?? \"\").includes(\"config\");\n    if (esConfig) throw new Error('permission-denied');",
+    r.fulfill(js(firebaseFalso({}).replace(
+      "const nombre = ref[2];",
+      "throw new Error('permission-denied');",
     ))));
 
   await page.goto("/mesa.html");
@@ -247,4 +277,76 @@ test("si la lectura falla, la mesa sigue entera", async ({ page }) => {
   await expect.poll(() => mascaraDeLaBrujula(page)).toContain("rosa-viento.svg");
   await expect(page.locator(".mesa")).toBeVisible();
   expect(errores, "una lectura fallida no puede tirar la mesa").toEqual([]);
+});
+
+// =====================================================================
+// 4. Cada mesa lee la suya
+// =====================================================================
+
+/** Qué documentos de configuración pidió la mesa, en orden. */
+const pedidas = (page) => page.evaluate(() => window.__configPedidas ?? []);
+
+test("la mesa de entrenamiento lee el documento de entrenamiento", async ({ page }) => {
+  await abrirMesaCon(page, {
+    "mesa-entrenamiento": { brujula: "/img/mesa/rosa-viento.svg?propia=1" },
+  });
+
+  await expect.poll(() => mascaraDeLaBrujula(page)).toContain("propia=1");
+
+  // Y con el suyo puesto, NO va a buscar el global: un viaje de menos.
+  expect(await pedidas(page)).toEqual(["mesa-entrenamiento"]);
+});
+
+test("si el contexto no tiene el suyo, hereda el global", async ({ page }) => {
+  /*
+   * El caso de producción de hoy: existe `config/mesa` y ninguno de los
+   * cuatro. Sin este fallback, la mesa que los jugadores ya tienen puesta se
+   * apagaría de golpe el día que esto se despliegue.
+   */
+  await abrirMesaCon(page, { mesa: { brujula: "/img/mesa/rosa-viento.svg?global=1" } });
+
+  await expect.poll(() => mascaraDeLaBrujula(page)).toContain("global=1");
+  expect(await pedidas(page), "primero el suyo, después el general")
+    .toEqual(["mesa-entrenamiento", "mesa"]);
+});
+
+test("el documento del contexto le gana al global", async ({ page }) => {
+  /*
+   * LA AFIRMACIÓN QUE SOSTIENE TODA LA FASE.
+   *
+   * Con los dos documentos puestos y diciendo cosas distintas, una mesa que
+   * leyera siempre el global se vería perfecta en todas las otras pruebas:
+   * ahí los dos dicen lo mismo, o hay uno solo. Acá no.
+   */
+  await abrirMesaCon(page, {
+    "mesa-entrenamiento": { brujula: "/img/mesa/rosa-viento.svg?propia=1" },
+    mesa: { brujula: "/img/mesa/rosa-viento.svg?global=1" },
+  });
+
+  await expect.poll(() => mascaraDeLaBrujula(page)).toContain("propia=1");
+  expect(await mascaraDeLaBrujula(page), "se quedó con el general").not.toContain("global=1");
+});
+
+test("sin ninguno de los dos, la mesa de siempre", async ({ page }) => {
+  const errores = await abrirMesaCon(page, {});
+
+  await expect.poll(() => pedidas(page)).toEqual(["mesa-entrenamiento", "mesa"]);
+  expect(await mascaraDeLaBrujula(page)).toContain("rosa-viento.svg");
+  expect(await capaDeLaSala(page)).toMatch(/^none,/);
+  expect(errores, errores.join(" | ")).toEqual([]);
+});
+
+test("una mesa con sala pide la pública, no la de entrenamiento", async ({ page }) => {
+  /*
+   * Es lo único que distingue los contextos ANTES de leer la sala: con
+   * `?sala=` hay partida en red, y por descarte es pública. Privada todavía
+   * cae acá adentro a propósito —hace falta `extra.privada`, que llega con
+   * el documento de la sala— y eso es otra fase.
+   */
+  await abrirMesaCon(page, { "mesa-publica": { sala: "#1a1a2e" } }, { sala: "ABCDEF" });
+
+  await expect.poll(() => pedidas(page)).toEqual(["mesa-publica"]);
+  await expect
+    .poll(() => capaDeLaSala(page))
+    .toMatch(/linear-gradient\(rgb\(26, 26, 46\), rgb\(26, 26, 46\)\)/);
 });

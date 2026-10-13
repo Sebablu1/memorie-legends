@@ -34,6 +34,7 @@ import { z } from "zod";
 import { esCodigoValido, LARGO_CODIGO } from "./reglas/salas.js";
 import { TAM_MANO } from "./reglas/baraja.js";
 import { TIPOS_VALIDOS } from "./reglas/catalogo.js";
+import { CONTEXTOS_VALIDOS } from "./reglas/salas.js";
 import { ACCIONES } from "./partida-red.js";
 import { MOTIVOS, LARGO_COMENTARIO } from "./reportes.js";
 
@@ -340,6 +341,22 @@ const RutaDeImagen = z
   .refine((v) => v.startsWith("/img/"), { message: "La ruta tiene que empezar con /img/." });
 
 export const EsquemaDisenoDeMesa = z.object({
+  /*
+   * Cuál de las cuatro mesas se está editando.
+   *
+   * OPCIONAL, y eso es compatibilidad: sin contexto se escribe el documento
+   * global, que es lo que el panel hacía antes de que existieran. Lo ya
+   * guardado sigue valiendo y no hay nada que migrar.
+   *
+   * La lista sale de `reglas/salas.js` y no se escribe acá: un contexto
+   * nuevo no puede exigir acordarse de dos lugares. Es la misma razón por la
+   * que `EsquemaTipo` usa `TIPOS_VALIDOS`.
+   *
+   * Y `nullish` y no `optional`: el SDK de Firebase manda `null` donde el
+   * navegador dejó `undefined`, así que un campo opcional que no acepte
+   * `null` rechaza llamadas legítimas. Lo exige `validacion.mjs` para todos.
+   */
+  contexto: z.enum(CONTEXTOS_VALIDOS).nullish(),
   // `ninguna` es la tercera opción de la brújula: ni la de siempre ni una
   // propia, sino que no haya. Para la sala no existe —apagarla y no tocarla
   // son lo mismo— y por eso sólo está de este lado.

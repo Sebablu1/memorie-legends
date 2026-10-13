@@ -29,6 +29,71 @@ export const MODOS = { ENTRENAMIENTO: "entrenamiento", LEYENDAS: "leyendas" };
 
 export const esEntrenamiento = (partida) => partida?.modo === MODOS.ENTRENAMIENTO;
 
+// ------------------------------------------- contextos de la mesa
+
+/**
+ * Las cuatro mesas que la casa puede decorar por separado.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * NO SON `MODOS`, Y POR ESO SON OTRA LISTA
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `MODOS` tiene dos valores y describe cómo funciona la PARTIDA: con el
+ * motor acá o en el servidor, con Leyendas o sin ellas. Tres de estos cuatro
+ * contextos son el mismo modo —`leyendas`— y se diferencian sólo en cómo se
+ * llegó a la mesa.
+ *
+ * Mezclarlos obligaría a que `esEntrenamiento` y `usaLeyendas` supieran de
+ * decoración, que no es asunto suyo.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * `TORNEO` NO SE USA TODAVÍA, Y ESTÁ IGUAL
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Porque todavía no existe la partida de torneo: `torneos.js` guarda
+ * inscripciones y un ranking, y las partidas que juega un inscripto son
+ * salas públicas o privadas comunes. El panel deja guardar su diseño y nadie
+ * lo lee.
+ *
+ * No hay nada que «encender» el día que exista: en cuanto algo calcule este
+ * contexto, la mesa lo va a leer sola.
+ */
+export const CONTEXTOS_DE_MESA = Object.freeze({
+  ENTRENAMIENTO: "entrenamiento",
+  PUBLICA: "publica",
+  PRIVADA: "privada",
+  TORNEO: "torneo",
+});
+
+export const CONTEXTOS_VALIDOS = Object.freeze(Object.values(CONTEXTOS_DE_MESA));
+
+/**
+ * El documento global, el que escribía el panel antes de que hubiera
+ * contextos.
+ *
+ * Sigue siendo el que se lee cuando un contexto no tiene el suyo. No se
+ * copia a los cuatro: copiarlo obligaría a mantener cuatro versiones de lo
+ * mismo, y cambiar la global no llegaría a ninguna.
+ */
+export const DOCUMENTO_GLOBAL_DE_MESA = "mesa";
+
+/**
+ * El documento de configuración de un contexto.
+ *
+ * Es una función y no una plantilla suelta para que el nombre se arme en UN
+ * solo lugar: lo necesitan la mesa que lee, el panel que escribe y el
+ * servidor que guarda, y tres plantillas iguales se separan en cuanto una
+ * cambie.
+ *
+ * Un contexto desconocido cae al global en vez de inventar un documento: de
+ * un nombre con una letra de más saldría una mesa sin decorar y sin que nada
+ * lo denuncie.
+ */
+export const documentoDeMesa = (contexto) =>
+  CONTEXTOS_VALIDOS.includes(contexto)
+    ? `${DOCUMENTO_GLOBAL_DE_MESA}-${contexto}`
+    : DOCUMENTO_GLOBAL_DE_MESA;
+
 /**
  * Una partida sólo mueve Leyendas si es del modo `leyendas` y tiene una
  * entrada válida. Cualquier otra cosa se trata como entrenamiento.
