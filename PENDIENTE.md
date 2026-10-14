@@ -532,48 +532,62 @@ conviene no confundirlo con un respaldo.
 
 - **Decisión:** queda así. Es el kit oficial de WhatsApp.
 
-### §73 — `mesa-vestida.spec.js:230`, una ventana de 550 ms — RESUELTO
+### §73 — La prueba del halo medía el reloj — RESUELTO
 
-El halo del asiento en turno. La prueba le saca a mano la clase `propio` al
-asiento propio y espera que la opacidad del `::before` llegue a 1.
+`mesa-vestida.spec.js`, «al que le toca se lo distingue por un halo». Le saca
+a mano la clase `propio` al asiento propio y afirma que el `::before` queda en
+opacidad 1.
 
 **Medido**, muestreando cada 100 ms después de sacar la clase:
 
 ```
-  +   0 ms  propio=false  en-turno=true  opacidad=0        mismo nodo=true
-  + 412 ms  propio=false  en-turno=true  opacidad=1        mismo nodo=true
-  + 960 ms  propio=true   en-turno=true  opacidad=0        mismo nodo=FALSE
+  +   0 ms  propio=false  en-turno=true  opacidad=0  mismo nodo=true
+  + 412 ms  propio=false  en-turno=true  opacidad=1  mismo nodo=true
+  + 960 ms  propio=true   en-turno=true  opacidad=0  mismo nodo=FALSE
 ```
 
-Dos cosas que la prueba no sabe:
+Dos cosas que la prueba no sabía:
 
 1. La transición de 0,35 s **corre igual** con `reducedMotion: "reduce"`
-   puesto en `playwright.config.js`. Tarda 412 ms en llegar a 1.
-2. A los ~960 ms el asiento **se reemplaza**: `mesa.js:1112` lo redibuja
-   desde una plantilla que incluye sus clases, así que `propio` vuelve y la
-   opacidad se queda en 0. No es que tarde: ya no va a pasar nunca.
+   puesto en `playwright.config.js`.
+2. A los ~960 ms el asiento **se reemplaza**: `mesa.js:1112` lo redibuja desde
+   una plantilla que incluye sus clases, así que `propio` vuelve y la opacidad
+   queda en 0. No es que tarde: ya no va a pasar nunca.
 
-O sea que la afirmación tiene **~550 ms** para acertar. `expect.poll` lee a los
-~0, 100, 350 y 850 ms: con la máquina descansada el tiro de los 850 cae dentro
-de la ventana y pasa; con carga esas lecturas se corren y pasan de largo, y los
-15 s de timeout son 15 s esperando algo que no vuelve. Eso explica los dos
-resultados: **5 de 5 en aislamiento** y rojo en la suite completa.
+**Hicieron falta tres intentos, y los dos primeros erraron igual.**
 
-**Cómo se arregló:** no esperando a ver el pico, sino PROVOCÁNDOLO y quedándose
-con el máximo. Un solo `page.evaluate` saca la clase, muestrea con `rAF` hasta
-~600 ms y devuelve la opacidad más alta vista. El pico se captura antes de que
-el redibujo llegue, y si llegara primero se corta por `isConnected` y vuelve el
-máximo parcial: la prueba falla fuerte en vez de leerle la opacidad a un nodo
-desprendido, que contesta cualquier cosa. Sigue afirmando lo mismo —que un
-asiento en turno que no es el mío se enciende— y ya no depende del reloj.
+El original esperaba con `expect.poll` a ver opacidad 1. Tenía ~550 ms de
+ventana —entre los 412 y los 960— y `expect.poll` lee a los ~0, 100, 350 y
+850 ms: descansada acertaba en el tiro de los 850, con carga pasaba de largo y
+los 15 s de timeout eran 15 s esperando algo que no vuelve. **5 de 5 sola,
+roja en la suite completa.**
 
-**Lo que NO se hizo:** aflojar el `toBe(1)` a `> 0.5`. Ensanchaba la ventana a
-~800 ms y la dejaba igual de colgada del redibujo. Era comprar tiempo.
+El segundo muestreaba con `rAF` adentro de un `page.evaluate` para cazar el
+pico antes del redibujo. Mejoró el diagnóstico —fallo en 18 s con un número en
+vez de 31 s de timeout— y no el fondo: en la suite completa se cortó con la
+opacidad en **0,978042**. La transición se acerca a 1 asintóticamente, así que
+los «412 ms» no eran el costo de la animación sino cuánto había tardado esa
+vez. Seguía siendo una prueba con reloj. **5 de 5 sola, roja en la suite.**
 
-**Lo que queda escrito acá y no en el código:** que una prueba que le muta el
-DOM a la mesa tiene fecha de vencimiento, porque la mesa redibuja sus asientos
-desde una plantilla con las clases adentro. Si aparece otra prueba que saque o
-ponga una clase a mano y después espere, es el mismo pozo.
+**Lo que lo cerró:** apagar la transición para medir. Se inyecta
+`.jugador::before { transition: none !important }`, se saca la clase y se lee
+la opacidad **en el mismo bloque sincrónico** — leer el estilo computado fuerza
+el recálculo, así que ese valor ya es el final. Sin un solo `await` en el
+medio, el redibujo no tiene por dónde entrar y la carga de la máquina deja de
+importar.
+
+El `toBe(1)` quedó intacto. Lo que se dejó de medir es la animación, no la
+regla.
+
+**La lección, que es más grande que esta prueba:**
+
+- Una prueba que mide una ANIMACIÓN mide el reloj. Si lo que se afirma es una
+  regla de CSS, hay que apagar la transición y leer el valor final.
+- Una prueba que le MUTA el DOM a la mesa tiene fecha de vencimiento: la mesa
+  redibuja sus asientos desde una plantilla con las clases adentro. Si aparece
+  otra que saque o ponga una clase a mano y después espere, es el mismo pozo.
+- Y «5 de 5 en aislamiento» no prueba que un flake esté arreglado. Las tres
+  versiones daban 5 de 5 solas. Las dos primeras eran rojas en la suite.
 
 ### §72 — El harness de mesa sale a la Firestore de producción
 
