@@ -270,53 +270,58 @@ test("al que le toca se lo distingue por un halo, no por un contorno", async ({
    */
   const asiento = page.locator('.jugador[data-jugador="0"]');
   /**
-   * Se PROVOCA el pico y se mira el máximo, en un solo viaje al navegador.
+   * La transición se APAGA para medir, y se lee en el mismo bloque.
    *
    * ─────────────────────────────────────────────────────────────────────
-   * ESTO ERA UN `expect.poll` Y TENÍA UNA VENTANA DE 550 ms
+   * DOS INTENTOS ANTERIORES, Y POR QUÉ LOS DOS MEDÍAN EL RELOJ
    * ─────────────────────────────────────────────────────────────────────
    *
-   * Sacaba la clase desde acá y después esperaba, desde afuera, a ver la
-   * opacidad en 1. Medido, muestreando cada 100 ms:
+   * Lo que esta prueba afirma es una REGLA: un asiento en turno que no es el
+   * mío se enciende. Las dos versiones anteriores medían, en cambio, cuánto
+   * tardaba la animación en llegar — y eso depende de la máquina.
    *
-   *     +   0 ms  propio=false  opacidad=0      mismo nodo=true
-   *     + 412 ms  propio=false  opacidad=1      mismo nodo=true
-   *     + 960 ms  propio=true   opacidad=0      mismo nodo=FALSE
+   * El primero sacaba la clase y esperaba con `expect.poll` a ver opacidad 1.
+   * Medido, muestreando cada 100 ms:
    *
-   * Dos cosas que no sabía. Una: la transición de 0,35 s corre igual con
-   * `reducedMotion: "reduce"` puesto en la config, y tarda 412 ms en llegar.
-   * Dos: a los ~960 ms el asiento SE REEMPLAZA —`mesa.js` lo redibuja desde
-   * una plantilla que incluye sus clases—, así que `propio` vuelve y la
-   * opacidad se queda en 0. No es que tarde: ya no va a pasar nunca.
+   *     +   0 ms  propio=false  opacidad=0  mismo nodo=true
+   *     + 412 ms  propio=false  opacidad=1  mismo nodo=true
+   *     + 960 ms  propio=true   opacidad=0  mismo nodo=FALSE
    *
-   * Así que la afirmación tenía ~550 ms para acertar, y `expect.poll` lee a
-   * los ~0, 100, 350 y 850 ms: con la máquina descansada el tiro de los 850
-   * caía adentro, con carga se corría y los 15 s de timeout eran 15 s
-   * esperando algo que no vuelve. Pasaba 5 de 5 sola y fallaba en la suite.
+   * A los ~960 ms el asiento SE REEMPLAZA —`mesa.js` lo redibuja desde una
+   * plantilla que incluye sus clases—, así que `propio` vuelve y la opacidad
+   * se queda en 0 para siempre. La afirmación tenía ~550 ms para acertar y
+   * `expect.poll` lee a los ~0, 100, 350 y 850 ms: descansada acertaba, con
+   * carga pasaba de largo y los 15 s de timeout eran 15 s esperando algo que
+   * no vuelve.
    *
-   * Muestreando acá adentro con `rAF`, el pico se captura antes de que el
-   * redibujo llegue. Y si llegara primero, se corta por `isConnected` y
-   * vuelve el máximo parcial: la prueba falla fuerte en vez de leerle la
-   * opacidad a un nodo desprendido, que contesta cualquier cosa.
+   * El segundo muestreaba con `rAF` acá adentro para cazar el pico antes del
+   * redibujo. Mejoró el diagnóstico y no el fondo: en la suite completa se
+   * cortó con la opacidad en **0,978042**. La transición de 0,35 s se acerca
+   * a 1 asintóticamente, así que «412 ms» no era el costo de la animación
+   * sino cuánto había tardado esa vez. Seguía siendo una prueba con reloj.
    *
-   * Aflojar el `toBe(1)` a `> 0.5` ensancharía la ventana a ~800 ms y la
-   * dejaría igual de colgada del redibujo. Es comprar tiempo, no arreglar.
+   * Sin transición no hay nada en el medio: se saca la clase y se lee, y
+   * leer el estilo computado fuerza el recálculo, así que ese valor YA es el
+   * final. Al no haber un solo `await`, el redibujo no tiene por dónde
+   * entrar y la carga de la máquina deja de importar.
+   *
+   * El `toBe(1)` queda, y queda exacto: lo que se dejó de medir es la
+   * animación, no la regla. Que el halo entre con una transición y no de
+   * golpe no es una promesa que esta prueba estuviera cuidando.
    */
-  const picoDelHalo = await asiento.evaluate(async (el) => {
-    el.classList.remove("propio");
-
-    let pico = 0;
-    const limite = performance.now() + 600;
-    while (performance.now() < limite) {
-      if (!el.isConnected) break; // lo redibujaron: lo que siga no es este asiento
-      pico = Math.max(pico, Number(getComputedStyle(el, "::before").opacity));
-      if (pico === 1) break;
-      await new Promise(requestAnimationFrame);
+  const encendido = await asiento.evaluate((el) => {
+    const sinTransicion = document.createElement("style");
+    sinTransicion.textContent = ".jugador::before { transition: none !important; }";
+    document.head.append(sinTransicion);
+    try {
+      el.classList.remove("propio");
+      return Number(getComputedStyle(el, "::before").opacity);
+    } finally {
+      sinTransicion.remove();
     }
-    return pico;
   });
 
-  expect(picoDelHalo, "un asiento en turno que no es el mío no se enciende").toBe(1);
+  expect(encendido, "un asiento en turno que no es el mío no se enciende").toBe(1);
 
   await asiento.evaluate((el) => el.classList.add("propio"));
 
