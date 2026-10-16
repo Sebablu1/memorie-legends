@@ -2,6 +2,14 @@
   "projects": {
     "default": "memorie-legends"
   },
-  "targets": {},
+  "targets": {
+    "memorie-legends": {
+      "hosting": {
+        "game": [
+          "memorie-legends-juego"
+        ]
+      }
+    }
+  },
   "etags": {}
 }

@@ -1,66 +1,97 @@
-{
-  "hosting": {
-    "public": "public",
-    "// ignore": "Los PNG de avatares e insignias son los ORIGINALES, antes de recortarles el fondo. Quedan en el repositorio como punto de partida por si algun dia hace falta otra calidad u otro tamano, pero nadie los pide: el catalogo apunta siempre al .webp. Son 3,8 MB que no tiene sentido subir. Ojo: vale SOLO para esas dos carpetas. Los dorsos de img/dorsos se servian en PNG y desde el 30 de septiembre de 2026 son WebP, asi que ya no hay ningun PNG que excluir ahi: si algun dia vuelve a haber uno, sera porque alguien lo puso, y se sube. Y los .bak: `*.bak*` esta en .gitignore, que es OTRA lista — hosting tiene la suya y no mira esa. Las cuatro copias de mesa.js y la de mesa.css se estaban sirviendo en memorielegends.com despues del despliegue del 10 de octubre de 2026: 200 OK y 1,1 MB de codigo viejo publico. Hosting publica una version COMPLETA en cada despliegue, asi que con ignorarlas alcanza: el proximo despliegue las saca y no hay que borrar nada a mano.",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**",
-      "**/*.bak*",
-      "img/avatar/*.png",
-      "img/insignias/*.png"
-    ],
-    "// rewrites": "El link corto de una sala privada: memorielegends.com/s/ABCD1234. Lo sirve s.html, que guarda el codigo y manda al lobby. NO apunta a lobby.html: el lobby tiene catorce rutas relativas -css/, img/, js/- y servido bajo /s/ todas resolverian a /s/css/... y la pagina saldria rota. Es el mismo motivo por el que 404.html quedo con rutas absolutas.",
-    "rewrites": [
-      { "source": "/s/**", "destination": "/s.html" }
-    ],
-    "headers": [
-      {
-        "//": "El HTML NUNCA se cachea. Es el que nombra a todo lo demás: si se guarda, un despliegue no llega hasta que venza, y quien tenga la copia vieja pide archivos que ya no existen.",
-        "source": "**/*.html",
-        "headers": [
-          { "key": "Cache-Control", "value": "no-cache, must-revalidate" }
-        ]
-      },
-      {
-        "//": "CSS y JS: revalidar, pero permitiendo usar la copia guardada mientras se comprueba. `stale-while-revalidate` es lo que saca el viaje de ida y vuelta del camino crítico — el navegador dibuja con lo que tiene y actualiza en segundo plano. Sin nombres con hash no se puede ir más lejos: un `max-age` largo serviría código viejo después de cada despliegue.",
-        "source": "**/*.@(js|css)",
-        "headers": [
-          { "key": "Cache-Control", "value": "no-cache, stale-while-revalidate=86400" }
-        ]
-      },
-      {
-        "//": "Un mes. Es seguro SOLO si una imagen que cambia cambia de dirección: de nombre (memorie-legends2.png -> .webp) o de versión (las cartas llevan ?v=VERSION_CARTAS, en reglas/baraja.js). Reemplazar un archivo con el mismo nombre deja la copia vieja en cada navegador que ya la tenía, hasta que venza: pasó con las cartas rediseñadas. Eran 7 días.",
-        "source": "**/*.@(png|jpg|jpeg|gif|webp|svg|ico|avif)",
-        "headers": [
-          { "key": "Cache-Control", "value": "public, max-age=2592000, stale-while-revalidate=604800" }
-        ]
-      },
-      {
-        "// avatar": "Un DÍA, no un mes, y sólo para los avatares. Son las únicas imágenes que se reemplazan manteniendo el nombre: el arte se rehace y el archivo sigue llamándose asesino.webp. Con el mes de abajo, el borde del CDN siguió entregando los viejos despues de desplegar los nuevos —el archivo estaba en el servidor, se veía pidiendolo con cualquier query— y la unica salida era esperar. La version al dibujar (avatarUrl, en modulos/imagenes.js) resuelve el caso de cada cambio; esto acota lo que puede durar un descuido. El precio es una revalidacion por avatar por dia: trece 304 de doscientos bytes.",
-        "source": "img/avatar/**",
-        "headers": [
-          { "key": "Cache-Control", "value": "public, max-age=86400, stale-while-revalidate=604800" }
-        ]
-      },
-      {
-        "//": "Las fuentes no cambian nunca: si hiciera falta otra, sería otro archivo.",
-        "source": "**/*.@(woff2|woff|ttf)",
-        "headers": [
-          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-        ]
-      }
-    ]
-  },
-  "functions": {
-    "source": "functions",
-    "runtime": "nodejs22",
-    "predeploy": [
-      "npm --prefix \"$RESOURCE_DIR\" run copiar-reglas"
-    ]
-  },
-  "firestore": {
-    "database": "southamerica",
-    "rules": "firestore.rules"
-  }
+﻿{
+    "hosting":  [
+                    {
+                        "public":  "public",
+                        "// ignore":  "Los PNG de avatares e insignias son los ORIGINALES, antes de recortarles el fondo. Quedan en el repositorio como punto de partida por si algun dia hace falta otra calidad u otro tamano, pero nadie los pide: el catalogo apunta siempre al .webp. Son 3,8 MB que no tiene sentido subir. Ojo: vale SOLO para esas dos carpetas. Los dorsos de img/dorsos se servian en PNG y desde el 30 de septiembre de 2026 son WebP, asi que ya no hay ningun PNG que excluir ahi: si algun dia vuelve a haber uno, sera porque alguien lo puso, y se sube. Y los .bak: `*.bak*` esta en .gitignore, que es OTRA lista — hosting tiene la suya y no mira esa. Las cuatro copias de mesa.js y la de mesa.css se estaban sirviendo en memorielegends.com despues del despliegue del 10 de octubre de 2026: 200 OK y 1,1 MB de codigo viejo publico. Hosting publica una version COMPLETA en cada despliegue, asi que con ignorarlas alcanza: el proximo despliegue las saca y no hay que borrar nada a mano.",
+                        "ignore":  [
+                                       "firebase.json",
+                                       "**/.*",
+                                       "**/node_modules/**",
+                                       "**/*.bak*",
+                                       "img/avatar/*.png",
+                                       "img/insignias/*.png"
+                                   ],
+                        "// rewrites":  "El link corto de una sala privada: memorielegends.com/s/ABCD1234. Lo sirve s.html, que guarda el codigo y manda al lobby. NO apunta a lobby.html: el lobby tiene catorce rutas relativas -css/, img/, js/- y servido bajo /s/ todas resolverian a /s/css/... y la pagina saldria rota. Es el mismo motivo por el que 404.html quedo con rutas absolutas.",
+                        "rewrites":  [
+                                         {
+                                             "source":  "/s/**",
+                                             "destination":  "/s.html"
+                                         }
+                                     ],
+                        "headers":  [
+                                        {
+                                            "//":  "Root: no cache",
+                                            "source":  "/",
+                                            "headers":  [
+                                                            {
+                                                                "key":  "Cache-Control",
+                                                                "value":  "no-cache, must-revalidate"
+                                                            }
+                                                        ]
+                                        },
+                                        {
+                                            "//":  "El HTML NUNCA se cachea. Es el que nombra a todo lo demás: si se guarda, un despliegue no llega hasta que venza, y quien tenga la copia vieja pide archivos que ya no existen.",
+                                            "source":  "**/*.html",
+                                            "headers":  [
+                                                            {
+                                                                "key":  "Cache-Control",
+                                                                "value":  "no-cache, must-revalidate"
+                                                            }
+                                                        ]
+                                        },
+                                        {
+                                            "//":  "CSS y JS: revalidar, pero permitiendo usar la copia guardada mientras se comprueba. `stale-while-revalidate` es lo que saca el viaje de ida y vuelta del camino crítico — el navegador dibuja con lo que tiene y actualiza en segundo plano. Sin nombres con hash no se puede ir más lejos: un `max-age` largo serviría código viejo después de cada despliegue.",
+                                            "source":  "**/*.@(js|css)",
+                                            "headers":  [
+                                                            {
+                                                                "key":  "Cache-Control",
+                                                                "value":  "no-cache, stale-while-revalidate=86400"
+                                                            }
+                                                        ]
+                                        },
+                                        {
+                                            "//":  "Un mes. Es seguro SOLO si una imagen que cambia cambia de dirección: de nombre (memorie-legends2.png -\u003e .webp) o de versión (las cartas llevan ?v=VERSION_CARTAS, en reglas/baraja.js). Reemplazar un archivo con el mismo nombre deja la copia vieja en cada navegador que ya la tenía, hasta que venza: pasó con las cartas rediseñadas. Eran 7 días.",
+                                            "source":  "**/*.@(png|jpg|jpeg|gif|webp|svg|ico|avif)",
+                                            "headers":  [
+                                                            {
+                                                                "key":  "Cache-Control",
+                                                                "value":  "public, max-age=2592000, stale-while-revalidate=604800"
+                                                            }
+                                                        ]
+                                        },
+                                        {
+                                            "// avatar":  "Un DÍA, no un mes, y sólo para los avatares. Son las únicas imágenes que se reemplazan manteniendo el nombre: el arte se rehace y el archivo sigue llamándose asesino.webp. Con el mes de abajo, el borde del CDN siguió entregando los viejos despues de desplegar los nuevos —el archivo estaba en el servidor, se veía pidiendolo con cualquier query— y la unica salida era esperar. La version al dibujar (avatarUrl, en modulos/imagenes.js) resuelve el caso de cada cambio; esto acota lo que puede durar un descuido. El precio es una revalidacion por avatar por dia: trece 304 de doscientos bytes.",
+                                            "source":  "img/avatar/**",
+                                            "headers":  [
+                                                            {
+                                                                "key":  "Cache-Control",
+                                                                "value":  "public, max-age=86400, stale-while-revalidate=604800"
+                                                            }
+                                                        ]
+                                        },
+                                        {
+                                            "//":  "Las fuentes no cambian nunca: si hiciera falta otra, sería otro archivo.",
+                                            "source":  "**/*.@(woff2|woff|ttf)",
+                                            "headers":  [
+                                                            {
+                                                                "key":  "Cache-Control",
+                                                                "value":  "public, max-age=31536000, immutable"
+                                                            }
+                                                        ]
+                                        }
+                                    ],
+                        "target":  "game"
+                    }
+                ],
+    "functions":  {
+                      "source":  "functions",
+                      "runtime":  "nodejs22",
+                      "predeploy":  [
+                                        "npm --prefix \"$RESOURCE_DIR\" run copiar-reglas"
+                                    ]
+                  },
+    "firestore":  {
+                      "database":  "southamerica",
+                      "rules":  "firestore.rules"
+                  }
 }
